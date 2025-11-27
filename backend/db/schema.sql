@@ -1,0 +1,41 @@
+CREATE DATABASE IF NOT EXISTS edu_payroll CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE edu_payroll;
+
+CREATE TABLE IF NOT EXISTS admins (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS employees (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  first_name VARCHAR(100) NOT NULL,
+  last_name VARCHAR(100) NOT NULL,
+  email VARCHAR(150) UNIQUE,
+  designation VARCHAR(100),
+  salary DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payroll_runs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  run_date DATE NOT NULL,
+  status ENUM('draft','queued','completed') DEFAULT 'draft',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payslips (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  employee_id BIGINT NOT NULL,
+  payroll_run_id BIGINT NOT NULL,
+  gross DECIMAL(12,2) NOT NULL,
+  deductions DECIMAL(12,2) NOT NULL,
+  net_pay DECIMAL(12,2) NOT NULL,
+  pdf_path VARCHAR(255),
+  status ENUM('pending','queued','done','error') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+  FOREIGN KEY (payroll_run_id) REFERENCES payroll_runs(id) ON DELETE CASCADE
+);

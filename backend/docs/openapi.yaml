@@ -1,0 +1,18 @@
+openapi: 3.0.0
+info:
+  title: Edu Payroll API (Flask)
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/login:
+    post:
+      summary: Login (returns JWT)
+  /api/employees:
+    get:
+      summary: List employees (paginated)
+    post:
+      summary: Create employee
+  /api/payrolls/run:
+    post:
+      summary: Run payroll (enqueues payslips)
