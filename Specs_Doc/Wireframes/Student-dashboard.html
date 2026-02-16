@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Student Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+
+    <style>
+        body {
+            font-family: Inter, system-ui, sans-serif;
+            background-color: #e5e7ec;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="flex">
+
+        <!-- ========================= SIDEBAR ========================= -->
+        <aside class="w-64 bg-white min-h-screen px-6 py-6 md:relative">
+
+            <nav class="space-y-2 text-sm">
+                <h2 class="text-purple-600 font-bold text-xl flex items-center gap-2 mb-8">
+                    <i class="bi bi-mortarboard"></i>
+                    <span class="app-name"></span>
+                </h2>
+
+                <a data-target="dashboard"
+                    class="menu active flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-100 text-purple-600 font-semibold cursor-pointer">
+                    <i class="bi bi-grid-fill"></i> Dashboard
+                </a>
+
+                <a data-target="attendance"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-calendar-check"></i> Attendance
+                </a>
+
+                <a data-target="subjects"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-book"></i> Subjects
+                </a>
+
+                <a data-target="assignments"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-journal-text"></i> Assignments
+                </a>
+
+                <a data-target="exams"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-award"></i> Exams & Results
+                </a>
+
+                <a data-target="timetable"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-clock"></i> Timetable
+                </a>
+
+                <a data-target="profile"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-person"></i> Profile
+                </a>
+            </nav>
+        </aside>
+
+        <!-- ========================= MAIN CONTENT ========================= -->
+        <main class="flex-1 p-4 md:p-8">
+
+            <!-- TOP BAR -->
+            <div class="flex justify-between items-center mb-6 relative">
+
+                <!-- LEFT: DESKTOP SEARCH -->
+                <div class="hidden md:block w-1/2">
+                    <input
+                        class="w-full px-5 py-3 rounded-full bg-white shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Search anything here">
+                </div>
+
+                <!-- Right Icons -->
+                <div class="flex items-center gap-6">
+
+                    <!-- SIDEBAR BUTTON (MOBILE) -->
+                    <button id="mobileSidebarBtn"
+                        class="md:hidden bg-white shadow-sm p-2.5 rounded-full flex items-center justify-center">
+                        <i class="bi bi-list text-lg"></i>
+                    </button>
+
+                    <!-- SEARCH ICON (MOBILE) -->
+                    <button id="searchIcon"
+                        class="md:hidden bg-white shadow-sm p-2.5 rounded-full flex items-center justify-center">
+                        <i class="bi bi-search text-lg"></i>
+                    </button>
+
+                    <!-- NOTIFICATION (OPTIONAL: YOU CAN KEEP IT HERE) -->
+                    <div class="relative cursor-pointer">
+                        <i class="bi bi-bell text-xl"></i>
+                        <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+                    </div>
+
+                    <!-- PROFILE -->
+                    <div class="relative">
+                        <button id="profileBtn" class="flex items-center gap-2 focus:outline-none">
+                            <img src="https://i.pravatar.cc/100" class="rounded-full w-9 h-9">
+                            <span class="font-medium hidden sm:inline">Aditya</span>
+                            <i class="bi bi-chevron-down text-sm"></i>
+                        </button>
+
+                        <!-- Dropdown -->
+                        <div id="profileMenu"
+                            class="hidden absolute right-0 mt-3 w-52 bg-white rounded-xl shadow-lg border z-50">
+
+                            <div class="px-4 py-3 border-b">
+                                <p class="font-semibold text-gray-800">Aditya</p>
+                                <p class="text-sm text-gray-500">Student</p>
+                            </div>
+
+                            <ul class="py-2 text-sm">
+                                <li>
+                                    <a href="javascript:void(0)" id="myProfileLink"
+                                        class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                                        <i class="bi bi-person"></i> My Profile
+                                    </a>
+
+                                </li>
+                                <li>
+                                    <a href="#" class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                                        <i class="bi bi-gear"></i> Account Settings
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#" class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                                        <i class="bi bi-shield-lock"></i> Change Password
+                                    </a>
+                                </li>
+                            </ul>
+
+                            <div class="border-t">
+                                <a href="index.html"
+                                    class="flex items-center gap-2 px-4 py-3 text-red-600 hover:bg-red-50">
+                                    <i class="bi bi-box-arrow-right"></i> Logout
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div id="mobileSearch" class="hidden md:hidden mb-4">
+                <input
+                    class="w-full px-5 py-3 rounded-full bg-white shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Search anything here">
+            </div>
+
+            <!-- ========================= DASHBOARD SECTION ========================= -->
+            <section id="dashboard" class="section p-6 space-y-6 active">
+
+                <h2 class="text-xl font-semibold">Welcome back, Luke 👋</h2>
+                <p class="text-gray-500 mb-6">Here’s your academic overview.</p>
+
+                <!-- STATS CARDS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+
+                    <div class="bg-green-50 p-6 rounded-2xl">
+                        <p class="text-sm text-gray-500">Attendance</p>
+                        <h3 class="text-2xl font-bold">92%</h3>
+                    </div>
+
+                    <div class="bg-blue-50 p-6 rounded-2xl">
+                        <p class="text-sm text-gray-500">Subjects</p>
+                        <h3 class="text-2xl font-bold">6</h3>
+                    </div>
+
+                    <div class="bg-yellow-50 p-6 rounded-2xl">
+                        <p class="text-sm text-gray-500">Pending Assignments</p>
+                        <h3 class="text-2xl font-bold">3</h3>
+                    </div>
+
+                    <div class="bg-purple-50 p-6 rounded-2xl">
+                        <p class="text-sm text-gray-500">Average Score</p>
+                        <h3 class="text-2xl font-bold">78%</h3>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                    <!-- LEFT SIDE -->
+                    <div class="lg:col-span-7 space-y-6">
+
+                        <div class="bg-white p-6 rounded-2xl">
+                            <h3 class="font-semibold mb-4">Upcoming Assignments</h3>
+                            <ul class="text-sm space-y-3">
+                                <li>📘 Math – Algebra Worksheet <span class="text-red-500">(Due Tomorrow)</span></li>
+                                <li>📗 English – Essay Writing <span class="text-yellow-500">(2 days left)</span></li>
+                                <li>🔬 Science – Lab Report <span class="text-green-500">(Submitted)</span></li>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-2xl">
+                            <h3 class="font-semibold mb-4">Upcoming Exams</h3>
+                            <p class="text-sm">📐 Mathematics – 12 Oct 2023</p>
+                            <p class="text-sm">📘 English – 15 Oct 2023</p>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-2xl">
+                            <h3 class="font-semibold mb-3">Notices</h3>
+                            <p class="text-sm">📢 Unit Test from next Monday</p>
+                            <p class="text-sm">🎉 Annual Day Registration Open</p>
+                        </div>
+
+                        <!-- Upcoming Events -->
+                        <div class="bg-white p-5 sm:p-6 rounded-2xl">
+                            <h3 class="font-semibold mb-4">Upcoming Events</h3>
+
+                            <div class="space-y-3 text-sm">
+                                
+                                <div class="p-4 border rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium">Annual Sports Day</p>
+                                        <p class="text-gray-500 text-xs">22 Oct • 8:30 AM</p>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs bg-green-100 text-green-600 rounded-lg">
+                                        Activity
+                                    </span>
+                                </div>
+
+                                <div class="p-4 border rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium">Diwali Holidays</p>
+                                        <p class="text-gray-500 text-xs">20 Oct</p>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded-lg">
+                                        Holiday
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- RIGHT SIDE -->
+                    <div class="lg:col-span-5 space-y-6">
+
+                        <div class="bg-white p-6 rounded-2xl text-center">
+                            <h3 class="font-semibold mb-2">Attendance Overview</h3>
+                            <div class="relative w-full h-40">
+                                <canvas id="attendanceChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-2xl">
+                            <h3 class="font-semibold mb-3">Subjects</h3>
+                            <ul class="text-sm space-y-2">
+                                <li>📘 Mathematics</li>
+                                <li>📗 English</li>
+                                <li>🔬 Science</li>
+                                <li>🌍 Social Studies</li>
+                                <li>💻 Computer</li>
+                            </ul>
+                        </div>
+
+                        <!-- Issued Books -->
+                        <div class="bg-white p-5 sm:p-6 rounded-2xl">
+                            <h3 class="font-semibold mb-4">Issued Library Books</h3>
+
+                            <div class="space-y-3 text-sm">
+                                <div class="p-4 border rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium">📘 Physics – Fundamentals</p>
+                                        <p class="text-gray-500 text-xs">Issued on 01 Oct 2023</p>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-lg">
+                                        Due in 3 days
+                                    </span>
+                                </div>
+
+                                <div class="p-4 border rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium">📕 History – Modern India</p>
+                                        <p class="text-gray-500 text-xs">Issued on 28 Sep 2023</p>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded-lg">
+                                        Overdue
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= ATTENDANCE SECTION ================= -->
+            <section id="attendance" class="section p-4 sm:p-6 space-y-6">
+
+                <!-- Attendance Summary -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                    <div class="bg-green-50 p-5 rounded-2xl">
+                        <p class="text-sm text-gray-500">Overall Attendance</p>
+                        <h3 class="text-xl sm:text-2xl font-bold">92%</h3>
+                    </div>
+                    <div class="bg-blue-50 p-5 rounded-2xl">
+                        <p class="text-sm text-gray-500">Present Days</p>
+                        <h3 class="text-xl sm:text-2xl font-bold">138</h3>
+                    </div>
+                    <div class="bg-red-50 p-5 rounded-2xl">
+                        <p class="text-sm text-gray-500">Absent Days</p>
+                        <h3 class="text-xl sm:text-2xl font-bold">12</h3>
+                    </div>
+                    <div class="bg-yellow-50 p-5 rounded-2xl">
+                        <p class="text-sm text-gray-500">Late Entries</p>
+                        <h3 class="text-xl sm:text-2xl font-bold">5</h3>
+                    </div>
+                </div>
+
+                <!-- Chart + Monthly Stats -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                    <!-- Attendance Chart -->
+                    <div class="lg:col-span-5 bg-white rounded-2xl p-5 sm:p-6 text-center">
+                        <h3 class="font-semibold mb-3">Attendance Overview</h3>
+                        <div class="relative w-full h-48">
+                            <canvas id="attendanceDonut"></canvas>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-3">Current Academic Year</p>
+                    </div>
+
+                    <!-- Monthly Breakdown -->
+                    <div class="lg:col-span-7 bg-white rounded-2xl p-5 sm:p-6">
+                        <h3 class="font-semibold mb-4">Monthly Attendance (Demo)</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                            <div class="p-4 rounded-xl bg-gray-50">
+                                <p class="text-gray-500">January</p>
+                                <p class="font-semibold">94%</p>
+                            </div>
+                            <div class="p-4 rounded-xl bg-gray-50">
+                                <p class="text-gray-500">February</p>
+                                <p class="font-semibold">91%</p>
+                            </div>
+                            <div class="p-4 rounded-xl bg-gray-50">
+                                <p class="text-gray-500">March</p>
+                                <p class="font-semibold">89%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Attendance Records -->
+                <div class="bg-white rounded-2xl p-5 sm:p-6 overflow-x-auto">
+                    <h3 class="font-semibold mb-4">Recent Attendance</h3>
+                    <table class="w-full text-sm">
+                        <thead class="text-gray-500 border-b">
+                            <tr>
+                                <th class="py-2 text-left">Date</th>
+                                <th class="py-2 text-left">Day</th>
+                                <th class="py-2 text-left">Status</th>
+                                <th class="py-2 text-left">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b">
+                                <td class="py-2">12 Oct 2023</td>
+                                <td>Thursday</td>
+                                <td class="text-green-600 font-medium">Present</td>
+                                <td>-</td>
+                            </tr>
+                            <tr class="border-b">
+                                <td class="py-2">11 Oct 2023</td>
+                                <td>Wednesday</td>
+                                <td class="text-red-500 font-medium">Absent</td>
+                                <td>Medical Leave</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2">10 Oct 2023</td>
+                                <td>Tuesday</td>
+                                <td class="text-yellow-500 font-medium">Late</td>
+                                <td>Bus Delay</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Extra Features -->
+                <div
+                    class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-semibold">Download Attendance Report</h3>
+                        <p class="text-sm text-gray-500">PDF for parent & student reference</p>
+                    </div>
+                    <button class="bg-purple-600 text-white px-5 py-2 rounded-xl text-sm hover:bg-purple-700">
+                        Download PDF
+                    </button>
+                </div>
+
+            </section>
+
+            <!-- ================= SUBJECTS SECTION ================= -->
+            <section id="subjects" class="section p-4 sm:p-6 space-y-6">
+
+                <!-- Subjects Overview -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                    <div class="bg-purple-50 p-5 rounded-2xl">
+                        <p class="text-sm text-gray-500">Total Subjects</p>
+                        <h3 class="text-xl sm:text-2xl font-bold">6</h3>
+                    </div>
+                    <div class="bg-green-50 p-5 rounded-2xl">
+                        <p class="text-sm text-gray-500">Completed Topics</p>
+                        <h3 class="text-xl sm:text-2xl font-bold">42</h3>
+                    </div>
+                    <div class="bg-yellow-50 p-5 rounded-2xl">
+                        <p class="text-sm text-gray-500">Pending Topics</p>
+                        <h3 class="text-xl sm:text-2xl font-bold">8</h3>
+                    </div>
+                    <div class="bg-blue-50 p-5 rounded-2xl">
+                        <p class="text-sm text-gray-500">Avg Performance</p>
+                        <h3 class="text-xl sm:text-2xl font-bold">78%</h3>
+                    </div>
+                </div>
+
+                <!-- Subject Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                    <!-- Mathematics -->
+                    <div class="bg-white rounded-2xl p-5 sm:p-6 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-semibold text-lg">📐 Mathematics</h3>
+                            <span class="text-sm text-gray-500">Mr. R Sharma</span>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">Syllabus Progress</p>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-purple-600 h-2 rounded-full" style="width: 85%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">85% completed</p>
+                        </div>
+
+                        <div class="text-sm">
+                            <p>📘 Chapters: 14</p>
+                            <p>📝 Assignments: 5</p>
+                            <p>🧪 Next Test: 18 Oct</p>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button class="flex-1 bg-purple-600 text-white py-2 rounded-xl text-sm">
+                                View Details
+                            </button>
+                            <button class="flex-1 border border-gray-300 py-2 rounded-xl text-sm">
+                                Resources
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- English -->
+                    <div class="bg-white rounded-2xl p-5 sm:p-6 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-semibold text-lg">📘 English</h3>
+                            <span class="text-sm text-gray-500">Ms. A Thomas</span>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">Syllabus Progress</p>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 72%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">72% completed</p>
+                        </div>
+
+                        <div class="text-sm">
+                            <p>📗 Chapters: 10</p>
+                            <p>📝 Assignments: 3</p>
+                            <p>🧪 Next Test: 20 Oct</p>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button class="flex-1 bg-purple-600 text-white py-2 rounded-xl text-sm">
+                                View Details
+                            </button>
+                            <button class="flex-1 border border-gray-300 py-2 rounded-xl text-sm">
+                                Resources
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Science -->
+                    <div class="bg-white rounded-2xl p-5 sm:p-6 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-semibold text-lg">🔬 Science</h3>
+                            <span class="text-sm text-gray-500">Dr. K Iyer</span>
+                        </div>
+
+                        <div>
+                            <p class="text-sm text-gray-500 mb-1">Syllabus Progress</p>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: 64%"></div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">64% completed</p>
+                        </div>
+
+                        <div class="text-sm">
+                            <p>🔬 Practicals: 6</p>
+                            <p>📝 Assignments: 4</p>
+                            <p>🧪 Next Test: 22 Oct</p>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button class="flex-1 bg-purple-600 text-white py-2 rounded-xl text-sm">
+                                View Details
+                            </button>
+                            <button class="flex-1 border border-gray-300 py-2 rounded-xl text-sm">
+                                Resources
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Extra Features -->
+                <div
+                    class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-semibold">Download Subject Syllabus</h3>
+                        <p class="text-sm text-gray-500">PDF syllabus for all subjects</p>
+                    </div>
+                    <button class="bg-purple-600 text-white px-5 py-2 rounded-xl text-sm hover:bg-purple-700">
+                        Download PDF
+                    </button>
+                </div>
+
+            </section>
+
+            <!-- ================= ASSIGNMENTS SECTION ================= -->
+            <section id="assignments" class="section p-4 sm:p-6 space-y-6">
+
+                <div
+                    class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                        <h3 class="font-semibold text-lg">Assignments</h3>
+                        <p class="text-sm text-gray-500">Track, submit & review your work</p>
+                    </div>
+                    <span class="px-4 py-2 rounded-full bg-yellow-100 text-yellow-600 text-sm">
+                        3 Pending
+                    </span>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 sm:p-6 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-gray-500 border-b">
+                            <tr>
+                                <th class="text-left py-2">Subject</th>
+                                <th class="text-left py-2">Title</th>
+                                <th class="text-left py-2">Due Date</th>
+                                <th class="text-left py-2">Status</th>
+                                <th class="text-left py-2">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b">
+                                <td>Math</td>
+                                <td>Algebra Worksheet</td>
+                                <td>14 Oct</td>
+                                <td class="text-red-500 font-medium">Pending</td>
+                                <td>
+                                    <button class="px-3 py-1 bg-purple-600 text-white rounded-lg text-xs">
+                                        Upload
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="border-b">
+                                <td>English</td>
+                                <td>Essay Writing</td>
+                                <td>16 Oct</td>
+                                <td class="text-yellow-500 font-medium">In Review</td>
+                                <td>
+                                    <button class="px-3 py-1 border rounded-lg text-xs">
+                                        View
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Science</td>
+                                <td>Lab Report</td>
+                                <td>10 Oct</td>
+                                <td class="text-green-600 font-medium">Submitted</td>
+                                <td>
+                                    <button class="px-3 py-1 border rounded-lg text-xs">
+                                        View
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <!-- ================= EXAMS & RESULTS SECTION ================= -->
+            <section id="exams" class="section p-4 sm:p-6 space-y-6">
+
+                <div class="bg-white rounded-2xl p-5 sm:p-6">
+                    <h3 class="font-semibold text-lg mb-1">Exams & Results</h3>
+                    <p class="text-sm text-gray-500">Your upcoming exams & performance</p>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 sm:p-6">
+                    <h4 class="font-semibold mb-4">Upcoming Exams</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li>📐 Mathematics — <strong>12 Oct</strong> (10:00 AM)</li>
+                        <li>📘 English — <strong>15 Oct</strong> (9:30 AM)</li>
+                        <li>🔬 Science — <strong>18 Oct</strong> (11:00 AM)</li>
+                    </ul>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 sm:p-6 overflow-x-auto">
+                    <h4 class="font-semibold mb-4">Recent Results</h4>
+                    <table class="w-full text-sm">
+                        <thead class="text-gray-500 border-b">
+                            <tr>
+                                <th class="text-left py-2">Subject</th>
+                                <th class="text-left py-2">Marks</th>
+                                <th class="text-left py-2">Grade</th>
+                                <th class="text-left py-2">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b">
+                                <td>Math</td>
+                                <td>88 / 100</td>
+                                <td class="text-green-600">A</td>
+                                <td>Very Good</td>
+                            </tr>
+                            <tr class="border-b">
+                                <td>English</td>
+                                <td>76 / 100</td>
+                                <td class="text-blue-600">B+</td>
+                                <td>Good</td>
+                            </tr>
+                            <tr>
+                                <td>Science</td>
+                                <td>82 / 100</td>
+                                <td class="text-green-600">A-</td>
+                                <td>Well Done</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <!-- ================= TIMETABLE SECTION ================= -->
+            <section id="timetable" class="section p-4 sm:p-6 space-y-6">
+
+                <div class="bg-white rounded-2xl p-5 sm:p-6">
+                    <h3 class="font-semibold text-lg">Weekly Timetable</h3>
+                    <p class="text-sm text-gray-500">Class 10 • Section A</p>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 sm:p-6 overflow-x-auto">
+                    <table class="w-full text-sm text-center border-collapse">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="p-2">Day</th>
+                                <th class="p-2">9–10</th>
+                                <th class="p-2">10–11</th>
+                                <th class="p-2">11–12</th>
+                                <th class="p-2">12–1</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b">
+                                <td class="font-medium">Monday</td>
+                                <td>Math</td>
+                                <td>English</td>
+                                <td>Science</td>
+                                <td>Computer</td>
+                            </tr>
+                            <tr class="border-b">
+                                <td class="font-medium">Tuesday</td>
+                                <td>Science</td>
+                                <td>Math</td>
+                                <td>English</td>
+                                <td>Library</td>
+                            </tr>
+                            <tr>
+                                <td class="font-medium">Wednesday</td>
+                                <td>Math</td>
+                                <td>Computer</td>
+                                <td>Science</td>
+                                <td>Sports</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <!-- ================= STUDENT PROFILE SECTION ================= -->
+            <section id="profile" class="section p-4 sm:p-6 space-y-6">
+
+                <div class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                    <img src="https://i.pravatar.cc/100" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full">
+                    <div class="text-center sm:text-left">
+                        <h3 class="font-semibold text-xl">Aditya</h3>
+                        <p class="text-sm text-gray-500">Class 10 • Section A • Roll No: 23</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <div class="bg-white rounded-2xl p-5 sm:p-6">
+                        <h4 class="font-semibold mb-3">Personal Details</h4>
+                        <p class="text-sm">📅 Date of Birth: 12 Aug 2008</p>
+                        <p class="text-sm">👤 Gender: Male</p>
+                        <p class="text-sm">📞 Phone: +91 98765 43210</p>
+                        <p class="text-sm">📧 Email: luke@student.schooli.com</p>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-5 sm:p-6">
+                        <h4 class="font-semibold mb-3">Parent Details</h4>
+                        <p class="text-sm">👨 Father: John R</p>
+                        <p class="text-sm">📞 Contact: +91 99887 66554</p>
+                        <p class="text-sm">🏠 Address: Chennai, India</p>
+                    </div>
+
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 sm:p-6 text-right">
+                    <button class="bg-purple-600 text-white px-5 py-2 rounded-xl text-sm">
+                        Edit Profile
+                    </button>
+                </div>
+
+            </section>
+        </main>
+    </div>
+    <script src="js-scripts/dashboard-js.js"></script>
+</body>
+
+</html>
