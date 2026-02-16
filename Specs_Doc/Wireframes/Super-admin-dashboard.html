@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super admin Dashboard</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+
+    <style>
+        body {
+            font-family: Inter, system-ui, sans-serif;
+            background-color: #e5e7ec;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body class="">
+
+    <div class="flex">
+
+        <!-- SIDEBAR -->
+        <aside class="w-64 bg-white min-h-screen px-6 py-6 md:relative">
+
+            <nav class="space-y-2 text-sm">
+                <h2 class="text-purple-600 font-bold text-xl flex items-center gap-2 mb-8">
+                    <i class="bi bi-mortarboard"></i>
+                    <span class="app-name"></span>
+                </h2>
+                <a data-target="dashboard"
+                    class="menu active flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-100 text-purple-600 font-semibold cursor-pointer">
+                    <i class="bi bi-grid-fill"></i> Dashboard
+                </a>
+                <a data-target="students"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-people-fill"></i> Students
+                </a>
+                <a data-target="teachers"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-person-fill"></i> Teachers
+                </a>
+                <a data-target="classSection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-journal-bookmark-fill"></i> Classes
+                </a>
+                <a data-target="SubjectSection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-book"></i> Subjects
+                </a>
+                <a data-target="librarySection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-book-fill"></i> Library
+                </a>
+                <a data-target="accountSection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-cash-stack"></i> Accounts
+                </a>
+                <a data-target="examSection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-journal-text"></i> Exams
+                </a>
+                <a data-target="TransportSection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-bus-front-fill"></i> Transports
+                </a>
+                <a data-target="RoutineSection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-calendar-week"></i>
+                    Routine
+                </a>
+
+                <a data-target="HostelSection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-building"></i>
+                    Hostels
+                </a>
+
+                <a data-target="noticeEventSection"
+                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
+                    <i class="bi bi-bell-fill"></i> Notice
+                </a>
+            </nav>
+        </aside>
+
+        <!-- MAIN -->
+        <main class="flex-1 p-4 md:p-8">
+
+            <!-- TOP BAR (FIXED ORDER: Sidebar → Search → Profile) -->
+            <div class="flex justify-between items-center mb-6 gap-4">
+
+                <!-- LEFT: DESKTOP SEARCH -->
+                <div class="hidden md:block w-1/2">
+                    <input
+                        class="w-full px-5 py-3 rounded-full bg-white shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Search anything here">
+                </div>
+
+                <!-- RIGHT: ICONS (CORRECT ORDER) -->
+                <div class="flex items-center gap-4">
+
+                    <!-- SIDEBAR BUTTON (MOBILE) -->
+                    <button id="mobileSidebarBtn"
+                        class="md:hidden bg-white shadow-sm p-2.5 rounded-full flex items-center justify-center">
+                        <i class="bi bi-list text-lg"></i>
+                    </button>
+
+                    <!-- SEARCH ICON (MOBILE) -->
+                    <button id="searchIcon"
+                        class="md:hidden bg-white shadow-sm p-2.5 rounded-full flex items-center justify-center">
+                        <i class="bi bi-search text-lg"></i>
+                    </button>
+
+                    <!-- NOTIFICATION (OPTIONAL: YOU CAN KEEP IT HERE) -->
+                    <div class="relative cursor-pointer">
+                        <i class="bi bi-bell text-xl"></i>
+                        <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+                    </div>
+
+                    <!-- PROFILE -->
+                    <div class="relative">
+                        <button id="profileBtn" class="flex items-center gap-2 focus:outline-none">
+                            <img src="https://i.pravatar.cc/100" class="rounded-full w-9 h-9">
+                            <span class="font-medium hidden sm:inline">Aditya</span>
+                            <i class="bi bi-chevron-down text-sm"></i>
+                        </button>
+
+                        <!-- Dropdown -->
+                        <div id="profileMenu"
+                            class="hidden absolute right-0 mt-3 w-52 bg-white rounded-xl shadow-lg border z-50">
+
+                            <div class="px-4 py-3 border-b">
+                                <p class="font-semibold text-gray-800">Aditya</p>
+                                <p class="text-sm text-gray-500">Student</p>
+                            </div>
+
+                            <ul class="py-2 text-sm">
+                                <li>
+                                    <a href="javascript:void(0)" id="myProfileLink"
+                                        class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                                        <i class="bi bi-person"></i> My Profile
+                                    </a>
+
+                                </li>
+                                <li>
+                                    <a href="#" class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                                        <i class="bi bi-gear"></i> Account Settings
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="#" class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
+                                        <i class="bi bi-shield-lock"></i> Change Password
+                                    </a>
+                                </li>
+                            </ul>
+
+                            <div class="border-t">
+                                <a href="index.html"
+                                    class="flex items-center gap-2 px-4 py-3 text-red-600 hover:bg-red-50">
+                                    <i class="bi bi-box-arrow-right"></i> Logout
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div id="mobileSearch" class="hidden md:hidden mb-4">
+                <input
+                    class="w-full px-5 py-3 rounded-full bg-white shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Search anything here">
+            </div>
+
+            <!-- ================= DASHBOARD ================= -->
+            <section id="dashboard" class="section active p-4 sm:p-6 space-y-6">
+
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-semibold">Welcome.</h2>
+                    <p class="text-gray-500">Navigate the future of education with <span class="app-name"></span>.</p>
+                </div>
+
+                <!-- STATS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    <div class="bg-purple-50 p-5 sm:p-6 rounded-2xl flex justify-between items-center">
+                        <div>
+                            <p class="text-sm text-gray-500">Students</p>
+                            <h3 class="text-xl sm:text-2xl font-bold">15.00K</h3>
+                        </div>
+                        <i class="bi bi-mortarboard text-purple-500 text-3xl"></i>
+                    </div>
+
+                    <div class="bg-blue-50 p-5 sm:p-6 rounded-2xl flex justify-between items-center">
+                        <div>
+                            <p class="text-sm text-gray-500">Teachers</p>
+                            <h3 class="text-xl sm:text-2xl font-bold">200</h3>
+                        </div>
+                        <i class="bi bi-person text-blue-500 text-3xl"></i>
+                    </div>
+
+                    <div class="bg-orange-50 p-5 sm:p-6 rounded-2xl flex justify-between items-center">
+                        <div>
+                            <p class="text-sm text-gray-500">Awards</p>
+                            <h3 class="text-xl sm:text-2xl font-bold">5.6K</h3>
+                        </div>
+                        <i class="bi bi-award text-orange-500 text-3xl"></i>
+                    </div>
+                </div>
+
+                <!-- MAIN GRID -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                    <!-- LEFT PANEL -->
+                    <div class="lg:col-span-7 space-y-6">
+
+                        <!-- Class Routine -->
+                        <div class="bg-white p-5 sm:p-6 rounded-2xl">
+                            <h3 class="font-semibold mb-4">Class Routine</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <p class="font-medium">October, 2023</p>
+                                    <button class="mt-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm">
+                                        Download routine (pdf)
+                                    </button>
+                                </div>
+                                <div>
+                                    <p class="font-medium">November, 2023</p>
+                                    <button class="mt-2 bg-black text-white px-4 py-2 rounded-xl text-sm">
+                                        Download routine (pdf)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Star Students -->
+                        <div class="bg-white p-5 sm:p-6 rounded-2xl overflow-x-auto">
+                            <h3 class="font-semibold mb-4">Star Students</h3>
+                            <table class="w-full text-sm">
+                                <tr class="border-b">
+                                    <td class="py-2 flex items-center gap-2">
+                                        <img src="https://i.pravatar.cc/41" class="w-8 rounded-full">
+                                        Evelyn Harper
+                                    </td>
+                                    <td>PRE43178</td>
+                                    <td>1185</td>
+                                    <td>98%</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 flex items-center gap-2">
+                                        <img src="https://i.pravatar.cc/42" class="w-8 rounded-full">
+                                        Diana Plenty
+                                    </td>
+                                    <td>PRE43174</td>
+                                    <td>1165</td>
+                                    <td>91%</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Total Exams -->
+                        <div class="bg-white p-5 sm:p-6 rounded-2xl">
+                            <h3 class="font-semibold">Total Exams</h3>
+                            <p class="text-2xl sm:text-3xl font-bold mt-2">256</p>
+                            <p class="text-sm text-gray-500">This month</p>
+                        </div>
+
+                        <!-- Notifications -->
+                        <div class="bg-white p-5 sm:p-6 rounded-2xl">
+                            <h3 class="font-semibold mb-3">Notifications</h3>
+                            <p class="text-sm">🚨 Emergency School Closure – 4:00 PM</p>
+                            <p class="text-sm">🎯 New Extracurricular Clubs – 4:00 PM</p>
+                        </div>
+
+                    </div>
+
+                    <!-- RIGHT PANEL -->
+                    <div class="lg:col-span-5 space-y-6">
+
+                        <!-- Course Stats -->
+                        <div class="bg-white p-5 sm:p-6 rounded-2xl text-center">
+                            <h3 class="font-semibold mb-2">Course Statistics</h3>
+
+                            <div class="relative w-full h-40 mx-auto">
+                                <canvas id="chart"></canvas>
+                            </div>
+
+                            <p class="mt-3 font-semibold">Total: 15,000</p>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-2xl">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold">Library Management</h3>
+                                <button class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg">
+                                    + Add Book
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="p-3 bg-gray-50 rounded-xl">
+                                    <p class="text-gray-500">Total Books</p>
+                                    <p class="text-xl font-bold">2,998</p>
+                                </div>
+                                <div class="p-3 bg-gray-50 rounded-xl">
+                                    <p class="text-gray-500">Subjects</p>
+                                    <p class="text-xl font-bold">4</p>
+                                </div>
+                            </div>
+
+                            <ul class="mt-4 space-y-2 text-sm">
+                                <li class="flex justify-between">📘 Literature <span>302</span></li>
+                                <li class="flex justify-between">📐 Mathematics <span>1872</span></li>
+                                <li class="flex justify-between">📗 English <span>575</span></li>
+                                <li class="flex justify-between">🔬 Science <span>249</span></li>
+                            </ul>
+                        </div>
+
+
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= STUDENTS SECTION ================= -->
+            <section id="students" class="section p-4 sm:p-6 space-y-6">
+
+                <!-- Header -->
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold text-gray-800">Students</h2>
+                        <p class="text-sm text-gray-500">Manage students, performance & attendance</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition text-sm">
+                            ➖ Remove Student
+                        </button>
+                        <button
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition text-sm">
+                            ➕ Add Student
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Total Students</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-indigo-600">15,000</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Active</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-green-600">14,200</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">On Leave</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-yellow-500">530</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Suspended</p>
+                        <h3 class="text-xl sm:text-2xl font-bold text-red-500">270</h3>
+                    </div>
+                </div>
+
+                <!-- Search + Filter -->
+                <div
+                    class="bg-white rounded-xl shadow p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+                    <input type="text" placeholder="Search student by name or ID..."
+                        class="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+
+                    <div class="flex flex-wrap gap-3">
+                        <select class="px-4 py-2 border rounded-lg">
+                            <option>All Classes</option>
+                            <option>Class 01</option>
+                            <option>Class 02</option>
+                            <option>Class 03</option>
+                        </select>
+
+                        <select class="px-4 py-2 border rounded-lg">
+                            <option>Status</option>
+                            <option>Active</option>
+                            <option>On Leave</option>
+                            <option>Suspended</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Students Table -->
+                <div class="bg-white rounded-xl shadow overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="px-4 py-3">Student</th>
+                                <th class="px-4 py-3">ID</th>
+                                <th class="px-4 py-3">Class</th>
+                                <th class="px-4 py-3">Marks</th>
+                                <th class="px-4 py-3">Attendance</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 flex items-center gap-3">
+                                    <img src="https://i.pravatar.cc/40?img=12" class="w-9 h-9 rounded-full">
+                                    <span class="font-medium">Evelyn Harper</span>
+                                </td>
+                                <td class="px-4 py-3">STU-2317</td>
+                                <td class="px-4 py-3">Class 06</td>
+                                <td class="px-4 py-3 font-semibold">1185</td>
+                                <td class="px-4 py-3">98%</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">Active</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 flex items-center gap-3">
+                                    <img src="https://i.pravatar.cc/40?img=32" class="w-9 h-9 rounded-full">
+                                    <span class="font-medium">Diana Plenty</span>
+                                </td>
+                                <td class="px-4 py-3">STU-2411</td>
+                                <td class="px-4 py-3">Class 04</td>
+                                <td class="px-4 py-3 font-semibold">1165</td>
+                                <td class="px-4 py-3">91%</td>
+                                <td class="px-4 py-3">
+                                    <span class="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">On
+                                        Leave</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 flex items-center gap-3">
+                                    <img src="https://i.pravatar.cc/40?img=56" class="w-9 h-9 rounded-full">
+                                    <span class="font-medium">John Millar</span>
+                                </td>
+                                <td class="px-4 py-3">STU-2199</td>
+                                <td class="px-4 py-3">Class 03</td>
+                                <td class="px-4 py-3 font-semibold">1175</td>
+                                <td class="px-4 py-3">92%</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full">Suspended</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <section id="teachers" class="section p-6 space-y-6">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Teachers</h2>
+                        <p class="text-sm text-gray-500">Manage teachers, subjects & performance</p>
+                    </div>
+                    <div>
+                        <button
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
+                            ➖ Remove Teacher
+                        </button>
+                        <button
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
+                            ➕ Add Teacher
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Total Teachers</p>
+                        <h3 class="text-2xl font-bold text-indigo-600">200</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Active</p>
+                        <h3 class="text-2xl font-bold text-green-600">185</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">On Leave</p>
+                        <h3 class="text-2xl font-bold text-yellow-500">10</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Retired</p>
+                        <h3 class="text-2xl font-bold text-red-500">5</h3>
+                    </div>
+                </div>
+
+                <!-- Search + Filter -->
+                <div
+                    class="bg-white rounded-xl shadow p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+                    <input type="text" placeholder="Search teacher by name or ID..."
+                        class="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+
+                    <div class="flex gap-3">
+                        <select class="px-4 py-2 border rounded-lg">
+                            <option>All Subjects</option>
+                            <option>Mathematics</option>
+                            <option>Science</option>
+                            <option>English</option>
+                            <option>Computer</option>
+                        </select>
+
+                        <select class="px-4 py-2 border rounded-lg">
+                            <option>Status</option>
+                            <option>Active</option>
+                            <option>On Leave</option>
+                            <option>Retired</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Teachers Table -->
+                <div class="bg-white rounded-xl shadow overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="px-4 py-3">Teacher</th>
+                                <th class="px-4 py-3">ID</th>
+                                <th class="px-4 py-3">Subject</th>
+                                <th class="px-4 py-3">Classes</th>
+                                <th class="px-4 py-3">Experience</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 flex items-center gap-3">
+                                    <img src="https://i.pravatar.cc/40?img=47" class="w-9 h-9 rounded-full">
+                                    <span class="font-medium">Mr. Robert Fox</span>
+                                </td>
+                                <td class="px-4 py-3">TCH-1021</td>
+                                <td class="px-4 py-3">Mathematics</td>
+                                <td class="px-4 py-3">Class 05, 06</td>
+                                <td class="px-4 py-3">12 yrs</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">Active</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 flex items-center gap-3">
+                                    <img src="https://i.pravatar.cc/40?img=52" class="w-9 h-9 rounded-full">
+                                    <span class="font-medium">Ms. Sophia Lane</span>
+                                </td>
+                                <td class="px-4 py-3">TCH-1044</td>
+                                <td class="px-4 py-3">English</td>
+                                <td class="px-4 py-3">Class 03, 04</td>
+                                <td class="px-4 py-3">8 yrs</td>
+                                <td class="px-4 py-3">
+                                    <span class="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">On
+                                        Leave</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 flex items-center gap-3">
+                                    <img src="https://i.pravatar.cc/40?img=60" class="w-9 h-9 rounded-full">
+                                    <span class="font-medium">Dr. John Miller</span>
+                                </td>
+                                <td class="px-4 py-3">TCH-1099</td>
+                                <td class="px-4 py-3">Science</td>
+                                <td class="px-4 py-3">Class 07, 08</td>
+                                <td class="px-4 py-3">18 yrs</td>
+                                <td class="px-4 py-3">
+                                    <span class="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full">Retired</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <section id="librarySection" class="section p-6 space-y-6">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Library</h2>
+                        <p class="text-sm text-gray-500">Manage books, categories & issue records</p>
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
+                        ➕ Add Book
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Total Books</p>
+                        <h3 class="text-2xl font-bold text-indigo-600">8,450</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Issued</p>
+                        <h3 class="text-2xl font-bold text-yellow-500">1,320</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Available</p>
+                        <h3 class="text-2xl font-bold text-green-600">6,890</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Overdue</p>
+                        <h3 class="text-2xl font-bold text-red-500">240</h3>
+                    </div>
+                </div>
+
+                <!-- Search + Filter -->
+                <div
+                    class="bg-white rounded-xl shadow p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+                    <input type="text" placeholder="Search book by title, author or ISBN..."
+                        class="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+
+                    <div class="flex gap-3">
+                        <select class="px-4 py-2 border rounded-lg">
+                            <option>All Categories</option>
+                            <option>Science</option>
+                            <option>Mathematics</option>
+                            <option>Literature</option>
+                            <option>Technology</option>
+                        </select>
+
+                        <select class="px-4 py-2 border rounded-lg">
+                            <option>Status</option>
+                            <option>Available</option>
+                            <option>Issued</option>
+                            <option>Overdue</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Books Table -->
+                <div class="bg-white rounded-xl shadow overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="px-4 py-3">Book</th>
+                                <th class="px-4 py-3">ISBN</th>
+                                <th class="px-4 py-3">Category</th>
+                                <th class="px-4 py-3">Author</th>
+                                <th class="px-4 py-3">Issued To</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-medium">Introduction to Algorithms</td>
+                                <td class="px-4 py-3">978-0262033848</td>
+                                <td class="px-4 py-3">Technology</td>
+                                <td class="px-4 py-3">Thomas H. Cormen</td>
+                                <td class="px-4 py-3">Evelyn Harper</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Issued</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-medium">Advanced Physics</td>
+                                <td class="px-4 py-3">978-8120345935</td>
+                                <td class="px-4 py-3">Science</td>
+                                <td class="px-4 py-3">Resnick & Halliday</td>
+                                <td class="px-4 py-3">—</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">Available</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-medium">English Literature</td>
+                                <td class="px-4 py-3">978-0199535569</td>
+                                <td class="px-4 py-3">Literature</td>
+                                <td class="px-4 py-3">William Shakespeare</td>
+                                <td class="px-4 py-3">John Millar</td>
+                                <td class="px-4 py-3">
+                                    <span class="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full">Overdue</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <section id="examSection" class="section p-6 space-y-6">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Examinations</h2>
+                        <p class="text-sm text-gray-500">Manage exams, schedules, results & performance</p>
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
+                        ➕ Create Exam
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Total Exams</p>
+                        <h3 class="text-2xl font-bold text-indigo-600">42</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Ongoing</p>
+                        <h3 class="text-2xl font-bold text-yellow-500">5</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Completed</p>
+                        <h3 class="text-2xl font-bold text-green-600">34</h3>
+                    </div>
+                    <div class="bg-white rounded-xl shadow p-4">
+                        <p class="text-sm text-gray-500">Upcoming</p>
+                        <h3 class="text-2xl font-bold text-blue-600">3</h3>
+                    </div>
+                </div>
+
+                <!-- Search + Filter -->
+                <div
+                    class="bg-white rounded-xl shadow p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+                    <input type="text" placeholder="Search exam by name or class..."
+                        class="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+
+                    <div class="flex gap-3">
+                        <select class="px-4 py-2 border rounded-lg">
+                            <option>All Classes</option>
+                            <option>Class 01</option>
+                            <option>Class 02</option>
+                            <option>Class 03</option>
+                        </select>
+
+                        <select class="px-4 py-2 border rounded-lg">
+                            <option>Status</option>
+                            <option>Upcoming</option>
+                            <option>Ongoing</option>
+                            <option>Completed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Exams Table -->
+                <div class="bg-white rounded-xl shadow overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="px-4 py-3">Exam</th>
+                                <th class="px-4 py-3">Class</th>
+                                <th class="px-4 py-3">Subject</th>
+                                <th class="px-4 py-3">Date</th>
+                                <th class="px-4 py-3">Duration</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-medium">Mid Term Exam</td>
+                                <td class="px-4 py-3">Class 06</td>
+                                <td class="px-4 py-3">Mathematics</td>
+                                <td class="px-4 py-3">12 Mar 2026</td>
+                                <td class="px-4 py-3">3 Hours</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Ongoing</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </td>
+                            </tr>
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-medium">Final Exam</td>
+                                <td class="px-4 py-3">Class 10</td>
+                                <td class="px-4 py-3">Science</td>
+                                <td class="px-4 py-3">28 Mar 2026</td>
+                                <td class="px-4 py-3">3 Hours</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">Upcoming</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">Schedule</button>
+                                </td>
+                            </tr>
+
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3 font-medium">Unit Test</td>
+                                <td class="px-4 py-3">Class 04</td>
+                                <td class="px-4 py-3">English</td>
+                                <td class="px-4 py-3">05 Feb 2026</td>
+                                <td class="px-4 py-3">1.5 Hours</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">Completed</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button class="text-indigo-600 hover:underline">Result</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <section id="RoutineSection" class="section p-6 space-y-6">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Class Routine</h2>
+                        <p class="text-sm text-gray-500">Daily & weekly class schedules</p>
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
+                        ➕ Add Routine
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div
+                    class="bg-white rounded-xl shadow p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+                    <select class="px-4 py-2 border rounded-lg">
+                        <option>Select Class</option>
+                        <option>Class 01</option>
+                        <option>Class 02</option>
+                        <option>Class 03</option>
+                    </select>
+
+                    <select class="px-4 py-2 border rounded-lg">
+                        <option>Select Day</option>
+                        <option>Monday</option>
+                        <option>Tuesday</option>
+                        <option>Wednesday</option>
+                        <option>Thursday</option>
+                        <option>Friday</option>
+                    </select>
+                </div>
+
+                <!-- Routine Table -->
+                <div class="bg-white rounded-xl shadow overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Time</th>
+                                <th class="px-4 py-3 text-left">Subject</th>
+                                <th class="px-4 py-3 text-left">Teacher</th>
+                                <th class="px-4 py-3 text-left">Room</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3">09:00 - 10:00</td>
+                                <td class="px-4 py-3 font-medium">Mathematics</td>
+                                <td class="px-4 py-3">Mr. Anil</td>
+                                <td class="px-4 py-3">Room 101</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3">10:00 - 11:00</td>
+                                <td class="px-4 py-3 font-medium">English</td>
+                                <td class="px-4 py-3">Ms. Priya</td>
+                                <td class="px-4 py-3">Room 102</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3">11:00 - 12:00</td>
+                                <td class="px-4 py-3 font-medium">Science</td>
+                                <td class="px-4 py-3">Dr. Kumar</td>
+                                <td class="px-4 py-3">Lab 2</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <section id="classSection" class="section p-6 space-y-6">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Classes</h2>
+                        <p class="text-sm text-gray-500">Manage classes, sections & mentors</p>
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
+                        ➕ Add Class
+                    </button>
+                </div>
+
+                <!-- Class Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                    <!-- Class Card -->
+                    <div class="bg-white rounded-xl shadow p-5 hover:shadow-lg transition">
+                        <h3 class="text-lg font-semibold text-gray-800">Class 01 - A</h3>
+                        <p class="text-sm text-gray-500 mt-1">Mentor: Mr. Anil</p>
+
+                        <div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+                            <div>
+                                <p class="text-gray-500">Students</p>
+                                <p class="font-semibold">45</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Subjects</p>
+                                <p class="font-semibold">6</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                                Active
+                            </span>
+                            <button class="text-indigo-600 hover:underline text-sm">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Class Card -->
+                    <div class="bg-white rounded-xl shadow p-5 hover:shadow-lg transition">
+                        <h3 class="text-lg font-semibold text-gray-800">Class 02 - B</h3>
+                        <p class="text-sm text-gray-500 mt-1">Mentor: Ms. Priya</p>
+
+                        <div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+                            <div>
+                                <p class="text-gray-500">Students</p>
+                                <p class="font-semibold">38</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Subjects</p>
+                                <p class="font-semibold">5</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                                Active
+                            </span>
+                            <button class="text-indigo-600 hover:underline text-sm">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Class Card -->
+                    <div class="bg-white rounded-xl shadow p-5 hover:shadow-lg transition">
+                        <h3 class="text-lg font-semibold text-gray-800">Class 03 - C</h3>
+                        <p class="text-sm text-gray-500 mt-1">Mentor: Dr. Kumar</p>
+
+                        <div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+                            <div>
+                                <p class="text-gray-500">Students</p>
+                                <p class="font-semibold">40</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500">Subjects</p>
+                                <p class="font-semibold">7</p>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                                Draft
+                            </span>
+                            <button class="text-indigo-600 hover:underline text-sm">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+            <section id="accountSection" class="section p-6 space-y-6">
+
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Accounts & Finance</h2>
+                        <p class="text-sm text-gray-500">Fees, payments & financial overview</p>
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        ➕ Add Payment
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-sm text-gray-500">Total Fees</p>
+                        <h3 class="text-xl font-bold text-indigo-600">₹12,50,000</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-sm text-gray-500">Collected</p>
+                        <h3 class="text-xl font-bold text-green-600">₹9,80,000</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-sm text-gray-500">Pending</p>
+                        <h3 class="text-xl font-bold text-red-500">₹2,70,000</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-sm text-gray-500">This Month</p>
+                        <h3 class="text-xl font-bold text-blue-600">₹1,20,000</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Student</th>
+                                <th class="px-4 py-3 text-left">Class</th>
+                                <th class="px-4 py-3 text-left">Amount</th>
+                                <th class="px-4 py-3 text-left">Status</th>
+                                <th class="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr>
+                                <td class="px-4 py-3">Aarav Patel</td>
+                                <td class="px-4 py-3">Class 08</td>
+                                <td class="px-4 py-3">₹15,000</td>
+                                <td class="px-4 py-3">
+                                    <span class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">Paid</span>
+                                </td>
+                                <td class="px-4 py-3 text-right text-indigo-600">Receipt</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3">Neha Sharma</td>
+                                <td class="px-4 py-3">Class 09</td>
+                                <td class="px-4 py-3">₹18,000</td>
+                                <td class="px-4 py-3">
+                                    <span class="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full">Pending</span>
+                                </td>
+                                <td class="px-4 py-3 text-right text-indigo-600">Pay Now</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <section id="SubjectSection" class="section p-6 space-y-6">
+
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Subjects</h2>
+                        <p class="text-sm text-gray-500">Academic subjects & assignments</p>
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        ➕ Add Subject
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="font-semibold">Mathematics</h3>
+                        <p class="text-sm text-gray-500">Classes: 6–10</p>
+                        <p class="mt-2 text-sm">Teacher: Mr. Anil</p>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="font-semibold">Science</h3>
+                        <p class="text-sm text-gray-500">Classes: 7–10</p>
+                        <p class="mt-2 text-sm">Teacher: Dr. Kumar</p>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="font-semibold">English</h3>
+                        <p class="text-sm text-gray-500">Classes: 5–10</p>
+                        <p class="mt-2 text-sm">Teacher: Ms. Priya</p>
+                    </div>
+                </div>
+
+            </section>
+            <section id="TransportSection" class="section p-6 space-y-6">
+
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Transport</h2>
+                        <p class="text-sm text-gray-500">Bus routes & vehicle management</p>
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        ➕ Add Route
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-3">Bus No</th>
+                                <th class="px-4 py-3">Route</th>
+                                <th class="px-4 py-3">Driver</th>
+                                <th class="px-4 py-3">Students</th>
+                                <th class="px-4 py-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            <tr>
+                                <td class="px-4 py-3">BUS-12</td>
+                                <td class="px-4 py-3">North City</td>
+                                <td class="px-4 py-3">Ramesh</td>
+                                <td class="px-4 py-3">42</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">Active</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3">BUS-07</td>
+                                <td class="px-4 py-3">East Zone</td>
+                                <td class="px-4 py-3">Suresh</td>
+                                <td class="px-4 py-3">35</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Maintenance</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <section id="HostelSection" class="section p-6 space-y-6">
+
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800">Hostel</h2>
+                        <p class="text-sm text-gray-500">Rooms, students & facilities</p>
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        ➕ Add Room
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="font-semibold">Room 101</h3>
+                        <p class="text-sm text-gray-500">Capacity: 4</p>
+                        <p class="mt-2 text-sm">Occupied: 3</p>
+                        <span class="inline-block mt-3 px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                            Available
+                        </span>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="font-semibold">Room 202</h3>
+                        <p class="text-sm text-gray-500">Capacity: 3</p>
+                        <p class="mt-2 text-sm">Occupied: 3</p>
+                        <span class="inline-block mt-3 px-3 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                            Full
+                        </span>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="font-semibold">Room 305</h3>
+                        <p class="text-sm text-gray-500">Capacity: 2</p>
+                        <p class="mt-2 text-sm">Occupied: 1</p>
+                        <span class="inline-block mt-3 px-3 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                            Available
+                        </span>
+                    </div>
+                </div>
+
+            </section>
+
+            <section id="noticeEventSection" class="section p-6 space-y-6 bg-gray-50 min-h-screen">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">
+                            Notices & Events
+                        </h2>
+                        <p class="text-sm text-gray-500">
+                            Manage announcements and school activities
+                        </p>
+                    </div>
+                    <button
+                        class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700 transition">
+                        + New Notice
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm">
+                        <p class="text-sm text-gray-500">Total Notices</p>
+                        <h3 class="text-2xl font-bold text-gray-800 mt-2">24</h3>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm">
+                        <p class="text-sm text-gray-500">Upcoming Events</p>
+                        <h3 class="text-2xl font-bold text-gray-800 mt-2">8</h3>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm">
+                        <p class="text-sm text-gray-500">High Priority</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-2">3</h3>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="bg-white rounded-2xl shadow p-6">
+
+                    <!-- Tab Buttons -->
+                    <div class="flex border-b mb-6">
+                        <button id="noticesBtn" onclick="showTab('notices')"
+                            class="tab-btn px-4 py-2 font-medium border-b-2 border-indigo-600 text-indigo-600">
+                            Notices
+                        </button>
+
+                        <button id="eventBtn" onclick="showTab('event')"
+                            class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-indigo-600">
+                            Create Event
+                        </button>
+                    </div>
+
+
+                    <!-- Notices Tab -->
+                    <div id="noticesTab" class="tab-content space-y-4">
+
+                        <div class="flex justify-between items-center">
+                            <input type="text" placeholder="Search notices..."
+                                class="w-1/3 px-4 py-2 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            <select class="px-4 py-2 border rounded-xl">
+                                <option>All Categories</option>
+                                <option>Academic</option>
+                                <option>Examination</option>
+                                <option>Holiday</option>
+                            </select>
+                        </div>
+
+                        <!-- Notice List Style (Horizontal Card) -->
+                        <div class="space-y-3">
+
+                            <div
+                                class="flex justify-between items-center bg-gray-50 p-4 rounded-xl hover:bg-gray-100 transition">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">
+                                        Emergency School Closure
+                                    </h4>
+                                    <p class="text-sm text-gray-500">
+                                        Due to heavy rainfall, school remains closed.
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-6 text-sm">
+                                    <span class="px-3 py-1 bg-red-100 text-red-600 rounded-full">High</span>
+                                    <span class="text-gray-400">15 Aug 2026</span>
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex justify-between items-center bg-gray-50 p-4 rounded-xl hover:bg-gray-100 transition">
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">
+                                        Mid-Term Exam Schedule
+                                    </h4>
+                                    <p class="text-sm text-gray-500">
+                                        Exam timetable is now available.
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-6 text-sm">
+                                    <span class="px-3 py-1 bg-yellow-100 text-yellow-600 rounded-full">Medium</span>
+                                    <span class="text-gray-400">10 Aug 2026</span>
+                                    <button class="text-indigo-600 hover:underline">View</button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Create Event Tab -->
+                    <div id="eventTab" class="tab-content hidden">
+
+                        <form class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Event Title</label>
+                                <input type="text" class="w-full border rounded-xl px-4 py-2">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Audience</label>
+                                <select class="w-full border rounded-xl px-4 py-2">
+                                    <option>Students</option>
+                                    <option>Teachers</option>
+                                    <option>Staff</option>
+                                    <option>All</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Date</label>
+                                <input type="date" class="w-full border rounded-xl px-4 py-2">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Time</label>
+                                <input type="time" class="w-full border rounded-xl px-4 py-2">
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium mb-1">Description</label>
+                                <textarea rows="3" class="w-full border rounded-xl px-4 py-2"></textarea>
+                            </div>
+
+                            <div class="md:col-span-2 flex justify-end gap-3">
+                                <button type="reset" class="px-4 py-2 bg-gray-100 rounded-xl">
+                                    Cancel
+                                </button>
+                                <button type="submit"
+                                    class="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700">
+                                    Create Event
+                                </button>
+                            </div>
+
+                        </form>
+
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- ================= SUPER ADMIN PROFILE SECTION ================= -->
+            <section id="profile" class="section p-4 sm:p-6 space-y-6">
+
+                <!-- Profile Header -->
+                <div class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                    <img src="https://i.pravatar.cc/100" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full border">
+
+                    <div class="text-center sm:text-left">
+                        <h3 class="font-semibold text-xl">Mr. Aditya Sharma</h3>
+                        <p class="text-sm text-gray-500">
+                            Super Admin • System Administrator
+                        </p>
+                        <p class="text-sm mt-1">
+                            Admin ID: SA1001
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Details Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <!-- Admin Details -->
+                    <div class="bg-white rounded-2xl p-5 sm:p-6">
+                        <h4 class="font-semibold mb-3">Admin Details</h4>
+                        <p class="text-sm">📧 Email: admin@schooli.com</p>
+                        <p class="text-sm">📞 Phone: +91 98765 43210</p>
+                        <p class="text-sm">🏫 Organization: Schooli Management</p>
+                        <p class="text-sm">📅 Joined On: 01 Jan 2022</p>
+                    </div>
+
+                    <!-- System Access -->
+                    <div class="bg-white rounded-2xl p-5 sm:p-6">
+                        <h4 class="font-semibold mb-3">System Access</h4>
+                        <p class="text-sm">🛡 Role: Super Administrator</p>
+                        <p class="text-sm">🔐 Access Level: Full Control</p>
+                        <p class="text-sm">🌐 Last Login: Today • 10:15 AM</p>
+                        <p class="text-sm">📍 Location: Chennai, India</p>
+                    </div>
+
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="bg-white rounded-2xl p-5 sm:p-6 flex flex-wrap gap-3 justify-end">
+                    <button
+                        class="bg-purple-600 text-white px-5 py-2 rounded-xl text-sm hover:bg-purple-700 transition">
+                        Edit Profile
+                    </button>
+
+                    <button class="border px-5 py-2 rounded-xl text-sm hover:bg-gray-100 transition">
+                        Change Password
+                    </button>
+
+                    <button class="border px-5 py-2 rounded-xl text-sm hover:bg-gray-100 transition">
+                        Security Settings
+                    </button>
+                </div>
+
+            </section>
+
+
+        </main>
+    </div>
+    <script src="js-scripts/dashboard-js.js"></script>
+</body>
+
+</html>
