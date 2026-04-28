@@ -2,748 +2,1462 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Student Dashboard</title>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
-
     <style>
-        body {
+        .maincolor {
             font-family: Inter, system-ui, sans-serif;
             background-color: #e5e7ec;
-        }
-
-        .section {
-            display: none;
-        }
-
-        .section.active {
-            display: block;
         }
     </style>
 </head>
 
-<body>
+<body class="bg-gray-50">
+
     <div class="flex">
 
-        <!-- ========================= SIDEBAR ========================= -->
-        <aside class="w-64 bg-white min-h-screen px-6 py-6 md:relative">
+        <!-- MOBILE OVERLAY -->
+        <div id="mobileOverlay" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[50] md:hidden"></div>
 
-            <nav class="space-y-2 text-sm">
-                <h2 class="text-purple-600 font-bold text-xl flex items-center gap-2 mb-8">
-                    <i class="bi bi-mortarboard"></i>
-                    <span class="app-name"></span>
-                </h2>
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="fixed top-0 left-0 h-screen w-64
+            bg-white/95 backdrop-blur-xl border-r shadow-2xl z-[60]
+            flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300">
 
-                <a data-target="dashboard"
-                    class="menu active flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-100 text-purple-600 font-semibold cursor-pointer">
-                    <i class="bi bi-grid-fill"></i> Dashboard
-                </a>
+            <!-- LOGO -->
+            <div class="px-6 py-5 border-b flex items-center gap-2">
+                <i class="bi bi-mortarboard text-purple-600 text-xl"></i>
+                <span class="app-name font-bold text-lg text-purple-600"></span>
+            </div>
 
-                <a data-target="attendance"
-                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
-                    <i class="bi bi-calendar-check"></i> Attendance
-                </a>
+            <!-- NAV -->
+            <nav class="flex-1 overflow-y-auto px-4 py-4 space-y-1 text-sm">
+                <button data-section="dashboard" class="menu-btn relative flex w-full items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
+                  bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 font-semibold shadow">
+                    <i class="bi bi-grid-fill"></i>
+                    <span class="truncate">Dashboard</span>
+                </button>
 
-                <a data-target="subjects"
-                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
-                    <i class="bi bi-book"></i> Subjects
-                </a>
+                <button data-section="attendance"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <i class="bi bi-calendar-check"></i>
+                    <span class="truncate">Attendance</span>
+                </button>
 
-                <a data-target="assignments"
-                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
-                    <i class="bi bi-journal-text"></i> Assignments
-                </a>
+                <button data-section="assignments"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <i class="bi bi-journal-text"></i>
+                    <span class="truncate">Assignments</span>
+                </button>
 
-                <a data-target="exams"
-                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
-                    <i class="bi bi-award"></i> Exams & Results
-                </a>
+                <button data-section="exams"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <i class="bi bi-award"></i>
+                    <span class="truncate">Exams & Results</span>
+                </button>
 
-                <a data-target="timetable"
-                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
-                    <i class="bi bi-clock"></i> Timetable
-                </a>
+                <button data-section="timetable"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <i class="bi bi-clock"></i>
+                    <span class="truncate">Timetable</span>
+                </button>
 
-                <a data-target="profile"
-                    class="menu flex items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 cursor-pointer">
-                    <i class="bi bi-person"></i> Profile
-                </a>
+                <button data-section="studhostel"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <i class="bi bi-building"></i>
+                    <span class="truncate">Hostel</span>
+                </button>
+
+                <button data-section="library"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <i class="bi bi-collection"></i>
+                    <span class="truncate">Library</span>
+                </button>
+
+                <button data-section="notices"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <i class="bi bi-bell"></i>
+                    <span class="truncate">Notices</span>
+                </button>
+
+                <button data-section="studentLeave"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+
+                    <i class="bi bi-calendar-check"></i>
+                    <span class="truncate">My Leaves</span>
+
+                </button>
+
+                <button data-section="profile"
+                    class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-700">
+                    <i class="bi bi-person"></i>
+                    <span class="truncate">Profile</span>
+                </button>
             </nav>
+
+            <!-- FOOTER -->
+            <div class="p-4 border-t text-xs text-gray-400">
+                <span class="app-name"></span> © 2026
+            </div>
         </aside>
 
-        <!-- ========================= MAIN CONTENT ========================= -->
-        <main class="flex-1 p-4 md:p-8">
+        <!-- MAIN -->
+        <main
+            class="flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8 md:ml-64 maincolor transition-all duration-300 maincolor">
 
-            <!-- TOP BAR -->
-            <div class="flex justify-between items-center mb-6 relative">
+            <!-- HEADER -->
+            <div class="sticky top-0 z-40 px-4 sm:px-6 py-3 
+                bg-gradient-to-r from-white/70 via-white/60 to-white/70
+                backdrop-blur-2xl border border-white/40
+                shadow-[0_10px_40px_rgba(0,0,0,0.08)]
+                rounded-2xl transition-all duration-300 flex items-center justify-between gap-4">
 
-                <!-- LEFT: DESKTOP SEARCH -->
-                <div class="hidden md:block w-1/2">
-                    <input
-                        class="w-full px-5 py-3 rounded-full bg-white shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Search anything here">
+                <!-- MOBILE LOGO -->
+                <div class="flex items-center gap-2 md:hidden">
+                    <i class="bi bi-mortarboard text-indigo-600 text-lg"></i>
+                    <span class="app-name font-semibold text-gray-700 text-sm truncate max-w-[140px]"></span>
                 </div>
 
-                <!-- Right Icons -->
-                <div class="flex items-center gap-6">
+                <!-- DESKTOP SEARCH -->
+                <div class="hidden md:flex w-1/2 relative group px-4">
+                    <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition"></i>
+                    <input type="text" id="desktopSearch" class="w-full pl-10 pr-4 py-2.5 rounded-full
+                        bg-white/70 backdrop-blur-md border border-gray-200
+                        focus:bg-white transition-all duration-300
+                        outline-none focus:ring-2 focus:ring-indigo-500
+                        shadow-sm hover:shadow-md" placeholder="Search anything here...">
+                </div>
 
-                    <!-- SIDEBAR BUTTON (MOBILE) -->
+                <!-- RIGHT ICONS -->
+                <div class="flex items-center gap-2 sm:gap-4">
+
+                    <!-- MOBILE MENU -->
                     <button id="mobileSidebarBtn"
-                        class="md:hidden bg-white shadow-sm p-2.5 rounded-full flex items-center justify-center">
+                        class="md:hidden bg-white/70 backdrop-blur-md hover:bg-white transition p-2.5 rounded-full shadow-md hover:scale-105">
                         <i class="bi bi-list text-lg"></i>
                     </button>
 
-                    <!-- SEARCH ICON (MOBILE) -->
-                    <button id="searchIcon"
-                        class="md:hidden bg-white shadow-sm p-2.5 rounded-full flex items-center justify-center">
+                    <!-- MOBILE SEARCH -->
+                    <button id="mobileSearchBtn"
+                        class="md:hidden bg-white/70 backdrop-blur-md hover:bg-white transition p-2.5 rounded-full shadow-md hover:scale-105">
                         <i class="bi bi-search text-lg"></i>
                     </button>
 
-                    <!-- NOTIFICATION (OPTIONAL: YOU CAN KEEP IT HERE) -->
-                    <div class="relative cursor-pointer">
-                        <i class="bi bi-bell text-xl"></i>
-                        <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
+                    <!-- NOTIFICATIONS -->
+                    <div class="relative">
+                        <div id="notificationBtn" class="relative cursor-pointer bg-white/70 backdrop-blur-md 
+                            hover:bg-white transition p-2.5 rounded-full shadow-md hover:scale-105">
+                            <i class="bi bi-bell text-lg"></i>
+                            <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 
+                              text-[10px] flex items-center justify-center 
+                              bg-gradient-to-r from-red-500 to-pink-500 
+                              text-white rounded-full animate-pulse shadow">3</span>
+                        </div>
+
+                        <div id="notificationMenu" class="hidden fixed top-20 left-1/2 -translate-x-1/2 
+                              w-[92vw] max-w-md bg-white/95 backdrop-blur-2xl 
+                              rounded-2xl shadow-2xl border border-white/40 z-[70] overflow-hidden">
+                            <div class="p-4 border-b font-semibold flex justify-between items-center">
+                                Notifications
+                                <button id="closeNotifications"
+                                    class="text-xs text-gray-500 hover:text-red-500">✕</button>
+                            </div>
+                            <div class="max-h-80 overflow-y-auto p-4 text-sm space-y-3">
+
+                                <div class="p-3 bg-blue-50 rounded-xl">
+                                    <p class="font-medium text-gray-800">📢 New Exam Schedule Released</p>
+                                    <p class="text-xs text-gray-500">2 hours ago</p>
+                                </div>
+
+                                <div class="p-3 bg-green-50 rounded-xl">
+                                    <p class="font-medium text-gray-800">✅ Attendance Updated</p>
+                                    <p class="text-xs text-gray-500">Today</p>
+                                </div>
+
+                            </div>
+                            <div
+                                class="p-3 text-center text-sm text-indigo-600 hover:bg-gray-50 cursor-pointer font-medium">
+                                View All Notices →
+                            </div>
+                        </div>
                     </div>
 
                     <!-- PROFILE -->
                     <div class="relative">
-                        <button id="profileBtn" class="flex items-center gap-2 focus:outline-none">
-                            <img src="https://i.pravatar.cc/100" class="rounded-full w-9 h-9">
-                            <span class="font-medium hidden sm:inline">Aditya</span>
-                            <i class="bi bi-chevron-down text-sm"></i>
+                        <button id="profileBtn"
+                            class="flex items-center gap-2 bg-gradient-to-r from-white/70 to-white/60 backdrop-blur-md px-2 py-1.5 rounded-full transition shadow-md hover:scale-105">
+                            <img src="https://i.pravatar.cc/100"
+                                class="rounded-full w-9 h-9 border-2 border-white shadow" />
+                            <span class="font-medium hidden sm:inline text-sm">Aditya</span>
                         </button>
 
-                        <!-- Dropdown -->
-                        <div id="profileMenu"
-                            class="hidden absolute right-0 mt-3 w-52 bg-white rounded-xl shadow-lg border z-50">
-
-                            <div class="px-4 py-3 border-b">
-                                <p class="font-semibold text-gray-800">Aditya</p>
-                                <p class="text-sm text-gray-500">Student</p>
+                        <div id="profileMenu" class="hidden absolute right-0 mt-4 w-56 
+                              bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/40 z-50">
+                            <div class="px-4 py-4 border-b">
+                                <p class="font-semibold">Aditya</p>
                             </div>
-
                             <ul class="py-2 text-sm">
-                                <li>
-                                    <a href="javascript:void(0)" id="myProfileLink"
-                                        class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
-                                        <i class="bi bi-person"></i> My Profile
-                                    </a>
-
-                                </li>
-                                <li>
-                                    <a href="#" class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
-                                        <i class="bi bi-gear"></i> Account Settings
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href="#" class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100">
-                                        <i class="bi bi-shield-lock"></i> Change Password
-                                    </a>
-                                </li>
+                                <li onclick="openSection('profile')" class="px-4 py-2 hover:bg-gray-100 cursor-pointer">
+                                    My Profile</li>
+                                <li id="openPasswordModal" class="px-4 py-2 hover:bg-gray-100 cursor-pointer">Password
+                                    Change</li>
                             </ul>
-
                             <div class="border-t">
-                                <a href="index.html"
-                                    class="flex items-center gap-2 px-4 py-3 text-red-600 hover:bg-red-50">
-                                    <i class="bi bi-box-arrow-right"></i> Logout
-                                </a>
+                                <button id="logoutBtn" class="w-full px-4 py-3 text-red-600 hover:bg-red-50">
+                                    Logout
+                                </button>
                             </div>
                         </div>
                     </div>
 
                 </div>
             </div>
-            <div id="mobileSearch" class="hidden md:hidden mb-4">
-                <input
-                    class="w-full px-5 py-3 rounded-full bg-white shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Search anything here">
+
+            <!-- MOBILE SEARCH -->
+            <div id="mobileSearch" class="hidden md:hidden px-4 mt-4">
+                <input type="text" class="w-full px-5 py-3 rounded-full bg-white shadow-md
+                    outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Search anything here...">
             </div>
 
-            <!-- ========================= DASHBOARD SECTION ========================= -->
-            <section id="dashboard" class="section p-6 space-y-6 active">
+            <!-- DASHBOARD SECTION -->
+            <section class="section p-4 sm:p-6 space-y-6" id="dashboardSection">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-semibold">
+                        Welcome back, <span id="studentName">Aditya</span> 👋
+                    </h2>
+                    <p class="text-gray-500 text-sm">Here’s your academic overview.</p>
+                </div>
 
-                <h2 class="text-xl font-semibold">Welcome back, Luke 👋</h2>
-                <p class="text-gray-500 mb-6">Here’s your academic overview.</p>
-
-                <!-- STATS CARDS -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-
-                    <div class="bg-green-50 p-6 rounded-2xl">
-                        <p class="text-sm text-gray-500">Attendance</p>
-                        <h3 class="text-2xl font-bold">92%</h3>
+                <!-- STATS -->
+                <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                    <!-- Attendance -->
+                    <div class="bg-white shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
+                        <p class="text-xs sm:text-sm text-gray-500">Attendance</p>
+                        <h3 class="text-xl sm:text-2xl font-bold mt-1 fade-in" id="attendancePercent">82%</h3>
                     </div>
 
-                    <div class="bg-blue-50 p-6 rounded-2xl">
-                        <p class="text-sm text-gray-500">Subjects</p>
-                        <h3 class="text-2xl font-bold">6</h3>
+                    <!-- Subjects -->
+                    <div class="bg-white shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
+                        <p class="text-xs sm:text-sm text-gray-500">Subjects</p>
+                        <h3 class="text-xl sm:text-2xl font-bold mt-1 fade-in" id="subjectsCount">6</h3>
                     </div>
 
-                    <div class="bg-yellow-50 p-6 rounded-2xl">
-                        <p class="text-sm text-gray-500">Pending Assignments</p>
-                        <h3 class="text-2xl font-bold">3</h3>
+                    <!-- Assignments -->
+                    <div class="bg-white shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
+                        <p class="text-xs sm:text-sm text-gray-500">Pending Assignments</p>
+                        <h3 class="text-xl sm:text-2xl font-bold mt-1 fade-in" id="pendingAssignments">1</h3>
                     </div>
 
-                    <div class="bg-purple-50 p-6 rounded-2xl">
-                        <p class="text-sm text-gray-500">Average Score</p>
-                        <h3 class="text-2xl font-bold">78%</h3>
+                    <!-- Score -->
+                    <div class="bg-white shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
+                        <p class="text-xs sm:text-sm text-gray-500">Average Score</p>
+                        <h3 class="text-xl sm:text-2xl font-bold mt-1 fade-in" id="averageScore">89%</h3>
                     </div>
                 </div>
 
+                <!-- MAIN GRID -->
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-                    <!-- LEFT SIDE -->
+                    <!-- LEFT -->
                     <div class="lg:col-span-7 space-y-6">
-
-                        <div class="bg-white p-6 rounded-2xl">
-                            <h3 class="font-semibold mb-4">Upcoming Assignments</h3>
-                            <ul class="text-sm space-y-3">
-                                <li>📘 Math – Algebra Worksheet <span class="text-red-500">(Due Tomorrow)</span></li>
-                                <li>📗 English – Essay Writing <span class="text-yellow-500">(2 days left)</span></li>
-                                <li>🔬 Science – Lab Report <span class="text-green-500">(Submitted)</span></li>
+                        <!-- ASSIGNMENTS -->
+                        <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
+                            <h3 class="font-semibold mb-4 text-sm sm:text-base">Upcoming Assignments</h3>
+                            <ul class="text-sm space-y-3 fade-in" id="assignmentsList">
+                                <li class="flex justify-between">
+                                    <span class="truncate">📘 Example Assignment</span>
+                                    <span class="text-gray-500 text-xs">Pending</span>
+                                </li>
                             </ul>
                         </div>
 
-                        <div class="bg-white p-6 rounded-2xl">
-                            <h3 class="font-semibold mb-4">Upcoming Exams</h3>
-                            <p class="text-sm">📐 Mathematics – 12 Oct 2023</p>
-                            <p class="text-sm">📘 English – 15 Oct 2023</p>
+                        <!-- EXAMS -->
+                        <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
+                            <h3 class="font-semibold mb-4 text-sm sm:text-base">Upcoming Exams</h3>
+                            <div class="fade-in space-y-2" id="examsList">
+                                <ul class="space-y-2 text-sm">
+
+                                    <li class="p-3 bg-blue-50 rounded-xl">
+                                        <p class="font-medium">Math Midterm</p>
+                                        <p class="text-xs text-gray-500">10 April 2026</p>
+                                    </li>
+
+                                    <li class="p-3 bg-indigo-50 rounded-xl">
+                                        <p class="font-medium">Science Practical</p>
+                                        <p class="text-xs text-gray-500">15 April 2026</p>
+                                    </li>
+
+                                    <li class="p-3 bg-purple-50 rounded-xl">
+                                        <p class="font-medium">English Final</p>
+                                        <p class="text-xs text-gray-500">25 April 2026</p>
+                                    </li>
+
+                                </ul>
+                            </div>
                         </div>
 
-                        <div class="bg-white p-6 rounded-2xl">
-                            <h3 class="font-semibold mb-3">Notices</h3>
-                            <p class="text-sm">📢 Unit Test from next Monday</p>
-                            <p class="text-sm">🎉 Annual Day Registration Open</p>
-                        </div>
+                        <!-- NOTICES -->
+                        <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
+                            <h3 class="font-semibold mb-3 text-sm sm:text-base">Notices</h3>
+                            <div class="fade-in space-y-2" id="noticesList">
 
-                        <!-- Upcoming Events -->
-                        <div class="bg-white p-5 sm:p-6 rounded-2xl">
-                            <h3 class="font-semibold mb-4">Upcoming Events</h3>
-
-                            <div class="space-y-3 text-sm">
-                                
-                                <div class="p-4 border rounded-xl flex justify-between items-center">
-                                    <div>
-                                        <p class="font-medium">Annual Sports Day</p>
-                                        <p class="text-gray-500 text-xs">22 Oct • 8:30 AM</p>
-                                    </div>
-                                    <span class="px-2 py-1 text-xs bg-green-100 text-green-600 rounded-lg">
-                                        Activity
-                                    </span>
+                                <div class="p-3 border rounded-xl">
+                                    <p class="font-medium text-sm truncate">📢 Final Exam Schedule Released</p>
+                                    <p class="text-xs text-gray-500">25 Mar 2026</p>
                                 </div>
 
-                                <div class="p-4 border rounded-xl flex justify-between items-center">
-                                    <div>
-                                        <p class="font-medium">Diwali Holidays</p>
-                                        <p class="text-gray-500 text-xs">20 Oct</p>
-                                    </div>
-                                    <span class="px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded-lg">
-                                        Holiday
-                                    </span>
+                                <div class="p-3 border rounded-xl">
+                                    <p class="font-medium text-sm truncate">📅 Parent Meeting Notice</p>
+                                    <p class="text-xs text-gray-500">20 Mar 2026</p>
+                                </div>
+
+                                <div class="p-3 border rounded-xl">
+                                    <p class="font-medium text-sm truncate">📚 Library Return Reminder</p>
+                                    <p class="text-xs text-gray-500">18 Mar 2026</p>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- LIBRARY -->
+                        <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm hover:shadow-md transition">
+                            <h3 class="font-semibold mb-4 text-sm sm:text-base">Issued Library Books</h3>
+                            <div class="fade-in space-y-2" id="libraryList">
+
+                                <div class="p-3 border rounded-xl">
+                                    <p class="font-medium text-sm truncate">📘 Mathematics Guide</p>
+                                    <p class="text-xs text-gray-500">Issued: 01 Mar 2026</p>
+                                    <p class="text-xs text-red-500">Overdue</p>
+                                </div>
+
+                                <div class="p-3 border rounded-xl">
+                                    <p class="font-medium text-sm truncate">📗 Science Practical</p>
+                                    <p class="text-xs text-gray-500">Issued: 05 Mar 2026</p>
+                                    <p class="text-xs text-red-500">Overdue</p>
+                                </div>
+
+                                <div class="p-3 border rounded-xl">
+                                    <p class="font-medium text-sm truncate">📙 English Grammar</p>
+                                    <p class="text-xs text-gray-500">Issued: 10 Mar 2026</p>
+                                    <p class="text-xs text-green-600">Issued</p>
+                                </div>
+
+                                <div class="p-3 border rounded-xl">
+                                    <p class="font-medium text-sm truncate">📕 History Notes</p>
+                                    <p class="text-xs text-gray-500">Issued: 12 Mar 2026</p>
+                                    <p class="text-xs text-green-600">Issued</p>
+                                </div>
+
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- RIGHT SIDE -->
+                    <!-- RIGHT -->
                     <div class="lg:col-span-5 space-y-6">
-
-                        <div class="bg-white p-6 rounded-2xl text-center">
-                            <h3 class="font-semibold mb-2">Attendance Overview</h3>
-                            <div class="relative w-full h-40">
-                                <canvas id="attendanceChart"></canvas>
+                        <!-- PERFORMANCE CHART -->
+                        <div
+                            class="bg-white p-4 sm:p-6 rounded-2xl text-center relative shadow-sm hover:shadow-md transition">
+                            <h3 class="font-semibold mb-2 text-sm sm:text-base">Performance Overview</h3>
+                            <div class="relative w-full h-40 sm:h-48">
+                                <canvas id="examChartDashboard"></canvas>
                             </div>
                         </div>
 
-                        <div class="bg-white p-6 rounded-2xl">
-                            <h3 class="font-semibold mb-3">Subjects</h3>
-                            <ul class="text-sm space-y-2">
-                                <li>📘 Mathematics</li>
-                                <li>📗 English</li>
-                                <li>🔬 Science</li>
-                                <li>🌍 Social Studies</li>
-                                <li>💻 Computer</li>
-                            </ul>
-                        </div>
+                        <!-- ATTENDANCE CHART -->
+                        <div class="lg:col-span-5 bg-white rounded-2xl p-6 flex flex-col items-center shadow-sm">
+                            <h3 class="font-semibold mb-3">Attendance Overview</h3>
 
-                        <!-- Issued Books -->
-                        <div class="bg-white p-5 sm:p-6 rounded-2xl">
-                            <h3 class="font-semibold mb-4">Issued Library Books</h3>
-
-                            <div class="space-y-3 text-sm">
-                                <div class="p-4 border rounded-xl flex justify-between items-center">
-                                    <div>
-                                        <p class="font-medium">📘 Physics – Fundamentals</p>
-                                        <p class="text-gray-500 text-xs">Issued on 01 Oct 2023</p>
-                                    </div>
-                                    <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-lg">
-                                        Due in 3 days
-                                    </span>
-                                </div>
-
-                                <div class="p-4 border rounded-xl flex justify-between items-center">
-                                    <div>
-                                        <p class="font-medium">📕 History – Modern India</p>
-                                        <p class="text-gray-500 text-xs">Issued on 28 Sep 2023</p>
-                                    </div>
-                                    <span class="px-2 py-1 text-xs bg-red-100 text-red-600 rounded-lg">
-                                        Overdue
-                                    </span>
-                                </div>
+                            <div class="w-48 h-48">
+                                <canvas id="attendanceChartDashboard"></canvas>
                             </div>
-                        </div>
 
+                            <p class="text-sm text-gray-500 mt-3">Current Academic Year</p>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- ================= ATTENDANCE SECTION ================= -->
-            <section id="attendance" class="section p-4 sm:p-6 space-y-6">
+            <!-- ASSIGNMENTS SECTION -->
+            <section class="section p-4 sm:p-6 space-y-6 hidden" id="assignmentsSection">
 
-                <!-- Attendance Summary -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                    <div class="bg-green-50 p-5 rounded-2xl">
-                        <p class="text-sm text-gray-500">Overall Attendance</p>
-                        <h3 class="text-xl sm:text-2xl font-bold">92%</h3>
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 
+      flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-white text-lg sm:text-xl font-semibold">Assignments</h2>
+                        <p class="text-white text-xs sm:text-sm opacity-90">Track and manage your work</p>
                     </div>
-                    <div class="bg-blue-50 p-5 rounded-2xl">
-                        <p class="text-sm text-gray-500">Present Days</p>
-                        <h3 class="text-xl sm:text-2xl font-bold">138</h3>
+
+                    <input type="text" id="assignmentSearch" placeholder="Search assignments..." class="w-full sm:w-64 px-4 py-2 rounded-xl text-sm 
+      border border-white/30 bg-white/90 focus:outline-none focus:ring-2 focus:ring-white" />
+                </div>
+
+
+                <!-- FILTER TABS -->
+                <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                    <!-- SCROLLABLE TABS -->
+                    <div class="flex overflow-x-auto no-scrollbar border-b text-sm font-medium">
+                        <button class="tab-btn active flex-shrink-0 px-4 py-3 capitalize whitespace-nowrap"
+                            data-tab="all">
+                            all <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">3</span>
+                        </button>
+                        <button class="tab-btn flex-shrink-0 px-4 py-3 capitalize whitespace-nowrap" data-tab="new">
+                            new <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">1</span>
+                        </button>
+                        <button class="tab-btn flex-shrink-0 px-4 py-3 capitalize whitespace-nowrap" data-tab="pending">
+                            pending <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">1</span>
+                        </button>
+                        <button class="tab-btn flex-shrink-0 px-4 py-3 capitalize whitespace-nowrap"
+                            data-tab="submitted">
+                            submitted <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">1</span>
+                        </button>
+                        <button class="tab-btn flex-shrink-0 px-4 py-3 capitalize whitespace-nowrap" data-tab="late">
+                            late <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">0</span>
+                        </button>
                     </div>
-                    <div class="bg-red-50 p-5 rounded-2xl">
-                        <p class="text-sm text-gray-500">Absent Days</p>
-                        <h3 class="text-xl sm:text-2xl font-bold">12</h3>
-                    </div>
-                    <div class="bg-yellow-50 p-5 rounded-2xl">
-                        <p class="text-sm text-gray-500">Late Entries</p>
-                        <h3 class="text-xl sm:text-2xl font-bold">5</h3>
+
+                    <!-- ASSIGNMENT LIST -->
+                    <div class="p-4 sm:p-5 grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+
+                        <!-- Assignment cards with data-tab attribute -->
+                        <div class="assignment-card" data-tab="new">
+                            <p class="text-xs text-gray-500">Math</p>
+                            <h4 class="font-semibold text-sm sm:text-base line-clamp-2">Algebra Homework</h4>
+                            <p class="text-xs text-gray-400 mt-1">Due: 2026-03-30</p>
+                            <span
+                                class="inline-block mt-2 text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-600">New</span>
+                        </div>
+
+                        <div class="assignment-card" data-tab="pending">
+                            <p class="text-xs text-gray-500">Science</p>
+                            <h4 class="font-semibold text-sm sm:text-base line-clamp-2">Physics Lab Report</h4>
+                            <p class="text-xs text-gray-400 mt-1">Due: 2026-03-29</p>
+                            <span
+                                class="inline-block mt-2 text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-600">Pending</span>
+                        </div>
+
+                        <div class="assignment-card" data-tab="submitted">
+                            <p class="text-xs text-gray-500">History</p>
+                            <h4 class="font-semibold text-sm sm:text-base line-clamp-2">WWII Essay</h4>
+                            <p class="text-xs text-gray-400 mt-1">Due: 2026-03-28</p>
+                            <span
+                                class="inline-block mt-2 text-xs px-2 py-1 rounded-full bg-green-100 text-green-600">Submitted</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Chart + Monthly Stats -->
+                <script>
+
+                </script>
+            </section>
+
+            <!-- HOSTEL SECTION -->
+            <section class="section p-4 sm:p-6 space-y-6 hidden" id="studhostelSection">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-5 sm:p-6 rounded-2xl shadow-md 
+      flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-semibold">🏠 Hostel</h3>
+                        <p class="text-xs sm:text-sm opacity-90">
+                            Manage your hostel details and stay information
+                        </p>
+                    </div>
+
+                    <button id="openComplaintBtn"
+                        class="w-full sm:w-auto px-4 py-2 bg-white text-emerald-600 rounded-xl text-sm font-medium hover:bg-gray-100 transition">
+                        Raise Complaint
+                    </button>
+                </div>
+
+                <!-- STATS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">Room Number</p>
+                        <h4 class="text-lg sm:text-xl font-semibold">A-101</h4>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">Room Type</p>
+                        <h4 class="text-lg sm:text-xl font-semibold">Double Sharing</h4>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">Fee Status</p>
+                        <h4 class="text-lg sm:text-xl font-semibold text-green-600">Paid</h4>
+                    </div>
+
+                </div>
+
+                <!-- DETAILS -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+
+                    <!-- ROOM DETAILS -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
+                        <h4 class="font-semibold text-sm sm:text-base">Room Details</h4>
+
+                        <div class="text-xs sm:text-sm space-y-2 text-gray-600">
+                            <p><span class="font-medium">Block:</span> A</p>
+                            <p><span class="font-medium">Floor:</span> 1</p>
+                            <p><span class="font-medium">Check-in Date:</span> 2026-01-10</p>
+                            <p><span class="font-medium">Bed Number:</span> 2</p>
+                        </div>
+                    </div>
+
+                    <!-- WARDEN -->
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm space-y-3">
+                        <h4 class="font-semibold text-sm sm:text-base">Warden Details</h4>
+
+                        <div class="text-xs sm:text-sm space-y-2 text-gray-600">
+                            <p><span class="font-medium">Name:</span> Mr. Sharma</p>
+                            <p><span class="font-medium">Contact:</span> 9876543210</p>
+                            <p><span class="font-medium">Email:</span> warden@school.com</p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ROOMMATES -->
+                <div class="bg-white p-4 sm:p-5 rounded-2xl shadow-sm">
+                    <h4 class="font-semibold mb-3 text-sm sm:text-base">Roommates</h4>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-3 bg-gray-50 rounded-xl">
+                            <p class="font-medium text-sm">Rahul Patil</p>
+                            <p class="text-[11px] text-gray-500">ID: STU102</p>
+                        </div>
+
+                        <div class="p-3 bg-gray-50 rounded-xl">
+                            <p class="font-medium text-sm">Aman Khan</p>
+                            <p class="text-[11px] text-gray-500">ID: STU103</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COMPLAINTS -->
+                <div class="bg-white rounded-2xl shadow-sm">
+
+                    <div class="p-4 sm:p-5 border-b flex justify-between items-center">
+                        <h4 class="font-semibold text-sm sm:text-base">Complaints</h4>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs sm:text-sm min-w-[400px]">
+
+                            <thead class="bg-gray-50 text-gray-500">
+                                <tr>
+                                    <th class="py-3 px-3 text-left">Issue</th>
+                                    <th class="text-left px-3">Status</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y">
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-3">Fan not working</td>
+                                    <td class="px-3">
+                                        <span
+                                            class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-600">Pending</span>
+                                    </td>
+                                </tr>
+
+                                <tr class="hover:bg-gray-50">
+                                    <td class="py-3 px-3">Water leakage</td>
+                                    <td class="px-3">
+                                        <span
+                                            class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">Resolved</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- MODAL -->
+            <div id="complaintModal"
+                class="hidden fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50">
+
+                <div class="bg-white rounded-t-2xl sm:rounded-2xl p-5 w-full sm:max-w-md shadow-lg space-y-4">
+
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-base sm:text-lg font-semibold">Raise Complaint</h3>
+                        <button id="closeComplaintBtn" class="text-gray-500 hover:text-red-500">✕</button>
+                    </div>
+
+                    <textarea rows="4" placeholder="Describe your issue..."
+                        class="w-full border rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
+
+                    <div class="flex flex-col sm:flex-row justify-end gap-2">
+                        <button id="cancelComplaintBtn" class="px-4 py-2 text-sm rounded-lg border">Cancel</button>
+                        <button class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">Submit</button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- LIBRARY SECTION -->
+            <section id="librarySection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-5 sm:p-6 rounded-2xl shadow-md 
+        flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-semibold">📚 Library</h3>
+                        <p class="text-xs sm:text-sm opacity-90">
+                            Manage your issued books and track due dates
+                        </p>
+                    </div>
+
+                    <input type="text" id="librarySearch" placeholder="Search books..." class="w-full sm:w-64 px-4 py-2 rounded-xl text-sm text-black 
+            bg-white/90 focus:outline-none focus:ring-2 focus:ring-white/50" />
+                </div>
+
+                <!-- STATS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">Total Books</p>
+                        <h4 id="totalBooks" class="text-lg sm:text-xl font-semibold">5</h4>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">Overdue</p>
+                        <h4 id="overdueBooks" class="text-lg sm:text-xl font-semibold text-red-500">2</h4>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">Fine Due</p>
+                        <h4 id="fineDue" class="text-lg sm:text-xl font-semibold text-red-500">₹120</h4>
+                    </div>
+                </div>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-2xl shadow-sm">
+
+                    <div class="p-4 sm:p-5 border-b">
+                        <h4 class="font-semibold text-sm sm:text-base">Issued Books</h4>
+                    </div>
+
+                    <!-- DESKTOP -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-sm min-w-[700px]">
+                            <thead class="bg-gray-50 text-gray-500">
+                                <tr>
+                                    <th class="py-3 px-4 text-left">Book</th>
+                                    <th class="text-left px-2">Issue</th>
+                                    <th class="text-left px-2">Due</th>
+                                    <th class="text-left px-2">Days Left</th>
+                                    <th class="text-left px-2">Fine (₹)</th>
+                                    <th class="text-left px-2">Status</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Mathematics Guide</td>
+                                    <td class="px-2">01 Mar 2026</td>
+                                    <td class="px-2">15 Mar 2026</td>
+                                    <td class="px-2 text-red-500">-14</td>
+                                    <td class="px-2">₹70</td>
+                                    <td class="px-2 text-red-600 font-medium">Overdue</td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Science Practical</td>
+                                    <td class="px-2">05 Mar 2026</td>
+                                    <td class="px-2">20 Mar 2026</td>
+                                    <td class="px-2 text-red-500">-9</td>
+                                    <td class="px-2">₹50</td>
+                                    <td class="px-2 text-red-600 font-medium">Overdue</td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">English Grammar</td>
+                                    <td class="px-2">10 Mar 2026</td>
+                                    <td class="px-2">30 Mar 2026</td>
+                                    <td class="px-2 text-green-600">1</td>
+                                    <td class="px-2">₹0</td>
+                                    <td class="px-2 text-green-600 font-medium">Issued</td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">History Notes</td>
+                                    <td class="px-2">12 Mar 2026</td>
+                                    <td class="px-2">02 Apr 2026</td>
+                                    <td class="px-2 text-green-600">4</td>
+                                    <td class="px-2">₹0</td>
+                                    <td class="px-2 text-green-600 font-medium">Issued</td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Computer Basics</td>
+                                    <td class="px-2">15 Mar 2026</td>
+                                    <td class="px-2">05 Apr 2026</td>
+                                    <td class="px-2 text-green-600">7</td>
+                                    <td class="px-2">₹0</td>
+                                    <td class="px-2 text-green-600 font-medium">Issued</td>
+                                </tr>
+
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- MOBILE -->
+                    <div class="md:hidden p-4 space-y-3">
+
+                        <div class="bg-gray-50 p-3 rounded-xl">
+                            <p class="font-medium">Mathematics Guide</p>
+                            <p class="text-xs text-gray-500">Due: 15 Mar 2026</p>
+                            <p class="text-red-600 text-sm">Overdue | Fine ₹70</p>
+                        </div>
+
+                        <div class="bg-gray-50 p-3 rounded-xl">
+                            <p class="font-medium">Science Practical</p>
+                            <p class="text-xs text-gray-500">Due: 20 Mar 2026</p>
+                            <p class="text-red-600 text-sm">Overdue | Fine ₹50</p>
+                        </div>
+
+                        <div class="bg-gray-50 p-3 rounded-xl">
+                            <p class="font-medium">English Grammar</p>
+                            <p class="text-xs text-gray-500">Due: 30 Mar 2026</p>
+                            <p class="text-green-600 text-sm">Issued</p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- NOTICES SECTION -->
+            <section id="noticesSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white p-5 sm:p-6 rounded-2xl shadow-md 
+        flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-semibold">📢 Notices</h3>
+                        <p class="text-xs sm:text-sm opacity-90">
+                            Stay updated with latest announcements
+                        </p>
+                    </div>
+
+                </div>
+
+                <!-- STATS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">Total Notices</p>
+                        <h4 id="noticeTotal" class="text-lg sm:text-xl font-semibold">6</h4>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">Important</p>
+                        <h4 id="noticeImportant" class="text-lg sm:text-xl font-semibold text-red-500">2</h4>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm">
+                        <p class="text-xs text-gray-500">This Week</p>
+                        <h4 id="noticeWeek" class="text-lg sm:text-xl font-semibold">3</h4>
+                    </div>
+                </div>
+
+                <!-- LIST -->
+                <div class="bg-white rounded-2xl shadow-sm">
+
+                    <div class="p-4 sm:p-5 border-b">
+                        <h4 class="font-semibold text-sm sm:text-base">Recent Notices</h4>
+                    </div>
+
+                    <!-- DESKTOP TABLE -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-sm min-w-[700px]">
+                            <thead class="bg-gray-50 text-gray-500">
+                                <tr>
+                                    <th class="py-3 px-4 text-left">Title</th>
+                                    <th class="text-left px-2">Category</th>
+                                    <th class="text-left px-2">Date</th>
+                                    <th class="text-center px-2">Priority</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Final Exam Schedule Released</td>
+                                    <td class="px-2">Exams</td>
+                                    <td class="px-2">25 Mar 2026</td>
+                                    <td class="px-2 text-center">
+                                        <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-600">High</span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Holiday Announcement</td>
+                                    <td class="px-2">General</td>
+                                    <td class="px-2">22 Mar 2026</td>
+                                    <td class="px-2 text-center">
+                                        <span
+                                            class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">Low</span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Parent Meeting Notice</td>
+                                    <td class="px-2">Meeting</td>
+                                    <td class="px-2">20 Mar 2026</td>
+                                    <td class="px-2 text-center">
+                                        <span
+                                            class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-600">Medium</span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Library Book Return Reminder</td>
+                                    <td class="px-2">Library</td>
+                                    <td class="px-2">18 Mar 2026</td>
+                                    <td class="px-2 text-center">
+                                        <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-600">High</span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">Sports Day Registration</td>
+                                    <td class="px-2">Sports</td>
+                                    <td class="px-2">15 Mar 2026</td>
+                                    <td class="px-2 text-center">
+                                        <span
+                                            class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-600">Medium</span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td class="px-4 py-3 font-medium">New Course Materials Available</td>
+                                    <td class="px-2">Academic</td>
+                                    <td class="px-2">12 Mar 2026</td>
+                                    <td class="px-2 text-center">
+                                        <span
+                                            class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">Low</span>
+                                    </td>
+                                </tr>
+
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- MOBILE -->
+                    <div class="md:hidden p-4 space-y-3">
+
+                        <div class="bg-gray-50 p-3 rounded-xl">
+                            <p class="font-medium">Final Exam Schedule Released</p>
+                            <p class="text-xs text-gray-500">25 Mar 2026 • Exams</p>
+                            <span class="text-xs text-red-600">High Priority</span>
+                        </div>
+
+                        <div class="bg-gray-50 p-3 rounded-xl">
+                            <p class="font-medium">Holiday Announcement</p>
+                            <p class="text-xs text-gray-500">22 Mar 2026 • General</p>
+                            <span class="text-xs text-green-600">Low Priority</span>
+                        </div>
+
+                        <div class="bg-gray-50 p-3 rounded-xl">
+                            <p class="font-medium">Parent Meeting Notice</p>
+                            <p class="text-xs text-gray-500">20 Mar 2026 • Meeting</p>
+                            <span class="text-xs text-yellow-600">Medium Priority</span>
+                        </div>
+
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- ======================== ATTENDANCE SECTION ===========================================-->
+            <section id="attendanceSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl p-5 sm:p-6">
+                    <h3 class="font-semibold text-lg sm:text-xl">Attendance Overview</h3>
+                </div>
+
+                <!-- SUMMARY -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-green-50 p-4 rounded-2xl">
+                        <p class="text-sm text-gray-500">Overall Attendance</p>
+                        <h3 id="attPercent" class="text-xl font-bold">82%</h3>
+                    </div>
+
+                    <div class="bg-blue-50 p-4 rounded-2xl">
+                        <p class="text-sm text-gray-500">Present Days</p>
+                        <h3 id="attPresent" class="text-xl font-bold">164</h3>
+                    </div>
+
+                    <div class="bg-red-50 p-4 rounded-2xl">
+                        <p class="text-sm text-gray-500">Absent Days</p>
+                        <h3 id="attAbsent" class="text-xl font-bold">28</h3>
+                    </div>
+
+                    <div class="bg-yellow-50 p-4 rounded-2xl">
+                        <p class="text-sm text-gray-500">Late Entries</p>
+                        <h3 id="attLate" class="text-xl font-bold">6</h3>
+                    </div>
+                </div>
+
+                <!-- CHART + MONTHLY -->
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                    <!-- Attendance Chart -->
-                    <div class="lg:col-span-5 bg-white rounded-2xl p-5 sm:p-6 text-center">
+                    <!-- CHART -->
+                    <div class="lg:col-span-5 bg-white rounded-2xl p-6 flex flex-col items-center shadow-sm">
                         <h3 class="font-semibold mb-3">Attendance Overview</h3>
-                        <div class="relative w-full h-48">
-                            <canvas id="attendanceDonut"></canvas>
+
+                        <div class="w-48 h-48">
+                            <canvas id="attendanceChartSection"></canvas>
                         </div>
+
                         <p class="text-sm text-gray-500 mt-3">Current Academic Year</p>
                     </div>
 
-                    <!-- Monthly Breakdown -->
-                    <div class="lg:col-span-7 bg-white rounded-2xl p-5 sm:p-6">
-                        <h3 class="font-semibold mb-4">Monthly Attendance (Demo)</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                            <div class="p-4 rounded-xl bg-gray-50">
-                                <p class="text-gray-500">January</p>
-                                <p class="font-semibold">94%</p>
-                            </div>
-                            <div class="p-4 rounded-xl bg-gray-50">
-                                <p class="text-gray-500">February</p>
-                                <p class="font-semibold">91%</p>
-                            </div>
-                            <div class="p-4 rounded-xl bg-gray-50">
-                                <p class="text-gray-500">March</p>
-                                <p class="font-semibold">89%</p>
-                            </div>
+                    <!-- MONTHLY -->
+                    <div class="lg:col-span-7 bg-white rounded-2xl p-6 shadow-sm">
+                        <h3 class="font-semibold mb-4">Monthly Attendance</h3>
+
+                        <div id="monthlyAttendance"
+                            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-sm">
+
+                            <div class="bg-green-50 p-3 rounded-xl">Jan - 85%</div>
+                            <div class="bg-green-50 p-3 rounded-xl">Feb - 80%</div>
+                            <div class="bg-yellow-50 p-3 rounded-xl">Mar - 75%</div>
+                            <div class="bg-green-50 p-3 rounded-xl">Apr - 88%</div>
+                            <div class="bg-green-50 p-3 rounded-xl">May - 90%</div>
+                            <div class="bg-red-50 p-3 rounded-xl">Jun - 65%</div>
+                            <div class="bg-green-50 p-3 rounded-xl">Jul - 84%</div>
+                            <div class="bg-green-50 p-3 rounded-xl">Aug - 87%</div>
+
                         </div>
                     </div>
                 </div>
 
-                <!-- Recent Attendance Records -->
-                <div class="bg-white rounded-2xl p-5 sm:p-6 overflow-x-auto">
+                <!-- RECENT RECORDS -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm">
+
                     <h3 class="font-semibold mb-4">Recent Attendance</h3>
-                    <table class="w-full text-sm">
-                        <thead class="text-gray-500 border-b">
-                            <tr>
-                                <th class="py-2 text-left">Date</th>
-                                <th class="py-2 text-left">Day</th>
-                                <th class="py-2 text-left">Status</th>
-                                <th class="py-2 text-left">Remarks</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="border-b">
-                                <td class="py-2">12 Oct 2023</td>
-                                <td>Thursday</td>
-                                <td class="text-green-600 font-medium">Present</td>
-                                <td>-</td>
-                            </tr>
-                            <tr class="border-b">
-                                <td class="py-2">11 Oct 2023</td>
-                                <td>Wednesday</td>
-                                <td class="text-red-500 font-medium">Absent</td>
-                                <td>Medical Leave</td>
-                            </tr>
-                            <tr>
-                                <td class="py-2">10 Oct 2023</td>
-                                <td>Tuesday</td>
-                                <td class="text-yellow-500 font-medium">Late</td>
-                                <td>Bus Delay</td>
-                            </tr>
-                        </tbody>
-                    </table>
+
+                    <!-- DESKTOP -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-sm min-w-[600px]">
+                            <thead class="text-gray-500 border-b">
+                                <tr>
+                                    <th class="py-2 text-left">Date</th>
+                                    <th class="text-left">Day</th>
+                                    <th class="text-left">Status</th>
+                                    <th class="text-left">Remarks</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="attendanceTable">
+                                <tr class="border-b">
+                                    <td class="py-2">2026-03-20</td>
+                                    <td>Friday</td>
+                                    <td class="text-green-600 font-medium">Present</td>
+                                    <td>On time</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="py-2">2026-03-19</td>
+                                    <td>Thursday</td>
+                                    <td class="text-yellow-600 font-medium">Late</td>
+                                    <td>10 min late</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="py-2">2026-03-18</td>
+                                    <td>Wednesday</td>
+                                    <td class="text-red-600 font-medium">Absent</td>
+                                    <td>Sick leave</td>
+                                </tr>
+                                <tr class="border-b">
+                                    <td class="py-2">2026-03-17</td>
+                                    <td>Tuesday</td>
+                                    <td class="text-green-600 font-medium">Present</td>
+                                    <td>-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- MOBILE -->
+                    <div id="attendanceMobile" class="md:hidden space-y-3">
+
+                        <div class="p-3 bg-gray-50 rounded-xl">
+                            <p class="font-medium">2026-03-20 (Friday)</p>
+                            <p class="text-green-600 text-sm">Present</p>
+                            <p class="text-xs text-gray-500">On time</p>
+                        </div>
+
+                        <div class="p-3 bg-gray-50 rounded-xl">
+                            <p class="font-medium">2026-03-19 (Thursday)</p>
+                            <p class="text-yellow-600 text-sm">Late</p>
+                            <p class="text-xs text-gray-500">10 min late</p>
+                        </div>
+
+                    </div>
                 </div>
 
-                <!-- Extra Features -->
-                <div
-                    class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <!-- DOWNLOAD -->
+                <div class="bg-white rounded-2xl p-6 flex flex-col sm:flex-row justify-between gap-4 shadow-sm">
                     <div>
                         <h3 class="font-semibold">Download Attendance Report</h3>
-                        <p class="text-sm text-gray-500">PDF for parent & student reference</p>
+                        <p class="text-sm text-gray-500">PDF for reference</p>
                     </div>
-                    <button class="bg-purple-600 text-white px-5 py-2 rounded-xl text-sm hover:bg-purple-700">
+
+                    <button id="downloadBtn"
+                        class="bg-purple-600 text-white px-5 py-2 rounded-xl text-sm hover:bg-purple-700 transition">
                         Download PDF
                     </button>
                 </div>
 
             </section>
 
-            <!-- ================= SUBJECTS SECTION ================= -->
-            <section id="subjects" class="section p-4 sm:p-6 space-y-6">
+            <!-- TIMETABLE SECTION -->
+            <section id="timetableSection" class="section hidden p-4 sm:p-6 space-y-6">
 
-                <!-- Subjects Overview -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                    <div class="bg-purple-50 p-5 rounded-2xl">
-                        <p class="text-sm text-gray-500">Total Subjects</p>
-                        <h3 class="text-xl sm:text-2xl font-bold">6</h3>
-                    </div>
-                    <div class="bg-green-50 p-5 rounded-2xl">
-                        <p class="text-sm text-gray-500">Completed Topics</p>
-                        <h3 class="text-xl sm:text-2xl font-bold">42</h3>
-                    </div>
-                    <div class="bg-yellow-50 p-5 rounded-2xl">
-                        <p class="text-sm text-gray-500">Pending Topics</p>
-                        <h3 class="text-xl sm:text-2xl font-bold">8</h3>
-                    </div>
-                    <div class="bg-blue-50 p-5 rounded-2xl">
-                        <p class="text-sm text-gray-500">Avg Performance</p>
-                        <h3 class="text-xl sm:text-2xl font-bold">78%</h3>
+                <!-- LOADER -->
+                <div id="timetableLoader" class="flex justify-center items-center py-20 hidden">
+                    <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin">
                     </div>
                 </div>
 
-                <!-- Subject Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- CONTENT -->
+                <div id="timetableContent">
 
-                    <!-- Mathematics -->
-                    <div class="bg-white rounded-2xl p-5 sm:p-6 space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-semibold text-lg">📐 Mathematics</h3>
-                            <span class="text-sm text-gray-500">Mr. R Sharma</span>
-                        </div>
+                    <!-- HEADER -->
+                    <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl p-5 sm:p-6">
+                        <h3 class="font-semibold text-lg sm:text-xl">Weekly Timetable</h3>
+                        <p class="text-xs sm:text-sm opacity-90">
+                            Class 10 • A
+                        </p>
+                    </div>
 
-                        <div>
-                            <p class="text-sm text-gray-500 mb-1">Syllabus Progress</p>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-purple-600 h-2 rounded-full" style="width: 85%"></div>
+                    <!-- DESKTOP TABLE -->
+                    <div class="hidden md:block bg-white rounded-2xl p-5 sm:p-6 shadow-sm overflow-x-auto">
+                        <table class="w-full text-sm text-center border-collapse min-w-[700px]">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="p-3 text-left">Day</th>
+                                    <th class="p-3">09:00–10:00</th>
+                                    <th class="p-3">10:00–11:00</th>
+                                    <th class="p-3">11:00–12:00</th>
+                                    <th class="p-3">01:00–02:00</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="font-medium text-left px-3 py-2">Monday</td>
+                                    <td>Math</td>
+                                    <td>Science</td>
+                                    <td>English</td>
+                                    <td>Computer</td>
+                                </tr>
+
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="font-medium text-left px-3 py-2">Tuesday</td>
+                                    <td>Physics</td>
+                                    <td>Chemistry</td>
+                                    <td>Math</td>
+                                    <td>Sports</td>
+                                </tr>
+
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="font-medium text-left px-3 py-2">Wednesday</td>
+                                    <td>Biology</td>
+                                    <td>English</td>
+                                    <td>History</td>
+                                    <td>Computer</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- MOBILE VIEW -->
+                    <div class="md:hidden space-y-4">
+
+                        <div class="bg-white rounded-2xl shadow-sm p-4">
+                            <h4 class="font-semibold mb-3 text-indigo-600">Monday</h4>
+
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between bg-gray-50 px-3 py-2 rounded-lg">
+                                    <span class="text-xs">09:00–10:00</span>
+                                    <span>Math</span>
+                                </div>
+
+                                <div class="flex justify-between bg-gray-50 px-3 py-2 rounded-lg">
+                                    <span class="text-xs">10:00–11:00</span>
+                                    <span>Science</span>
+                                </div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1">85% completed</p>
                         </div>
 
-                        <div class="text-sm">
-                            <p>📘 Chapters: 14</p>
-                            <p>📝 Assignments: 5</p>
-                            <p>🧪 Next Test: 18 Oct</p>
-                        </div>
+                        <div class="bg-white rounded-2xl shadow-sm p-4">
+                            <h4 class="font-semibold mb-3 text-indigo-600">Tuesday</h4>
 
-                        <div class="flex gap-2">
-                            <button class="flex-1 bg-purple-600 text-white py-2 rounded-xl text-sm">
-                                View Details
-                            </button>
-                            <button class="flex-1 border border-gray-300 py-2 rounded-xl text-sm">
-                                Resources
-                            </button>
-                        </div>
-                    </div>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between bg-gray-50 px-3 py-2 rounded-lg">
+                                    <span class="text-xs">09:00–10:00</span>
+                                    <span>Physics</span>
+                                </div>
 
-                    <!-- English -->
-                    <div class="bg-white rounded-2xl p-5 sm:p-6 space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-semibold text-lg">📘 English</h3>
-                            <span class="text-sm text-gray-500">Ms. A Thomas</span>
-                        </div>
-
-                        <div>
-                            <p class="text-sm text-gray-500 mb-1">Syllabus Progress</p>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-green-500 h-2 rounded-full" style="width: 72%"></div>
+                                <div class="flex justify-between bg-gray-50 px-3 py-2 rounded-lg">
+                                    <span class="text-xs">10:00–11:00</span>
+                                    <span>Chemistry</span>
+                                </div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1">72% completed</p>
                         </div>
 
-                        <div class="text-sm">
-                            <p>📗 Chapters: 10</p>
-                            <p>📝 Assignments: 3</p>
-                            <p>🧪 Next Test: 20 Oct</p>
-                        </div>
+                    </div>
 
-                        <div class="flex gap-2">
-                            <button class="flex-1 bg-purple-600 text-white py-2 rounded-xl text-sm">
-                                View Details
-                            </button>
-                            <button class="flex-1 border border-gray-300 py-2 rounded-xl text-sm">
-                                Resources
+                </div>
+
+            </section>
+
+            <!-- EXAMS SECTION -->
+            <section id="examsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl p-5 sm:p-6">
+                    <h3 class="font-semibold text-lg sm:text-xl mb-1">
+                        Exams & Results
+                    </h3>
+                    <p class="text-xs sm:text-sm opacity-90">
+                        Track exams, analyze performance & download reports
+                    </p>
+                </div>
+
+                <!-- CHART + UPCOMING -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+
+                    <!-- PERFORMANCE CHART -->
+                    <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+                        <h4 class="font-semibold mb-3 text-sm sm:text-base">
+                            Performance Trend
+                        </h4>
+                        <div class="relative w-full h-52 sm:h-64">
+                            <canvas id="examChartSection"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- UPCOMING EXAMS -->
+                    <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+                        <h4 class="font-semibold mb-3 text-sm sm:text-base">
+                            Upcoming Exams
+                        </h4>
+
+                        <ul class="space-y-2 text-sm">
+
+                            <li class="p-3 bg-blue-50 rounded-xl">
+                                <p class="font-medium">Math Midterm</p>
+                                <p class="text-xs text-gray-500">10 April 2026</p>
+                            </li>
+
+                            <li class="p-3 bg-indigo-50 rounded-xl">
+                                <p class="font-medium">Science Practical</p>
+                                <p class="text-xs text-gray-500">15 April 2026</p>
+                            </li>
+
+                            <li class="p-3 bg-purple-50 rounded-xl">
+                                <p class="font-medium">English Final</p>
+                                <p class="text-xs text-gray-500">25 April 2026</p>
+                            </li>
+
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- RESULTS TABLE -->
+                <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+
+                    <!-- HEADER + FILTERS -->
+                    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
+                        <h4 class="font-semibold text-sm sm:text-base">
+                            All Results
+                        </h4>
+
+                        <div class="flex flex-wrap gap-2 items-center">
+
+                            <!-- YEAR FILTER -->
+                            <select id="yearFilter" class="border rounded-lg px-3 py-1 text-xs sm:text-sm">
+                                <option value="all">All Years</option>
+                                <option value="2024">2024</option>
+                                <option value="2025">2025</option>
+                            </select>
+
+                            <!-- EXAM FILTER -->
+                            <select id="examFilter" class="border rounded-lg px-3 py-1 text-xs sm:text-sm">
+                                <option value="all">All Exams</option>
+                                <option value="Midterm">Midterm</option>
+                                <option value="Final">Final</option>
+                            </select>
+
+                            <!-- DOWNLOAD -->
+                            <button
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm">
+                                Download PDF
                             </button>
                         </div>
                     </div>
 
-                    <!-- Science -->
-                    <div class="bg-white rounded-2xl p-5 sm:p-6 space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-semibold text-lg">🔬 Science</h3>
-                            <span class="text-sm text-gray-500">Dr. K Iyer</span>
-                        </div>
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs sm:text-sm min-w-[600px]">
+                            <thead class="text-gray-500 border-b bg-gray-50">
+                                <tr>
+                                    <th class="text-left py-2 px-2">Year</th>
+                                    <th class="text-left py-2 px-2">Exam</th>
+                                    <th class="text-left py-2 px-2">Subject</th>
+                                    <th class="text-left py-2 px-2">Marks</th>
+                                    <th class="text-left py-2 px-2">Grade</th>
+                                    <th class="text-left py-2 px-2">Remarks</th>
+                                </tr>
+                            </thead>
 
+                            <tbody>
+
+                                <tr class="border-b">
+                                    <td class="px-2 py-2">2025</td>
+                                    <td>Final</td>
+                                    <td>Mathematics</td>
+                                    <td class="font-medium">88</td>
+                                    <td class="text-green-600 font-medium">A</td>
+                                    <td>Excellent</td>
+                                </tr>
+
+                                <tr class="border-b">
+                                    <td class="px-2 py-2">2025</td>
+                                    <td>Final</td>
+                                    <td>Science</td>
+                                    <td class="font-medium">81</td>
+                                    <td class="text-green-600 font-medium">A</td>
+                                    <td>Very Good</td>
+                                </tr>
+
+                                <tr class="border-b">
+                                    <td class="px-2 py-2">2025</td>
+                                    <td>Midterm</td>
+                                    <td>English</td>
+                                    <td class="font-medium">74</td>
+                                    <td class="text-yellow-600 font-medium">B</td>
+                                    <td>Good</td>
+                                </tr>
+
+                                <tr class="border-b">
+                                    <td class="px-2 py-2">2024</td>
+                                    <td>Final</td>
+                                    <td>History</td>
+                                    <td class="font-medium">69</td>
+                                    <td class="text-yellow-600 font-medium">B</td>
+                                    <td>Needs improvement</td>
+                                </tr>
+
+                                <tr class="border-b">
+                                    <td class="px-2 py-2">2024</td>
+                                    <td>Midterm</td>
+                                    <td>Computer</td>
+                                    <td class="font-medium">92</td>
+                                    <td class="text-green-600 font-medium">A+</td>
+                                    <td>Outstanding</td>
+                                </tr>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============================= STUDENT LEAVE SECTION ============================= -->
+            <section class="section hidden p-4 sm:p-6 space-y-6" id="studentLeaveSection">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow">
+                    <h2 class="text-xl font-semibold">My Leave Requests</h2>
+                    <p class="text-sm opacity-90">Apply and track your leave</p>
+                </div>
+
+                <!-- APPLY LEAVE -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm space-y-4">
+
+                    <h3 class="font-semibold">Apply for Leave</h3>
+
+                    <!-- DATE -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <input type="date" id="sLeaveFrom" class="px-4 py-2 border rounded-xl text-sm bg-white ">
+
+                        <input type="date" id="sLeaveTo" class="px-4 py-2 border rounded-xl text-sm bg-white ">
+                    </div>
+
+                    <!-- REASON -->
+                    <textarea id="sLeaveReason" placeholder="Enter reason..."
+                        class="w-full px-4 py-2 border rounded-xl text-sm bg-white "></textarea>
+
+                    <!-- DAYS + BUTTON -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <p class="text-sm text-gray-500">
+                            Total Days: <span id="sTotalDays">0</span>
+                        </p>
+
+                        <button onclick="applyStudentLeave()"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-sm w-full sm:w-auto">
+                            Submit Request
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- HISTORY -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm">
+                    <h3 class="font-semibold mb-4">Leave History</h3>
+                    <div id="studentLeaveList" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div>
-                            <p class="text-sm text-gray-500 mb-1">Syllabus Progress</p>
-                            <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-blue-500 h-2 rounded-full" style="width: 64%"></div>
-                            </div>
-                            <p class="text-xs text-gray-500 mt-1">64% completed</p>
+                            <p>${from} → ${to} (${days} days)</p>
+                            <p class="text-xs text-gray-500">${reason}</p>
                         </div>
-
-                        <div class="text-sm">
-                            <p>🔬 Practicals: 6</p>
-                            <p>📝 Assignments: 4</p>
-                            <p>🧪 Next Test: 22 Oct</p>
-                        </div>
-
-                        <div class="flex gap-2">
-                            <button class="flex-1 bg-purple-600 text-white py-2 rounded-xl text-sm">
-                                View Details
-                            </button>
-                            <button class="flex-1 border border-gray-300 py-2 rounded-xl text-sm">
-                                Resources
-                            </button>
-                        </div>
+                        <span class="text-xs bg-yellow-100 text-yellow-600 px-3 py-1 rounded-full">
+                            Pending
+                        </span>
                     </div>
-                </div>
-
-                <!-- Extra Features -->
-                <div
-                    class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <h3 class="font-semibold">Download Subject Syllabus</h3>
-                        <p class="text-sm text-gray-500">PDF syllabus for all subjects</p>
-                    </div>
-                    <button class="bg-purple-600 text-white px-5 py-2 rounded-xl text-sm hover:bg-purple-700">
-                        Download PDF
-                    </button>
                 </div>
 
             </section>
 
-            <!-- ================= ASSIGNMENTS SECTION ================= -->
-            <section id="assignments" class="section p-4 sm:p-6 space-y-6">
+            <!-- PROFILE SECTION -->
+            <section id="profileSection" class="section hidden p-4 sm:p-6 space-y-6">
 
-                <div
-                    class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div>
-                        <h3 class="font-semibold text-lg">Assignments</h3>
-                        <p class="text-sm text-gray-500">Track, submit & review your work</p>
-                    </div>
-                    <span class="px-4 py-2 rounded-full bg-yellow-100 text-yellow-600 text-sm">
-                        3 Pending
-                    </span>
-                </div>
+                <!-- PROFILE HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 
+    flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
 
-                <div class="bg-white rounded-2xl p-5 sm:p-6 overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="text-gray-500 border-b">
-                            <tr>
-                                <th class="text-left py-2">Subject</th>
-                                <th class="text-left py-2">Title</th>
-                                <th class="text-left py-2">Due Date</th>
-                                <th class="text-left py-2">Status</th>
-                                <th class="text-left py-2">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="border-b">
-                                <td>Math</td>
-                                <td>Algebra Worksheet</td>
-                                <td>14 Oct</td>
-                                <td class="text-red-500 font-medium">Pending</td>
-                                <td>
-                                    <button class="px-3 py-1 bg-purple-600 text-white rounded-lg text-xs">
-                                        Upload
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr class="border-b">
-                                <td>English</td>
-                                <td>Essay Writing</td>
-                                <td>16 Oct</td>
-                                <td class="text-yellow-500 font-medium">In Review</td>
-                                <td>
-                                    <button class="px-3 py-1 border rounded-lg text-xs">
-                                        View
-                                    </button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Science</td>
-                                <td>Lab Report</td>
-                                <td>10 Oct</td>
-                                <td class="text-green-600 font-medium">Submitted</td>
-                                <td>
-                                    <button class="px-3 py-1 border rounded-lg text-xs">
-                                        View
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                    <img src="https://i.pravatar.cc/100"
+                        class="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white shadow" />
 
-            </section>
+                    <div class="text-center sm:text-left w-full">
+                        <h3 class="font-semibold text-lg sm:text-xl text-white">
+                            Aditya Patil
+                        </h3>
 
-            <!-- ================= EXAMS & RESULTS SECTION ================= -->
-            <section id="exams" class="section p-4 sm:p-6 space-y-6">
-
-                <div class="bg-white rounded-2xl p-5 sm:p-6">
-                    <h3 class="font-semibold text-lg mb-1">Exams & Results</h3>
-                    <p class="text-sm text-gray-500">Your upcoming exams & performance</p>
-                </div>
-
-                <div class="bg-white rounded-2xl p-5 sm:p-6">
-                    <h4 class="font-semibold mb-4">Upcoming Exams</h4>
-                    <ul class="space-y-2 text-sm">
-                        <li>📐 Mathematics — <strong>12 Oct</strong> (10:00 AM)</li>
-                        <li>📘 English — <strong>15 Oct</strong> (9:30 AM)</li>
-                        <li>🔬 Science — <strong>18 Oct</strong> (11:00 AM)</li>
-                    </ul>
-                </div>
-
-                <div class="bg-white rounded-2xl p-5 sm:p-6 overflow-x-auto">
-                    <h4 class="font-semibold mb-4">Recent Results</h4>
-                    <table class="w-full text-sm">
-                        <thead class="text-gray-500 border-b">
-                            <tr>
-                                <th class="text-left py-2">Subject</th>
-                                <th class="text-left py-2">Marks</th>
-                                <th class="text-left py-2">Grade</th>
-                                <th class="text-left py-2">Remarks</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="border-b">
-                                <td>Math</td>
-                                <td>88 / 100</td>
-                                <td class="text-green-600">A</td>
-                                <td>Very Good</td>
-                            </tr>
-                            <tr class="border-b">
-                                <td>English</td>
-                                <td>76 / 100</td>
-                                <td class="text-blue-600">B+</td>
-                                <td>Good</td>
-                            </tr>
-                            <tr>
-                                <td>Science</td>
-                                <td>82 / 100</td>
-                                <td class="text-green-600">A-</td>
-                                <td>Well Done</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-            </section>
-
-            <!-- ================= TIMETABLE SECTION ================= -->
-            <section id="timetable" class="section p-4 sm:p-6 space-y-6">
-
-                <div class="bg-white rounded-2xl p-5 sm:p-6">
-                    <h3 class="font-semibold text-lg">Weekly Timetable</h3>
-                    <p class="text-sm text-gray-500">Class 10 • Section A</p>
-                </div>
-
-                <div class="bg-white rounded-2xl p-5 sm:p-6 overflow-x-auto">
-                    <table class="w-full text-sm text-center border-collapse">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="p-2">Day</th>
-                                <th class="p-2">9–10</th>
-                                <th class="p-2">10–11</th>
-                                <th class="p-2">11–12</th>
-                                <th class="p-2">12–1</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="border-b">
-                                <td class="font-medium">Monday</td>
-                                <td>Math</td>
-                                <td>English</td>
-                                <td>Science</td>
-                                <td>Computer</td>
-                            </tr>
-                            <tr class="border-b">
-                                <td class="font-medium">Tuesday</td>
-                                <td>Science</td>
-                                <td>Math</td>
-                                <td>English</td>
-                                <td>Library</td>
-                            </tr>
-                            <tr>
-                                <td class="font-medium">Wednesday</td>
-                                <td>Math</td>
-                                <td>Computer</td>
-                                <td>Science</td>
-                                <td>Sports</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-            </section>
-
-            <!-- ================= STUDENT PROFILE SECTION ================= -->
-            <section id="profile" class="section p-4 sm:p-6 space-y-6">
-
-                <div class="bg-white rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                    <img src="https://i.pravatar.cc/100" class="w-20 h-20 sm:w-24 sm:h-24 rounded-full">
-                    <div class="text-center sm:text-left">
-                        <h3 class="font-semibold text-xl">Aditya</h3>
-                        <p class="text-sm text-gray-500">Class 10 • Section A • Roll No: 23</p>
+                        <p class="text-xs sm:text-sm text-white mt-1 opacity-90">
+                            Class: 10 • Section: A • Roll No: 12
+                        </p>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- DETAILS GRID -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
 
-                    <div class="bg-white rounded-2xl p-5 sm:p-6">
-                        <h4 class="font-semibold mb-3">Personal Details</h4>
-                        <p class="text-sm">📅 Date of Birth: 12 Aug 2008</p>
+                    <!-- PERSONAL DETAILS -->
+                    <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm space-y-3">
+                        <h4 class="font-semibold text-sm sm:text-base mb-2">
+                            Personal Details
+                        </h4>
+
+                        <p class="text-sm">📅 DOB: 2005-05-10</p>
                         <p class="text-sm">👤 Gender: Male</p>
-                        <p class="text-sm">📞 Phone: +91 98765 43210</p>
-                        <p class="text-sm">📧 Email: luke@student.schooli.com</p>
+                        <p class="text-sm">🩸 Blood Group: O+</p>
+                        <p class="text-sm">📞 Phone: 9876543210</p>
+                        <p class="text-sm break-all">📧 Email: example@email.com</p>
                     </div>
 
-                    <div class="bg-white rounded-2xl p-5 sm:p-6">
-                        <h4 class="font-semibold mb-3">Parent Details</h4>
-                        <p class="text-sm">👨 Father: John R</p>
-                        <p class="text-sm">📞 Contact: +91 99887 66554</p>
-                        <p class="text-sm">🏠 Address: Chennai, India</p>
+                    <!-- FAMILY DETAILS -->
+                    <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm space-y-3">
+                        <h4 class="font-semibold text-sm sm:text-base mb-2">
+                            Family Details
+                        </h4>
+
+                        <p class="text-sm">👨 Father: Digvigy Patil</p>
+                        <p class="text-sm">📞 9876543211</p>
+
+                        <p class="text-sm">👩 Mother: Sangita Patil</p>
+                        <p class="text-sm">📞 9876543212</p>
+
+                        <p class="text-sm">🏠 Mahajanpur, Maharashtra</p>
+                    </div>
+
+                    <!-- EMERGENCY -->
+                    <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm space-y-3">
+                        <h4 class="font-semibold text-sm sm:text-base mb-2">
+                            Emergency Contact
+                        </h4>
+
+                        <p class="text-sm">🚨 Chetan Patil</p>
+                        <p class="text-sm">📞 9999999999</p>
+                        <p class="text-sm">🔗 Uncle</p>
+                    </div>
+
+                    <!-- MEDICAL -->
+                    <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm space-y-3">
+                        <h4 class="font-semibold text-sm sm:text-base mb-2">
+                            Medical Info
+                        </h4>
+
+                        <p class="text-sm">🩺 None</p>
+                        <p class="text-sm">⚠️ No allergies</p>
                     </div>
 
                 </div>
 
-                <div class="bg-white rounded-2xl p-5 sm:p-6 text-right">
-                    <button class="bg-purple-600 text-white px-5 py-2 rounded-xl text-sm">
-                        Edit Profile
-                    </button>
+                <!-- ACTION BUTTON -->
+                <div class="bg-white rounded-2xl p-4 sm:p-6">
+                    <div class="flex justify-end">
+                        <button class="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 transition 
+        text-white px-5 py-2 rounded-xl text-sm">
+                            Edit Profile
+                        </button>
+                    </div>
                 </div>
 
             </section>
         </main>
     </div>
-    <script src="js-scripts/dashboard-js.js"></script>
+
+    <!-- PASSWORD MODAL -->
+    <div id="passwordModal" class="hidden fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+
+            <h2 class="text-lg font-semibold mb-4">Change Password</h2>
+
+            <div class="flex flex-col gap-3">
+                <input id="currentPass" type="password" placeholder="Current Password"
+                    class="px-4 py-2 border rounded-lg">
+
+                <input id="newPass" type="password" placeholder="New Password" class="px-4 py-2 border rounded-lg">
+
+                <input id="confirmPass" type="password" placeholder="Confirm Password"
+                    class="px-4 py-2 border rounded-lg">
+
+                <div id="togglePassword" class="flex items-center gap-2 cursor-pointer text-gray-500">
+                    <i class="bi bi-eye-fill"></i>
+                    <span>Show Passwords</span>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-4">
+                <button id="closePasswordModal" type="button" class="px-4 py-2 rounded-lg bg-gray-200">
+                    Cancel
+                </button>
+
+                <button id="savePasswordBtn" type="button" class="px-4 py-2 rounded-lg bg-blue-600 text-white">
+                    Save
+                </button>
+            </div>
+
+        </div>
+    </div>
+    <script src="./js-scripts/main.js"></script>
+    <script src="./js-scripts/stuDashbord.js"></script>
 </body>
 
 </html>

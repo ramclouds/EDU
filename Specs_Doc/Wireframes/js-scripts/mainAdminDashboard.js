@@ -1,3 +1,119 @@
+// ========================= DASHBOARD =================
+document.addEventListener('DOMContentLoaded', function () {
+    // 1. Context & Theme Detection
+    const isDark = document.documentElement.classList.contains('dark');
+    const labelColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+
+    // 2. Student Growth Line Chart
+    const growthCanvas = document.getElementById('userGrowthChart');
+    if (growthCanvas) {
+        const ctxGrowth = growthCanvas.getContext('2d');
+        
+        // Create a beautiful area gradient
+        const growthGradient = ctxGrowth.createLinearGradient(0, 0, 0, 400);
+        growthGradient.addColorStop(0, 'rgba(79, 70, 229, 0.4)');
+        growthGradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
+
+        new Chart(ctxGrowth, {
+            type: 'line',
+            data: {
+                labels: ['2020', '2021', '2022', '2023', '2024', '2025'],
+                datasets: [{
+                    label: 'Total Students',
+                    data: [5000, 8500, 12000, 15500, 17200, 18540],
+                    borderColor: '#4f46e5',
+                    borderWidth: 3,
+                    backgroundColor: growthGradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { 
+                        grid: { color: gridColor }, 
+                        ticks: { color: labelColor },
+                        border: { display: false }
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: labelColor },
+                        border: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // 3. Attendance Bar Chart
+    const attendanceCanvas = document.getElementById('attendanceChart');
+    if (attendanceCanvas) {
+        new Chart(attendanceCanvas, {
+            type: 'bar',
+            data: {
+                labels: ['M', 'T', 'W', 'T', 'F', 'S'],
+                datasets: [{
+                    data: [95, 88, 92, 90, 85, 70],
+                    backgroundColor: '#6366f1',
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { display: false },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: labelColor },
+                        border: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // 4. Fees Doughnut Chart
+    const feesCanvas = document.getElementById('feesChart');
+    if (feesCanvas) {
+        new Chart(feesCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: ['Paid', 'Pending'],
+                datasets: [{
+                    data: [85, 15],
+                    backgroundColor: ['#10b981', isDark ? '#1e293b' : '#f1f5f9'],
+                    borderWidth: 0,
+                    weight: 0.5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '80%',
+                plugins: {
+                    legend: { 
+                        position: 'bottom', 
+                        labels: { 
+                            color: labelColor, 
+                            usePointStyle: true,
+                            padding: 20
+                        } 
+                    }
+                }
+            }
+        });
+    }
+});
+
+
 //  =========== ACTIVIES & EVENTS ====================
 let events = [
     { id: 1, title: "Annual Day", start: "2026-04-20", end: "2026-04-20" }
@@ -712,7 +828,7 @@ function loadAttendance() {
 let chart;
 
 function renderChart(present, absent) {
-    const ctx = document.getElementById('attendanceChart');
+    const ctx = document.getElementById('attendanceChartA');
 
     if (chart) chart.destroy();
 

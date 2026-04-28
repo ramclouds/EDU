@@ -15,8 +15,14 @@ function login(event) {
     else if (role === "teacher") {
         window.location.href = "Teacher-dashboard.html";
     }
-    else if (role === "admin") {
+    else if (role === "super-admin") {
         window.location.href = "Super-admin-dashboard.html";
+    }
+    else if (role === "account-admin") {
+        window.location.href = "Accounts-admin-dashboard.html";
+    }
+    else if (role === "library-admin") {
+        window.location.href = "Library-admin-dashboard.html";
     }
 }
 
