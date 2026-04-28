@@ -1,0 +1,2926 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Dashboard | Main Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
+
+</head>
+
+<body class="bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-100">
+
+    <div class="flex">
+
+        <!-- MOBILE OVERLAY -->
+        <div id="mobileOverlay" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[50] md:hidden"></div>
+
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="fixed top-0 left-0 h-screen w-64
+    bg-white/95 dark:bg-slate-900
+    backdrop-blur-xl border-r shadow-2xl z-[60]
+    flex flex-col
+    transform -translate-x-full md:translate-x-0
+    transition-transform duration-300
+    text-gray-800 dark:text-gray-100">
+
+            <!-- LOGO -->
+            <div class="px-6 py-5 border-b flex items-center gap-2">
+                <i class="bi bi-mortarboard text-purple-600 text-xl"></i>
+                <span class="app-name font-bold text-lg text-purple-600"></span>
+            </div>
+
+            <!-- SCROLLABLE AREA -->
+            <div class="relative flex-1 overflow-hidden">
+
+                <!-- TOP FADE -->
+                <div class="pointer-events-none absolute top-0 left-0 w-full h-6 
+        bg-gradient-to-b from-white dark:from-slate-900 to-transparent z-10"></div>
+
+                <!-- NAV -->
+                <nav class="h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-4 space-y-2 text-sm">
+
+                    <!-- MAIN -->
+                    <p class="text-xs text-gray-400 px-2 mt-2">MAIN</p>
+
+                    <button data-section="dashboard"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 font-semibold shadow">
+                        <i class="bi bi-grid"></i> Dashboard
+                    </button>
+
+                    <!-- BOOK MANAGEMENT -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">BOOK MANAGEMENT</p>
+
+                    <button data-section="books"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-book"></i> All Books
+                    </button>
+
+                    <button data-section="add-book"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-plus-circle"></i> Add Book
+                    </button>
+
+                    <button data-section="categories"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-tags"></i> Categories
+                    </button>
+
+                    <button data-section="authors"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-person"></i> Authors
+                    </button>
+
+                    <!-- ISSUE / RETURN -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">CIRCULATION</p>
+
+                    <button data-section="issue-books"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-arrow-up-right-circle"></i> Issue Book
+                    </button>
+
+                    <button data-section="return-books"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-arrow-down-left-circle"></i> Return Book
+                    </button>
+
+                    <!-- USERS -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">LIBRARY USERS</p>
+
+                    <button data-section="students"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-mortarboard"></i> Students
+                    </button>
+
+                    <button data-section="teachers"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-person-badge"></i> Teachers
+                    </button>
+
+                    <button data-section="members"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-people"></i> All Members
+                    </button>
+
+                    <!-- FINES -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">FINES & PAYMENTS</p>
+
+                    <button data-section="fines"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-cash-stack"></i> Fine Management
+                    </button>
+
+                    <button data-section="transactions"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-receipt"></i> Transactions
+                    </button>
+
+                    <!-- REPORTS -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">REPORTS</p>
+
+                    <button data-section="reports"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-bar-chart"></i> Reports & Analytics
+                    </button>
+
+                    <!-- NOTIFICATIONS -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">COMMUNICATION</p>
+
+                    <button data-section="notifications"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-bell"></i> Notifications
+                    </button>
+
+                    <!-- SYSTEM -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">SYSTEM</p>
+
+                    <button data-section="settings"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-gear"></i> Settings
+                    </button>
+
+                    <button data-section="logs"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-shield-check"></i> Activity Logs
+                    </button>
+
+                </nav>
+
+                <!-- BOTTOM FADE -->
+                <div class="pointer-events-none absolute bottom-0 left-0 w-full h-6 
+        bg-gradient-to-t from-white dark:from-slate-900 to-transparent z-10"></div>
+            </div>
+
+            <!-- FOOTER -->
+            <div class="p-4 border-t text-xs text-gray-400">
+                <span class="app-name"></span> © 2026
+            </div>
+
+        </aside>
+
+        <!-- MAIN -->
+        <main
+            class="flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8 md:ml-64 maincolor transition-all duration-300 dark:bg-slate-900 text-gray-800 dark:text-gray-100">
+
+            <!-- HEADER -->
+            <div class="sticky top-0 z-40 px-4 sm:px-6 py-3 
+    bg-gradient-to-r from-white/70 via-white/60 to-white/70 
+    dark:from-slate-800/80 dark:via-slate-800/70 dark:to-slate-800/80
+    backdrop-blur-2xl border border-white/40 dark:border-slate-700
+    shadow-[0_10px_40px_rgba(0,0,0,0.08)]
+    rounded-2xl transition-all duration-300 flex items-center justify-between gap-4">
+
+                <!-- MOBILE LOGO -->
+                <div class="flex items-center gap-2 md:hidden">
+                    <i class="bi bi-mortarboard text-indigo-600 text-lg"></i>
+                </div>
+
+                <!-- DESKTOP SEARCH -->
+                <div class="hidden md:flex w-1/2 relative group px-4">
+                    <i
+                        class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+                    <input type="text" id="desktopSearch" class="w-full pl-10 pr-4 py-2.5 rounded-full
+            bg-white/70 dark:bg-slate-700/70
+            backdrop-blur-md border border-gray-200 dark:border-slate-600
+            text-gray-800 dark:text-white
+            focus:bg-white dark:focus:bg-slate-700
+            transition-all duration-300
+            outline-none focus:ring-2 focus:ring-indigo-500
+            shadow-sm hover:shadow-md" placeholder="Search anything here...">
+                </div>
+
+                <!-- RIGHT ICONS -->
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <!-- <button id="darkToggleBtn" class="transition">
+                        <span id="darkIcon">🌙</span>
+                    </button> -->
+                    <!-- MOBILE MENU -->
+                    <button id="mobileSidebarBtn" class="md:hidden bg-white/70 dark:bg-slate-700/70 
+            backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
+            transition p-2.5 rounded-full shadow-md hover:scale-105">
+                        <i class="bi bi-list text-lg text-gray-700 dark:text-gray-200"></i>
+                    </button>
+
+                    <!-- MOBILE SEARCH -->
+                    <button id="mobileSearchBtn" class="md:hidden bg-white/70 dark:bg-slate-700/70 
+            backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
+            transition p-2.5 rounded-full shadow-md hover:scale-105">
+                        <i class="bi bi-search text-lg text-gray-700 dark:text-gray-200"></i>
+                    </button>
+
+                    <!-- NOTIFICATIONS -->
+                    <div class="relative">
+                        <div id="notificationBtn" class="relative cursor-pointer bg-white/70 dark:bg-slate-700/70
+                backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
+                transition p-2.5 rounded-full shadow-md hover:scale-105">
+                            <i class="bi bi-bell text-lg text-gray-700 dark:text-gray-200"></i>
+
+                            <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 
+                  text-[10px] flex items-center justify-center 
+                  bg-gradient-to-r from-red-500 to-pink-500 
+                  text-white rounded-full animate-pulse shadow">3</span>
+                        </div>
+
+                        <!-- NOTIFICATION MENU -->
+                        <div id="notificationMenu" class="hidden fixed top-20 left-1/2 -translate-x-1/2 
+                w-[92vw] max-w-md 
+                bg-white/95 dark:bg-slate-800/95
+                backdrop-blur-2xl 
+                rounded-2xl shadow-2xl 
+                border border-white/40 dark:border-slate-700
+                z-[70] overflow-hidden">
+
+                            <div
+                                class="p-4 border-b dark:border-slate-700 font-semibold flex justify-between items-center">
+                                Notifications
+                                <button id="closeNotifications"
+                                    class="text-xs text-gray-500 hover:text-red-500">✕</button>
+                            </div>
+
+                            <div class="max-h-06 overflow-y-auto p-4 text-sm space-y-3">
+
+                                <div class="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
+                                    <p class="font-medium text-gray-800 dark:text-gray-200">📢 New Exam Schedule
+                                        Released</p>
+                                    <p class="text-xs text-gray-500">2 hours ago</p>
+                                </div>
+
+                                <div class="p-3 bg-green-50 dark:bg-green-900/30 rounded-xl">
+                                    <p class="font-medium text-gray-800 dark:text-gray-200">✅ Attendance Updated</p>
+                                    <p class="text-xs text-gray-500">Today</p>
+                                </div>
+
+                            </div>
+
+                            <div onclick="openSection('notice')" class="p-3 text-center text-sm text-indigo-600 
+                    hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer font-medium">
+                                View All Notices →
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PROFILE -->
+                    <div class="relative">
+                        <button id="profileBtn" class="flex items-center gap-2 
+                bg-gradient-to-r from-white/70 to-white/60 
+                dark:from-slate-700 dark:to-slate-600
+                backdrop-blur-md px-2 py-1.5 rounded-full 
+                transition shadow-md hover:scale-105">
+
+                            <img src="https://i.pravatar.cc/100"
+                                class="rounded-full w-9 h-9 border-2 border-white dark:border-slate-500 shadow" />
+
+                            <span class="font-medium hidden sm:inline text-sm text-gray-700 dark:text-gray-200">
+                                Main Admin Name
+                            </span>
+                        </button>
+
+                        <div id="profileMenu" class="hidden absolute right-0 mt-4 w-56 
+                bg-white/95 dark:bg-slate-800/95
+                backdrop-blur-2xl rounded-2xl shadow-2xl 
+                border border-white/40 dark:border-slate-700 z-50">
+
+                            <div class="px-4 py-4 border-b dark:border-slate-700">
+                                <p class="font-semibold text-gray-800 dark:text-gray-200">Main Admin Name</p>
+                            </div>
+
+                            <ul class="py-2 text-sm">
+
+                                <li onclick="openSection('profile')"
+                                    class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer">
+                                    <i class="fa-solid fa-user text-gray-500"></i>
+                                    My Profile
+                                </li>
+
+                                <li id="openPasswordModal"
+                                    class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer">
+                                    <i class="fa-solid fa-lock text-gray-500"></i>
+                                    Password Change
+                                </li>
+
+                                <li onclick="openSection('settings')"
+                                    class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer">
+                                    <i class="fa-solid fa-gear text-gray-500"></i>
+                                    Settings
+                                </li>
+
+                            </ul>
+                            <div class="border-t dark:border-slate-700">
+                                <button id="logoutBtn"
+                                    class="w-full px-4 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30">
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- MOBILE SEARCH -->
+            <div id="mobileSearch" class="hidden md:hidden px-4 mt-4">
+                <input type="text" class="w-full px-5 py-3 rounded-full 
+        bg-white dark:bg-slate-700 
+        text-gray-800 dark:text-white
+        shadow-md outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Search anything here...">
+            </div>
+
+            <!-- =========================== Dashboard Section =========================== -->
+            <section id="dashboardSection" class="section p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-semibold">
+                        Welcome Back, Admin 👋
+                    </h2>
+                    <p class="text-gray-500 text-sm">
+                        Here’s your library overview for today
+                    </p>
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Total Books</p>
+                        <h3 class="text-lg font-semibold">1,250</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Issued Books</p>
+                        <h3 class="text-blue-600 text-lg font-semibold">320</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Members</p>
+                        <h3 class="text-indigo-600 text-lg font-semibold">540</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Revenue</p>
+                        <h3 class="text-green-600 text-lg font-semibold">₹4,350</h3>
+                    </div>
+
+                </div>
+
+                <!-- QUICK ACTIONS -->
+                <div class="bg-white p-4 rounded-xl shadow">
+                    <h3 class="text-sm font-semibold mb-3">Quick Actions</h3>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm">
+                            Issue Book
+                        </button>
+
+                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">
+                            Return Book
+                        </button>
+
+                        <button class="bg-yellow-500 text-white px-4 py-2 rounded-lg text-sm">
+                            Add Book
+                        </button>
+
+                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
+                            Add Member
+                        </button>
+
+                    </div>
+                </div>
+
+                <!-- CHARTS -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <!-- ISSUE TREND -->
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="text-sm font-semibold mb-3">Issue Trend</h3>
+                        <div class="h-48 flex items-center justify-center text-gray-400 text-sm">
+                            Line Chart Placeholder
+                        </div>
+                    </div>
+
+                    <!-- REVENUE TREND -->
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="text-sm font-semibold mb-3">Revenue Trend</h3>
+                        <div class="h-48 flex items-center justify-center text-gray-400 text-sm">
+                            Bar Chart Placeholder
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RECENT ACTIVITY -->
+                <div class="bg-white rounded-xl shadow p-4">
+                    <h3 class="text-sm font-semibold mb-3">Recent Activity</h3>
+
+                    <div class="space-y-3 text-sm">
+
+                        <div class="flex justify-between">
+                            <span>Amit Sharma issued "Physics Fundamentals"</span>
+                            <span class="text-gray-400">2 min ago</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span>Priya Patil returned "Mathematics Vol 1"</span>
+                            <span class="text-gray-400">10 min ago</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span>Fine paid by Rahul Verma (₹45)</span>
+                            <span class="text-gray-400">30 min ago</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span>New book added: "Chemistry Guide"</span>
+                            <span class="text-gray-400">1 hr ago</span>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- OVERDUE ALERT -->
+                <div class="bg-red-50 border border-red-200 p-4 rounded-xl">
+                    <h3 class="text-sm font-semibold text-red-600 mb-2">
+                        ⚠ Overdue Alerts
+                    </h3>
+
+                    <ul class="text-sm text-red-700 space-y-1">
+                        <li>Priya Patil - 5 days overdue</li>
+                        <li>Kavita Joshi - 8 days overdue</li>
+                        <li>Rahul Verma - 3 days overdue</li>
+                    </ul>
+                </div>
+
+            </section>
+            <!-- ============================= ALL BOOKS SECTION START============================= -->
+            <section id="booksSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Library Books</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Manage all books in library
+                            </p>
+                        </div>
+
+                        <!-- BUTTON -->
+                        <button class="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow">
+                            + Add Book
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- SEARCH + FILTER -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input id="searchInput" type="text" placeholder="Search by title, author..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <select id="categoryFilter" class="border rounded-lg px-3 py-2 text-sm">
+                        <option value="">All Categories</option>
+                        <option value="Science">Science</option>
+                        <option value="Math">Math</option>
+                        <option value="History">History</option>
+                        <option value="Programming">Programming</option>
+                    </select>
+                </div>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">Book ID</th>
+                                <th class="p-3 text-left">Title</th>
+                                <th class="p-3 text-left">Author</th>
+                                <th class="p-3 text-left">Category</th>
+                                <th class="p-3 text-left">Available</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="booksTable" class="divide-y"></tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================= ALL BOOKS SECTION  ============================= -->
+            <!-- ============================= ADD BOOKS SECTION ============================= -->
+            <section id="add-bookSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Add New Book</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Fill in the details to add a new book to the library </p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- FORM -->
+                <div class="bg-white rounded-xl shadow p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+                    <!-- BOOK TITLE -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Book Title *</label>
+                        <input id="bookTitle" type="text" placeholder="e.g. Physics Fundamentals"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- AUTHOR -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Author Name *</label>
+                        <input id="bookAuthor" type="text" placeholder="e.g. H.C. Verma"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- CATEGORY -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Category *</label>
+                        <select id="bookCategory" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="">Select Category</option>
+                            <option>Science</option>
+                            <option>Mathematics</option>
+                            <option>History</option>
+                            <option>Programming</option>
+                            <option>Literature</option>
+                        </select>
+                    </div>
+
+                    <!-- ISBN -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">ISBN Number</label>
+                        <input id="bookISBN" type="text" placeholder="e.g. 978-3-16-148410-0"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- TOTAL COPIES -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Total Copies *</label>
+                        <input id="bookTotal" type="number" placeholder="e.g. 10"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- AVAILABLE COPIES -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Available Copies</label>
+                        <input type="number" placeholder="Auto or same as total"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- SHELF -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Shelf / Rack No *</label>
+                        <input id="bookShelf" type="text" placeholder="e.g. A-12"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- PUBLISHER -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Publisher</label>
+                        <input type="text" placeholder="e.g. Pearson"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- YEAR -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Published Year</label>
+                        <input type="number" placeholder="e.g. 2020"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- LANGUAGE -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Language</label>
+                        <input type="text" placeholder="e.g. English"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- DESCRIPTION -->
+                    <div class="sm:col-span-2">
+                        <label class="text-xs font-medium text-gray-600">Description</label>
+                        <textarea rows="3" placeholder="Short description about the book..."
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                    </div>
+
+                    <!-- ACTION -->
+                    <div class="sm:col-span-2 flex justify-end">
+                        <button onclick="addBook()"
+                            class="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                            Add Book
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- RECENTLY ADDED -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">Recently Added Books</h3>
+
+                    <div class="bg-white rounded-xl shadow overflow-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100 text-gray-600">
+                                <tr>
+                                    <th class="p-3 text-left">Book ID</th>
+                                    <th class="p-3 text-left">Title</th>
+                                    <th class="p-3 text-left">Author</th>
+                                    <th class="p-3 text-left">Category</th>
+                                    <th class="p-3 text-left">Copies</th>
+                                    <th class="p-3 text-left">Shelf</th>
+                                    <th class="p-3 text-left">Added On</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="recentBooksTable" class="divide-y">
+
+                                <!-- DEMO ROW -->
+                                <tr>
+                                    <td class="p-3">B001</td>
+                                    <td class="p-3 font-medium">Physics Fundamentals</td>
+                                    <td class="p-3">H.C. Verma</td>
+                                    <td class="p-3">Science</td>
+                                    <td class="p-3">10</td>
+                                    <td class="p-3">A-12</td>
+                                    <td class="p-3">2026-04-21</td>
+                                </tr>
+
+                                <tr>
+                                    <td class="p-3">B002</td>
+                                    <td class="p-3 font-medium">Mathematics Vol 1</td>
+                                    <td class="p-3">R.D. Sharma</td>
+                                    <td class="p-3">Mathematics</td>
+                                    <td class="p-3">8</td>
+                                    <td class="p-3">B-05</td>
+                                    <td class="p-3">2026-04-20</td>
+                                </tr>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- ============================== Categories Section Start=================================== -->
+            <section id="categoriesSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Book Categories</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Organize books by categories </p>
+                        </div>
+
+                        <!-- BUTTON -->
+                        <input type="text" placeholder="Search category..."
+                            class="border rounded-lg px-3 py-2 text-sm sm:w-60" />
+
+                    </div>
+
+                </div>
+
+                <!-- ADD CATEGORY -->
+                <div class="bg-white p-5 rounded-xl shadow grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                    <div class="sm:col-span-2">
+                        <label class="text-xs text-gray-600 font-medium">Category Name *</label>
+                        <input id="categoryName" type="text" placeholder="e.g. Science"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <div class="flex items-end">
+                        <button onclick="addCategory()"
+                            class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                            Add Category
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- CATEGORY LIST -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">#</th>
+                                <th class="p-3 text-left">Category Name</th>
+                                <th class="p-3 text-left">Total Books</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <tr>
+                                <td class="p-3">1</td>
+                                <td class="p-3 font-medium">Science</td>
+                                <td class="p-3">120</td>
+                                <td class="p-3">
+                                    <span class="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">Active</span>
+                                </td>
+                                <td class="p-3 flex gap-2">
+                                    <button class="text-blue-600 text-xs">Edit</button>
+                                    <button class="text-red-600 text-xs">Delete</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================ Authors Section Start ======================== -->
+            <section id="authorsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Authors Management</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Manage all book authors
+                            </p>
+                        </div>
+
+                        <input type="text" placeholder="Search author..."
+                            class="border rounded-lg px-3 py-2 text-sm w-full sm:w-60" />
+
+                    </div>
+
+                </div>
+
+                <!-- ADD AUTHOR -->
+                <div class="bg-white p-5 rounded-xl shadow grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                    <div>
+                        <label class="text-xs text-gray-600 font-medium">Author Name *</label>
+                        <input id="authorName" type="text" placeholder="e.g. H.C. Verma"
+                            class="mt-1 border rounded-lg px-3 py-2 text-sm w-full" />
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-gray-600 font-medium">Country</label>
+                        <input id="authorCountry" type="text" placeholder="e.g. India"
+                            class="mt-1 border rounded-lg px-3 py-2 text-sm w-full" />
+                    </div>
+
+                    <div class="flex items-end">
+                        <button onclick="addAuthor()"
+                            class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                            Add Author
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- AUTHORS TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">#</th>
+                                <th class="p-3 text-left">Author Name</th>
+                                <th class="p-3 text-left">Country</th>
+                                <th class="p-3 text-left">Books</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <tr>
+                                <td class="p-3">1</td>
+                                <td class="p-3 font-medium">H.C. Verma</td>
+                                <td class="p-3">India</td>
+                                <td class="p-3">25</td>
+                                <td class="p-3 flex gap-2">
+                                    <button class="text-blue-600 text-xs">Edit</button>
+                                    <button class="text-red-600 text-xs">Delete</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <!-- ============================ Issue Book Section Start ===================== -->
+            <section id="issue-booksSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Issue & Manage Books</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Issue new books and manage all issued records
+                            </p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- ISSUE FORM -->
+                <div class="bg-white rounded-xl shadow p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+                    <!-- MEMBER -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Select Member *</label>
+                        <select id="issueUser" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="">Select Member</option>
+                            <option>Rahul Verma (Student)</option>
+                            <option>Kavita Joshi (Teacher)</option>
+                        </select>
+                    </div>
+
+                    <!-- BOOK -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Select Book *</label>
+                        <select id="issueBook" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="">Select Book</option>
+                            <option>Physics Fundamentals</option>
+                            <option>Mathematics Vol 1</option>
+                        </select>
+                    </div>
+
+                    <!-- ISSUE DATE -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Issue Date *</label>
+                        <input type="date" id="issueDate" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- RETURN DATE -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Expected Return Date *</label>
+                        <input type="date" id="returnDate" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <div class="sm:col-span-2 flex justify-end">
+                        <button onclick="issueBook()"
+                            class="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                            Issue Book
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="flex flex-col sm:flex-row gap-3">
+
+                    <input type="text" placeholder="Search member or book..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Status</option>
+                        <option>Issued</option>
+                        <option>Overdue</option>
+                        <option>Returned</option>
+                    </select>
+
+                </div>
+
+                <!-- ISSUED TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">Issue ID</th>
+                                <th class="p-3 text-left">Member</th>
+                                <th class="p-3 text-left">Book</th>
+                                <th class="p-3 text-left">Issue Date</th>
+                                <th class="p-3 text-left">Return Date</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Fine</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <!-- ROW 1 -->
+                            <tr>
+                                <td class="p-3">I1001</td>
+                                <td class="p-3">Amit Sharma</td>
+                                <td class="p-3 font-medium">Physics Fundamentals</td>
+                                <td class="p-3">2026-04-01</td>
+                                <td class="p-3">2026-04-10</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Issued
+                                    </span>
+                                </td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                </td>
+                            </tr>
+
+                            <!-- ROW 2 -->
+                            <tr>
+                                <td class="p-3">I1002</td>
+                                <td class="p-3">Priya Patil</td>
+                                <td class="p-3 font-medium">Mathematics Vol 1</td>
+                                <td class="p-3">2026-03-28</td>
+                                <td class="p-3">2026-04-05</td>
+                                <td class="p-3">
+                                    <span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">
+                                        Overdue
+                                    </span>
+                                </td>
+                                <td class="p-3">₹75</td>
+                                <td class="p-3 flex gap-2">
+                                    <button class="text-green-600 text-xs">Return</button>
+                                    <button class="text-yellow-600 text-xs">Pay</button>
+                                </td>
+                            </tr>
+
+                            <!-- ROW 3 -->
+                            <tr>
+                                <td class="p-3">I1003</td>
+                                <td class="p-3">Rahul Verma</td>
+                                <td class="p-3 font-medium">JavaScript Basics</td>
+                                <td class="p-3">2026-04-02</td>
+                                <td class="p-3">2026-04-12</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Issued
+                                    </span>
+                                </td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <button class="text-green-600 text-xs">Return</button>
+                                </td>
+                            </tr>
+
+                            <!-- ROW 4 -->
+                            <tr>
+                                <td class="p-3">I1005</td>
+                                <td class="p-3">Anjali Deshmukh</td>
+                                <td class="p-3 font-medium">World History</td>
+                                <td class="p-3">2026-03-20</td>
+                                <td class="p-3">2026-03-30</td>
+                                <td class="p-3">
+                                    <span class="text-gray-600 bg-gray-200 px-2 py-1 rounded text-xs">
+                                        Returned
+                                    </span>
+                                </td>
+                                <td class="p-3">₹50</td>
+                                <td class="p-3">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================ Return Book Section ==================== -->
+            <section id="return-booksSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Return Book</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Process returns, calculate fines & manage payments
+                            </p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- RETURN FORM -->
+                <div class="bg-white rounded-xl shadow p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+                    <!-- SELECT RECORD -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Select Issued Record *</label>
+                        <select id="returnIssueId" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="">Select Record</option>
+                            <option>I1001 - Rahul Verma - Physics Fundamentals</option>
+                            <option>I1002 - Kavita Joshi - Computer Networks</option>
+                        </select>
+                    </div>
+
+                    <!-- RETURN DATE -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Actual Return Date *</label>
+                        <input type="date" id="actualReturnDate"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- AUTO INFO -->
+                    <div class="sm:col-span-2 bg-gray-50 p-4 rounded-lg text-sm space-y-1">
+                        <p><strong>Member:</strong> Rahul Verma (Student)</p>
+                        <p><strong>Book:</strong> Physics Fundamentals</p>
+                        <p><strong>Due Date:</strong> 2026-04-20</p>
+                        <p><strong>Late Days:</strong> 3</p>
+                        <p><strong>Fine:</strong> <span class="text-red-600 font-semibold">₹45</span></p>
+                    </div>
+
+                    <!-- ACTIONS -->
+                    <div class="sm:col-span-2 flex flex-wrap justify-end gap-3">
+
+                        <button class="bg-green-600 text-white px-5 py-2 rounded-lg text-sm">
+                            Return Book
+                        </button>
+
+                        <button class="bg-yellow-500 text-white px-5 py-2 rounded-lg text-sm">
+                            Pay Fine
+                        </button>
+
+                        <button class="bg-gray-500 text-white px-5 py-2 rounded-lg text-sm">
+                            Waive Fine
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- RETURNED RECORDS -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">Returned Books</h3>
+
+                    <div class="bg-white rounded-xl shadow overflow-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-100 text-gray-600">
+                                <tr>
+                                    <th class="p-3 text-left">ID</th>
+                                    <th class="p-3 text-left">Member</th>
+                                    <th class="p-3 text-left">Book</th>
+                                    <th class="p-3 text-left">Return Date</th>
+                                    <th class="p-3 text-left">Late Days</th>
+                                    <th class="p-3 text-left">Fine</th>
+                                    <th class="p-3 text-left">Status</th>
+                                    <th class="p-3 text-left">Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW 1 -->
+                                <tr>
+                                    <td class="p-3">R1001</td>
+                                    <td class="p-3">Rahul Verma</td>
+                                    <td class="p-3">Physics Fundamentals</td>
+                                    <td class="p-3">2026-04-23</td>
+                                    <td class="p-3">3</td>
+                                    <td class="p-3">₹45</td>
+                                    <td class="p-3">
+                                        <span
+                                            class="bg-yellow-100 text-yellow-600 px-2 py-1 text-xs rounded">Pending</span>
+                                    </td>
+                                    <td class="p-3 flex gap-2">
+                                        <button class="text-green-600 text-xs">Pay</button>
+                                        <button class="text-gray-600 text-xs">Waive</button>
+                                    </td>
+                                </tr>
+
+                                <!-- ROW 2 -->
+                                <tr>
+                                    <td class="p-3">R1002</td>
+                                    <td class="p-3">Kavita Joshi</td>
+                                    <td class="p-3">Computer Networks</td>
+                                    <td class="p-3">2026-04-21</td>
+                                    <td class="p-3">1</td>
+                                    <td class="p-3">₹15</td>
+                                    <td class="p-3">
+                                        <span class="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">Paid</span>
+                                    </td>
+                                    <td class="p-3">
+                                        <button class="text-blue-600 text-xs">View</button>
+                                    </td>
+                                </tr>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- ============================= Students Section =====================  -->
+            <section id="studentsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Students</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Manage all library members
+                            </p>
+                        </div>
+
+                        <!-- BUTTON -->
+                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow">
+                            <i class="bi bi-download"></i> Export Excel
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- SEARCH + FILTER -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" placeholder="Search by name or roll no..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Classes</option>
+                        <option>Class 8</option>
+                        <option>Class 9</option>
+                        <option>Class 10</option>
+                    </select>
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Status</option>
+                        <option>Active</option>
+                        <option>Blocked</option>
+                    </select>
+                </div>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">ID</th>
+                                <th class="p-3 text-left">Name</th>
+                                <th class="p-3 text-left">Class</th>
+                                <th class="p-3 text-left">Books</th>
+                                <th class="p-3 text-left">Fine</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <!-- ROW -->
+                            <tr>
+                                <td class="p-3">S1001</td>
+                                <td class="p-3 font-medium">Amit Sharma</td>
+                                <td class="p-3">10-A</td>
+                                <td class="p-3">2</td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Active
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">S1002</td>
+                                <td class="p-3 font-medium">Priya Patil</td>
+                                <td class="p-3">9-B</td>
+                                <td class="p-3">1</td>
+                                <td class="p-3">₹75</td>
+                                <td class="p-3">
+                                    <span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">
+                                        Blocked
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">S1003</td>
+                                <td class="p-3 font-medium">Rahul Verma</td>
+                                <td class="p-3">8-C</td>
+                                <td class="p-3">3</td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Active
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">S1004</td>
+                                <td class="p-3 font-medium">Sneha Kulkarni</td>
+                                <td class="p-3">10-B</td>
+                                <td class="p-3">0</td>
+                                <td class="p-3">₹100</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">
+                                        Pending
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================= Teachers Section =====================  -->
+            <section id="teachersSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Teachers</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Manage teacher library members
+                            </p>
+                        </div>
+
+                        <!-- BUTTON -->
+                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow">
+                            <i class="bi bi-download"></i> Export Excel </button>
+
+                    </div>
+
+                </div>
+
+                <!-- SEARCH + FILTER -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" placeholder="Search by name or employee ID..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Departments</option>
+                        <option>Science</option>
+                        <option>Mathematics</option>
+                        <option>History</option>
+                        <option>Computer</option>
+                    </select>
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Status</option>
+                        <option>Active</option>
+                        <option>Blocked</option>
+                    </select>
+                </div>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">ID</th>
+                                <th class="p-3 text-left">Name</th>
+                                <th class="p-3 text-left">Department</th>
+                                <th class="p-3 text-left">Books</th>
+                                <th class="p-3 text-left">Fine</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <!-- ROW 1 -->
+                            <tr>
+                                <td class="p-3">T1001</td>
+                                <td class="p-3 font-medium">Mr. Rajesh Kumar</td>
+                                <td class="p-3">Science</td>
+                                <td class="p-3">1</td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Active
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                            <!-- ROW 2 -->
+                            <tr>
+                                <td class="p-3">T1002</td>
+                                <td class="p-3 font-medium">Mrs. Sunita Patil</td>
+                                <td class="p-3">Mathematics</td>
+                                <td class="p-3">2</td>
+                                <td class="p-3">₹50</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">
+                                        Pending
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                            <!-- ROW 3 -->
+                            <tr>
+                                <td class="p-3">T1003</td>
+                                <td class="p-3 font-medium">Mr. Anil Deshmukh</td>
+                                <td class="p-3">History</td>
+                                <td class="p-3">0</td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Active
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                            <!-- ROW 4 -->
+                            <tr>
+                                <td class="p-3">T1004</td>
+                                <td class="p-3 font-medium">Mrs. Kavita Joshi</td>
+                                <td class="p-3">Computer</td>
+                                <td class="p-3">3</td>
+                                <td class="p-3">₹120</td>
+                                <td class="p-3">
+                                    <span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">
+                                        Blocked
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                            <!-- ROW 5 -->
+                            <tr>
+                                <td class="p-3">T1005</td>
+                                <td class="p-3 font-medium">Mr. Suresh Yadav</td>
+                                <td class="p-3">Science</td>
+                                <td class="p-3">1</td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Active
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+
+                                    <button class="text-blue-600 text-xs">
+                                        View
+                                    </button>
+
+                                    <button class="text-indigo-600 text-xs">
+                                        Issue
+                                    </button>
+
+                                    <button class="text-green-600 text-xs">
+                                        Pay
+                                    </button>
+
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <!-- ============================= Members SECTION ============================= -->
+            <section id="membersSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">All Members</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Students & Teachers using library
+                            </p>
+                        </div>
+
+                        <!-- BUTTON -->
+                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow">
+                            <i class="bi bi-download"></i> Export Excel
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- SEARCH + FILTER -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" placeholder="Search by name or ID..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Roles</option>
+                        <option>Student</option>
+                        <option>Teacher</option>
+                    </select>
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Status</option>
+                        <option>Active</option>
+                        <option>Pending</option>
+                        <option>Blocked</option>
+                    </select>
+                </div>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">ID</th>
+                                <th class="p-3 text-left">Name</th>
+                                <th class="p-3 text-left">Role</th>
+                                <th class="p-3 text-left">Class / Dept</th>
+                                <th class="p-3 text-left">Books</th>
+                                <th class="p-3 text-left">Fine</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <!-- STUDENT -->
+                            <tr>
+                                <td class="p-3">S1001</td>
+                                <td class="p-3 font-medium">Amit Sharma</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">
+                                        Student
+                                    </span>
+                                </td>
+                                <td class="p-3">10-A</td>
+                                <td class="p-3">2</td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Active
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                    <button class="text-indigo-600 text-xs">Issue</button>
+                                    <button class="text-green-600 text-xs">Pay</button>
+                                </td>
+                            </tr>
+
+                            <!-- TEACHER -->
+                            <tr>
+                                <td class="p-3">T1002</td>
+                                <td class="p-3 font-medium">Mrs. Sunita Patil</td>
+                                <td class="p-3">
+                                    <span class="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs">
+                                        Teacher
+                                    </span>
+                                </td>
+                                <td class="p-3">Mathematics</td>
+                                <td class="p-3">2</td>
+                                <td class="p-3">₹50</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">
+                                        Pending
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                    <button class="text-indigo-600 text-xs">Issue</button>
+                                    <button class="text-green-600 text-xs">Pay</button>
+                                </td>
+                            </tr>
+
+                            <!-- STUDENT -->
+                            <tr>
+                                <td class="p-3">S1003</td>
+                                <td class="p-3 font-medium">Rahul Verma</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">
+                                        Student
+                                    </span>
+                                </td>
+                                <td class="p-3">8-C</td>
+                                <td class="p-3">3</td>
+                                <td class="p-3">₹0</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">
+                                        Active
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                    <button class="text-indigo-600 text-xs">Issue</button>
+                                    <button class="text-green-600 text-xs">Pay</button>
+                                </td>
+                            </tr>
+
+                            <!-- TEACHER BLOCKED -->
+                            <tr>
+                                <td class="p-3">T1004</td>
+                                <td class="p-3 font-medium">Mrs. Kavita Joshi</td>
+                                <td class="p-3">
+                                    <span class="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs">
+                                        Teacher
+                                    </span>
+                                </td>
+                                <td class="p-3">Computer</td>
+                                <td class="p-3">3</td>
+                                <td class="p-3">₹120</td>
+                                <td class="p-3">
+                                    <span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">
+                                        Blocked
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                    <button class="text-indigo-600 text-xs">Issue</button>
+                                    <button class="text-green-600 text-xs">Pay</button>
+                                </td>
+                            </tr>
+
+                            <!-- STUDENT -->
+                            <tr>
+                                <td class="p-3">S1005</td>
+                                <td class="p-3 font-medium">Anjali Deshmukh</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">
+                                        Student
+                                    </span>
+                                </td>
+                                <td class="p-3">9-A</td>
+                                <td class="p-3">1</td>
+                                <td class="p-3">₹50</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">
+                                        Pending
+                                    </span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                    <button class="text-indigo-600 text-xs">Issue</button>
+                                    <button class="text-green-600 text-xs">Pay</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+
+            <!-- ====================== Fine Management section ========================= -->
+            <section id="finesSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Fine Management</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Track and manage all fines
+                            </p>
+                        </div>
+
+                        <!-- BUTTON -->
+                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow">
+                            <i class="bi bi-download"></i> Export Report
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="flex flex-col sm:flex-row gap-3">
+
+                    <!-- SEARCH -->
+                    <input type="text" placeholder="Search by name or ID..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <!-- ROLE FILTER -->
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Roles</option>
+                        <option>Student</option>
+                        <option>Teacher</option>
+                        <option>Other</option>
+                    </select>
+
+                    <!-- STATUS FILTER -->
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Status</option>
+                        <option>Pending</option>
+                        <option>Paid</option>
+                        <option>Waived</option>
+                    </select>
+
+                </div>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">Fine ID</th>
+                                <th class="p-3 text-left">Member</th>
+                                <th class="p-3 text-left">Role</th>
+                                <th class="p-3 text-left">Book</th>
+                                <th class="p-3 text-left">Days Late</th>
+                                <th class="p-3 text-left">Amount</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <!-- ROW 1 -->
+                            <tr>
+                                <td class="p-3">F1001</td>
+                                <td class="p-3 font-medium">Priya Patil</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Student</span>
+                                </td>
+                                <td class="p-3">Mathematics Vol 1</td>
+                                <td class="p-3">5</td>
+                                <td class="p-3">₹75</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">Pending</span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-green-600 text-xs">Pay</button>
+                                    <button class="text-red-600 text-xs">Waive</button>
+                                    <button class="text-blue-600 text-xs">View</button>
+                                </td>
+                            </tr>
+
+                            <!-- ROW 2 -->
+                            <tr>
+                                <td class="p-3">F1002</td>
+                                <td class="p-3 font-medium">Kavita Joshi</td>
+                                <td class="p-3">
+                                    <span class="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs">Teacher</span>
+                                </td>
+                                <td class="p-3">Computer Networks</td>
+                                <td class="p-3">8</td>
+                                <td class="p-3">₹120</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">Pending</span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-green-600 text-xs">Pay</button>
+                                    <button class="text-red-600 text-xs">Waive</button>
+                                    <button class="text-blue-600 text-xs">View</button>
+                                </td>
+                            </tr>
+
+                            <!-- ROW 3 -->
+                            <tr>
+                                <td class="p-3">F1003</td>
+                                <td class="p-3 font-medium">Rahul Verma</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Student</span>
+                                </td>
+                                <td class="p-3">Physics Fundamentals</td>
+                                <td class="p-3">3</td>
+                                <td class="p-3">₹45</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">Paid</span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                </td>
+                            </tr>
+
+                            <!-- ROW 4 -->
+                            <tr>
+                                <td class="p-3">F1004</td>
+                                <td class="p-3 font-medium">Amit Sharma</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Student</span>
+                                </td>
+                                <td class="p-3">Chemistry Guide</td>
+                                <td class="p-3">2</td>
+                                <td class="p-3">₹30</td>
+                                <td class="p-3">
+                                    <span class="text-gray-600 bg-gray-200 px-2 py-1 rounded text-xs">Waived</span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                </td>
+                            </tr>
+
+                            <!-- ROW 5 -->
+                            <tr>
+                                <td class="p-3">F1005</td>
+                                <td class="p-3 font-medium">Library Guest</td>
+                                <td class="p-3">
+                                    <span class="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs">Other</span>
+                                </td>
+                                <td class="p-3">General Knowledge</td>
+                                <td class="p-3">4</td>
+                                <td class="p-3">₹60</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">Pending</span>
+                                </td>
+                                <td class="p-3 flex gap-2 flex-wrap">
+                                    <button class="text-green-600 text-xs">Pay</button>
+                                    <button class="text-red-600 text-xs">Waive</button>
+                                    <button class="text-blue-600 text-xs">View</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================= Transactions ============================ -->
+            <section id="transactionsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Transactions</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Track all fine payments and transactions
+                            </p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- STATS CARDS -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Total Collection</p>
+                        <h3 class="text-lg font-semibold">₹330</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Paid</p>
+                        <h3 class="text-green-600 text-lg font-semibold">₹120</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Pending</p>
+                        <h3 class="text-yellow-600 text-lg font-semibold">₹210</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Waived</p>
+                        <h3 class="text-gray-600 text-lg font-semibold">₹30</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="flex flex-col sm:flex-row gap-3">
+
+                    <input type="text" placeholder="Search by name or transaction ID..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Roles</option>
+                        <option>Student</option>
+                        <option>Teacher</option>
+                        <option>Other</option>
+                    </select>
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Status</option>
+                        <option>Paid</option>
+                        <option>Pending</option>
+                        <option>Waived</option>
+                    </select>
+
+                </div>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">Txn ID</th>
+                                <th class="p-3 text-left">Member</th>
+                                <th class="p-3 text-left">Role</th>
+                                <th class="p-3 text-left">Amount</th>
+                                <th class="p-3 text-left">Method</th>
+                                <th class="p-3 text-left">Date</th>
+                                <th class="p-3 text-left">Status</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <tr>
+                                <td class="p-3">TXN1001</td>
+                                <td class="p-3 font-medium">Rahul Verma</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Student</span>
+                                </td>
+                                <td class="p-3">₹45</td>
+                                <td class="p-3">Cash</td>
+                                <td class="p-3">2026-04-05</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">Paid</span>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">TXN1002</td>
+                                <td class="p-3 font-medium">Priya Patil</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Student</span>
+                                </td>
+                                <td class="p-3">₹75</td>
+                                <td class="p-3">UPI</td>
+                                <td class="p-3">2026-04-08</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">Pending</span>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">TXN1003</td>
+                                <td class="p-3 font-medium">Kavita Joshi</td>
+                                <td class="p-3">
+                                    <span class="bg-purple-100 text-purple-600 px-2 py-1 rounded text-xs">Teacher</span>
+                                </td>
+                                <td class="p-3">₹120</td>
+                                <td class="p-3">Card</td>
+                                <td class="p-3">2026-04-10</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">Pending</span>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">TXN1004</td>
+                                <td class="p-3 font-medium">Amit Sharma</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">Student</span>
+                                </td>
+                                <td class="p-3">₹30</td>
+                                <td class="p-3">Cash</td>
+                                <td class="p-3">2026-04-03</td>
+                                <td class="p-3">
+                                    <span class="text-gray-600 bg-gray-200 px-2 py-1 rounded text-xs">Waived</span>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">TXN1005</td>
+                                <td class="p-3 font-medium">Library Guest</td>
+                                <td class="p-3">
+                                    <span class="bg-gray-200 text-gray-700 px-2 py-1 rounded text-xs">Other</span>
+                                </td>
+                                <td class="p-3">₹60</td>
+                                <td class="p-3">UPI</td>
+                                <td class="p-3">2026-04-09</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">Pending</span>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================= Reports & Analytics===========================  -->
+            <section id="reportsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Reports & Analytics</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                View detailed reports of book activity, members & fines
+                            </p>
+                        </div>
+
+                        <button class="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow">
+                            <i class="bi bi-download"></i> Export Report
+                        </button>
+
+                    </div>
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white p-4 rounded-xl shadow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <!-- MEMBER TYPE -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Member Type</label>
+                        <select class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                            <option>All Members</option>
+                            <option>Student</option>
+                            <option>Teacher</option>
+                        </select>
+                    </div>
+
+                    <!-- STATUS -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">Book Status</label>
+                        <select class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                            <option>All Status</option>
+                            <option>Issued</option>
+                            <option>Returned</option>
+                            <option>Overdue</option>
+                        </select>
+                    </div>
+
+                    <!-- FROM DATE -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">From Date</label>
+                        <input type="date" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                    <!-- TO DATE -->
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">To Date</label>
+                        <input type="date" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm" />
+                    </div>
+
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Total Books</p>
+                        <h3 class="text-lg font-semibold">1,250</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Books Issued</p>
+                        <h3 class="text-blue-600 text-lg font-semibold">320</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Overdue Books</p>
+                        <h3 class="text-red-600 text-lg font-semibold">45</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Total Fine Collected</p>
+                        <h3 class="text-green-600 text-lg font-semibold">₹4,350</h3>
+                    </div>
+
+                </div>
+
+                <!-- CHARTS -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="text-sm font-semibold mb-3">Book Issue Trend</h3>
+                        <div class="h-48 flex items-center justify-center text-gray-400 text-sm">
+                            Line Chart (Books Issued Over Time)
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="text-sm font-semibold mb-3">Member Distribution</h3>
+                        <div class="h-48 flex items-center justify-center text-gray-400 text-sm">
+                            Pie Chart (Students vs Teachers)
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- REPORT TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">Report ID</th>
+                                <th class="p-3 text-left">Member Name</th>
+                                <th class="p-3 text-left">Member Type</th>
+                                <th class="p-3 text-left">Transaction Type</th>
+                                <th class="p-3 text-left">Book Title</th>
+                                <th class="p-3 text-left">Transaction Date</th>
+                                <th class="p-3 text-left">Status</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <tr>
+                                <td class="p-3">R1001</td>
+                                <td class="p-3 font-medium">Amit Sharma</td>
+                                <td class="p-3">Student</td>
+                                <td class="p-3">Issued</td>
+                                <td class="p-3">Physics Fundamentals</td>
+                                <td class="p-3">2026-04-01</td>
+                                <td class="p-3">
+                                    <span class="text-blue-600 bg-blue-100 px-2 py-1 rounded text-xs">Active</span>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">R1002</td>
+                                <td class="p-3 font-medium">Priya Patil</td>
+                                <td class="p-3">Student</td>
+                                <td class="p-3">Overdue</td>
+                                <td class="p-3">Mathematics Vol 1</td>
+                                <td class="p-3">2026-03-28</td>
+                                <td class="p-3">
+                                    <span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">Late</span>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">R1003</td>
+                                <td class="p-3 font-medium">Kavita Joshi</td>
+                                <td class="p-3">Teacher</td>
+                                <td class="p-3">Issued</td>
+                                <td class="p-3">Computer Networks</td>
+                                <td class="p-3">2026-04-05</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">Returned</span>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================ Notifications =================================  -->
+            <section id="notificationsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Notifications</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Manage alerts & communication
+                            </p>
+                        </div>
+
+                        <!-- BUTTON -->
+                        <button class="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow">
+                            <i class="bi bi-plus"></i> Send Notification
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="flex flex-col sm:flex-row gap-3">
+
+                    <input type="text" placeholder="Search notifications..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Types</option>
+                        <option>Overdue</option>
+                        <option>Fine</option>
+                        <option>General</option>
+                    </select>
+
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Status</option>
+                        <option>Sent</option>
+                        <option>Pending</option>
+                        <option>Failed</option>
+                    </select>
+
+                </div>
+
+                <!-- STATS -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Total</p>
+                        <h3 class="text-lg font-semibold">120</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Sent</p>
+                        <h3 class="text-green-600 text-lg font-semibold">95</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Pending</p>
+                        <h3 class="text-yellow-600 text-lg font-semibold">20</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Failed</p>
+                        <h3 class="text-red-600 text-lg font-semibold">5</h3>
+                    </div>
+
+                </div>
+
+                <!-- TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">ID</th>
+                                <th class="p-3 text-left">Message</th>
+                                <th class="p-3 text-left">Type</th>
+                                <th class="p-3 text-left">Recipient</th>
+                                <th class="p-3 text-left">Channel</th>
+                                <th class="p-3 text-left">Date</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <!-- ROW -->
+                            <tr>
+                                <td class="p-3">N1001</td>
+                                <td class="p-3">Book overdue reminder</td>
+                                <td class="p-3">
+                                    <span class="bg-red-100 text-red-600 px-2 py-1 rounded text-xs">Overdue</span>
+                                </td>
+                                <td class="p-3">Priya Patil</td>
+                                <td class="p-3">SMS</td>
+                                <td class="p-3">2026-04-10</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">Sent</span>
+                                </td>
+                                <td class="p-3 flex gap-2">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                    <button class="text-indigo-600 text-xs">Resend</button>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">N1002</td>
+                                <td class="p-3">Fine payment reminder</td>
+                                <td class="p-3">
+                                    <span class="bg-yellow-100 text-yellow-600 px-2 py-1 rounded text-xs">Fine</span>
+                                </td>
+                                <td class="p-3">Kavita Joshi</td>
+                                <td class="p-3">Email</td>
+                                <td class="p-3">2026-04-09</td>
+                                <td class="p-3">
+                                    <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded text-xs">Pending</span>
+                                </td>
+                                <td class="p-3 flex gap-2">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                    <button class="text-indigo-600 text-xs">Send</button>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">N1003</td>
+                                <td class="p-3">Library closed notice</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs">General</span>
+                                </td>
+                                <td class="p-3">All Members</td>
+                                <td class="p-3">App</td>
+                                <td class="p-3">2026-04-08</td>
+                                <td class="p-3">
+                                    <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">Sent</span>
+                                </td>
+                                <td class="p-3 flex gap-2">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">N1004</td>
+                                <td class="p-3">Overdue alert</td>
+                                <td class="p-3">
+                                    <span class="bg-red-100 text-red-600 px-2 py-1 rounded text-xs">Overdue</span>
+                                </td>
+                                <td class="p-3">Rahul Verma</td>
+                                <td class="p-3">WhatsApp</td>
+                                <td class="p-3">2026-04-11</td>
+                                <td class="p-3">
+                                    <span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">Failed</span>
+                                </td>
+                                <td class="p-3 flex gap-2">
+                                    <button class="text-blue-600 text-xs">View</button>
+                                    <button class="text-indigo-600 text-xs">Retry</button>
+                                </td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================= SETTINGS SECTION ============================= -->
+            <section class="section p-4 sm:p-6 space-y-6 hidden dark:bg-slate-900 dark:text-gray-100"
+                id="settingsSection">
+
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow">
+                    <h2 class="text-xl font-semibold">Settings</h2>
+                    <p class="text-sm opacity-90">Manage system preferences, security & school configuration</p>
+                </div>
+
+                <!--  SYSTEM PREFERENCES  -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm space-y-5">
+
+                    <h3 class="font-semibold">System Preferences</h3>
+
+                    <!-- DARK MODE -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm">Dark Mode</span>
+
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="darkToggle" class="sr-only peer">
+
+                            <div class="w-11 h-6 bg-gray-200 dark:bg-slate-600 rounded-full relative
+                    peer peer-checked:bg-indigo-600 transition">
+
+                                <div class="absolute top-[2px] left-[2px] h-5 w-5 bg-white rounded-full
+                        transition-all peer-checked:translate-x-full">
+                                </div>
+
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- NOTIFICATIONS -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm">Enable Notifications</span>
+
+                        <input type="checkbox" checked class="w-5 h-5 accent-indigo-600 cursor-pointer">
+                    </div>
+
+                    <!-- EMAIL NOTIFICATIONS -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm">Email Notifications</span>
+
+                        <input type="checkbox" checked class="w-5 h-5 accent-indigo-600 cursor-pointer">
+                    </div>
+
+                    <!-- LANGUAGE -->
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                        <span class="text-sm">Language</span>
+
+                        <select class="px-3 py-2 border rounded-lg text-sm w-full sm:w-auto 
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+
+                            <option>English</option>
+                            <option>Hindi</option>
+                            <option>Marathi</option>
+                        </select>
+                    </div>
+
+
+                </div>
+
+                <!--  SCHOOL CONFIGURATION  -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm space-y-5">
+
+                    <h3 class="font-semibold">School Configuration</h3>
+
+                    <!-- ACADEMIC YEAR -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm">Academic Year</span>
+                        <input type="text" placeholder="2025-2026" class="px-3 py-2 border rounded-lg text-sm w-40
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                    </div>
+
+                    <!-- GRADING SYSTEM -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm">Grading System</span>
+
+                        <select class="px-3 py-2 border rounded-lg text-sm w-40
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+
+                            <option>Marks (0-100)</option>
+                            <option>Grades (A-F)</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <!--  SECURITY SETTINGS  -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm space-y-5">
+
+                    <h3 class="font-semibold">Security</h3>
+
+                    <!-- 2FA -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm">Two-Factor Authentication (2FA)</span>
+
+                        <input type="checkbox" class="w-5 h-5 accent-indigo-600 cursor-pointer">
+                    </div>
+
+                    <!-- SESSION TIMEOUT -->
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm">Session Timeout (mins)</span>
+
+                        <input type="number" value="30" class="px-3 py-2 border rounded-lg text-sm w-24
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white">
+                    </div>
+
+                    <!-- PASSWORD RESET -->
+                    <button
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm transition w-full sm:w-auto">
+                        Force Password Reset for All Users
+                    </button>
+
+                </div>
+
+                <!--  BACKUP & DATA  -->
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
+
+                    <h3 class="font-semibold">Backup & Data</h3>
+
+                    <div class="flex flex-wrap gap-3">
+                        <button
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm transition">
+                            Backup Database
+                        </button>
+
+                        <button
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm transition">
+                            Export Data
+                        </button>
+
+                        <button
+                            class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-xl text-sm transition">
+                            Restore Backup
+                        </button>
+                    </div>
+
+                </div>
+
+                <!--  DANGER ZONE  -->
+                <div class="bg-red-50 dark:bg-red-500/10 p-5 rounded-2xl shadow-sm space-y-4">
+
+                    <h3 class="font-semibold text-red-600 dark:text-red-300">Danger Zone</h3>
+
+                    <div class="flex flex-col sm:flex-row gap-3">
+
+                        <button class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm transition">
+                            Logout from All Devices
+                        </button>
+
+                        <button class="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-xl text-sm transition">
+                            Reset Entire System
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </section>
+            <section id="logsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <!-- HEADER -->
+                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                        <!-- TEXT -->
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-semibold">Activity & Logs</h2>
+                            <p class="text-xs sm:text-sm opacity-90">
+                                Track all system activities and user actions
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white p-4 rounded-xl shadow flex flex-col sm:flex-row gap-3">
+
+                    <!-- SEARCH -->
+                    <input type="text" placeholder="Search user, action..."
+                        class="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                    <!-- USER TYPE -->
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Users</option>
+                        <option>Admin</option>
+                        <option>Teacher</option>
+                        <option>Student</option>
+                    </select>
+
+                    <!-- ACTION TYPE -->
+                    <select class="border rounded-lg px-3 py-2 text-sm">
+                        <option>All Actions</option>
+                        <option>Login</option>
+                        <option>Logout</option>
+                        <option>Issue Book</option>
+                        <option>Return Book</option>
+                        <option>Fine Payment</option>
+                        <option>Add Book</option>
+                        <option>Delete Book</option>
+                    </select>
+
+                    <!-- DATE -->
+                    <input type="date" class="border rounded-lg px-3 py-2 text-sm" />
+
+                </div>
+
+                <!-- SUMMARY CARDS -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-xs text-gray-500">Total Activities</p>
+                        <h3 class="text-lg font-semibold">1,250</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-xs text-gray-500">Logins Today</p>
+                        <h3 class="text-green-600 text-lg font-semibold">85</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-xs text-gray-500">Books Issued</p>
+                        <h3 class="text-blue-600 text-lg font-semibold">320</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-xs text-gray-500">Errors</p>
+                        <h3 class="text-red-600 text-lg font-semibold">5</h3>
+                    </div>
+
+                </div>
+
+                <!-- ACTIVITY TABLE -->
+                <div class="bg-white rounded-xl shadow overflow-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="p-3 text-left">Time</th>
+                                <th class="p-3 text-left">User</th>
+                                <th class="p-3 text-left">Role</th>
+                                <th class="p-3 text-left">Action</th>
+                                <th class="p-3 text-left">Details</th>
+                                <th class="p-3 text-left">Status</th>
+                                <th class="p-3 text-left">IP</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y">
+
+                            <!-- ROW -->
+                            <tr>
+                                <td class="p-3">10:15 AM</td>
+                                <td class="p-3">Salman (Admin)</td>
+                                <td class="p-3">Admin</td>
+                                <td class="p-3 font-medium">Add Book</td>
+                                <td class="p-3">Added "Physics Fundamentals"</td>
+                                <td class="p-3">
+                                    <span class="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">Success</span>
+                                </td>
+                                <td class="p-3">192.168.1.1</td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">10:20 AM</td>
+                                <td class="p-3">Rahul Verma</td>
+                                <td class="p-3">Student</td>
+                                <td class="p-3 font-medium">Issue Book</td>
+                                <td class="p-3">Issued "Math Vol 1"</td>
+                                <td class="p-3">
+                                    <span class="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">Success</span>
+                                </td>
+                                <td class="p-3">192.168.1.5</td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">10:30 AM</td>
+                                <td class="p-3">Priya Patil</td>
+                                <td class="p-3">Teacher</td>
+                                <td class="p-3 font-medium">Return Book</td>
+                                <td class="p-3">Returned "Chemistry Guide"</td>
+                                <td class="p-3">
+                                    <span class="bg-yellow-100 text-yellow-600 px-2 py-1 text-xs rounded">Pending
+                                        Fine</span>
+                                </td>
+                                <td class="p-3">192.168.1.8</td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">11:00 AM</td>
+                                <td class="p-3">System</td>
+                                <td class="p-3">System</td>
+                                <td class="p-3 font-medium">Auto Fine</td>
+                                <td class="p-3">Generated ₹50 fine</td>
+                                <td class="p-3">
+                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 text-xs rounded">Auto</span>
+                                </td>
+                                <td class="p-3">—</td>
+                            </tr>
+
+                            <tr>
+                                <td class="p-3">11:30 AM</td>
+                                <td class="p-3">Admin</td>
+                                <td class="p-3">Admin</td>
+                                <td class="p-3 font-medium">Delete Book</td>
+                                <td class="p-3">Deleted "Old History Book"</td>
+                                <td class="p-3">
+                                    <span class="bg-red-100 text-red-600 px-2 py-1 text-xs rounded">Critical</span>
+                                </td>
+                                <td class="p-3">192.168.1.1</td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+            <!-- ============================= SETTINGS END ============================= -->
+            <!-- ============================= LIBRARY ADMIN PROFILE SECTION ============================= -->
+            <section id="profileSection"
+                class="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
+
+                <!-- HEADER -->
+                <div
+                    class="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-xl overflow-hidden">
+
+                    <div class="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
+
+                    <div class="relative flex flex-col sm:flex-row items-center gap-6">
+
+                        <img src="https://i.pravatar.cc/120?img=12"
+                            class="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
+
+                        <div class="text-center sm:text-left flex-1">
+                            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">
+                                Salman Pinjari
+                            </h2>
+
+                            <p class="text-sm opacity-90 mt-1">
+                                Library Admin • School Library System
+                            </p>
+
+                            <div class="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
+                                <span class="px-3 py-1 text-xs bg-white/20 rounded-full">LIB-ADMIN-001</span>
+                                <span class="px-3 py-1 text-xs bg-white/20 rounded-full">Full Library Access</span>
+
+                                <span class="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
+                                    Active
+                                </span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- GRID -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+
+                    <!-- PERSONAL -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">👤 Personal Info</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>DOB: <span class="font-medium">1995-05-10</span></p>
+                            <p>Gender: <span class="font-medium">Male</span></p>
+                            <p>Phone: <span class="font-medium">9876543210</span></p>
+                            <p>Email: <span class="font-medium">library@school.com</span></p>
+                        </div>
+                    </div>
+
+                    <!-- ROLE -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">📚 Role & Access</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Role: <span class="font-medium">Library Admin</span></p>
+                            <p>Permissions: <span class="font-medium">Books, Members, Fines</span></p>
+                            <p>Access Level: <span class="text-green-600 font-medium">Full Control</span></p>
+                        </div>
+                    </div>
+
+                    <!-- LIBRARY INFO -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">🏫 Library Info</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Library Name: <span class="font-medium">ABC School Library</span></p>
+                            <p>Code: <span class="font-medium">LIB-102</span></p>
+                            <p>Total Books: <span class="font-medium">1250+</span></p>
+                            <p>Sections: <span class="font-medium">Science, Arts, Tech</span></p>
+                        </div>
+                    </div>
+
+                    <!-- SYSTEM CONTROL -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">⚙️ System Control</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Members Managed: <span class="font-medium">540+</span></p>
+                            <p>Active Issues: <span class="font-medium">320</span></p>
+                            <p>Modules Enabled: <span class="font-medium">All Library</span></p>
+                        </div>
+                    </div>
+
+                    <!-- FINANCE -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">💰 Fine Control</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Fine Access: <span class="text-green-600 font-medium">Full</span></p>
+                            <p>Waive Authority: <span class="font-medium">Yes</span></p>
+                            <p>Total Collection: <span class="font-medium">₹4,350</span></p>
+                        </div>
+                    </div>
+
+                    <!-- SECURITY -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">🔐 Security</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Last Login: <span class="font-medium">Today</span></p>
+                            <p>2FA: <span class="text-green-600 font-medium">Enabled</span></p>
+                            <p>Login Alerts: <span class="font-medium">Active</span></p>
+                        </div>
+                    </div>
+
+                    <!-- ACTIVITY -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">📊 Activity</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Logins (30d): <span class="font-medium">60</span></p>
+                            <p>Books Issued: <span class="font-medium">320+</span></p>
+                            <p>Last Action: <span class="font-medium">Issued Book</span></p>
+                        </div>
+                    </div>
+
+                    <!-- ADDRESS -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">📍 Address</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Aurangabad, Maharashtra</p>
+                            <p>Pincode: 431001</p>
+                        </div>
+                    </div>
+
+                    <!-- SUPPORT -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">📞 Support Contact</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Name: <span class="font-medium">Library Assistant</span></p>
+                            <p>Phone: <span class="font-medium">9876501234</span></p>
+                            <p>Email: <span class="font-medium">support@library.com</span></p>
+                        </div>
+                    </div>
+
+                    <!-- ACCOUNT -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">🖥️ Account</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Username: <span class="font-medium">lib_admin001</span></p>
+                            <p>Status: <span class="text-green-600 font-medium">Active</span></p>
+                            <p>Created On: <span class="font-medium">2022</span></p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ACTION BAR -->
+                <div class="sticky bottom-4 flex justify-center sm:justify-end gap-3">
+
+                    <button
+                        class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium shadow-lg hover:opacity-90">
+                        Edit Profile
+                    </button>
+
+                </div>
+
+            </section>
+            <!-- PASSWORD MODAL -->
+            <div id="passwordModal"
+                class="hidden fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 p-4">
+
+                <!-- MODAL CARD -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 w-full max-w-md">
+
+                    <!-- TITLE -->
+                    <h2 class="text-lg sm:text-xl font-semibold mb-4 dark:text-white">
+                        Change Password
+                    </h2>
+
+                    <!-- INPUTS -->
+                    <div class="flex flex-col gap-3">
+
+                        <input id="currentPass" type="password" placeholder="Current Password"
+                            class="px-4 py-2 border rounded-lg text-sm 
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+                        <input id="newPass" type="password" placeholder="New Password"
+                            class="px-4 py-2 border rounded-lg text-sm 
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+                        <input id="confirmPass" type="password" placeholder="Confirm Password"
+                            class="px-4 py-2 border rounded-lg text-sm 
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+                        <!-- TOGGLE -->
+                        <div id="togglePassword"
+                            class="flex items-center gap-2 cursor-pointer text-gray-500 dark:text-gray-300 text-sm hover:text-gray-700 dark:hover:text-white transition">
+
+                            <i class="bi bi-eye-fill"></i>
+                            <span>Show Passwords</span>
+                        </div>
+
+                    </div>
+
+                    <!-- BUTTONS -->
+                    <div class="flex flex-col sm:flex-row justify-end gap-3 mt-5">
+
+                        <button id="closePasswordModal" type="button"
+                            class="w-full sm:w-auto px-4 py-2 rounded-lg bg-gray-200 dark:bg-slate-700 dark:text-white hover:bg-gray-300 dark:hover:bg-slate-600 transition">
+                            Cancel
+                        </button>
+
+                        <button id="savePasswordBtn" type="button"
+                            class="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
+                            Save Password
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+            <!-- ============================= PROFILE SECTION END ============================= -->
+
+            <script src="./js-scripts/main.js"></script>
+            <script src="./js-scripts/libraryAdminDashboard.js"></script>
+            <!-- NOTIFICATION CONTAINER -->
+            <!-- <div id="notificationContainer" class="fixed top-5 right-5 space-y-3 z-[9999]"></div> -->
+        </main>
+
+    </div>
+</body>
+
+</html>
