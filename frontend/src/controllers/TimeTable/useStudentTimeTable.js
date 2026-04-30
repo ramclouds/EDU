@@ -23,7 +23,9 @@ export function useStudentTimeTable({
 
     // ================= TIMETABLE START =================
     useEffect(() => {
-        if (activeSection !== "timetable") return;
+        if (activeSection !== "timetable" &&
+            activeSection !== "dashboard"
+        ) return;
 
         const { user } = getAuth();
         if (!user) return;
