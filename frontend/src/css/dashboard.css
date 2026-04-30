@@ -1,0 +1,83 @@
+.maincolor {
+    font-family: Inter, system-ui, sans-serif;
+    background-color: #e5e7ec;
+}
+
+.section {
+    display: none;
+}
+
+.section.active {
+    display: block;
+}
+
+.fade-in {
+    animation: fadeIn 0.4s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+/* CARDS */
+.dark .bg-white {
+    background-color: #1e293b !important;
+    color: #e5e7eb;
+}
+
+/* TEXT */
+.dark .text-gray-500,
+.dark .text-gray-400 {
+    color: #94a3b8 !important;
+}
+
+/* INPUTS */
+.dark input,
+.dark textarea,
+.dark select {
+    background-color: #334155 !important;
+    color: white !important;
+    border-color: #475569 !important;
+}
+
+/* SIDEBAR */
+.dark aside {
+    background-color: #1e293b !important;
+}
+
+/* HEADER */
+.dark .bg-gradient-to-r {
+    background: #1e293b !important;
+}
+
+/* BUTTON HOVER */
+.dark .hover\:bg-gray-100:hover {
+    background-color: #334155 !important;
+}
+
+* {
+    transition: background-color 0.3s, color 0.3s;
+}
+
+
+/* =========================
+   SCROLLBAR
+========================= */
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}

@@ -1,29 +1,64 @@
-import React from 'react'
-import { Link, Routes, Route, Navigate } from 'react-router-dom'
-import EmployeeList from './pages/EmployeeList'
-import PayrollRun from './pages/PayrollRun'
-import PayslipView from './pages/PayslipView'
+import { Routes, Route, Navigate } from "react-router-dom";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import StudentDashboard from "./pages/student-dashboard";
+import TeacherDashboard from "./pages/teacher-dashboard";
 
-function requireAuth() {
-  return localStorage.getItem('token')
+/* Dummy Dashboards (replace later with real components) */
+
+function AdminDashboard() {
+  return <h1>Admin Dashboard</h1>;
 }
 
-export default function App(){
-  if (!requireAuth()) return <Navigate to="/login" replace />
+/* 🔐 Protected Route */
+function ProtectedRoute({ children, allowedRole }) {
+  const token = localStorage.getItem("token");
+  const userRole = localStorage.getItem("role");
+
+  if (!token) {
+    return <Navigate to="/" />;
+  }
+
+  if (allowedRole && userRole !== allowedRole) {
+    return <Navigate to="/" />;
+  }
+
+  return children;
+}
+
+export default function App() {
   return (
-    <div className="p-4">
-      <header className="mb-4">
-        <h1 className="text-2xl font-bold">Basic Education Management - Payroll</h1>
-        <nav className="space-x-4 mt-2">
-          <Link to="/" className="text-blue-600">Employees</Link>
-          <Link to="/payroll" className="text-blue-600">Run Payroll</Link>
-        </nav>
-      </header>
-      <Routes>
-        <Route path="/" element={<EmployeeList/>} />
-        <Route path="/payroll" element={<PayrollRun/>} />
-        <Route path="/payslip/:id" element={<PayslipView/>} />
-      </Routes>
-    </div>
-  )
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+
+      {/* Protected Routes */}
+      <Route
+        path="/student-dashboard"
+        element={
+          <ProtectedRoute allowedRole="student">
+            <StudentDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/teacher-dashboard"
+        element={
+          <ProtectedRoute allowedRole="teacher">
+            <TeacherDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin-dashboard"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  );
 }
