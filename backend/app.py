@@ -459,13 +459,13 @@ def create_app():
     )
 
     app.add_url_rule(
-        "/api/student/<int:id>/hostel",
+        "/api/student/<int:student_id>/hostel",
         view_func=StudentHostelDetails.as_view("hostel"),
         methods=["GET"],
     )
 
     app.add_url_rule(
-        "/api/student/<int:id>/hostel/complaint",
+        "/api/student/<int:student_id>/hostel/complaint",
         view_func=CreateHostelComplaint.as_view("hostel_complaint"),
         methods=["POST"],
     )

@@ -7,6 +7,9 @@ import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useStudentAssignments } from "../controllers/Assingments/useStudentAssignments";
 import { useStudentLeaves } from "../controllers/Leaves/useStudentLeaves";
 import { useStudentTimeTable } from "../controllers/TimeTable/useStudentTimeTable";
+import { useStudentAttendance } from "../controllers/Attendance/useStudentAttendance";
+import { useStudentExams } from "../controllers/ExamResult/useStudentExams";
+import { useStudentHostel } from "../controllers/Hostel/useStudentHostel";
 
 function StudentDashboard() {
   const [noticeTab, setNoticeTab] = useState("announcements");
@@ -42,36 +45,13 @@ function StudentDashboard() {
   const {
     loading,
     noticeLoading,
-    examLoading,
-    hostelLoading,
-    attendanceLoading,
-
     // 📊 Data
-    attendance,
-    results,
-    upcomingExams,
-    performance,
+
     announcements,
     noticeStats,
     unreadCount,
-    hostel,
     libraryData,
     librarySummary,
-
-    // 🎛 Filters
-    filters,
-    filterOptions,
-
-    // 📊 Charts
-    attendanceChartRef,
-    performanceChartRef,
-
-    // 📥 Downloads
-    handleDownloadPDF,
-    handleDownloadResultsPDF,
-
-    // 🔍 Filters
-    handleFilterChange,
 
     // 🔔 Notices
     markNoticeAsRead,
@@ -86,11 +66,6 @@ function StudentDashboard() {
     sortedNotifications,
     totalUnread,
     handleNotificationClick,
-
-    // 🏠 Hostel
-    complaintText,
-    setComplaintText,
-    handleRaiseComplaint,
 
     // 🍞 Toast
     toast,
@@ -113,6 +88,7 @@ function StudentDashboard() {
     submitAssignment,
   } = useStudentAssignments(fetchWithAuth, showToast);
 
+  // ================= LEAVE HOOK =================
   const {
     leaveForm,
     studentLeaves,
@@ -129,6 +105,7 @@ function StudentDashboard() {
     showToast,
   });
 
+  // ================= TIMETABLE HOOK =================
   const { timetableLoading, timetable } = useStudentTimeTable({
     activeSection,
     fetchWithAuth,
@@ -154,6 +131,36 @@ function StudentDashboard() {
     handleSave,
     handleLogout,
   } = useStudentProfile({ fetchWithAuth });
+
+  // ================== Attendance =============
+  const {
+    attendance,
+    attendanceLoading,
+    attendanceChartRef,
+    handleDownloadPDF,
+  } = useStudentAttendance(fetchWithAuth, activeSection, showToast);
+
+  // ================= EXAM HOOK =================
+  const {
+    examLoading,
+    results,
+    performance,
+    upcomingExams,
+    filters,
+    filterOptions,
+    performanceChartRef,
+    handleFilterChange,
+    handleDownloadResultsPDF,
+  } = useStudentExams(fetchWithAuth, activeSection, showToast);
+
+  // ================= HOSTEL HOOK =================
+  const {
+    hostel,
+    hostelLoading,
+    complaintText,
+    setComplaintText,
+    handleRaiseComplaint,
+  } = useStudentHostel(fetchWithAuth, activeSection, showToast);
 
   // 🎴 Dashboard Card Animation
   useEffect(() => {
