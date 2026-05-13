@@ -57,7 +57,15 @@ from utils.leaves import (
 )
 
 # ================= ACADEMICS =================
-from utils.attendance import StudentAttendanceAPI, DownloadAttendancePDF
+from utils.attendance import (
+    StudentAttendanceAPI,
+    DownloadAttendancePDF,
+    TeacherAssignedClassesAPI,
+    StudentsByClassAPI,
+    AttendanceMarkAPI,
+    GetAttendanceByDateAPI,
+    DownloadTeacherAttendanceReportAPI,
+)
 
 from utils.timetable import (
     StudentTimetableAPI,
@@ -382,21 +390,58 @@ def create_app():
         methods=["POST"],
     )
 
+    # ================= STUDENT ATTENDANCE =================
+    app.add_url_rule(
+        "/api/student/attendance/<int:student_id>",
+        view_func=StudentAttendanceAPI.as_view("student_attendance"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/student/attendance/download/<int:student_id>",
+        view_func=DownloadAttendancePDF.as_view("download_attendance_pdf"),
+        methods=["GET"],
+    )
+
+    # ================= TEACHER ATTENDANCE =================
+    # 1️⃣ Get teacher assigned classes
+    app.add_url_rule(
+        "/api/teacher/classes/<int:teacher_id>",
+        view_func=TeacherAssignedClassesAPI.as_view("teacher_classes"),
+        methods=["GET"],
+    )
+
+    # 2️⃣ Get students by class
+    app.add_url_rule(
+        "/api/students/by-class/<int:academic_class_id>",
+        view_func=StudentsByClassAPI.as_view("students_by_class"),
+        methods=["GET"],
+    )
+
+    # 3️⃣ Mark attendance (CREATE + UPDATE)
+    app.add_url_rule(
+        "/api/attendance/mark",
+        view_func=AttendanceMarkAPI.as_view("mark_attendance"),
+        methods=["POST"],
+    )
+
+    # 4️⃣ Get attendance by date
+    app.add_url_rule(
+        "/api/attendance",
+        view_func=GetAttendanceByDateAPI.as_view("get_attendance_by_date"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/attendance/report",
+        view_func=DownloadTeacherAttendanceReportAPI.as_view(
+            "download_teacher_attendance_report"
+        ),
+    )
+
     # ==================================================
     # ACADEMICS
     # ==================================================
-
-    app.add_url_rule(
-        "/api/attendance/<int:student_id>",
-        view_func=StudentAttendanceAPI.as_view("attendance"),
-        methods=["GET"],
-    )
-
-    app.add_url_rule(
-        "/api/attendance/pdf/<int:student_id>",
-        view_func=DownloadAttendancePDF.as_view("attendance_pdf"),
-        methods=["GET"],
-    )
 
     app.add_url_rule(
         "/api/timetable/<int:student_id>",
