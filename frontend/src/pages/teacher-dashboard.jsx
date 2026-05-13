@@ -8,6 +8,7 @@ import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useTeacherLeaves } from "../controllers/Leaves/useTeacherLeaves";
 import { useTeacherTimetable } from "../controllers/TimeTable/useTeacherTimetable";
 import { useTeacherProfile } from "../controllers/Profiles/useTeacherProfile";
+import { useTeacherAttendance } from "../controllers/Attendance/useTeacherAttendance";
 
 function TeacherDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -159,6 +160,26 @@ function TeacherDashboard() {
     downloadLoading,
     downloadTeacherTimetablePDF,
   } = useTeacherTimetable({ activeSection, fetchWithAuth, showToast });
+
+  // ================= ATTENDANCE HOOK =================
+  const {
+    classes,
+    students,
+    attendance,
+    selectedClass: attendanceClass,
+    setSelectedClass: setAttendanceClass,
+    selectedDate,
+    setSelectedDate,
+    attendanceCounts,
+    markAttendance,
+    markAll,
+    saveAttendance,
+    getTodayDate,
+    updateRemark,
+    selectedMonth,
+    setSelectedMonth,
+    downloadAttendanceReport,
+  } = useTeacherAttendance(fetchWithAuth, showToast);
 
   // ================= PROFILE HOOK =================
   const {
@@ -700,6 +721,282 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           </section>
         )}
         {/* ===================== DASHBOARD SECTION END =========================== */}
+        {/*  ============================= ATTENDANCE SECTION START =============================  */}
+        {activeSection === "attendance" && (
+          <section className="p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-3xl p-5 sm:p-6 shadow-lg">
+              <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+                {/* LEFT */}
+                <div>
+                  <h2 className="text-white text-xl sm:text-2xl font-bold">
+                    Student Attendance
+                  </h2>
+
+                  <p className="text-white/80 text-sm mt-1">
+                    Manage subject-wise attendance records and monthly reports
+                  </p>
+                </div>
+
+                {/* RIGHT */}
+                <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+                  {/* MONTH */}
+                  <div className="flex flex-col">
+                    <label className="text-white text-xs mb-1">
+                      Report Month
+                    </label>
+
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="px-4 py-2 rounded-xl text-sm border border-white/20 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-white"
+                    />
+                  </div>
+
+                  {/* DOWNLOAD */}
+                  <div className="flex items-end">
+                    <button
+                      onClick={downloadAttendanceReport}
+                      className="bg-white hover:bg-gray-100 transition text-indigo-600 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm"
+                    >
+                      Download Monthly Report
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* FILTERS */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                {/* DATE */}
+                <div className="flex flex-col">
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Attendance Date
+                  </label>
+
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    max={getTodayDate()}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="px-4 py-2.5 border rounded-xl text-sm dark:bg-slate-900 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+
+                {/* CLASS + SUBJECT */}
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                    Assigned Class & Subject
+                  </label>
+
+                  <select
+                    value={
+                      attendanceClass
+                        ? `${attendanceClass.academic_class_id}-${attendanceClass.subject_id}`
+                        : ""
+                    }
+                    onChange={(e) => {
+                      const selected = classes.find(
+                        (c) =>
+                          `${c.academic_class_id}-${c.subject_id}` ===
+                          e.target.value,
+                      );
+
+                      setAttendanceClass(selected);
+                    }}
+                    className="px-4 py-2.5 border rounded-xl text-sm dark:bg-slate-900 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  >
+                    <option value="">Select Assigned Subject</option>
+
+                    {classes.map((c) => (
+                      <option
+                        key={`${c.academic_class_id}-${c.subject_id}`}
+                        value={`${c.academic_class_id}-${c.subject_id}`}
+                      >
+                        {c.class_name} • {c.subject_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ACTION BUTTONS */}
+                <div className="flex gap-2 items-end">
+                  <button
+                    onClick={() => markAll("Present")}
+                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 transition text-white px-4 py-2.5 rounded-xl text-sm font-medium"
+                  >
+                    All Present
+                  </button>
+
+                  <button
+                    onClick={() => markAll("Absent")}
+                    className="flex-1 bg-red-500 hover:bg-red-600 transition text-white px-4 py-2.5 rounded-xl text-sm font-medium"
+                  >
+                    All Absent
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* SUMMARY */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* TOTAL */}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Total Students
+                </p>
+
+                <h3 className="text-2xl font-bold mt-1 text-gray-800 dark:text-white">
+                  {attendanceCounts?.total || 0}
+                </h3>
+              </div>
+
+              {/* PRESENT */}
+              <div className="bg-green-50 dark:bg-green-500/10 rounded-2xl p-5 border border-green-100 dark:border-green-500/20">
+                <p className="text-xs text-green-700 dark:text-green-400">
+                  Present
+                </p>
+
+                <h3 className="text-2xl font-bold mt-1 text-green-600">
+                  {attendanceCounts?.present || 0}
+                </h3>
+              </div>
+
+              {/* ABSENT */}
+              <div className="bg-red-50 dark:bg-red-500/10 rounded-2xl p-5 border border-red-100 dark:border-red-500/20">
+                <p className="text-xs text-red-700 dark:text-red-400">Absent</p>
+
+                <h3 className="text-2xl font-bold mt-1 text-red-600">
+                  {attendanceCounts?.absent || 0}
+                </h3>
+              </div>
+
+              {/* PENDING */}
+              <div className="bg-yellow-50 dark:bg-yellow-500/10 rounded-2xl p-5 border border-yellow-100 dark:border-yellow-500/20">
+                <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                  Pending
+                </p>
+
+                <h3 className="text-2xl font-bold mt-1 text-yellow-600">
+                  {attendanceCounts?.pending || 0}
+                </h3>
+              </div>
+            </div>
+
+            {/* STUDENT LIST */}
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
+              {/* HEADER */}
+              <div className="px-5 py-4 border-b dark:border-slate-700 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-800 dark:text-white">
+                    Student Attendance List
+                  </h3>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Mark attendance subject-wise for selected class
+                  </p>
+                </div>
+              </div>
+
+              {/* STUDENTS */}
+              <div className="divide-y dark:divide-slate-700 max-h-[600px] overflow-y-auto">
+                {students.length > 0 ? (
+                  students.map((s) => (
+                    <div
+                      key={s.student_id}
+                      className="p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition"
+                    >
+                      {/* LEFT */}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
+                          {s.name}
+                        </p>
+
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Roll No: {s.roll_number} • {s.class_label}
+                        </p>
+                      </div>
+
+                      {/* RIGHT */}
+                      <div className="flex flex-col sm:flex-row gap-3 sm:items-center w-full lg:w-auto">
+                        {/* STATUS */}
+                        <div className="flex gap-2">
+                          {/* PRESENT */}
+                          <button
+                            onClick={() =>
+                              markAttendance(s.student_id, "Present")
+                            }
+                            className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
+                              attendance[s.student_id]?.status === "Present"
+                                ? "bg-green-500 text-white shadow"
+                                : "bg-gray-100 dark:bg-slate-700 hover:bg-green-100"
+                            }`}
+                          >
+                            Present
+                          </button>
+
+                          {/* ABSENT */}
+                          <button
+                            onClick={() =>
+                              markAttendance(s.student_id, "Absent")
+                            }
+                            className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
+                              attendance[s.student_id]?.status === "Absent"
+                                ? "bg-red-500 text-white shadow"
+                                : "bg-gray-100 dark:bg-slate-700 hover:bg-red-100"
+                            }`}
+                          >
+                            Absent
+                          </button>
+
+                          {/* LATE */}
+                          <button
+                            onClick={() => markAttendance(s.student_id, "Late")}
+                            className={`px-4 py-2 rounded-xl text-xs font-medium transition ${
+                              attendance[s.student_id]?.status === "Late"
+                                ? "bg-yellow-500 text-white shadow"
+                                : "bg-gray-100 dark:bg-slate-700 hover:bg-yellow-100"
+                            }`}
+                          >
+                            Late
+                          </button>
+                        </div>
+
+                        {/* REMARK */}
+                        <input
+                          type="text"
+                          placeholder="Optional remarks"
+                          value={attendance[s.student_id]?.remarks || ""}
+                          onChange={(e) =>
+                            updateRemark(s.student_id, e.target.value)
+                          }
+                          className="border dark:border-slate-700 dark:bg-slate-900 px-3 py-2 rounded-xl text-xs w-full sm:w-52 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-16 text-center">
+                    <p className="text-sm text-gray-400">No students found</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SAVE BUTTON */}
+            <div className="flex justify-end">
+              <button
+                onClick={saveAttendance}
+                className="bg-indigo-600 hover:bg-indigo-700 transition text-white px-8 py-3 rounded-2xl text-sm font-semibold shadow-lg"
+              >
+                Save Attendance
+              </button>
+            </div>
+          </section>
+        )}
+        {/*  ============================= ATTENDANCE SECTION END =============================  */}
         {/*  ============================= TIMETABLE SECTION START =============================  */}
         {activeSection === "timetable" && (
           <section className="section p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">

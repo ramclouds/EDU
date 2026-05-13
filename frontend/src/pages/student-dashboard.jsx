@@ -948,6 +948,10 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                               <p className="font-semibold text-gray-800 dark:text-white">
                                 {m.percentage ?? 0}%
                               </p>
+
+                              <p className="text-[10px] text-gray-400 mt-1">
+                                {m.present}/{m.total}
+                              </p>
                             </div>
                           );
                         })
@@ -973,6 +977,8 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         <tr>
                           <th className="py-2 text-left">Date</th>
                           <th className="text-left">Day</th>
+                          <th className="text-left">Subject</th>
+                          <th className="text-left">Period</th>
                           <th className="text-left">Status</th>
                           <th className="text-left">Remarks</th>
                         </tr>
@@ -988,8 +994,17 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                               <td className="py-2 text-gray-700 dark:text-gray-200">
                                 {r.date || "-"}
                               </td>
+
                               <td className="text-gray-700 dark:text-gray-200">
                                 {r.day || "-"}
+                              </td>
+
+                              <td className="text-gray-700 dark:text-gray-200">
+                                {r.subject || "-"}
+                              </td>
+
+                              <td className="text-gray-700 dark:text-gray-200">
+                                {r.period_no || "-"}
                               </td>
 
                               <td
@@ -1012,7 +1027,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         ) : (
                           <tr>
                             <td
-                              colSpan="4"
+                              colSpan="6"
                               className="py-4 text-center text-gray-400"
                             >
                               No attendance records
@@ -1036,21 +1051,31 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                             <span>{r.day}</span>
                           </div>
 
-                          <p
-                            className={`mt-1 font-medium ${
-                              r.status === "Present"
-                                ? "text-green-600"
-                                : r.status === "Absent"
-                                  ? "text-red-500"
-                                  : "text-yellow-500"
-                            }`}
-                          >
-                            {r.status}
-                          </p>
+                          <div className="mt-2 space-y-1">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                              {r.subject || "-"}
+                            </p>
 
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {r.remarks || "-"}
-                          </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Period: {r.period_no || "-"}
+                            </p>
+
+                            <p
+                              className={`font-medium ${
+                                r.status === "Present"
+                                  ? "text-green-600"
+                                  : r.status === "Absent"
+                                    ? "text-red-500"
+                                    : "text-yellow-500"
+                              }`}
+                            >
+                              {r.status}
+                            </p>
+
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {r.remarks || "-"}
+                            </p>
+                          </div>
                         </div>
                       ))
                     ) : (
