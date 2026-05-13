@@ -9,6 +9,7 @@ import { useTeacherLeaves } from "../controllers/Leaves/useTeacherLeaves";
 import { useTeacherTimetable } from "../controllers/TimeTable/useTeacherTimetable";
 import { useTeacherProfile } from "../controllers/Profiles/useTeacherProfile";
 import { useTeacherAttendance } from "../controllers/Attendance/useTeacherAttendance";
+import { useMyClasses } from "../controllers/MyClasses/useMyClass";
 
 function TeacherDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -161,6 +162,30 @@ function TeacherDashboard() {
     downloadTeacherTimetablePDF,
   } = useTeacherTimetable({ activeSection, fetchWithAuth, showToast });
 
+  // ================ My Classes ===================
+  const {
+    classesLoading,
+    classes: myclasses,
+
+    selectedClass: selectedMyClass,
+    selectedStudent,
+
+    isClassDetailOpen,
+    openClassDetail,
+    closeClassDetail,
+
+    isStudentProfileOpen,
+    openStudentProfile,
+    closeStudentProfile,
+
+    filteredStudents,
+    studentSearch: myClassStudentSearch,
+    setStudentSearch: setMyClassStudentSearch,
+
+    activeStudents,
+    inactiveStudents,
+  } = useMyClasses(activeSection, fetchWithAuth, showToast);
+
   // ================= ATTENDANCE HOOK =================
   const {
     classes,
@@ -202,6 +227,14 @@ function TeacherDashboard() {
     // auth
     handleLogout,
   } = useTeacherProfile({ fetchWithAuth });
+
+  useEffect(() => {
+    if (isStudentProfileOpen || isClassDetailOpen) {
+      setSidebarOpen(false);
+    } else if (window.innerWidth >= 768) {
+      setSidebarOpen(true);
+    }
+  }, [isStudentProfileOpen, isClassDetailOpen]);
 
   return (
     <div className="flex">
@@ -269,7 +302,7 @@ function TeacherDashboard() {
                 title={!sidebarOpen ? label : ""}
                 onClick={() => {
                   setActiveSection(key);
-                  if (window.innerWidth < 768) setSidebarOpen(false);
+                  setSidebarOpen(false);
                 }}
                 className={`relative group flex w-full items-center
           ${sidebarOpen ? "gap-3 px-4 justify-start" : "justify-center"}
@@ -343,7 +376,7 @@ function TeacherDashboard() {
                     title={!sidebarOpen ? label : ""}
                     onClick={() => {
                       setActiveSection(key);
-                      if (window.innerWidth < 768) setSidebarOpen(false);
+                      setSidebarOpen(false);
                     }}
                     className={`relative group flex w-full items-center
               ${sidebarOpen ? "gap-3 px-4 justify-start" : "justify-center"}
@@ -721,6 +754,392 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           </section>
         )}
         {/* ===================== DASHBOARD SECTION END =========================== */}
+        {/*  ============================= MY CLASSES START =============================  */}
+        {activeSection === "classes" && (
+          <section className="section p-4 sm:p-6 space-y-6 hidden active">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 text-white">
+              <h2 className="text-lg sm:text-xl font-semibold">My Classes</h2>
+
+              <p className="text-xs sm:text-sm opacity-90">
+                Manage your assigned classes and students
+              </p>
+            </div>
+
+            {/* LOADING */}
+            {classesLoading && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center shadow-sm">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Loading classes...
+                </p>
+              </div>
+            )}
+
+            {/* EMPTY */}
+            {!classesLoading && myclasses?.length === 0 && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center shadow-sm">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No assigned classes found
+                </p>
+              </div>
+            )}
+
+            {/* CLASS CARDS */}
+            {!classesLoading && myclasses?.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {myclasses.map((item) => {
+                  const activeStudents =
+                    item.students?.filter((s) => s.status === "Active")
+                      .length || 0;
+
+                  return (
+                    <div
+                      key={item.teacher_class_id}
+                      onClick={() => openClassDetail(item)}
+                      className="cursor-pointer bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm space-y-4 hover:shadow-md transition-all duration-200 hover:-translate-y-1"
+                    >
+                      {/* TOP */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <h3 className="font-semibold text-lg">
+                            {item.class_name}
+                          </h3>
+
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {item.subject_name}
+                          </p>
+                        </div>
+
+                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-1 rounded-full whitespace-nowrap">
+                          Active
+                        </span>
+                      </div>
+
+                      {/* STATS */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-center">
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                            Students
+                          </p>
+
+                          <h4 className="font-semibold text-lg">
+                            {item.total_students || 0}
+                          </h4>
+                        </div>
+
+                        <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-xl text-center">
+                          <p className="text-xs text-indigo-600">Active</p>
+
+                          <h4 className="font-semibold text-indigo-600 text-lg">
+                            {activeStudents}
+                          </h4>
+                        </div>
+                      </div>
+
+                      {/* PROGRESS */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>Class Strength</span>
+
+                          <span>{item.total_students || 0}</span>
+                        </div>
+
+                        <div className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full"
+                            style={{
+                              width: `${
+                                item.total_students > 0
+                                  ? (activeStudents / item.total_students) * 100
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+        {/* ================= CLASS DETAIL MODAL ================= */}
+        <div
+          className={`${
+            isClassDetailOpen ? "flex" : "hidden"
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-50 p-2 sm:p-4`}
+        >
+          <div className="w-full max-w-6xl mx-auto bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 space-y-5 max-h-[95vh] overflow-hidden">
+            {/* HEADER */}
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg sm:text-xl font-semibold">
+                  {selectedMyClass?.class_name}
+                </h2>
+
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                  {selectedMyClass?.subject_name} • Student Directory
+                </p>
+              </div>
+
+              <button
+                onClick={closeClassDetail}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* SEARCH + STATS */}
+            <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+              <input
+                type="text"
+                placeholder="Search student..."
+                value={myClassStudentSearch}
+                onChange={(e) => setMyClassStudentSearch(e.target.value)}
+                className="w-full lg:w-72 px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-800 dark:text-white rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+              />
+
+              <div className="flex gap-2 text-xs flex-wrap">
+                <span className="bg-gray-100 dark:bg-slate-700 px-3 py-1 rounded-full">
+                  Total: {selectedMyClass?.total_students || 0}
+                </span>
+
+                <span className="bg-green-100 dark:bg-green-900/30 text-green-600 px-3 py-1 rounded-full">
+                  Active:{" "}
+                  {selectedMyClass?.students?.filter(
+                    (s) => s.status === "Active",
+                  ).length || 0}
+                </span>
+
+                <span className="bg-red-100 dark:bg-red-900/30 text-red-600 px-3 py-1 rounded-full">
+                  Inactive:{" "}
+                  {selectedMyClass?.students?.filter(
+                    (s) => s.status === "Inactive",
+                  ).length || 0}
+                </span>
+              </div>
+            </div>
+
+            {/* TABLE HEADER */}
+            <div className="hidden md:grid grid-cols-12 text-xs text-gray-500 dark:text-gray-400 px-4 py-3 bg-gray-50 dark:bg-slate-700 rounded-xl">
+              <div className="col-span-3">Student</div>
+              <div className="col-span-2">Roll No</div>
+              <div className="col-span-2">Mobile</div>
+              <div className="col-span-2">Parent</div>
+              <div className="col-span-2">Status</div>
+              <div className="col-span-1 text-right">Action</div>
+            </div>
+
+            {/* STUDENTS */}
+            <div className="space-y-3 overflow-y-auto max-h-[60vh] pr-1">
+              {selectedMyClass?.students?.length > 0 ? (
+                selectedMyClass.students.map((student) => (
+                  <div
+                    key={student.student_id || student.id}
+                    className="grid grid-cols-1 md:grid-cols-12 items-center gap-3 px-4 py-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl hover:shadow-sm transition"
+                  >
+                    {/* STUDENT */}
+                    <div className="md:col-span-3 flex items-center gap-3">
+                      <img
+                        src={`https://i.pravatar.cc/150?u=${student.student_id}`}
+                        alt={student.full_name}
+                        className="w-11 h-11 rounded-full object-cover"
+                      />
+
+                      <div>
+                        <p className="text-sm font-medium">
+                          {student.full_name}
+                        </p>
+
+                        <p className="text-xs text-gray-400">
+                          {student.gender || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* ROLL */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.roll_number || "-"}
+                    </div>
+
+                    {/* MOBILE */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.mobile || "-"}
+                    </div>
+
+                    {/* PARENT */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.parent_name || "-"}
+                    </div>
+
+                    {/* STATUS */}
+                    <div className="md:col-span-2">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          student.status === "Active"
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-600"
+                            : "bg-red-100 dark:bg-red-900/30 text-red-600"
+                        }`}
+                      >
+                        {student.status}
+                      </span>
+                    </div>
+
+                    {/* ACTION */}
+                    <div className="md:col-span-1 md:text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openStudentProfile(student);
+                        }}
+                        className="text-indigo-600 text-xs font-medium hover:underline"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="bg-gray-50 dark:bg-slate-700 rounded-2xl p-6 text-center">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No students found
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* ================= STUDENT PROFILE MODAL ================= */}
+        <div
+          className={`${
+            isStudentProfileOpen ? "flex" : "hidden"
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[60] p-2 sm:p-4`}
+        >
+          <div className="bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 w-full max-w-5xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
+            {/* HEADER */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Student Profile</h2>
+
+              <button
+                onClick={closeStudentProfile}
+                className="text-gray-400 text-2xl hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* PROFILE */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+              <img
+                src={`https://i.pravatar.cc/150?u=${selectedStudent?.student_id}`}
+                alt={selectedStudent?.full_name}
+                className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm"
+              />
+
+              <div className="text-center sm:text-left">
+                <h3 className="text-xl font-semibold">
+                  {selectedStudent?.full_name}
+                </h3>
+
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Student ID: {selectedStudent?.student_id || "N/A"}
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
+                  <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.status || "Unknown"}
+                  </span>
+
+                  <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.gender || "N/A"}
+                  </span>
+
+                  <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.blood_group || "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* INFO */}
+            <div className="grid sm:grid-cols-2 gap-6 text-sm">
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Contact Info
+                </h4>
+
+                <div>Email: {selectedStudent?.email || "-"}</div>
+
+                <div>Mobile: {selectedStudent?.mobile || "-"}</div>
+
+                <div>Address: {selectedStudent?.address || "-"}</div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Academic
+                </h4>
+
+                <div>DOB: {selectedStudent?.date_of_birth || "-"}</div>
+
+                <div>Roll No: {selectedStudent?.roll_number || "-"}</div>
+
+                <div>
+                  Previous School: {selectedStudent?.previous_school || "-"}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Family
+                </h4>
+
+                <div>Father: {selectedStudent?.father_name || "-"}</div>
+
+                <div>Mother: {selectedStudent?.mother_name || "-"}</div>
+
+                <div>Parent: {selectedStudent?.parent_name || "-"}</div>
+
+                <div>
+                  Parent Mobile: {selectedStudent?.parent_mobile || "-"}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Emergency
+                </h4>
+
+                <div>
+                  Contact: {selectedStudent?.emergency_contact_name || "-"}
+                </div>
+
+                <div>
+                  Number: {selectedStudent?.emergency_contact_number || "-"}
+                </div>
+
+                <div>
+                  Relation: {selectedStudent?.emergency_contact_relation || "-"}
+                </div>
+              </div>
+            </div>
+
+            {/* MEDICAL */}
+            <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-xl text-sm">
+              <h4 className="font-medium text-red-600 mb-2">Medical Info</h4>
+
+              <p>
+                Medical Conditions:{" "}
+                {selectedStudent?.medical_conditions || "None"}
+              </p>
+
+              <p>Allergies: {selectedStudent?.allergies || "None"}</p>
+            </div>
+          </div>
+        </div>
+        {/*  ============================= MY CLASS SECTION END =============================  */}
         {/*  ============================= ATTENDANCE SECTION START =============================  */}
         {activeSection === "attendance" && (
           <section className="p-4 sm:p-6 space-y-6">
@@ -798,7 +1217,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         : ""
                     }
                     onChange={(e) => {
-                      const selected = classes.find(
+                      const selected = myclasses.find(
                         (c) =>
                           `${c.academic_class_id}-${c.subject_id}` ===
                           e.target.value,
@@ -810,7 +1229,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   >
                     <option value="">Select Assigned Subject</option>
 
-                    {classes.map((c) => (
+                    {myclasses.map((c) => (
                       <option
                         key={`${c.academic_class_id}-${c.subject_id}`}
                         value={`${c.academic_class_id}-${c.subject_id}`}
@@ -1025,7 +1444,7 @@ flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
             {/* ================= FILTERS ================= */}
             <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex flex-wrap gap-3">
               <select
-                value={selectedClass}
+                value={selectedMyClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
                 className="px-4 py-2 border rounded-xl text-sm
 bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100"
