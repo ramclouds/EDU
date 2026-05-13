@@ -38,7 +38,7 @@ export function useStudentAttendance(fetchWithAuth, activeSection, showToast) {
                 setAttendanceLoading(true);
 
                 const res = await fetchWithAuth(
-                    `${BASE_URL}/attendance/${user.id}`
+                    `${BASE_URL}/student/attendance/${user.id}`
                 );
 
                 const data = await res.json();
@@ -60,7 +60,7 @@ export function useStudentAttendance(fetchWithAuth, activeSection, showToast) {
 
         try {
             const res = await fetchWithAuth(
-                `${BASE_URL}/attendance/pdf/${user.id}`
+                `${BASE_URL}/student/attendance/download/${user.id}`
             );
 
             const blob = await res.blob();
@@ -68,7 +68,7 @@ export function useStudentAttendance(fetchWithAuth, activeSection, showToast) {
 
             const a = document.createElement("a");
             a.href = url;
-            a.download = "attendance.pdf";
+            a.download = `attendance_${new Date().getFullYear()}.pdf`;
             a.click();
 
             window.URL.revokeObjectURL(url);

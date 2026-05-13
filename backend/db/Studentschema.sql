@@ -117,33 +117,50 @@ CREATE TABLE student_academic_records (
 );
 
 -- 7. ATTENDANCE
-CREATE TABLE attendance (
+-- Represents a lecture/period.
+CREATE TABLE attendance_sessions (
     id INT PRIMARY KEY AUTO_INCREMENT,
 
-    student_id INT NOT NULL,
     academic_class_id INT NOT NULL,
+    subject_id INT NOT NULL,
 
-    attendance_date DATE NOT NULL,
+    session_date DATE NOT NULL,
+    period_no INT,
 
-    -- UPDATED: include Late
-    status ENUM('Present','Absent','Late') NOT NULL,
-
-    -- NEW: remarks (for Medical Leave, Bus Delay, etc.)
-    remarks VARCHAR(255),
-
-    -- NEW: track who marked attendance (admin/teacher)
-    marked_by INT,
-
-    -- NEW: academic year support (for filtering like "2024-2025")
-    academic_year VARCHAR(20),
+    teacher_id INT,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-    FOREIGN KEY (academic_class_id) REFERENCES academic_classes(id) ON DELETE CASCADE,
+    FOREIGN KEY (academic_class_id) REFERENCES academic_classes(id),
+    FOREIGN KEY (subject_id) REFERENCES subjects(id)
+);
 
-    -- prevent duplicate entry per day
-    UNIQUE KEY unique_attendance (student_id, attendance_date)
+-- attendance_records
+-- Stores each student’s attendance for that session.
+CREATE TABLE attendance_records (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+
+    session_id INT NOT NULL,
+    student_id INT NOT NULL,
+
+    status ENUM('Present','Absent','Late') NOT NULL,
+
+    remarks VARCHAR(255),
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (session_id)
+        REFERENCES attendance_sessions(id)
+        ON DELETE CASCADE,
+
+    FOREIGN KEY (student_id)
+        REFERENCES students(id)
+        ON DELETE CASCADE,
+
+    UNIQUE KEY unique_student_session (
+        session_id,
+        student_id
+    )
 );
 
 -- 8. TIMETABLE
