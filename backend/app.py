@@ -79,6 +79,12 @@ from utils.examResult import (
     UpcomingExamsAPI,
     DownloadResultPDF,
     ExamFilterOptionsAPI,
+    TeacherSubjectsAPI,
+    TeacherClassesAPI,
+    TeacherStudentsAPI,
+    TeacherStudentMarksAPI,
+    SaveTeacherMarksAPI,
+    TeacherReportCardAPI,
 )
 
 # ================= OTHER =================
@@ -92,6 +98,7 @@ from utils.announcement import (
 )
 
 from utils.library import StudentLibraryAPI
+from utils.teacherMyClasses import TeacherMyClasses
 
 # ==================================================
 # CREATE APP
@@ -119,17 +126,6 @@ def create_app():
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     )
-
-    @app.after_request
-    def after_request(response):
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
-        response.headers.add(
-            "Access-Control-Allow-Headers", "Content-Type,Authorization"
-        )
-        response.headers.add(
-            "Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS"
-        )
-        return response
 
     @app.before_request
     def handle_options():
@@ -468,7 +464,44 @@ def create_app():
         view_func=PerformanceAPI.as_view("performance"),
         methods=["GET"],
     )
+    # ================= TEACHER EXAM RESULT =================
+    app.add_url_rule(
+        "/api/teacher/students",
+        view_func=TeacherStudentsAPI.as_view("teacher_exam_students"),
+        methods=["GET"],
+    )
 
+    app.add_url_rule(
+        "/api/teacher/subjects",
+        view_func=TeacherSubjectsAPI.as_view("teacher_exam_subjects"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/classes",
+        view_func=TeacherClassesAPI.as_view("teacher_exam_classes"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/marks/<int:student_id>",
+        view_func=TeacherStudentMarksAPI.as_view("teacher_exam_student_marks"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/marks",
+        view_func=SaveTeacherMarksAPI.as_view("teacher_exam_save_marks"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/report-card/<int:student_id>",
+        view_func=TeacherReportCardAPI.as_view("teacher_exam_report_card"),
+        methods=["GET"],
+    )
+
+    # ================== Student Exam and Result ===============
     app.add_url_rule(
         "/api/results/<int:student_id>",
         view_func=StudentExamResultsAPI.as_view("results"),
@@ -515,14 +548,20 @@ def create_app():
         methods=["POST"],
     )
 
+    # ==================================
+    # MY CLASSES
+    # ==================================
+    app.add_url_rule(
+        "/api/teacher/my-classes/<int:teacher_id>",
+        view_func=TeacherMyClasses.as_view("teacher_my_classes"),
+        methods=["GET"],
+    )
     # ==================================================
     # FILE SERVING
     # ==================================================
 
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
     SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
-
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
 
     @app.route("/Submitted_Assignments/<path:filename>")

@@ -10,6 +10,7 @@ import { useTeacherTimetable } from "../controllers/TimeTable/useTeacherTimetabl
 import { useTeacherProfile } from "../controllers/Profiles/useTeacherProfile";
 import { useTeacherAttendance } from "../controllers/Attendance/useTeacherAttendance";
 import { useMyClasses } from "../controllers/MyClasses/useMyClass";
+import { useTeacherExamResult } from "../controllers/ExamResult/useTeacherExamResult";
 
 function TeacherDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -146,6 +147,52 @@ function TeacherDashboard() {
     saveGrade,
     forceResubmit,
   } = useTeacherAssignments(activeSection, fetchWithAuth, showToast);
+
+  const {
+    filteredStudents: ExamfilteredStudents,
+
+    subjects,
+    classes: ExamClasses,
+
+    selectedClass: ExamselectedClass,
+    setSelectedClass: ExamsetselectedClass,
+
+    selectedSubject: ExamselectedSubject,
+    setSelectedSubject: ExamsetselectedSubject,
+
+    selectedExam,
+    setSelectedExam,
+
+    search: ExamSearch,
+    setSearch: ExamsetSearch,
+
+    marksModalOpen,
+    reportModalOpen,
+
+    currentStudent,
+
+    marks,
+    handleMarkChange,
+    totalOutOf,
+    totalMarks,
+    percentage,
+    grade,
+
+    openMarksModal,
+    closeMarksModal,
+
+    saveMarks,
+
+    nextStudent,
+    prevStudent,
+
+    reportCard,
+
+    openReportCard,
+    closeReportCard,
+
+    printReport,
+  } = useTeacherExamResult(fetchWithAuth, activeSection, showToast);
 
   // ================= TIMETABLE HOOK =================
   const {
@@ -2280,6 +2327,503 @@ bg-gray-50 dark:bg-slate-700
           </div>
         )}
         {/* ============================= ASSIGNMENTS END ============================= */}
+        {/*  ============================= EXAM + RESULT SYSTEM =============================  */}
+        {activeSection === "exams" && (
+          <section className="section active p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
+            {/*  HEADER  */}
+            <div className="rounded-3xl p-5 text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 shadow-lg flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-wide">
+                  Exam Marks Entry Desk
+                </h2>
+                <p className="text-xs opacity-90">
+                  Admin Approved Target Subject Entry Matrix
+                </p>
+              </div>
+              <div
+                id="adminPermissionBadge"
+                className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-full font-medium backdrop-blur-md"
+              >
+                Status: Assessment Window Active
+              </div>
+            </div>
+
+            {/*  CONTROLS & FILTERING PIPELINE  */}
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex flex-wrap gap-3 items-center">
+              {/* CLASS FILTER */}
+              <select
+                value={ExamselectedClass}
+                onChange={(e) => ExamsetselectedClass(e.target.value)}
+                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
+              >
+                <option value="all">All Classes</option>
+
+                {Array.isArray(ExamClasses) &&
+                  ExamClasses.map((cls) => (
+                    <option key={cls.id} value={cls.name}>
+                      {cls.name}
+                    </option>
+                  ))}
+              </select>
+
+              {/* SUBJECT FILTER */}
+              <select
+                value={ExamselectedSubject}
+                onChange={(e) => ExamsetselectedSubject(e.target.value)}
+                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
+              >
+                {Array.isArray(subjects) &&
+                  subjects.map((subject) => (
+                    <option key={subject.id} value={subject.name}>
+                      {subject.name}
+                    </option>
+                  ))}
+              </select>
+
+              {/* EXAM FILTER */}
+              <select
+                value={selectedExam}
+                onChange={(e) => setSelectedExam(e.target.value)}
+                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
+              >
+                <option value="Unit Test 1">Unit Test 1</option>
+
+                <option value="Half Yearly">Half Yearly</option>
+
+                <option value="Unit Test 2">Unit Test 2</option>
+
+                <option value="Final Exam">Final Exam</option>
+              </select>
+
+              {/* SEARCH */}
+              <input
+                type="text"
+                value={ExamSearch}
+                onChange={(e) => ExamsetSearch(e.target.value)}
+                placeholder="Search student..."
+                className="px-4 py-2 border rounded-xl flex-1"
+              />
+            </div>
+
+            {/*  STUDENT CONTAINER MATRIX  */}
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-lg overflow-hidden divide-y">
+              {ExamfilteredStudents.length === 0 ? (
+                <div className="p-8 text-center text-gray-400">
+                  No students found
+                </div>
+              ) : (
+                ExamfilteredStudents.map((student, index) => (
+                  <div
+                    key={student.id}
+                    className="p-4 flex flex-wrap justify-between items-center gap-4 hover:bg-gray-50 dark:hover:bg-slate-700/20"
+                  >
+                    <div>
+                      <p className="font-semibold">{student.name}</p>
+
+                      <p className="text-xs text-gray-500">
+                        {student.className}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {/* STATUS */}
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium
+              ${
+                student.status === "Completed"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}
+                      >
+                        {student.status || "Pending"}
+                      </span>
+
+                      {/* ENTER MARKS */}
+                      <button
+                        onClick={() => openMarksModal(student, index)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs"
+                      >
+                        Enter Marks
+                      </button>
+
+                      {/* REPORT CARD */}
+                      <button
+                        onClick={() => openReportCard(student)}
+                        className="px-4 py-2 border rounded-xl text-xs"
+                      >
+                        View Ledger
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        )}
+        {/*  RESULT MARKING DIALOG CONTROL MODAL  */}
+        {marksModalOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xl space-y-5">
+              {/* HEADER */}
+              <div className="flex justify-between items-start border-b pb-3">
+                <div>
+                  <h2 className="font-semibold">{currentStudent?.name}</h2>
+                  <p className="text-xs text-gray-500">
+                    Roll {currentStudent?.roll}
+                  </p>
+                </div>
+
+                <button onClick={closeMarksModal} className="text-red-500">
+                  ✕
+                </button>
+              </div>
+
+              {/* SUBJECT + EXAM */}
+              <div className="bg-indigo-50 p-3 rounded-xl text-sm text-center">
+                {selectedSubject} - {selectedExam}
+              </div>
+
+              {/* MARKS GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* INTERNAL */}
+                <div>
+                  <label className="text-xs font-medium">Internal</label>
+                  <input
+                    type="number"
+                    name="internal"
+                    value={marks.internal}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+
+                  <input
+                    type="number"
+                    name="internalOutOf"
+                    value={marks.internalOutOf}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
+                    placeholder="Out of"
+                  />
+                </div>
+
+                {/* EXTERNAL */}
+                <div>
+                  <label className="text-xs font-medium">External</label>
+                  <input
+                    type="number"
+                    name="external"
+                    value={marks.external}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+
+                  <input
+                    type="number"
+                    name="externalOutOf"
+                    value={marks.externalOutOf}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
+                    placeholder="Out of"
+                  />
+                </div>
+
+                {/* ORAL */}
+                <div>
+                  <label className="text-xs font-medium">Oral</label>
+                  <input
+                    type="number"
+                    name="oral"
+                    value={marks.oral}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+
+                  <input
+                    type="number"
+                    name="oralOutOf"
+                    value={marks.oralOutOf}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
+                    placeholder="Out of"
+                  />
+                </div>
+
+                {/* PRACTICAL */}
+                <div>
+                  <label className="text-xs font-medium">Practical</label>
+                  <input
+                    type="number"
+                    name="practical"
+                    value={marks.practical}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+
+                  <input
+                    type="number"
+                    name="practicalOutOf"
+                    value={marks.practicalOutOf}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
+                    placeholder="Out of"
+                  />
+                </div>
+              </div>
+
+              {/* REMARKS */}
+              <div>
+                <label className="text-xs font-medium">Remarks</label>
+                <textarea
+                  name="remarks"
+                  value={marks.remarks}
+                  onChange={handleMarkChange}
+                  className="w-full border rounded-xl px-3 py-2"
+                  placeholder="Enter remarks..."
+                />
+              </div>
+
+              {/* SUMMARY */}
+              <div className="grid grid-cols-3 gap-3 text-center bg-gray-50 rounded-2xl p-4">
+                <div>
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="font-bold">{totalMarks}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500">Percentage</p>
+                  <p className="font-bold text-indigo-600">{percentage}%</p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500">Grade</p>
+                  <p className="font-bold text-green-600">{grade}</p>
+                </div>
+              </div>
+
+              {/* ACTIONS */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={saveMarks}
+                  className="bg-green-600 text-white py-3 rounded-xl"
+                >
+                  Save Marks
+                </button>
+
+                <button
+                  onClick={closeMarksModal}
+                  className="border py-3 rounded-xl"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              {/* NAVIGATION */}
+              <div className="flex justify-between">
+                <button
+                  onClick={prevStudent}
+                  className="px-4 py-2 border rounded-xl"
+                >
+                  ← Previous
+                </button>
+
+                <button
+                  onClick={nextStudent}
+                  className="px-4 py-2 border rounded-xl"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/*  COMPREHENSIVE PERFORMANCE MANAGEMENT REPORT CARD MODAL  */}
+        {reportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-800 dark:text-gray-100 w-full max-w-6xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
+              {/* HEADER */}
+              <div className="flex justify-between items-center border-b pb-4 dark:border-slate-700">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight">
+                    Cumulative Academic Achievement Ledger
+                  </h2>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Official Institution Record System
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={printReport}
+                    className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-xl text-xs font-medium shadow transition"
+                  >
+                    Print / Export PDF
+                  </button>
+
+                  <button
+                    onClick={closeReportCard}
+                    className="text-gray-400 hover:text-red-500 text-xl px-2 transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* STUDENT INFO */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs bg-gray-50 dark:bg-slate-700/50 p-4 rounded-2xl border dark:border-slate-600">
+                <div>
+                  <p className="text-gray-500">Student</p>
+                  <h3 className="font-semibold">
+                    {reportCard?.student?.name || "-"}
+                  </h3>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Roll No</p>
+                  <h3 className="font-semibold">
+                    {reportCard?.student?.rollNo || "-"}
+                  </h3>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Class</p>
+                  <h3 className="font-semibold">
+                    {reportCard?.student?.className || "-"}
+                  </h3>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Academic Year</p>
+                  <h3 className="font-semibold">{reportCard?.year || "-"}</h3>
+                </div>
+              </div>
+
+              {/* RESULT TABLE */}
+              <div className="overflow-x-auto border dark:border-slate-700 rounded-2xl">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-gray-300 uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="p-3.5">Subject</th>
+
+                      <th className="p-3.5 text-center">Internal</th>
+
+                      <th className="p-3.5 text-center">External</th>
+
+                      <th className="p-3.5 text-center">Practical</th>
+
+                      <th className="p-3.5 text-center">Oral</th>
+
+                      <th className="p-3.5 text-center">Total</th>
+
+                      <th className="p-3.5 text-center">Percentage</th>
+
+                      <th className="p-3.5 text-center">Grade</th>
+
+                      <th className="p-3.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y dark:divide-slate-700">
+                    {reportCard?.subjects?.map((item, index) => {
+                      const totalOutOf =
+                        Number(item.internalOutOf || 0) +
+                        Number(item.externalOutOf || 0) +
+                        Number(item.practicalOutOf || 0) +
+                        Number(item.oralOutOf || 0);
+
+                      return (
+                        <tr
+                          key={index}
+                          className="hover:bg-gray-50 dark:hover:bg-slate-700/20"
+                        >
+                          <td className="p-3 font-medium">{item.subject}</td>
+
+                          <td className="p-3 text-center">
+                            {item.internal} / {item.internalOutOf}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {item.external} / {item.externalOutOf}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {item.practical} / {item.practicalOutOf}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {item.oral} / {item.oralOutOf}
+                          </td>
+
+                          <td className="p-3 text-center font-bold">
+                            {item.total} / {totalOutOf}
+                          </td>
+
+                          <td className="p-3 text-center text-indigo-600 font-semibold">
+                            {item.percentage}%
+                          </td>
+
+                          <td className="p-3 text-center font-semibold">
+                            {item.grade}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            <span
+                              className={`px-2 py-1 rounded-full text-[10px] font-semibold
+                      ${
+                        item.status === "Published"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-yellow-100 text-yellow-700"
+                      }`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* SUMMARY */}
+              <div className="grid sm:grid-cols-3 gap-4 text-center">
+                {/* TOTAL */}
+                <div className="bg-indigo-50 dark:bg-indigo-500/10 p-4 rounded-2xl border border-indigo-100/30">
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                    Aggregated Score Total
+                  </p>
+
+                  <h3 className="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                    {reportCard?.summary?.total || "---"}
+                  </h3>
+                </div>
+
+                {/* PERCENTAGE */}
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 p-4 rounded-2xl border border-emerald-100/30">
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    True Percentage Scale
+                  </p>
+
+                  <h3 className="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                    {reportCard?.summary?.percentage || 0}%
+                  </h3>
+                </div>
+
+                {/* GRADE */}
+                <div className="bg-purple-50 dark:bg-purple-500/10 p-4 rounded-2xl border border-purple-100/30">
+                  <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                    Calculated System Grade
+                  </p>
+
+                  <h3 className="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                    {reportCard?.summary?.grade || "---"}
+                  </h3>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/*  ============================ Exams and Result Section END ====================  */}
         {/* ===================== TEACHER ANNOUNCEMENTS and NOTIFICATIONS CENTER ========================*/}
         {activeSection === "announcements" && (
           <section className="p-4 sm:p-6 space-y-6">

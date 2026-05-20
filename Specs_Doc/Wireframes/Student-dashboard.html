@@ -1126,158 +1126,247 @@
             </section>
 
             <!-- EXAMS SECTION -->
-            <section id="examsSection" class="section hidden p-4 sm:p-6 space-y-6">
+            <section id="examsSection" class="section hidden p-4 sm:p-6 space-y-6 bg-gray-50/50 min-h-screen">
 
-                <!-- HEADER -->
-                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl p-5 sm:p-6">
-                    <h3 class="font-semibold text-lg sm:text-xl mb-1">
-                        Exams & Results
-                    </h3>
-                    <p class="text-xs sm:text-sm opacity-90">
-                        Track exams, analyze performance & download reports
-                    </p>
+                <!-- SECTION HEADER -->
+                <div
+                    class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-5 border-b border-gray-200">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900 tracking-tight sm:text-2xl">
+                            Exams & Academic Results
+                        </h3>
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1">
+                            Track your upcoming schedules, analyze subject performance, and manage academic records.
+                        </p>
+                    </div>
+                    <!-- Quick Status Pill -->
+                    <div
+                        class="self-start sm:self-center flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full border border-green-200 text-green-700 text-xs font-medium">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                        Academic Year 2025-2026 Active
+                    </div>
                 </div>
 
-                <!-- CHART + UPCOMING -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <!-- ANALYTICS & UPCOMING GRID -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                    <!-- PERFORMANCE CHART -->
-                    <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
-                        <h4 class="font-semibold mb-3 text-sm sm:text-base">
-                            Performance Trend
-                        </h4>
-                        <div class="relative w-full h-52 sm:h-64">
+                    <!-- PERFORMANCE TREND CHART (Takes 2 columns on large screens) -->
+                    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-900 text-sm sm:text-base">
+                                    Performance Trend
+                                </h4>
+                                <p class="text-xs text-gray-400">Subject-wise score progression</p>
+                            </div>
+                            <span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">Overall CGPA:
+                                8.4</span>
+                        </div>
+                        <div class="relative w-full h-56 sm:h-64">
                             <canvas id="examChartSection"></canvas>
                         </div>
                     </div>
 
-                    <!-- UPCOMING EXAMS -->
-                    <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
-                        <h4 class="font-semibold mb-3 text-sm sm:text-base">
-                            Upcoming Exams
-                        </h4>
+                    <!-- UPCOMING EXAMS PANEL (Takes 1 column) -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-6 flex flex-col">
+                        <div class="mb-4">
+                            <h4 class="font-semibold text-gray-900 text-sm sm:text-base">
+                                Upcoming Schedules
+                            </h4>
+                            <p class="text-xs text-gray-400">Next 30 days assessment calendar</p>
+                        </div>
 
-                        <ul class="space-y-2 text-sm">
+                        <div class="space-y-3 flex-1 overflow-y-auto">
+                            <!-- Exam Card 1 -->
+                            <div
+                                class="p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-300 transition-colors flex items-start gap-3">
+                                <div
+                                    class="p-2 bg-blue-50 rounded-lg text-blue-600 font-semibold text-xs text-center min-w-[40px]">
+                                    10 <span class="block text-[10px] uppercase font-normal text-gray-500">Apr</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm text-gray-950">Math Midterm</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">Calculus & Algebra • 09:00 AM</p>
+                                </div>
+                            </div>
 
-                            <li class="p-3 bg-blue-50 rounded-xl">
-                                <p class="font-medium">Math Midterm</p>
-                                <p class="text-xs text-gray-500">10 April 2026</p>
-                            </li>
+                            <!-- Exam Card 2 -->
+                            <div
+                                class="p-3 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 transition-colors flex items-start gap-3">
+                                <div
+                                    class="p-2 bg-indigo-50 rounded-lg text-indigo-600 font-semibold text-xs text-center min-w-[40px]">
+                                    15 <span class="block text-[10px] uppercase font-normal text-gray-500">Apr</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm text-gray-950">Science Practical</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">Physics Lab - Optics • 11:30 AM</p>
+                                </div>
+                            </div>
 
-                            <li class="p-3 bg-indigo-50 rounded-xl">
-                                <p class="font-medium">Science Practical</p>
-                                <p class="text-xs text-gray-500">15 April 2026</p>
-                            </li>
-
-                            <li class="p-3 bg-purple-50 rounded-xl">
-                                <p class="font-medium">English Final</p>
-                                <p class="text-xs text-gray-500">25 April 2026</p>
-                            </li>
-
-                        </ul>
+                            <!-- Exam Card 3 -->
+                            <div
+                                class="p-3 bg-white border border-gray-200 rounded-xl hover:border-purple-300 transition-colors flex items-start gap-3">
+                                <div
+                                    class="p-2 bg-purple-50 rounded-lg text-purple-600 font-semibold text-xs text-center min-w-[40px]">
+                                    25 <span class="block text-[10px] uppercase font-normal text-gray-500">Apr</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm text-gray-950">English Final</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">Literature & Rhetoric • 02:00 PM</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- RESULTS TABLE -->
-                <div class="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+                <!-- RESULTS REPORT TABLE SECTION -->
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
-                    <!-- HEADER + FILTERS -->
-                    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4">
-                        <h4 class="font-semibold text-sm sm:text-base">
-                            All Results
-                        </h4>
+                    <!-- CONTROLS & FILTER BAR -->
+                    <div
+                        class="p-4 sm:p-5 border-b border-gray-200 bg-gray-50/50 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <h4 class="font-semibold text-gray-900 text-sm sm:text-base">
+                                Historical Academic Records
+                            </h4>
+                            <p class="text-xs text-gray-500">Filter and view comprehensive grade archives</p>
+                        </div>
 
-                        <div class="flex flex-wrap gap-2 items-center">
-
+                        <div class="flex flex-wrap items-center gap-2">
                             <!-- YEAR FILTER -->
-                            <select id="yearFilter" class="border rounded-lg px-3 py-1 text-xs sm:text-sm">
-                                <option value="all">All Years</option>
-                                <option value="2024">2024</option>
-                                <option value="2025">2025</option>
-                            </select>
+                            <div class="relative">
+                                <select id="yearFilter"
+                                    class="appearance-none border border-gray-300 bg-white rounded-lg pl-3 pr-8 py-1.5 text-xs sm:text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="all">All Academic Years</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2024">2024</option>
+                                </select>
+                            </div>
 
                             <!-- EXAM FILTER -->
-                            <select id="examFilter" class="border rounded-lg px-3 py-1 text-xs sm:text-sm">
-                                <option value="all">All Exams</option>
-                                <option value="Midterm">Midterm</option>
-                                <option value="Final">Final</option>
-                            </select>
+                            <div class="relative">
+                                <select id="examFilter"
+                                    class="appearance-none border border-gray-300 bg-white rounded-lg pl-3 pr-8 py-1.5 text-xs sm:text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="all">All Assessment Types</option>
+                                    <option value="Midterm">Midterm Exams</option>
+                                    <option value="Final">Final Examinations</option>
+                                </select>
+                            </div>
 
-                            <!-- DOWNLOAD -->
+                            <!-- DOWNLOAD ACTION BUTTON -->
                             <button
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm">
-                                Download PDF
+                                class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium px-3.5 py-1.5 rounded-lg text-xs sm:text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                </svg>
+                                Download Transcript (PDF)
                             </button>
                         </div>
                     </div>
 
-                    <!-- TABLE -->
+                    <!-- RESPONSIVE TABLE CONTAINER -->
                     <div class="overflow-x-auto">
-                        <table class="w-full text-xs sm:text-sm min-w-[600px]">
-                            <thead class="text-gray-500 border-b bg-gray-50">
+                        <table class="w-full text-xs sm:text-sm text-left border-collapse min-w-[700px]">
+                            <thead
+                                class="bg-gray-100 text-gray-700 uppercase tracking-wider text-[10px] font-bold border-b border-gray-200">
                                 <tr>
-                                    <th class="text-left py-2 px-2">Year</th>
-                                    <th class="text-left py-2 px-2">Exam</th>
-                                    <th class="text-left py-2 px-2">Subject</th>
-                                    <th class="text-left py-2 px-2">Marks</th>
-                                    <th class="text-left py-2 px-2">Grade</th>
-                                    <th class="text-left py-2 px-2">Remarks</th>
+                                    <th scope="col" class="py-3.5 px-4 font-semibold">Year</th>
+                                    <th scope="col" class="py-3.5 px-4 font-semibold">Assessment Type</th>
+                                    <th scope="col" class="py-3.5 px-4 font-semibold">Subject Title</th>
+                                    <th scope="col" class="py-3.5 px-4 font-semibold text-center">Obtained Marks</th>
+                                    <th scope="col" class="py-3.5 px-4 font-semibold text-center">Letter Grade</th>
+                                    <th scope="col" class="py-3.5 px-4 font-semibold">Instructor Performance Remarks
+                                    </th>
                                 </tr>
                             </thead>
 
-                            <tbody>
-
-                                <tr class="border-b">
-                                    <td class="px-2 py-2">2025</td>
-                                    <td>Final</td>
-                                    <td>Mathematics</td>
-                                    <td class="font-medium">88</td>
-                                    <td class="text-green-600 font-medium">A</td>
-                                    <td>Excellent</td>
+                            <tbody class="divide-y divide-gray-200 text-gray-600">
+                                <!-- Row 1 -->
+                                <tr class="hover:bg-gray-50/70 transition-colors">
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">2025</td>
+                                    <td class="px-4 py-3.5"><span
+                                            class="px-2 py-0.5 bg-gray-100 text-gray-800 rounded font-medium text-xs">Final</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">Mathematics</td>
+                                    <td class="px-4 py-3.5 text-center font-semibold text-gray-900">88/100</td>
+                                    <td class="px-4 py-3.5 text-center">
+                                        <span
+                                            class="inline-block px-2.5 py-0.5 bg-green-100 text-green-800 rounded-full font-bold text-xs">A</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 text-sm text-gray-500">Excellent understanding of advanced
+                                        conceptual theories.</td>
                                 </tr>
 
-                                <tr class="border-b">
-                                    <td class="px-2 py-2">2025</td>
-                                    <td>Final</td>
-                                    <td>Science</td>
-                                    <td class="font-medium">81</td>
-                                    <td class="text-green-600 font-medium">A</td>
-                                    <td>Very Good</td>
+                                <!-- Row 2 -->
+                                <tr class="hover:bg-gray-50/70 transition-colors">
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">2025</td>
+                                    <td class="px-4 py-3.5"><span
+                                            class="px-2 py-0.5 bg-gray-100 text-gray-800 rounded font-medium text-xs">Final</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">Science</td>
+                                    <td class="px-4 py-3.5 text-center font-semibold text-gray-900">81/100</td>
+                                    <td class="px-4 py-3.5 text-center">
+                                        <span
+                                            class="inline-block px-2.5 py-0.5 bg-green-100 text-green-800 rounded-full font-bold text-xs">A</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 text-sm text-gray-500">Very Good performance; demonstrated
+                                        solid lab application.</td>
                                 </tr>
 
-                                <tr class="border-b">
-                                    <td class="px-2 py-2">2025</td>
-                                    <td>Midterm</td>
-                                    <td>English</td>
-                                    <td class="font-medium">74</td>
-                                    <td class="text-yellow-600 font-medium">B</td>
-                                    <td>Good</td>
+                                <!-- Row 3 -->
+                                <tr class="hover:bg-gray-50/70 transition-colors">
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">2025</td>
+                                    <td class="px-4 py-3.5"><span
+                                            class="px-2 py-0.5 bg-blue-50 text-blue-800 rounded font-medium text-xs">Midterm</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">English</td>
+                                    <td class="px-4 py-3.5 text-center font-semibold text-gray-900">74/100</td>
+                                    <td class="px-4 py-3.5 text-center">
+                                        <span
+                                            class="inline-block px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full font-bold text-xs">B</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 text-sm text-gray-500">Good structural compositions. Needs
+                                        structural essay refinement.</td>
                                 </tr>
 
-                                <tr class="border-b">
-                                    <td class="px-2 py-2">2024</td>
-                                    <td>Final</td>
-                                    <td>History</td>
-                                    <td class="font-medium">69</td>
-                                    <td class="text-yellow-600 font-medium">B</td>
-                                    <td>Needs improvement</td>
+                                <!-- Row 4 -->
+                                <tr class="hover:bg-gray-50/70 transition-colors">
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">2024</td>
+                                    <td class="px-4 py-3.5"><span
+                                            class="px-2 py-0.5 bg-gray-100 text-gray-800 rounded font-medium text-xs">Final</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">History</td>
+                                    <td class="px-4 py-3.5 text-center font-semibold text-gray-900">69/100</td>
+                                    <td class="px-4 py-3.5 text-center">
+                                        <span
+                                            class="inline-block px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-full font-bold text-xs">B</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 text-sm text-gray-500">Needs improvement in descriptive
+                                        timeline analytics.</td>
                                 </tr>
 
-                                <tr class="border-b">
-                                    <td class="px-2 py-2">2024</td>
-                                    <td>Midterm</td>
-                                    <td>Computer</td>
-                                    <td class="font-medium">92</td>
-                                    <td class="text-green-600 font-medium">A+</td>
-                                    <td>Outstanding</td>
+                                <!-- Row 5 -->
+                                <tr class="hover:bg-gray-50/70 transition-colors">
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">2024</td>
+                                    <td class="px-4 py-3.5"><span
+                                            class="px-2 py-0.5 bg-blue-50 text-blue-800 rounded font-medium text-xs">Midterm</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 font-medium text-gray-900">Computer Science</td>
+                                    <td class="px-4 py-3.5 text-center font-semibold text-gray-900">92/100</td>
+                                    <td class="px-4 py-3.5 text-center">
+                                        <span
+                                            class="inline-block px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-xs">A+</span>
+                                    </td>
+                                    <td class="px-4 py-3.5 text-sm text-gray-500">Outstanding logical structure and
+                                        pristine coding syntax architecture.</td>
                                 </tr>
-
                             </tbody>
                         </table>
                     </div>
                 </div>
             </section>
-
             <!-- ============================= STUDENT LEAVE SECTION ============================= -->
             <section class="section hidden p-4 sm:p-6 space-y-6" id="studentLeaveSection">
 
