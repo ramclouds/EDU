@@ -840,7 +840,6 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           </section>
         )}
         {/* ===================== DASHBOARD SECTION END =========================== */}
-
         {/* ===================== ATTENDANCE SECTION START =========================== */}
         {activeSection === "attendance" && (
           <section className="p-4 sm:p-6 space-y-6">

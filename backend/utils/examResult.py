@@ -78,9 +78,24 @@ class ExamResult(db.Model):
     __tablename__ = "exam_results"
 
     id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer,db.ForeignKey("students.id"),nullable=False,index=True,)
-    exam_id = db.Column(db.Integer,db.ForeignKey("exams.id"),nullable=False,index=True,)
-    subject_id = db.Column(db.Integer,db.ForeignKey("subjects.id"),nullable=False,index=True,)
+    student_id = db.Column(
+        db.Integer,
+        db.ForeignKey("students.id"),
+        nullable=False,
+        index=True,
+    )
+    exam_id = db.Column(
+        db.Integer,
+        db.ForeignKey("exams.id"),
+        nullable=False,
+        index=True,
+    )
+    subject_id = db.Column(
+        db.Integer,
+        db.ForeignKey("subjects.id"),
+        nullable=False,
+        index=True,
+    )
 
     # MARKS
     internal_marks = db.Column(db.Float, default=0)
@@ -101,9 +116,19 @@ class ExamResult(db.Model):
 
     status = db.Column(db.String(20), default="Draft")
     remarks = db.Column(db.Text)
-    created_by = db.Column(db.Integer,db.ForeignKey("teachers.id"),)
-    created_at = db.Column(db.DateTime,server_default=func.now(),)
-    updated_at = db.Column(db.DateTime,server_default=func.now(),onupdate=func.now(),)
+    created_by = db.Column(
+        db.Integer,
+        db.ForeignKey("teachers.id"),
+    )
+    created_at = db.Column(
+        db.DateTime,
+        server_default=func.now(),
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
     __table_args__ = (
         db.UniqueConstraint(
             "student_id",
@@ -147,17 +172,14 @@ class StudentExamResultsAPI(MethodView):
                     Exam.academic_year,
                     Exam.exam_name,
                     Subject.subject_name,
-
                     ExamResult.internal_marks,
                     ExamResult.external_marks,
                     ExamResult.oral_marks,
                     ExamResult.practical_marks,
-
                     ExamResult.internal_out_of,
                     ExamResult.external_out_of,
                     ExamResult.oral_out_of,
                     ExamResult.practical_out_of,
-
                     ExamResult.total_marks,
                     ExamResult.percentage,
                     ExamResult.grade,
@@ -182,17 +204,14 @@ class StudentExamResultsAPI(MethodView):
                     "year": r.academic_year,
                     "exam": r.exam_name,
                     "subject": r.subject_name,
-
                     "internal": r.internal_marks or 0,
                     "external": r.external_marks or 0,
                     "oral": r.oral_marks or 0,
                     "practical": r.practical_marks or 0,
-
                     "internalOutOf": r.internal_out_of or 0,
                     "externalOutOf": r.external_out_of or 0,
                     "oralOutOf": r.oral_out_of or 0,
                     "practicalOutOf": r.practical_out_of or 0,
-
                     "marks": float(r.total_marks or 0),
                     "percentage": float(r.percentage or 0),
                     "grade": r.grade,
@@ -207,6 +226,7 @@ class StudentExamResultsAPI(MethodView):
         except Exception as e:
             logger.exception(e)
             return jsonify({"error": "Something went wrong"}), 500
+
 
 # PERFORMANCE (CHART DATA)
 class PerformanceAPI(MethodView):
@@ -293,14 +313,17 @@ class ExamFilterOptionsAPI(MethodView):
                 .all()
             )
 
-            return jsonify({
-                "years": [y[0] for y in years],
-                "exams": [e[0] for e in exams]
-            }), 200
+            return (
+                jsonify(
+                    {"years": [y[0] for y in years], "exams": [e[0] for e in exams]}
+                ),
+                200,
+            )
 
         except Exception as e:
             logger.exception(e)
             return jsonify({"error": "Failed to load filters"}), 500
+
 
 # DOWNLOAD PDF (UPDATED - MATCH TEACHER SYSTEM)
 class DownloadResultPDF(MethodView):
@@ -434,15 +457,17 @@ class DownloadResultPDF(MethodView):
             ]
 
             for res, exam, subject in results:
-                marks_data.append([
-                    subject.subject_name.upper(),
-                    f"{res.internal_marks}/{res.internal_out_of}",
-                    f"{res.external_marks}/{res.external_out_of}",
-                    f"{res.oral_marks}/{res.oral_out_of}",
-                    f"{res.practical_marks}/{res.practical_out_of}",
-                    f"{res.total_marks}",
-                    res.grade,
-                ])
+                marks_data.append(
+                    [
+                        subject.subject_name.upper(),
+                        f"{res.internal_marks}/{res.internal_out_of}",
+                        f"{res.external_marks}/{res.external_out_of}",
+                        f"{res.oral_marks}/{res.oral_out_of}",
+                        f"{res.practical_marks}/{res.practical_out_of}",
+                        f"{res.total_marks}",
+                        res.grade,
+                    ]
+                )
 
             marks_table = Table(marks_data, colWidths=[90, 70, 70, 70, 70, 60, 50])
 
@@ -502,7 +527,8 @@ class DownloadResultPDF(MethodView):
         except Exception as e:
             logger.exception(f"PDF error: {e}")
             return jsonify({"error": "Failed to generate PDF"}), 500
-        
+
+
 # ========================= GET TEACHER ASSIGNED STUDENTS =========================
 class TeacherStudentsAPI(MethodView):
 
@@ -513,13 +539,9 @@ class TeacherStudentsAPI(MethodView):
 
             teacher_id = request.args.get("teacher_id")
 
-            teacher_classes = TeacherClass.query.filter_by(
-                teacher_id=teacher_id
-            ).all()
+            teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
 
-            academic_class_ids = [
-                tc.academic_class_id for tc in teacher_classes
-            ]
+            academic_class_ids = [tc.academic_class_id for tc in teacher_classes]
 
             records = (
                 db.session.query(
@@ -530,7 +552,10 @@ class TeacherStudentsAPI(MethodView):
                     Section,
                 )
                 .join(Student, Student.id == StudentAcademicRecord.student_id)
-                .join(AcademicClass, AcademicClass.id == StudentAcademicRecord.academic_class_id)
+                .join(
+                    AcademicClass,
+                    AcademicClass.id == StudentAcademicRecord.academic_class_id,
+                )
                 .join(Division, Division.id == AcademicClass.division_id)
                 .join(Section, Section.id == AcademicClass.section_id)
                 .filter(
@@ -545,23 +570,29 @@ class TeacherStudentsAPI(MethodView):
             for record, student, academic, division, section in records:
 
                 # ✅ CHECK IF RESULT EXISTS
-                published_result = db.session.query(ExamResult).filter(
-                    ExamResult.student_id == student.id,
-                    ExamResult.status == "Published"
-                ).first()
+                published_result = (
+                    db.session.query(ExamResult)
+                    .filter(
+                        ExamResult.student_id == student.id,
+                        ExamResult.status == "Published",
+                    )
+                    .first()
+                )
 
                 status = "Completed" if published_result else "Pending"
 
-                data.append({
-                    "id": student.id,
-                    "name": f"{student.first_name} {student.last_name}",
-                    "rollNo": record.roll_number,
-                    "className": f"{division.division_name}-{section.section_name}",
-                    "division": division.division_name,
-                    "section": section.section_name,
-                    "academic_class_id": academic.id,
-                    "status": status,   # ✅ FIXED
-                })
+                data.append(
+                    {
+                        "id": student.id,
+                        "name": f"{student.first_name} {student.last_name}",
+                        "rollNo": record.roll_number,
+                        "className": f"{division.division_name}-{section.section_name}",
+                        "division": division.division_name,
+                        "section": section.section_name,
+                        "academic_class_id": academic.id,
+                        "status": status,  # ✅ FIXED
+                    }
+                )
 
             return jsonify(data), 200
 
@@ -1014,3 +1045,564 @@ class TeacherReportCardAPI(MethodView):
             logger.exception(e)
 
             return jsonify({"error": "Failed to load report card"}), 500
+
+
+# ========================= TEACHER ANALYTICS API =========================
+class TeacherAnalyticsAPI(MethodView):
+
+    @login_required
+    def get(self):
+        try:
+            from utils.teacherDetails import TeacherClass
+
+            teacher_id = request.args.get("teacher_id")
+            class_id = request.args.get("class_id")
+            subject_id = request.args.get("subject_id")
+
+            if not teacher_id:
+                return jsonify({"error": "teacher_id required"}), 400
+
+            # ================= GET ASSIGNED CLASSES =================
+            teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
+
+            assigned_class_ids = [tc.academic_class_id for tc in teacher_classes]
+
+            assigned_subject_ids = [tc.subject_id for tc in teacher_classes]
+
+            # ================= BASE QUERY =================
+            query = (
+                db.session.query(
+                    ExamResult,
+                    Student,
+                    Subject,
+                    AcademicClass,
+                    Division,
+                    Section,
+                )
+                .join(Student, Student.id == ExamResult.student_id)
+                .join(Subject, Subject.id == ExamResult.subject_id)
+                .join(
+                    StudentAcademicRecord,
+                    StudentAcademicRecord.student_id == Student.id,
+                )
+                .join(
+                    AcademicClass,
+                    AcademicClass.id == StudentAcademicRecord.academic_class_id,
+                )
+                .join(Division, Division.id == AcademicClass.division_id)
+                .join(Section, Section.id == AcademicClass.section_id)
+                .filter(
+                    StudentAcademicRecord.is_current == True,
+                    AcademicClass.id.in_(assigned_class_ids),
+                    Subject.id.in_(assigned_subject_ids),
+                    ExamResult.status == "Published",
+                )
+            )
+
+            # ================= FILTERS =================
+            if class_id and class_id != "all":
+                query = query.filter(AcademicClass.id == class_id)
+
+            if subject_id and subject_id != "all":
+                query = query.filter(Subject.id == subject_id)
+
+            results = query.all()
+
+            # ================= EMPTY =================
+            if not results:
+                return (
+                    jsonify(
+                        {
+                            "kpis": {
+                                "avgMarks": 0,
+                                "passRate": 0,
+                                "topScore": 0,
+                                "lowScore": 0,
+                            },
+                            "topStudents": [],
+                            "weakStudents": [],
+                            "performanceChart": {
+                                "labels": [],
+                                "data": [],
+                            },
+                            "subjectChart": {
+                                "labels": [],
+                                "data": [],
+                            },
+                            "insight": "No analytics data available",
+                        }
+                    ),
+                    200,
+                )
+
+            # ================= KPI =================
+            percentages = [r[0].percentage or 0 for r in results]
+            avg_marks = round(sum(percentages) / len(percentages), 2)
+            pass_students = len([p for p in percentages if p >= 35])
+            pass_rate = round((pass_students / len(percentages)) * 100, 2)
+            top_score = round(max(percentages), 2)
+            low_score = round(min(percentages), 2)
+
+            # ================= STUDENT-WISE ANALYTICS =================
+            student_map = {}
+            for res, student, subject, academic, division, section in results:
+                student_id = student.id
+                if student_id not in student_map:
+
+                    student_map[student_id] = {
+                        "student": f"{student.first_name} {student.last_name}",
+                        "className": f"{division.division_name}-{section.section_name}",
+                        "percentages": [],
+                    }
+
+                student_map[student_id]["percentages"].append(res.percentage or 0)
+
+            # ================= CALCULATE AVERAGES =================
+            student_analytics = []
+            for _, data in student_map.items():
+                avg_percentage = round(
+                    sum(data["percentages"]) / len(data["percentages"]),
+                    2,
+                )
+
+                student_analytics.append(
+                    {
+                        "student": data["student"],
+                        "className": data["className"],
+                        "percentage": avg_percentage,
+                    }
+                )
+
+            # ================= TOP STUDENTS =================
+            top_students = sorted(
+                student_analytics,
+                key=lambda x: x["percentage"],
+                reverse=True,
+            )[:5]
+
+            # ================= WEAK STUDENTS =================
+            top_student_names = [s["student"] for s in top_students]
+
+            weak_students = sorted(
+                [s for s in student_analytics if s["student"] not in top_student_names],
+                key=lambda x: x["percentage"],
+            )[:5]
+
+            if len(student_analytics) <= 1:
+                weak_students = []
+            # ================= CLASS PERFORMANCE =================
+            class_map = {}
+
+            for res, student, subject, academic, division, section in results:
+
+                class_name = f"{division.division_name}-{section.section_name}"
+
+                if class_name not in class_map:
+                    class_map[class_name] = []
+
+                class_map[class_name].append(res.percentage or 0)
+
+            performance_labels = []
+            performance_data = []
+
+            for cls, values in class_map.items():
+
+                performance_labels.append(cls)
+
+                performance_data.append(round(sum(values) / len(values), 2))
+
+            # ================= SUBJECT ANALYTICS =================
+            subject_map = {}
+
+            for res, student, subject, academic, division, section in results:
+
+                if subject.subject_name not in subject_map:
+                    subject_map[subject.subject_name] = []
+
+                subject_map[subject.subject_name].append(res.percentage or 0)
+
+            subject_labels = []
+            subject_data = []
+
+            for sub, vals in subject_map.items():
+
+                subject_labels.append(sub)
+
+                subject_data.append(round(sum(vals) / len(vals), 2))
+
+            # ================= AI INSIGHTS =================
+            insight = "Overall class performance is stable."
+
+            if avg_marks >= 85:
+                insight = "Excellent performance across assigned classes."
+
+            elif avg_marks >= 70:
+                insight = "Students are performing well with room for improvement."
+
+            elif avg_marks >= 50:
+                insight = "Average performance detected. Focus on weaker students."
+
+            else:
+                insight = "Critical improvement required in multiple subjects."
+
+            return (
+                jsonify(
+                    {
+                        "kpis": {
+                            "avgMarks": avg_marks,
+                            "passRate": pass_rate,
+                            "topScore": top_score,
+                            "lowScore": low_score,
+                        },
+                        "topStudents": top_students,
+                        "weakStudents": weak_students,
+                        "performanceChart": {
+                            "labels": performance_labels,
+                            "data": performance_data,
+                        },
+                        "subjectChart": {
+                            "labels": subject_labels,
+                            "data": subject_data,
+                        },
+                        "insight": insight,
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load analytics"}), 500
+
+
+# ========================= TEACHER ANALYTICS PDF =========================
+class TeacherAnalyticsPDFAPI(MethodView):
+
+    @login_required
+    def get(self):
+
+        try:
+            from utils.teacherDetails import TeacherClass
+
+            teacher_id = request.args.get("teacher_id")
+            class_id = request.args.get("class_id")
+            subject_id = request.args.get("subject_id")
+
+            if not teacher_id:
+                return jsonify({"error": "teacher_id required"}), 400
+
+            # ================= ASSIGNED CLASSES =================
+            teacher_classes = TeacherClass.query.filter_by(
+                teacher_id=teacher_id
+            ).all()
+
+            assigned_class_ids = [
+                tc.academic_class_id for tc in teacher_classes
+            ]
+
+            assigned_subject_ids = [
+                tc.subject_id for tc in teacher_classes
+            ]
+
+            # ================= QUERY =================
+            query = (
+                db.session.query(
+                    ExamResult,
+                    Student,
+                    Subject,
+                    AcademicClass,
+                    Division,
+                    Section,
+                )
+                .join(Student, Student.id == ExamResult.student_id)
+                .join(Subject, Subject.id == ExamResult.subject_id)
+                .join(
+                    StudentAcademicRecord,
+                    StudentAcademicRecord.student_id == Student.id,
+                )
+                .join(
+                    AcademicClass,
+                    AcademicClass.id == StudentAcademicRecord.academic_class_id,
+                )
+                .join(Division, Division.id == AcademicClass.division_id)
+                .join(Section, Section.id == AcademicClass.section_id)
+                .filter(
+                    StudentAcademicRecord.is_current == True,
+                    AcademicClass.id.in_(assigned_class_ids),
+                    Subject.id.in_(assigned_subject_ids),
+                    ExamResult.status == "Published",
+                )
+            )
+
+            # ================= FILTERS =================
+            if class_id and class_id != "all":
+                query = query.filter(AcademicClass.id == class_id)
+
+            if subject_id and subject_id != "all":
+                query = query.filter(Subject.id == subject_id)
+
+            results = query.all()
+
+            if not results:
+                return jsonify({"error": "No analytics data found"}), 404
+
+            # ================= KPI =================
+            percentages = [r[0].percentage or 0 for r in results]
+
+            avg_marks = round(sum(percentages) / len(percentages), 2)
+
+            pass_students = len([
+                p for p in percentages if p >= 35
+            ])
+
+            pass_rate = round(
+                (pass_students / len(percentages)) * 100,
+                2,
+            )
+
+            top_score = max(percentages)
+            low_score = min(percentages)
+
+            # ================= STUDENT ANALYTICS =================
+            student_map = {}
+
+            for res, student, subject, academic, division, section in results:
+
+                if student.id not in student_map:
+
+                    student_map[student.id] = {
+                        "student": (
+                            f"{student.first_name} "
+                            f"{student.last_name}"
+                        ),
+                        "className": (
+                            f"{division.division_name}-"
+                            f"{section.section_name}"
+                        ),
+                        "percentages": [],
+                    }
+
+                student_map[student.id]["percentages"].append(
+                    res.percentage or 0
+                )
+
+            student_analytics = []
+
+            for _, data in student_map.items():
+
+                avg_percentage = round(
+                    sum(data["percentages"]) /
+                    len(data["percentages"]),
+                    2,
+                )
+
+                student_analytics.append({
+                    "student": data["student"],
+                    "className": data["className"],
+                    "percentage": avg_percentage,
+                })
+
+            # ================= TOP =================
+            top_students = sorted(
+                student_analytics,
+                key=lambda x: x["percentage"],
+                reverse=True,
+            )[:5]
+
+            # ================= WEAK =================
+            top_names = [
+                s["student"] for s in top_students
+            ]
+
+            weak_students = sorted(
+                [
+                    s for s in student_analytics
+                    if s["student"] not in top_names
+                ],
+                key=lambda x: x["percentage"],
+            )[:5]
+
+            # ================= INSIGHT =================
+            insight = "Overall class performance is stable."
+
+            if avg_marks >= 85:
+                insight = (
+                    "Excellent performance across assigned classes."
+                )
+
+            elif avg_marks >= 70:
+                insight = (
+                    "Students are performing well with room for improvement."
+                )
+
+            elif avg_marks >= 50:
+                insight = (
+                    "Average performance detected."
+                )
+
+            else:
+                insight = (
+                    "Critical improvement required."
+                )
+
+            # ================= PDF =================
+            buffer = BytesIO()
+
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+            )
+
+            elements = []
+
+            styles = getSampleStyleSheet()
+
+            title_style = ParagraphStyle(
+                name="title",
+                alignment=TA_CENTER,
+                fontSize=18,
+                spaceAfter=20,
+            )
+
+            # ================= HEADER =================
+            elements.append(
+                Paragraph(
+                    "<b>Teacher Analytics Report</b>",
+                    title_style,
+                )
+            )
+
+            # ================= KPI TABLE =================
+            kpi_data = [
+                ["Metric", "Value"],
+                ["Average Marks", f"{avg_marks}%"],
+                ["Pass Rate", f"{pass_rate}%"],
+                ["Top Score", f"{top_score}%"],
+                ["Low Score", f"{low_score}%"],
+            ]
+
+            kpi_table = Table(
+                kpi_data,
+                colWidths=[220, 220],
+            )
+
+            kpi_table.setStyle(
+                TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0),
+                     colors.HexColor("#4F46E5")),
+
+                    ("TEXTCOLOR", (0, 0), (-1, 0),
+                     colors.white),
+
+                    ("GRID", (0, 0), (-1, -1),
+                     0.5, colors.black),
+
+                    ("FONTNAME", (0, 0), (-1, 0),
+                     "Helvetica-Bold"),
+                ])
+            )
+
+            elements.append(kpi_table)
+
+            elements.append(Spacer(1, 20))
+
+            # ================= TOP STUDENTS =================
+            elements.append(
+                Paragraph(
+                    "<b>Top Students</b>",
+                    styles["Heading2"],
+                )
+            )
+
+            top_data = [["Student", "Class", "Percentage"]]
+
+            for student in top_students:
+
+                top_data.append([
+                    student["student"],
+                    student["className"],
+                    f"{student['percentage']}%",
+                ])
+
+            top_table = Table(top_data)
+
+            top_table.setStyle(
+                TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0),
+                     colors.green),
+
+                    ("TEXTCOLOR", (0, 0), (-1, 0),
+                     colors.white),
+
+                    ("GRID", (0, 0), (-1, -1),
+                     0.5, colors.black),
+                ])
+            )
+
+            elements.append(top_table)
+
+            elements.append(Spacer(1, 20))
+
+            # ================= WEAK STUDENTS =================
+            elements.append(
+                Paragraph(
+                    "<b>Needs Improvement</b>",
+                    styles["Heading2"],
+                )
+            )
+
+            weak_data = [["Student", "Class", "Percentage"]]
+
+            for student in weak_students:
+
+                weak_data.append([
+                    student["student"],
+                    student["className"],
+                    f"{student['percentage']}%",
+                ])
+
+            weak_table = Table(weak_data)
+
+            weak_table.setStyle(
+                TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0),
+                     colors.red),
+
+                    ("TEXTCOLOR", (0, 0), (-1, 0),
+                     colors.white),
+
+                    ("GRID", (0, 0), (-1, -1),
+                     0.5, colors.black),
+                ])
+            )
+
+            elements.append(weak_table)
+
+            elements.append(Spacer(1, 20))
+
+            # ================= AI INSIGHT =================
+            elements.append(
+                Paragraph(
+                    f"<b>AI Insight:</b> {insight}",
+                    styles["BodyText"],
+                )
+            )
+
+            # ================= BUILD =================
+            doc.build(elements)
+
+            buffer.seek(0)
+
+            return send_file(
+                buffer,
+                as_attachment=True,
+                download_name="teacher_analytics_report.pdf",
+                mimetype="application/pdf",
+            )
+
+        except Exception as e:
+            logger.exception(e)
+
+            return jsonify({
+                "error": "Failed to generate analytics PDF"
+            }), 500

@@ -407,17 +407,11 @@ export function useTeacherExamResult(
         },
         body: JSON.stringify({
           studentId: currentStudent.id,
-
           subject: selectedSubject,
-
           examType: selectedExam,
-
           internal: Number(marks.internal || 0),
-
           external: Number(marks.external || 0),
-
           oral: Number(marks.oral || 0),
-
           practical: Number(marks.practical || 0),
 
           internalOutOf: Number(

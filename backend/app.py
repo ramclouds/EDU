@@ -3,6 +3,7 @@ from flask import Flask, jsonify, send_from_directory, request
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from dotenv import load_dotenv
+import traceback
 
 # ================= LOAD ENV =================
 load_dotenv()
@@ -85,6 +86,8 @@ from utils.examResult import (
     TeacherStudentMarksAPI,
     SaveTeacherMarksAPI,
     TeacherReportCardAPI,
+    TeacherAnalyticsAPI,
+    TeacherAnalyticsPDFAPI,
 )
 
 # ================= OTHER =================
@@ -501,6 +504,15 @@ def create_app():
         methods=["GET"],
     )
 
+    app.add_url_rule(
+        "/api/teacher/analytics",
+        view_func=TeacherAnalyticsAPI.as_view("teacher_analytics"),
+    )
+
+    app.add_url_rule(
+        "/api/teacher/analytics/pdf",
+        view_func=TeacherAnalyticsPDFAPI.as_view("teacher_analytics_pdf"),
+    )
     # ================== Student Exam and Result ===============
     app.add_url_rule(
         "/api/results/<int:student_id>",
@@ -556,26 +568,99 @@ def create_app():
         view_func=TeacherMyClasses.as_view("teacher_my_classes"),
         methods=["GET"],
     )
+
     # ==================================================
     # FILE SERVING
     # ==================================================
 
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+    # Absolute folders
     SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
+
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
 
+    print("BASE_DIR:", BASE_DIR)
+    print("SUBMITTED_FOLDER:", SUBMITTED_FOLDER)
+    print("ASSIGNMENT_FOLDER:", TEACHER_ASSIGNMENT_FOLDER)
+
+    # =============================
+    # STUDENT SUBMITTED FILES
+    # =============================
     @app.route("/Submitted_Assignments/<path:filename>")
     def submitted_files(filename):
-        return send_from_directory(SUBMITTED_FOLDER, filename)
 
+        try:
+
+            safe_filename = os.path.normpath(filename)
+
+            full_path = os.path.join(SUBMITTED_FOLDER, safe_filename)
+
+            if not os.path.exists(full_path):
+
+                return jsonify({"error": "File not found"}), 404
+
+            directory = os.path.dirname(full_path)
+
+            actual_filename = os.path.basename(full_path)
+
+            response = send_from_directory(
+                directory, actual_filename, as_attachment=False
+            )
+
+            # 🔥 OPEN IN BROWSER
+            response.headers["Content-Disposition"] = (
+                f'inline; filename="{actual_filename}"'
+            )
+
+            return response
+
+        except Exception as e:
+
+            traceback.print_exc()
+
+            return jsonify({"error": str(e)}), 500
+
+    # =============================
+    # TEACHER ASSIGNMENT FILES
+    # =============================
     @app.route("/Assignment_Files/<path:filename>")
     def assignment_files(filename):
-        return send_from_directory(TEACHER_ASSIGNMENT_FOLDER, filename)
+
+        try:
+
+            safe_filename = os.path.normpath(filename)
+
+            full_path = os.path.join(TEACHER_ASSIGNMENT_FOLDER, safe_filename)
+
+            if not os.path.exists(full_path):
+
+                return jsonify({"error": "File not found"}), 404
+
+            directory = os.path.dirname(full_path)
+
+            actual_filename = os.path.basename(full_path)
+
+            response = send_from_directory(
+                directory, actual_filename, as_attachment=False
+            )
+
+            # 🔥 OPEN INLINE
+            response.headers["Content-Disposition"] = (
+                f'inline; filename="{actual_filename}"'
+            )
+
+            return response
+
+        except Exception as e:
+
+            traceback.print_exc()
+
+            return jsonify({"error": str(e)}), 500
 
     # ==================================================
     # ERROR HANDLERS
     # ==================================================
-
     @app.errorhandler(404)
     def not_found(e):
         return jsonify({"error": "API not found"}), 404

@@ -24,6 +24,10 @@ export function useTeacherTimetable({
     const [selectedSubject, setSelectedSubject] =
         useState("All Subjects");
 
+    // TODAY SCHEDULE
+    const [todaySchedule, setTodaySchedule] =
+        useState([]);
+
 
     // ----------------------------
     // AUTH HELPER
@@ -50,7 +54,8 @@ export function useTeacherTimetable({
     // ============================
     useEffect(() => {
 
-        if (activeSection !== "timetable") return;
+        if (activeSection !== "timetable" &&
+            activeSection !== "dashboard") return;
 
         const { user } = getAuth();
 
@@ -227,6 +232,49 @@ export function useTeacherTimetable({
 
 
     // ============================
+    // TODAY DAY NAME
+    // ============================
+    const todayDayName = useMemo(() => {
+
+        return new Date().toLocaleDateString(
+            "en-US",
+            {
+                weekday: "long"
+            }
+        );
+
+    }, []);
+
+
+    // ============================
+    // TODAY SCHEDULE
+    // ============================
+    useEffect(() => {
+
+        const todayEntries =
+            teacherTimetable[todayDayName] || [];
+
+        // SORT BY START TIME
+        const sorted =
+            [...todayEntries].sort((a, b) => {
+
+                const timeA =
+                    a.start_time || a.time || "";
+
+                const timeB =
+                    b.start_time || b.time || "";
+
+                return timeA.localeCompare(timeB);
+            });
+
+        setTodaySchedule(sorted);
+
+    }, [
+        teacherTimetable,
+        todayDayName
+    ]);
+
+    // ============================
     // FILTERED TIMETABLE
     // ============================
     const filteredTimetable = useMemo(() => {
@@ -292,5 +340,6 @@ export function useTeacherTimetable({
         // DOWNLOAD
         downloadLoading,
         downloadTeacherTimetablePDF,
+        todaySchedule,
     };
 }
