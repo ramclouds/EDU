@@ -24,12 +24,12 @@ export function useLogin() {
         {
           method: "POST",
           headers: {
-            "Content-Type":"application/json"
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             identifier,
-            password
-          })
+            password,
+          }),
         }
       );
 
@@ -40,23 +40,67 @@ export function useLogin() {
         return;
       }
 
+      // ================= STORE AUTH =================
+
       localStorage.setItem("token", data.token);
+
       localStorage.setItem("role", data.role);
+
       localStorage.setItem(
         "user",
         JSON.stringify(data.user)
       );
 
+      // ================= STORE ADMIN TYPE =================
+
+      if (data.user?.admin_type) {
+        localStorage.setItem(
+          "admin_type",
+          data.user.admin_type
+        );
+      } else {
+        localStorage.removeItem("admin_type");
+      }
+
       console.log("LOGIN SUCCESS", data);
 
+      // ================= ROLE BASED REDIRECT =================
+
       if (data.role === "student") {
-        window.location.href="/student-dashboard";
+        window.location.href =
+          "/student-dashboard";
       }
+
       else if (data.role === "teacher") {
-        window.location.href="/teacher-dashboard";
+        window.location.href =
+          "/teacher-dashboard";
       }
+
       else if (data.role === "admin") {
-        window.location.href="/admin-dashboard";
+
+        switch (data.user?.admin_type) {
+
+          case "Super Admin":
+            window.location.href =
+              "/super-admin-dashboard";
+            break;
+
+          case "Library Admin":
+            window.location.href =
+              "/library-admin-dashboard";
+            break;
+
+          case "Accounts Admin":
+            window.location.href =
+              "/accounts-admin-dashboard";
+            break;
+
+          case "Hostel Admin":
+            window.location.href =
+              "/hostel-admin-dashboard";
+            break;
+        }
+      
       }
 
     } catch (error) {
@@ -67,44 +111,52 @@ export function useLogin() {
     }
   };
 
-
   // ================= FORGOT PASSWORD =================
+
   const handleForgotPassword = async () => {
+
     if (!resetEmail) {
       alert("Please enter your email");
       return;
     }
 
     try {
+
       const response = await fetch(
         "http://localhost:5000/api/forgot-password",
         {
-          method:"POST",
-          headers:{
-            "Content-Type":"application/json"
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            email: resetEmail
-          })
+            email: resetEmail,
+          }),
         }
       );
 
       const data = await response.json();
 
-      if(response.ok){
+      if (response.ok) {
+
         alert("Password reset link sent");
         setShowForgotModal(false);
         setResetEmail("");
+
       } else {
+
         alert(data.error);
+
       }
 
-    } catch(error){
+    } catch (error) {
+
       console.error(error);
+
       alert("Server error");
+
     }
   };
-
 
   return {
     identifier,
@@ -117,6 +169,7 @@ export function useLogin() {
     setResetEmail,
 
     loading,
+
     showPassword,
     setShowPassword,
 
@@ -124,6 +177,7 @@ export function useLogin() {
     setShowForgotModal,
 
     login,
-    handleForgotPassword
+
+    handleForgotPassword,
   };
 }

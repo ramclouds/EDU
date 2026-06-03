@@ -497,8 +497,8 @@
                         </p>
                         <h3 class="text-2xl font-bold dark:text-white">₹12.5L</h3>
                     </div>
-                    
-        
+
+
                     <div
                         class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
                         <div class="flex justify-between items-start">
@@ -3239,6 +3239,126 @@
                 </div>
 
             </section>
+
+            <!--  Add Asset Modal START  -->
+            <div id="addAssetModal"
+                class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+
+                <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-[fadeIn_.3s_ease]">
+
+                    <!-- Header -->
+                    <div
+                        class="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
+                        <div>
+                            <h2 class="text-xl font-bold">Register New Asset</h2>
+                            <p class="text-xs text-indigo-100">Add and manage organizational assets</p>
+                        </div>
+
+                        <button onclick="closeAddAssetModal()"
+                            class="w-10 h-10 rounded-full hover:bg-white/20 flex items-center justify-center text-xl transition">
+                            ✕
+                        </button>
+                    </div>
+
+                    <!-- Form -->
+                    <form class="p-6 space-y-5">
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                            <!-- Asset Name -->
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase">Asset Name</label>
+                                <input type="text" placeholder="Dell Latitude 7420"
+                                    class="mt-2 w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+
+                            <!-- Asset Code -->
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase">Asset Code</label>
+                                <input type="text" placeholder="AST-1024"
+                                    class="mt-2 w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+
+                            <!-- Category -->
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase">Category</label>
+                                <select
+                                    class="mt-2 w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option>Electronics</option>
+                                    <option>Furniture</option>
+                                    <option>Lab Equipment</option>
+                                    <option>Vehicles</option>
+                                </select>
+                            </div>
+
+                            <!-- Location -->
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase">Location</label>
+                                <input type="text" placeholder="Lab"
+                                    class="mt-2 w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+
+                            <!-- Purchase Date -->
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase">Purchase Date</label>
+                                <input type="date"
+                                    class="mt-2 w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+
+                            <!-- Value -->
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase">Asset Value</label>
+                                <input type="number" placeholder="85000"
+                                    class="mt-2 w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+
+                        </div>
+
+                        <!-- Status -->
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 uppercase">Status</label>
+
+                            <div class="flex gap-3 mt-3">
+                                <label
+                                    class="flex items-center gap-2 border border-slate-200 rounded-xl px-4 py-3 cursor-pointer hover:border-indigo-500">
+                                    <input type="radio" name="status" checked>
+                                    <span class="text-sm">Operational</span>
+                                </label>
+
+                                <label
+                                    class="flex items-center gap-2 border border-slate-200 rounded-xl px-4 py-3 cursor-pointer hover:border-indigo-500">
+                                    <input type="radio" name="status">
+                                    <span class="text-sm">Under Repair</span>
+                                </label>
+
+                                <label
+                                    class="flex items-center gap-2 border border-slate-200 rounded-xl px-4 py-3 cursor-pointer hover:border-indigo-500">
+                                    <input type="radio" name="status">
+                                    <span class="text-sm">Inactive</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+
+                            <button type="button" onclick="closeAddAssetModal()"
+                                class="px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition">
+                                Cancel
+                            </button>
+
+                            <button type="submit"
+                                class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold shadow-lg transition">
+                                Save Asset
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                </div>
+            </div>
+            <!--  Add Asset Modal END  -->
             <!-- ============================= Asset Inventory END ============================= -->
 
             <!-- ============================= SETTINGS SECTION ============================= -->
@@ -3773,4 +3893,5 @@
 
     </div>
 </body>
+
 </html>

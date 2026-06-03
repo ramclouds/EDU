@@ -3,6 +3,7 @@ from flask import Flask, jsonify, send_from_directory, request
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from dotenv import load_dotenv
+import traceback
 
 # ================= LOAD ENV =================
 load_dotenv()
@@ -17,6 +18,17 @@ from utils.teacherDetails import (
     TeacherDetails,
     UpdateTeacherProfile,
     ChangeTeacherPassword,
+)
+
+from utils.adminsDetails import AdminDetails, UpdateAdminProfile, ChangeAdminPassword
+from utils.assets import (
+    CreateAssetAPI,
+    GetAssetsAPI,
+    AssetDetailsAPI,
+    UpdateAssetAPI,
+    DeleteAssetAPI,
+    RestoreAssetAPI,
+    GetDeletedAssetsAPI,
 )
 
 # =================  ASSIGNMENTS =================
@@ -54,6 +66,8 @@ from utils.leaves import (
     StudentLeaveHistory,
     UpdateStudentLeaveStatus,
     DeleteStudentLeave,
+    AllTeacherLeaves,
+    AdminLeaveDashboard,
 )
 
 # ================= ACADEMICS =================
@@ -79,6 +93,14 @@ from utils.examResult import (
     UpcomingExamsAPI,
     DownloadResultPDF,
     ExamFilterOptionsAPI,
+    TeacherSubjectsAPI,
+    TeacherClassesAPI,
+    TeacherStudentsAPI,
+    TeacherStudentMarksAPI,
+    SaveTeacherMarksAPI,
+    TeacherReportCardAPI,
+    TeacherAnalyticsAPI,
+    TeacherAnalyticsPDFAPI,
 )
 
 # ================= OTHER =================
@@ -88,10 +110,12 @@ from utils.announcement import (
     CreateNoticeAPI,
     StudentNoticeAPI,
     TeacherNoticeAPI,
+    AdminNoticeAPI,
     MarkNoticeReadAPI,
 )
 
 from utils.library import StudentLibraryAPI
+from utils.teacherMyClasses import TeacherMyClasses
 
 # ==================================================
 # CREATE APP
@@ -119,17 +143,6 @@ def create_app():
         allow_headers=["Content-Type", "Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     )
-
-    @app.after_request
-    def after_request(response):
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:5173")
-        response.headers.add(
-            "Access-Control-Allow-Headers", "Content-Type,Authorization"
-        )
-        response.headers.add(
-            "Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS"
-        )
-        return response
 
     @app.before_request
     def handle_options():
@@ -198,6 +211,71 @@ def create_app():
         methods=["PUT"],
     )
 
+    # ===============================================
+    # ADMIN
+    # ===============================================
+
+    app.add_url_rule(
+        "/api/<int:id>/admin",
+        view_func=AdminDetails.as_view("admin_details"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/<int:id>/admin/update",
+        view_func=UpdateAdminProfile.as_view("update_admin"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/<int:id>/change-password",
+        view_func=ChangeAdminPassword.as_view("change_admin_password"),
+        methods=["PUT"],
+    )
+
+    # ==================================================
+    # ASSETS MANAGEMENT
+    # ==================================================
+    app.add_url_rule(
+        "/api/assets",
+        view_func=GetAssetsAPI.as_view("get_assets"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/create",
+        view_func=CreateAssetAPI.as_view("create_asset"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/<int:id>",
+        view_func=AssetDetailsAPI.as_view("asset_details"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/<int:id>",
+        view_func=UpdateAssetAPI.as_view("update_asset"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/<int:id>",
+        view_func=DeleteAssetAPI.as_view("delete_asset"),
+        methods=["DELETE"],
+    )
+    app.add_url_rule(
+        "/api/assets/restore/<int:id>",
+        view_func=RestoreAssetAPI.as_view("restore_asset"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/deleted",
+        view_func=GetDeletedAssetsAPI.as_view("deleted_assets"),
+        methods=["GET"],
+    )
     # ==================================================
     # TEACHER ASSIGNMENTS (NEW)
     # ==================================================
@@ -287,6 +365,12 @@ def create_app():
     )
 
     app.add_url_rule(
+        "/api/announcements/admin/<int:admin_id>",
+        view_func=AdminNoticeAPI.as_view("admin_notices"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
         "/api/announcements/read/<int:notice_id>/<int:user_id>",
         view_func=MarkNoticeReadAPI.as_view("mark_notice_read"),
         methods=["POST"],
@@ -295,7 +379,6 @@ def create_app():
     # ==================================================
     # NOTIFICATIONS
     # ==================================================
-
     app.add_url_rule(
         "/api/notifications",
         view_func=NotificationsAPI.as_view("notifications"),
@@ -335,6 +418,18 @@ def create_app():
     # ==================================================
     # LEAVES
     # ==================================================
+
+    app.add_url_rule(
+        "/api/admin/teacher/leaves",
+        view_func=AllTeacherLeaves.as_view("all_teacher_leaves"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/leaves/dashboard",
+        view_func=AdminLeaveDashboard.as_view("admin_leave_dashboard"),
+        methods=["GET"],
+    )
 
     app.add_url_rule(
         "/api/teacher/leave/apply",
@@ -442,7 +537,6 @@ def create_app():
     # ==================================================
     # ACADEMICS
     # ==================================================
-
     app.add_url_rule(
         "/api/timetable/<int:student_id>",
         view_func=StudentTimetableAPI.as_view("timetable"),
@@ -468,7 +562,53 @@ def create_app():
         view_func=PerformanceAPI.as_view("performance"),
         methods=["GET"],
     )
+    # ================= TEACHER EXAM RESULT =================
+    app.add_url_rule(
+        "/api/teacher/students",
+        view_func=TeacherStudentsAPI.as_view("teacher_exam_students"),
+        methods=["GET"],
+    )
 
+    app.add_url_rule(
+        "/api/teacher/subjects",
+        view_func=TeacherSubjectsAPI.as_view("teacher_exam_subjects"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/classes",
+        view_func=TeacherClassesAPI.as_view("teacher_exam_classes"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/marks/<int:student_id>",
+        view_func=TeacherStudentMarksAPI.as_view("teacher_exam_student_marks"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/marks",
+        view_func=SaveTeacherMarksAPI.as_view("teacher_exam_save_marks"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/report-card/<int:student_id>",
+        view_func=TeacherReportCardAPI.as_view("teacher_exam_report_card"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/teacher/analytics",
+        view_func=TeacherAnalyticsAPI.as_view("teacher_analytics"),
+    )
+
+    app.add_url_rule(
+        "/api/teacher/analytics/pdf",
+        view_func=TeacherAnalyticsPDFAPI.as_view("teacher_analytics_pdf"),
+    )
+    # ================== Student Exam and Result ===============
     app.add_url_rule(
         "/api/results/<int:student_id>",
         view_func=StudentExamResultsAPI.as_view("results"),
@@ -515,28 +655,98 @@ def create_app():
         methods=["POST"],
     )
 
+    # ==================================
+    # MY CLASSES
+    # ==================================
+    app.add_url_rule(
+        "/api/teacher/my-classes/<int:teacher_id>",
+        view_func=TeacherMyClasses.as_view("teacher_my_classes"),
+        methods=["GET"],
+    )
+
     # ==================================================
     # FILE SERVING
     # ==================================================
 
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
     SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
-
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
 
+    # =============================
+    # STUDENT SUBMITTED FILES
+    # =============================
     @app.route("/Submitted_Assignments/<path:filename>")
     def submitted_files(filename):
-        return send_from_directory(SUBMITTED_FOLDER, filename)
 
+        try:
+
+            safe_filename = os.path.normpath(filename)
+
+            full_path = os.path.join(SUBMITTED_FOLDER, safe_filename)
+
+            if not os.path.exists(full_path):
+
+                return jsonify({"error": "File not found"}), 404
+
+            directory = os.path.dirname(full_path)
+
+            actual_filename = os.path.basename(full_path)
+
+            response = send_from_directory(
+                directory, actual_filename, as_attachment=False
+            )
+
+            # 🔥 OPEN IN BROWSER
+            response.headers["Content-Disposition"] = (
+                f'inline; filename="{actual_filename}"'
+            )
+
+            return response
+
+        except Exception as e:
+
+            traceback.print_exc()
+
+            return jsonify({"error": str(e)}), 500
+
+    # =============================
+    # TEACHER ASSIGNMENT FILES
+    # =============================
     @app.route("/Assignment_Files/<path:filename>")
     def assignment_files(filename):
-        return send_from_directory(TEACHER_ASSIGNMENT_FOLDER, filename)
+
+        try:
+
+            safe_filename = os.path.normpath(filename)
+
+            full_path = os.path.join(TEACHER_ASSIGNMENT_FOLDER, safe_filename)
+
+            if not os.path.exists(full_path):
+
+                return jsonify({"error": "File not found"}), 404
+
+            directory = os.path.dirname(full_path)
+            actual_filename = os.path.basename(full_path)
+            response = send_from_directory(
+                directory, actual_filename, as_attachment=False
+            )
+
+            # 🔥 OPEN INLINE
+            response.headers["Content-Disposition"] = (
+                f'inline; filename="{actual_filename}"'
+            )
+
+            return response
+
+        except Exception as e:
+
+            traceback.print_exc()
+
+            return jsonify({"error": str(e)}), 500
 
     # ==================================================
     # ERROR HANDLERS
     # ==================================================
-
     @app.errorhandler(404)
     def not_found(e):
         return jsonify({"error": "API not found"}), 404

@@ -1329,316 +1329,207 @@
 
             <!-- ============================= EXAM + RESULT SYSTEM ============================= -->
             <section id="examsSection" class="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
+
                 <!-- HEADER -->
                 <div
-                    class="rounded-3xl p-5 text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 shadow-lg">
-                    <h2 class="text-xl font-semibold tracking-wide">Exam Marks</h2>
-                    <p class="text-xs opacity-90">Manage student results efficiently</p>
-                </div>
-
-                <!-- FILTER -->
-                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex flex-wrap gap-3">
-
-                    <select
-                        class="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100">
-                        <option>Class</option>
-                        <option>10-A</option>
-                    </select>
-
-                    <select
-                        class="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100">
-                        <option>Subject</option>
-                        <option>Mathematics</option>
-                    </select>
-
-                    <select
-                        class="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100">
-                        <option>Exam Type</option>
-                        <option>Unit Test 1</option>
-                        <option>Half Yearly</option>
-                        <option>Unit Test 2</option>
-                        <option>Final</option>
-                    </select>
-
-                    <input type="text" placeholder="Search student..."
-                        class="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100">
-
-                </div>
-
-                <!-- STUDENT LIST -->
-                <div
-                    class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-lg divide-y border border-white/40">
-
-                    <!-- ROW -->
-                    <div
-                        class="student-row p-4 flex justify-between items-center dark:hover:bg-slate-700/40 transition">
-
-                        <div>
-                            <p class="student-name text-sm font-semibold">Aditya Patil</p>
-                            <p class="text-xs text-gray-400">Roll 01 • 10-A</p>
-                        </div>
-
-                        <div class="flex items-center gap-2 sm:gap-3">
-
-                            <!-- STATUS -->
-                            <span class="status-badge-pro pending">
-                                Draft
-                            </span>
-
-                            <!-- ADD MARKS -->
-                            <button onclick="openMarksModal(1)" class="btn-primary-pro">
-                                Add Marks
-                            </button>
-
-                            <!-- VIEW -->
-                            <button onclick="openReportCard(this)" class="btn-ghost-pro">
-                                View
-                            </button>
-
-                        </div>
-
+                    class="rounded-3xl p-5 text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 shadow-lg flex justify-between items-center flex-wrap gap-4">
+                    <div>
+                        <h2 class="text-xl font-semibold tracking-wide">Exam Marks Entry Desk</h2>
+                        <p class="text-xs opacity-90">Admin Approved Target Subject Entry Matrix</p>
                     </div>
-
-                    <!-- ROW -->
-                    <div
-                        class="student-row p-4 flex justify-between items-center  dark:hover:bg-slate-700/40 transition">
-
-                        <div>
-                            <p class="student-name text-sm font-semibold">Digvijay Patil</p>
-                            <p class="text-xs text-gray-400">Roll 02 • 10-A</p>
-                        </div>
-
-                        <div class="flex items-center gap-2 sm:gap-3">
-
-                            <!-- STATUS -->
-                            <span class="status-badge-pro pending">
-                                Pending
-                            </span>
-
-                            <!-- ADD MARKS -->
-                            <button onclick="openMarksModal(1)" class="btn-primary-pro">
-                                Add Marks
-                            </button>
-
-                            <!-- VIEW -->
-                            <button onclick="openReportCard(this)" class="btn-ghost-pro">
-                                View
-                            </button>
-
-                        </div>
-
+                    <div id="adminPermissionBadge"
+                        class="bg-white/20 text-white text-xs px-3 py-1.5 rounded-full font-medium backdrop-blur-md">
+                        Status: Assessment Window Active
                     </div>
-
                 </div>
 
+                <!-- CONTROLS & FILTERING PIPELINE -->
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex flex-wrap gap-3 items-center">
+                    <select id="filterClass" onchange="filterAndRenderStudents()"
+                        class="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="All">All Classes</option>
+                        <option value="10-A">10-A</option>
+                    </select>
+
+                    <select id="filterSubject" onchange="filterAndRenderStudents()"
+                        class="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="Science">Science</option>
+                    </select>
+
+                    <select id="filterExam" onchange="filterAndRenderStudents()"
+                        class="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="Unit Test 1">Unit Test 1</option>
+                        <option value="Half Yearly">Half Yearly</option>
+                        <option value="Unit Test 2">Unit Test 2</option>
+                        <option value="Final">Final Exam</option>
+                    </select>
+
+                    <input type="text" id="studentSearchInput" oninput="filterAndRenderStudents()"
+                        placeholder="Search student name..."
+                        class="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100 flex-1 min-w-[200px] focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <!-- STUDENT CONTAINER MATRIX -->
+                <div id="studentListContainer"
+                    class="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-lg divide-y border border-white/40 overflow-hidden">
+                    <!-- Dynamic Row Insertions Target Element -->
+                </div>
             </section>
 
+            <!-- RESULT MARKING DIALOG CONTROL MODAL -->
             <div id="marksModal"
-                class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-
-                <div class="w-full max-w-md bg-white dark:bg-slate-900 
-        rounded-3xl shadow-2xl p-5 space-y-5 animate-fadeIn">
+                class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-all duration-300">
+                <div
+                    class="w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-6 space-y-5 animate-fadeIn transform scale-100">
 
                     <!-- HEADER -->
-                    <div class="flex justify-between items-start">
-
+                    <div class="flex justify-between items-start border-b pb-3 dark:border-slate-700">
                         <div>
-                            <h2 id="studentName" class="text-base font-semibold">Aditya Patil</h2>
+                            <h2 id="studentModalName" class="text-base font-semibold text-gray-900 dark:text-white">---
+                            </h2>
+                            <p id="studentModalMeta" class="text-xs text-gray-500 dark:text-gray-400">---</p>
                         </div>
-
-                        <button onclick="closeMarksModal()" class="text-gray-400 hover:text-red-500 text-lg">
-                            ✕
-                        </button>
+                        <button onclick="closeMarksModal()"
+                            class="text-gray-400 hover:text-red-500 transition-colors text-lg p-1">✕</button>
                     </div>
 
-                    <!-- NAV + CONTENT -->
-                    <div class="flex items-center justify-between gap-2">
+                    <!-- NAV + COMPONENT MATRIX BOX -->
+                    <div class="flex items-center justify-between gap-4">
+                        <button onclick="prevStudent()"
+                            class="p-3 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition font-bold text-gray-700 dark:text-gray-200">←</button>
 
-                        <!-- LEFT -->
-                        <button onclick="prevStudent()" class="nav-arrow-small">
-                            ←
-                        </button>
-
-                        <!-- CENTER -->
                         <div class="flex-1 space-y-4">
-
-                            <!-- MARK INPUTS -->
-                            <div class="grid grid-cols-2 gap-3">
-
-                                <div class="mark-box-small">
-                                    <label>INT</label>
-                                    <input type="number" max="20" class="mark-input-modal">
-                                </div>
-
-                                <div class="mark-box-small">
-                                    <label>EXT</label>
-                                    <input type="number" max="50" class="mark-input-modal">
-                                </div>
-
-                                <div class="mark-box-small">
-                                    <label>ORAL</label>
-                                    <input type="number" max="10" class="mark-input-modal">
-                                </div>
-
-                                <div class="mark-box-small">
-                                    <label>PRAC</label>
-                                    <input type="number" max="20" class="mark-input-modal">
-                                </div>
-
+                            <!-- EXAM CONFIG INFO BADGE -->
+                            <div
+                                class="bg-indigo-50 dark:bg-slate-800 p-2 rounded-xl text-xs text-center text-indigo-700 dark:text-indigo-300 font-medium border border-indigo-100 dark:border-slate-700">
+                                Active Module: <span id="modalActiveExamSubject">---</span>
                             </div>
 
-                            <!-- RESULT -->
-                            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 
-                    dark:from-slate-800 dark:to-slate-700 
-                    rounded-xl p-3 text-center text-sm">
-
-                                <p>Total: <span id="modalTotal">0</span></p>
-                                <p>%: <span id="modalPercent">0%</span></p>
-                                <p>Grade: <span id="modalGrade" class="font-bold text-indigo-600">-</span></p>
-
+                            <!-- DYNAMIC CORE LABELS CONFIG GENERATOR GRID -->
+                            <div id="dynamicInputMarkGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <!-- Dynamic Component Generation Target via JS runtime loops -->
                             </div>
 
+                            <!-- REAL-TIME SUMMARY STATS CALCULATION DISPLAY -->
+                            <div
+                                class="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 rounded-2xl p-4 grid grid-cols-3 text-center gap-2 border border-indigo-100/50 dark:border-none">
+                                <div>
+                                    <p
+                                        class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                                        Agg Total</p>
+                                    <p class="text-base font-bold text-gray-800 dark:text-white"><span
+                                            id="modalTotal">0</span> / <span id="modalMaxTotal">0</span></p>
+                                </div>
+                                <div>
+                                    <p
+                                        class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                                        Percentage</p>
+                                    <p id="modalPercent"
+                                        class="text-base font-bold text-indigo-600 dark:text-indigo-400">0%</p>
+                                </div>
+                                <div>
+                                    <p
+                                        class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                                        Auto Grade</p>
+                                    <p id="modalGrade"
+                                        class="text-base font-extrabold text-emerald-600 dark:text-emerald-400">-</p>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- RIGHT -->
-                        <button onclick="nextStudent()" class="nav-arrow-small">
-                            →
-                        </button>
-
+                        <button onclick="nextStudent()"
+                            class="p-3 rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition font-bold text-gray-700 dark:text-gray-200">→</button>
                     </div>
 
-                    <!-- SAVE -->
-                    <button onclick="saveMarks()" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 
-            text-white py-2.5 rounded-xl text-sm font-medium shadow-md 
-            hover:scale-[1.02] active:scale-95 transition">
-                        Save Marks
-                    </button>
-
+                    <!-- ACTION FORM CONTEXT STRINGS -->
+                    <div class="grid grid-cols-2 gap-3 pt-2">
+                        <button onclick="saveDraftMarks()"
+                            class="bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 py-3 rounded-xl text-sm font-medium transition active:scale-95">
+                            Save as Draft
+                        </button>
+                        <button onclick="submitToAdminPipeline()"
+                            class="bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 rounded-xl text-sm font-medium shadow-md hover:opacity-95 transition active:scale-95">
+                            Submit to Admin 🚀
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!--  REPORT CARD MODAL  -->
+            <!-- COMPREHENSIVE PERFORMANCE MANAGEMENT REPORT CARD MODAL -->
             <div id="reportCardModal"
-                class="hidden fixed inset-0 md:pl-64 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-
+                class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                 <div
-                    class="bg-white dark:bg-slate-800 dark:text-gray-100 w-full max-w-5xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
+                    class="bg-white dark:bg-slate-800 dark:text-gray-100 w-full max-w-4xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
 
-                    <!-- HEADER -->
-                    <div class="flex justify-between items-center">
+                    <!-- HEADER PRINT CONTROLS -->
+                    <div class="flex justify-between items-center border-b pb-4 dark:border-slate-700">
                         <div>
-                            <h2 class="text-xl font-semibold">Report Card</h2>
-                            <p class="text-sm text-gray-500 dark:text-gray-300">
-                                Academic Year 2025-26
-                            </p>
+                            <h2 class="text-xl font-bold tracking-tight">Cumulative Academic Achievement Ledger</h2>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Official Institution Record System</p>
                         </div>
-
                         <div class="flex gap-2">
                             <button onclick="printReport()"
-                                class="bg-gray-100 dark:bg-slate-700 dark:text-gray-100 px-4 py-2 rounded-xl text-sm">
-                                Print
+                                class="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-xl text-xs font-medium shadow transition">
+                                Print / Export PDF
                             </button>
-
-                            <button onclick="closeReportCard()" class="text-gray-400 hover:text-red-500 text-xl">
-                                ✕
-                            </button>
+                            <button onclick="closeReportCard()"
+                                class="text-gray-400 hover:text-red-500 text-xl px-2 transition">✕</button>
                         </div>
                     </div>
 
-                    <!-- STUDENT INFO -->
-                    <div class="grid sm:grid-cols-2 gap-4 text-sm 
-            bg-gray-50 dark:bg-slate-700 
-            p-4 rounded-xl">
-
-                        <div><b>Name:</b> Rahul Sharma</div>
-                        <div><b>Roll No:</b> 01</div>
-                        <div><b>Class:</b> 10-A</div>
-                        <div><b>Division:</b> A</div>
-
+                    <!-- DYNAMIC METADATA CONTAINER -->
+                    <div id="reportStudentMeta"
+                        class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs bg-gray-50 dark:bg-slate-700/50 p-4 rounded-2xl border dark:border-slate-600">
+                        <!-- Rendered dynamically programmatically -->
                     </div>
 
-                    <!-- SUBJECT TABLE -->
-                    <div class="overflow-x-auto">
-
-                        <table
-                            class="w-full text-sm border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden">
-
-                            <thead class="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 text-xs">
+                    <!-- RESULT SCORE TABLE ARCHITECTURE -->
+                    <div class="overflow-x-auto border dark:border-slate-700 rounded-2xl">
+                        <table class="w-full text-xs text-left">
+                            <thead
+                                class="bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-gray-300 uppercase tracking-wider text-[10px]">
                                 <tr>
-                                    <th class="p-3 text-left">Subject</th>
-                                    <th>Internal</th>
-                                    <th>External</th>
-                                    <th>Practical</th>
-                                    <th>Oral</th>
-                                    <th>Total</th>
-                                    <th>Grade</th>
+                                    <th class="p-3.5">Subject Matrix Domain</th>
+                                    <th class="p-3.5 text-center">Exam Segment</th>
+                                    <th class="p-3.5 text-center">Internal (INT)</th>
+                                    <th class="p-3.5 text-center">External (EXT)</th>
+                                    <th class="p-3.5 text-center">Practical (PRAC)</th>
+                                    <th class="p-3.5 text-center">Oral (ORAL)</th>
+                                    <th class="p-3.5 text-center font-bold">Aggregate Run</th>
+                                    <th class="p-3.5 text-center">Final Grade</th>
                                 </tr>
                             </thead>
-
-                            <tbody class="text-center">
-
-                                <tr class="border-t dark:border-slate-700">
-                                    <td class="p-3 text-left">Mathematics</td>
-                                    <td>20</td>
-                                    <td>60</td>
-                                    <td>10</td>
-                                    <td>10</td>
-                                    <td class="font-semibold">100</td>
-                                    <td class="text-green-600 dark:text-green-400">A+</td>
-                                </tr>
-
-                                <tr class="border-t dark:border-slate-700">
-                                    <td class="p-3 text-left">Science</td>
-                                    <td>18</td>
-                                    <td>55</td>
-                                    <td>12</td>
-                                    <td>10</td>
-                                    <td class="font-semibold">95</td>
-                                    <td class="text-green-600 dark:text-green-400">A</td>
-                                </tr>
-
+                            <tbody id="reportCardTableBody" class="divide-y dark:divide-slate-700">
+                                <!-- Computed elements populated recursively via dynamic code evaluation -->
                             </tbody>
-
                         </table>
-
                     </div>
 
-                    <!-- SUMMARY -->
+                    <!-- CUMULATIVE AGGREGATIONS OVERVIEW -->
                     <div class="grid sm:grid-cols-3 gap-4 text-center">
-
-                        <div class="bg-indigo-50 dark:bg-indigo-500/10 p-4 rounded-xl">
-                            <p class="text-sm text-indigo-600 dark:text-indigo-300">Total Marks</p>
-                            <h3 class="text-lg font-semibold">195 / 200</h3>
+                        <div class="bg-indigo-50 dark:bg-indigo-500/10 p-4 rounded-2xl border border-indigo-100/30">
+                            <p class="text-xs text-indigo-600 dark:text-indigo-400 font-medium">Aggregated Score Total
+                            </p>
+                            <h3 id="reportSummaryTotal" class="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                                ---</h3>
                         </div>
-
-                        <div class="bg-green-50 dark:bg-green-500/10 p-4 rounded-xl">
-                            <p class="text-sm text-green-600 dark:text-green-300">Percentage</p>
-                            <h3 class="text-lg font-semibold">82%</h3>
+                        <div class="bg-emerald-50 dark:bg-emerald-500/10 p-4 rounded-2xl border border-emerald-100/30">
+                            <p class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">True Percentage Scale
+                            </p>
+                            <h3 id="reportSummaryPercent" class="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                                ---</h3>
                         </div>
-
-                        <div class="bg-purple-50 dark:bg-purple-500/10 p-4 rounded-xl">
-                            <p class="text-sm text-purple-600 dark:text-purple-300">Final Grade</p>
-                            <h3 class="text-lg font-semibold">A</h3>
+                        <div class="bg-purple-50 dark:bg-purple-500/10 p-4 rounded-2xl border border-purple-100/30">
+                            <p class="text-xs text-purple-600 dark:text-purple-400 font-medium">Calculated System Grade
+                            </p>
+                            <h3 id="reportSummaryGrade" class="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                                ---</h3>
                         </div>
-
                     </div>
-
-                    <!-- TERM BREAKDOWN -->
-                    <div class="bg-gray-50 dark:bg-slate-700 p-4 rounded-xl text-sm space-y-2">
-
-                        <h4 class="font-medium text-gray-700 dark:text-gray-200">
-                            Term Summary
-                        </h4>
-
-                        <p>Term I (Unit Test 1 + Half-Yearly): 78%</p>
-                        <p>Term II (Unit Test 2 + Final Exam): 85%</p>
-
-                    </div>
-
                 </div>
-
             </div>
-            <!-- ===================== EXAM AND RESULT SECTION END ===================== -->
+            <!-- ============================ Exams and Result Section END ==================== -->
 
             <!-- ============================= TIMETABLE SECTION START ============================= -->
             <section id="timetableSection"

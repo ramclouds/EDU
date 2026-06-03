@@ -10,6 +10,9 @@ import { useTeacherTimetable } from "../controllers/TimeTable/useTeacherTimetabl
 import { useTeacherProfile } from "../controllers/Profiles/useTeacherProfile";
 import { useTeacherAttendance } from "../controllers/Attendance/useTeacherAttendance";
 import { useMyClasses } from "../controllers/MyClasses/useMyClass";
+import { useTeacherExamResult } from "../controllers/ExamResult/useTeacherExamResult";
+import { useAnalytics } from "../controllers/Analytics/useAnalytics";
+import { BASE_URL, FILE_BASE_URL } from "../config/appConfig";
 
 function TeacherDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -43,6 +46,7 @@ function TeacherDashboard() {
     toggleTheme,
   } = useDashboardUI();
 
+  // ================= TEACHER DASHBOARD HOOK =================
   const {
     // shared helpers
     fetchWithAuth,
@@ -72,6 +76,28 @@ function TeacherDashboard() {
     toast,
   } = useTeacherDashboard(activeSection);
 
+  // ================= ANALYTICS HOOK =================
+  const {
+    // loading
+    analyticsLoading,
+
+    // analytics data
+    analytics,
+
+    // filters
+    filters,
+    classes: analyticsClasses,
+    subjects: analyticsSubjects,
+
+    // chart refs
+    performanceChartRef,
+    subjectChartRef,
+
+    // handlers
+    handleFilterChange,
+    handleDownloadAnalytics,
+    dashboardPerformanceChartRef,
+  } = useAnalytics(fetchWithAuth, activeSection, showToast);
   // ================= Leaves HOOK =================
   const {
     // shared loading
@@ -103,6 +129,7 @@ function TeacherDashboard() {
     // assignment list
     teacherAssignments,
     assignmentLoading,
+    assignmentOverview,
     assignmentProgress,
     fetchTeacherAssignments,
 
@@ -147,6 +174,53 @@ function TeacherDashboard() {
     forceResubmit,
   } = useTeacherAssignments(activeSection, fetchWithAuth, showToast);
 
+  // ================= EXAM RESULT HOOK =================
+  const {
+    filteredStudents: ExamfilteredStudents,
+
+    subjects,
+    classes: ExamClasses,
+
+    selectedClass: ExamselectedClass,
+    setSelectedClass: ExamsetselectedClass,
+
+    selectedSubject: ExamselectedSubject,
+    setSelectedSubject: ExamsetselectedSubject,
+
+    selectedExam,
+    setSelectedExam,
+
+    search: ExamSearch,
+    setSearch: ExamsetSearch,
+
+    marksModalOpen,
+    reportModalOpen,
+
+    currentStudent,
+
+    marks,
+    handleMarkChange,
+    totalOutOf,
+    totalMarks,
+    percentage,
+    grade,
+
+    openMarksModal,
+    closeMarksModal,
+
+    saveMarks,
+
+    nextStudent,
+    prevStudent,
+
+    reportCard,
+
+    openReportCard,
+    closeReportCard,
+
+    printReport,
+  } = useTeacherExamResult(fetchWithAuth, activeSection, showToast);
+
   // ================= TIMETABLE HOOK =================
   const {
     teacherTimetableLoading,
@@ -160,6 +234,7 @@ function TeacherDashboard() {
     // DOWNLOAD
     downloadLoading,
     downloadTeacherTimetablePDF,
+    todaySchedule,
   } = useTeacherTimetable({ activeSection, fetchWithAuth, showToast });
 
   // ================ My Classes ===================
@@ -196,6 +271,7 @@ function TeacherDashboard() {
     selectedDate,
     setSelectedDate,
     attendanceCounts,
+    attendanceLoading,
     markAttendance,
     markAll,
     saveAttendance,
@@ -204,8 +280,14 @@ function TeacherDashboard() {
     selectedMonth,
     setSelectedMonth,
     downloadAttendanceReport,
-  } = useTeacherAttendance(fetchWithAuth, showToast);
-
+    dashboardAttendance,
+    fetchDashboardAttendance,
+    dashboardAttendanceChartRef,
+  } = useTeacherAttendance({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
   // ================= PROFILE HOOK =================
   const {
     // profile
@@ -738,22 +820,490 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         </div>
         {/* ===================== DASHBOARD SECTION START =========================== */}
         {activeSection === "dashboard" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/*  HEADER  */}
-            <div
-              className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 
-        rounded-2xl p-5 sm:p-6 text-white shadow-lg"
-            >
-              <h2 className="text-xl sm:text-2xl font-semibold">
-                Welcome Back 👋 {teacher?.first_name}
+            <div className="relative overflow-hidden rounded-3xl p-6 sm:p-8 text-white shadow-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500">
+              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top_left,white,transparent_60%)]" />
+
+              <h2 className="text-2xl sm:text-3xl font-semibold relative z-10">
+                Welcome Back 👋
               </h2>
-              <p className="text-xs sm:text-sm opacity-90">
-                Here’s your complete teaching overview
+
+              <p className="text-sm sm:text-base opacity-90 mt-1 relative z-10">
+                Here’s your teaching intelligence dashboard overview
               </p>
+            </div>
+
+            {/* ================= KPI CARDS ================= */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                {
+                  label: "Avg Marks",
+                  value: `${analytics?.kpis?.avgMarks || 0}%`,
+                  color: "text-indigo-600",
+                  bg: "from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-900/10",
+                  icon: "📊",
+                },
+                {
+                  label: "Pass Rate",
+                  value: `${analytics?.kpis?.passRate || 0}%`,
+                  color: "text-green-600",
+                  bg: "from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-900/10",
+                  icon: "🎯",
+                },
+                {
+                  label: "Top Score",
+                  value: analytics?.kpis?.topScore || 0,
+                  color: "text-purple-600",
+                  bg: "from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-900/10",
+                  icon: "🏆",
+                },
+                {
+                  label: "Weak Students",
+                  value: analytics?.weakStudents?.length || 0,
+                  color: "text-red-500",
+                  bg: "from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-900/10",
+                  icon: "⚠️",
+                },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className={`relative overflow-hidden rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 
+          bg-gradient-to-br ${item.bg}
+          hover:shadow-md hover:-translate-y-1 transition-all duration-300`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {item.label}
+                      </p>
+                      <h3 className={`text-2xl font-bold mt-1 ${item.color}`}>
+                        {item.value}
+                      </h3>
+                    </div>
+                    <span className="text-2xl">{item.icon}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ================= MAIN GRID ================= */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* ===== TODAY SCHEDULE ===== */}
+              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Today's Schedule</h3>
+
+                  <span className="text-xs px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                    {todaySchedule?.length || 0} Classes
+                  </span>
+                </div>
+
+                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  {todaySchedule?.length ? (
+                    todaySchedule.map((item, index) => (
+                      <div
+                        key={index}
+                        className="p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/40 transition"
+                      >
+                        <div className="flex justify-between">
+                          <div>
+                            <h4 className="font-medium">{item.subject}</h4>
+                            <p className="text-xs text-gray-500">
+                              {item.class_name}
+                            </p>
+                          </div>
+
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-indigo-600">
+                              {item.start_time || item.time || "-"}
+                            </p>
+                            {item.end_time && (
+                              <p className="text-xs text-gray-500">
+                                to {item.end_time}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-10">
+                      No classes scheduled today
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* ===== ATTENDANCE ===== */}
+              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+                <div className="flex justify-between mb-4">
+                  <h3 className="font-semibold">Today's Attendance</h3>
+
+                  <span className="text-xs px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                    {dashboardAttendance.totalClasses} Classes
+                  </span>
+                </div>
+
+                {/* SUMMARY */}
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  {[
+                    {
+                      label: "Present",
+                      value: dashboardAttendance.todayPresent,
+                      color: "green",
+                    },
+                    {
+                      label: "Absent",
+                      value: dashboardAttendance.todayAbsent,
+                      color: "red",
+                    },
+                    {
+                      label: "Late",
+                      value: dashboardAttendance.todayLate,
+                      color: "yellow",
+                    },
+                  ].map((item, i) => (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-xl text-center bg-${item.color}-50 dark:bg-${item.color}-900/20`}
+                    >
+                      <p className="text-xs text-gray-500">{item.label}</p>
+                      <p className={`text-lg font-bold text-${item.color}-600`}>
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* CLASS LIST */}
+                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                  {dashboardAttendance.todayClassAttendance?.length ? (
+                    dashboardAttendance.todayClassAttendance.map(
+                      (item, index) => (
+                        <div
+                          key={index}
+                          className="p-3 rounded-xl border border-gray-100 dark:border-slate-700"
+                        >
+                          <div className="flex justify-between mb-2">
+                            <div>
+                              <h4 className="text-sm font-medium">
+                                {item.class_name}
+                              </h4>
+                              <p className="text-xs text-gray-500">
+                                {item.subject_name}
+                              </p>
+                            </div>
+
+                            <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                              {item.total > 0 ? "Completed" : "Pending"}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-3 text-center text-sm">
+                            <div>
+                              <p className="text-xs text-gray-500">P</p>
+                              <p className="text-green-600 font-semibold">
+                                {item.present}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">A</p>
+                              <p className="text-red-600 font-semibold">
+                                {item.absent}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">L</p>
+                              <p className="text-yellow-600 font-semibold">
+                                {item.late}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ),
+                    )
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-10">
+                      No attendance records found today
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* ===== ATTENDANCE OVERVIEW ===== */}
+              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+                <h3 className="font-semibold mb-4">Attendance Overview</h3>
+
+                <div className="space-y-3 text-sm">
+                  <p>
+                    📚 Assigned Classes:{" "}
+                    <b>{dashboardAttendance.totalClasses}</b>
+                  </p>
+                  <p>
+                    👨‍🎓 Total Students:{" "}
+                    <b>{dashboardAttendance.totalStudents}</b>
+                  </p>
+                  <p>
+                    📋 Pending Attendance:{" "}
+                    <b>{dashboardAttendance.pendingAttendance}</b>
+                  </p>
+                  <p>
+                    📈 Attendance Rate:{" "}
+                    <b>{dashboardAttendance.attendanceRate}%</b>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ================= LOWER GRID ================= */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              {/* ===== ASSIGNMENTS ===== */}
+              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+                <h3 className="font-semibold mb-4">Assignment Overview</h3>
+
+                <div className="space-y-3 text-sm">
+                  {[
+                    {
+                      label: "Total",
+                      value: assignmentOverview.totalAssignments,
+                      color: "indigo",
+                    },
+                    {
+                      label: "Active",
+                      value: assignmentOverview.activeAssignments,
+                      color: "green",
+                    },
+                    {
+                      label: "Submissions",
+                      value: assignmentOverview.totalSubmissions,
+                      color: "purple",
+                    },
+                    {
+                      label: "Pending Review",
+                      value: assignmentOverview.pendingReview,
+                      color: "red",
+                    },
+                    {
+                      label: "Rate",
+                      value: `${assignmentOverview.averageSubmissionRate}%`,
+                      color: "yellow",
+                    },
+                  ].map((item, i) => (
+                    <div
+                      key={i}
+                      className="flex justify-between p-3 rounded-xl bg-gray-50 dark:bg-slate-700/40"
+                    >
+                      <span>{item.label}</span>
+                      <span className={`font-semibold text-${item.color}-600`}>
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ===== QUICK ACTIONS ===== */}
+              <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl p-5 shadow-sm">
+                <h3 className="font-semibold mb-4">Quick Actions</h3>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setActiveSection("attendance")}
+                    className="w-full py-3 rounded-xl bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:hover:bg-indigo-800/50 transition font-medium"
+                  >
+                    📋 Mark Attendance
+                  </button>
+
+                  <button
+                    onClick={() => setActiveSection("assignments")}
+                    className="w-full py-3 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 dark:hover:bg-purple-800/50 transition font-medium"
+                  >
+                    📝 Create Assignment
+                  </button>
+
+                  <button
+                    onClick={() => setActiveSection("exams")}
+                    className="w-full py-3 rounded-xl bg-green-100 hover:bg-green-200 dark:bg-green-900/40 dark:hover:bg-green-800/50 transition font-medium"
+                  >
+                    📊 Upload Marks
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
         )}
         {/* ===================== DASHBOARD SECTION END =========================== */}
+        {/* ============================= ANALYTICS SECTION START ============================= */}
+        {activeSection === "analytics" && (
+          <section className="section p-4 sm:p-6 space-y-6 active">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-5 sm:p-6 text-white shadow">
+              <h2 className="text-lg sm:text-xl font-semibold">
+                Analytics Dashboard
+              </h2>
+
+              <p className="text-xs sm:text-sm opacity-90">
+                Real-time teacher analytics
+              </p>
+            </div>
+
+            {/* FILTERS */}
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              <div className="flex gap-3 flex-wrap w-full sm:w-auto">
+                {/* CLASS */}
+                <select
+                  name="class_id"
+                  value={filters.class_id}
+                  onChange={handleFilterChange}
+                  className="px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-800 dark:text-white rounded-xl text-sm"
+                >
+                  <option value="all">All Classes</option>
+
+                  {analyticsClasses.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* SUBJECT */}
+                <select
+                  name="subject_id"
+                  value={filters.subject_id}
+                  onChange={handleFilterChange}
+                  className="px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-800 dark:text-white rounded-xl text-sm"
+                >
+                  <option value="all">All Subjects</option>
+
+                  {analyticsSubjects.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={handleDownloadAnalytics}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm"
+              >
+                Download Report
+              </button>
+            </div>
+
+            {/* KPI */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm text-center">
+                <p className="text-sm text-gray-400">Avg Marks</p>
+
+                <h3 className="text-2xl font-bold text-indigo-600">
+                  {analytics?.kpis?.avgMarks || 0}%
+                </h3>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm text-center">
+                <p className="text-sm text-gray-400">Pass Rate</p>
+
+                <h3 className="text-2xl font-bold text-green-600">
+                  {analytics?.kpis?.passRate || 0}%
+                </h3>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm text-center">
+                <p className="text-sm text-gray-400">Top Score</p>
+
+                <h3 className="text-2xl font-bold text-purple-600">
+                  {analytics?.kpis?.topScore || 0}
+                </h3>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm text-center">
+                <p className="text-sm text-gray-400">Low Score</p>
+
+                <h3 className="text-2xl font-bold text-red-500">
+                  {analytics?.kpis?.lowScore || 0}
+                </h3>
+              </div>
+            </div>
+
+            {/* AI */}
+            <div className="bg-gradient-to-r from-yellow-100 to-orange-100 dark:from-yellow-900/40 dark:to-orange-900/40 p-5 rounded-2xl shadow-sm">
+              <h3 className="font-semibold mb-2">AI Insights</h3>
+
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {analytics?.insight}
+              </p>
+            </div>
+
+            {/* CHARTS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm">
+                <h3 className="font-semibold mb-4">Class Performance</h3>
+
+                <div className="h-64">
+                  <canvas ref={performanceChartRef}></canvas>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm">
+                <h3 className="font-semibold mb-4">Subject Analysis</h3>
+
+                <div className="h-64">
+                  <canvas ref={subjectChartRef}></canvas>
+                </div>
+              </div>
+            </div>
+
+            {/* STUDENTS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* TOP */}
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm">
+                <h3 className="font-semibold mb-4">Top Students</h3>
+
+                <div className="space-y-3">
+                  {analytics?.topStudents?.map((student, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between bg-green-50 dark:bg-green-900/30 p-3 rounded-xl text-sm"
+                    >
+                      <span>{student.student}</span>
+
+                      <span>{student.className}</span>
+
+                      <span className="font-semibold text-green-600">
+                        {student.percentage}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* WEAK */}
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm">
+                <h3 className="font-semibold mb-4">Needs Improvement</h3>
+
+                <div className="space-y-3">
+                  {analytics?.weakStudents?.map((student, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between bg-red-50 dark:bg-red-900/30 p-3 rounded-xl text-sm"
+                    >
+                      <span>{student.student}</span>
+
+                      <span>{student.className}</span>
+
+                      <span className="font-semibold text-red-500">
+                        {student.percentage}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+        {/* ============================= ANALYTICS SECTION END ============================= */}
         {/*  ============================= MY CLASSES START =============================  */}
         {activeSection === "classes" && (
           <section className="section p-4 sm:p-6 space-y-6 hidden active">
@@ -1217,19 +1767,19 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         : ""
                     }
                     onChange={(e) => {
-                      const selected = myclasses.find(
+                      const selected = classes.find(
                         (c) =>
                           `${c.academic_class_id}-${c.subject_id}` ===
                           e.target.value,
                       );
 
-                      setAttendanceClass(selected);
+                      setAttendanceClass(selected || null);
                     }}
                     className="px-4 py-2.5 border rounded-xl text-sm dark:bg-slate-900 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   >
                     <option value="">Select Assigned Subject</option>
 
-                    {myclasses.map((c) => (
+                    {classes.map((c) => (
                       <option
                         key={`${c.academic_class_id}-${c.subject_id}`}
                         value={`${c.academic_class_id}-${c.subject_id}`}
@@ -1321,7 +1871,11 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
               {/* STUDENTS */}
               <div className="divide-y dark:divide-slate-700 max-h-[600px] overflow-y-auto">
-                {students.length > 0 ? (
+                {attendanceLoading ? (
+                  <div className="py-16 text-center">
+                    <p className="text-sm text-gray-400">Loading students...</p>
+                  </div>
+                ) : students.length > 0 ? (
                   students.map((s) => (
                     <div
                       key={s.student_id}
@@ -1398,7 +1952,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   ))
                 ) : (
                   <div className="py-16 text-center">
-                    <p className="text-sm text-gray-400">No students found</p>
+                    <p className="text-sm text-gray-400">
+                      Select class and date to load students
+                    </p>
                   </div>
                 )}
               </div>
@@ -1924,10 +2480,11 @@ bg-gray-50 dark:bg-slate-700
                             </div>
 
                             <a
-                              href={sub.submission_file_url}
+                              href={`${FILE_BASE_URL}${sub.submission_file_url}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-xs px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg hover:bg-blue-200 transition"
                             >
                               View
                             </a>
@@ -2280,6 +2837,503 @@ bg-gray-50 dark:bg-slate-700
           </div>
         )}
         {/* ============================= ASSIGNMENTS END ============================= */}
+        {/*  ============================= EXAM + RESULT SYSTEM =============================  */}
+        {activeSection === "exams" && (
+          <section className="section active p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
+            {/*  HEADER  */}
+            <div className="rounded-3xl p-5 text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 shadow-lg flex justify-between items-center flex-wrap gap-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-wide">
+                  Exam Marks Entry Desk
+                </h2>
+                <p className="text-xs opacity-90">
+                  Admin Approved Target Subject Entry Matrix
+                </p>
+              </div>
+              <div
+                id="adminPermissionBadge"
+                className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-full font-medium backdrop-blur-md"
+              >
+                Status: Assessment Window Active
+              </div>
+            </div>
+
+            {/*  CONTROLS & FILTERING PIPELINE  */}
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex flex-wrap gap-3 items-center">
+              {/* CLASS FILTER */}
+              <select
+                value={ExamselectedClass}
+                onChange={(e) => ExamsetselectedClass(e.target.value)}
+                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
+              >
+                <option value="all">All Classes</option>
+
+                {Array.isArray(ExamClasses) &&
+                  ExamClasses.map((cls) => (
+                    <option key={cls.id} value={cls.name}>
+                      {cls.name}
+                    </option>
+                  ))}
+              </select>
+
+              {/* SUBJECT FILTER */}
+              <select
+                value={ExamselectedSubject}
+                onChange={(e) => ExamsetselectedSubject(e.target.value)}
+                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
+              >
+                {Array.isArray(subjects) &&
+                  subjects.map((subject) => (
+                    <option key={subject.id} value={subject.name}>
+                      {subject.name}
+                    </option>
+                  ))}
+              </select>
+
+              {/* EXAM FILTER */}
+              <select
+                value={selectedExam}
+                onChange={(e) => setSelectedExam(e.target.value)}
+                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
+              >
+                <option value="Unit Test 1">Unit Test 1</option>
+
+                <option value="Half Yearly">Half Yearly</option>
+
+                <option value="Unit Test 2">Unit Test 2</option>
+
+                <option value="Final Exam">Final Exam</option>
+              </select>
+
+              {/* SEARCH */}
+              <input
+                type="text"
+                value={ExamSearch}
+                onChange={(e) => ExamsetSearch(e.target.value)}
+                placeholder="Search student..."
+                className="px-4 py-2 border rounded-xl flex-1"
+              />
+            </div>
+
+            {/*  STUDENT CONTAINER MATRIX  */}
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-lg overflow-hidden divide-y">
+              {ExamfilteredStudents.length === 0 ? (
+                <div className="p-8 text-center text-gray-400">
+                  No students found
+                </div>
+              ) : (
+                ExamfilteredStudents.map((student, index) => (
+                  <div
+                    key={student.id}
+                    className="p-4 flex flex-wrap justify-between items-center gap-4 hover:bg-gray-50 dark:hover:bg-slate-700/20"
+                  >
+                    <div>
+                      <p className="font-semibold">{student.name}</p>
+
+                      <p className="text-xs text-gray-500">
+                        {student.className}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {/* STATUS */}
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium
+              ${
+                student.status === "Completed"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}
+                      >
+                        {student.status || "Pending"}
+                      </span>
+
+                      {/* ENTER MARKS */}
+                      <button
+                        onClick={() => openMarksModal(student, index)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs"
+                      >
+                        Enter Marks
+                      </button>
+
+                      {/* REPORT CARD */}
+                      <button
+                        onClick={() => openReportCard(student)}
+                        className="px-4 py-2 border rounded-xl text-xs"
+                      >
+                        View Ledger
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        )}
+        {/*  RESULT MARKING DIALOG CONTROL MODAL  */}
+        {marksModalOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xl space-y-5">
+              {/* HEADER */}
+              <div className="flex justify-between items-start border-b pb-3">
+                <div>
+                  <h2 className="font-semibold">{currentStudent?.name}</h2>
+                  <p className="text-xs text-gray-500">
+                    Roll {currentStudent?.roll}
+                  </p>
+                </div>
+
+                <button onClick={closeMarksModal} className="text-red-500">
+                  ✕
+                </button>
+              </div>
+
+              {/* SUBJECT + EXAM */}
+              <div className="bg-indigo-50 p-3 rounded-xl text-sm text-center">
+                {selectedSubject} - {selectedExam}
+              </div>
+
+              {/* MARKS GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* INTERNAL */}
+                <div>
+                  <label className="text-xs font-medium">Internal</label>
+                  <input
+                    type="number"
+                    name="internal"
+                    value={marks.internal}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+
+                  <input
+                    type="number"
+                    name="internalOutOf"
+                    value={marks.internalOutOf}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
+                    placeholder="Out of"
+                  />
+                </div>
+
+                {/* EXTERNAL */}
+                <div>
+                  <label className="text-xs font-medium">External</label>
+                  <input
+                    type="number"
+                    name="external"
+                    value={marks.external}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+
+                  <input
+                    type="number"
+                    name="externalOutOf"
+                    value={marks.externalOutOf}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
+                    placeholder="Out of"
+                  />
+                </div>
+
+                {/* ORAL */}
+                <div>
+                  <label className="text-xs font-medium">Oral</label>
+                  <input
+                    type="number"
+                    name="oral"
+                    value={marks.oral}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+
+                  <input
+                    type="number"
+                    name="oralOutOf"
+                    value={marks.oralOutOf}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
+                    placeholder="Out of"
+                  />
+                </div>
+
+                {/* PRACTICAL */}
+                <div>
+                  <label className="text-xs font-medium">Practical</label>
+                  <input
+                    type="number"
+                    name="practical"
+                    value={marks.practical}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2"
+                  />
+
+                  <input
+                    type="number"
+                    name="practicalOutOf"
+                    value={marks.practicalOutOf}
+                    onChange={handleMarkChange}
+                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
+                    placeholder="Out of"
+                  />
+                </div>
+              </div>
+
+              {/* REMARKS */}
+              <div>
+                <label className="text-xs font-medium">Remarks</label>
+                <textarea
+                  name="remarks"
+                  value={marks.remarks}
+                  onChange={handleMarkChange}
+                  className="w-full border rounded-xl px-3 py-2"
+                  placeholder="Enter remarks..."
+                />
+              </div>
+
+              {/* SUMMARY */}
+              <div className="grid grid-cols-3 gap-3 text-center bg-gray-50 rounded-2xl p-4">
+                <div>
+                  <p className="text-xs text-gray-500">Total</p>
+                  <p className="font-bold">{totalMarks}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500">Percentage</p>
+                  <p className="font-bold text-indigo-600">{percentage}%</p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-500">Grade</p>
+                  <p className="font-bold text-green-600">{grade}</p>
+                </div>
+              </div>
+
+              {/* ACTIONS */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={saveMarks}
+                  className="bg-green-600 text-white py-3 rounded-xl"
+                >
+                  Save Marks
+                </button>
+
+                <button
+                  onClick={closeMarksModal}
+                  className="border py-3 rounded-xl"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              {/* NAVIGATION */}
+              <div className="flex justify-between">
+                <button
+                  onClick={prevStudent}
+                  className="px-4 py-2 border rounded-xl"
+                >
+                  ← Previous
+                </button>
+
+                <button
+                  onClick={nextStudent}
+                  className="px-4 py-2 border rounded-xl"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/*  COMPREHENSIVE PERFORMANCE MANAGEMENT REPORT CARD MODAL  */}
+        {reportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-800 dark:text-gray-100 w-full max-w-6xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
+              {/* HEADER */}
+              <div className="flex justify-between items-center border-b pb-4 dark:border-slate-700">
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight">
+                    Cumulative Academic Achievement Ledger
+                  </h2>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Official Institution Record System
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={printReport}
+                    className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-xl text-xs font-medium shadow transition"
+                  >
+                    Print / Export PDF
+                  </button>
+
+                  <button
+                    onClick={closeReportCard}
+                    className="text-gray-400 hover:text-red-500 text-xl px-2 transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* STUDENT INFO */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs bg-gray-50 dark:bg-slate-700/50 p-4 rounded-2xl border dark:border-slate-600">
+                <div>
+                  <p className="text-gray-500">Student</p>
+                  <h3 className="font-semibold">
+                    {reportCard?.student?.name || "-"}
+                  </h3>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Roll No</p>
+                  <h3 className="font-semibold">
+                    {reportCard?.student?.rollNo || "-"}
+                  </h3>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Class</p>
+                  <h3 className="font-semibold">
+                    {reportCard?.student?.className || "-"}
+                  </h3>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">Academic Year</p>
+                  <h3 className="font-semibold">{reportCard?.year || "-"}</h3>
+                </div>
+              </div>
+
+              {/* RESULT TABLE */}
+              <div className="overflow-x-auto border dark:border-slate-700 rounded-2xl">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-gray-50 dark:bg-slate-700 text-gray-600 dark:text-gray-300 uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="p-3.5">Subject</th>
+
+                      <th className="p-3.5 text-center">Internal</th>
+
+                      <th className="p-3.5 text-center">External</th>
+
+                      <th className="p-3.5 text-center">Practical</th>
+
+                      <th className="p-3.5 text-center">Oral</th>
+
+                      <th className="p-3.5 text-center">Total</th>
+
+                      <th className="p-3.5 text-center">Percentage</th>
+
+                      <th className="p-3.5 text-center">Grade</th>
+
+                      <th className="p-3.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y dark:divide-slate-700">
+                    {reportCard?.subjects?.map((item, index) => {
+                      const totalOutOf =
+                        Number(item.internalOutOf || 0) +
+                        Number(item.externalOutOf || 0) +
+                        Number(item.practicalOutOf || 0) +
+                        Number(item.oralOutOf || 0);
+
+                      return (
+                        <tr
+                          key={index}
+                          className="hover:bg-gray-50 dark:hover:bg-slate-700/20"
+                        >
+                          <td className="p-3 font-medium">{item.subject}</td>
+
+                          <td className="p-3 text-center">
+                            {item.internal} / {item.internalOutOf}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {item.external} / {item.externalOutOf}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {item.practical} / {item.practicalOutOf}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            {item.oral} / {item.oralOutOf}
+                          </td>
+
+                          <td className="p-3 text-center font-bold">
+                            {item.total} / {totalOutOf}
+                          </td>
+
+                          <td className="p-3 text-center text-indigo-600 font-semibold">
+                            {item.percentage}%
+                          </td>
+
+                          <td className="p-3 text-center font-semibold">
+                            {item.grade}
+                          </td>
+
+                          <td className="p-3 text-center">
+                            <span
+                              className={`px-2 py-1 rounded-full text-[10px] font-semibold
+                      ${
+                        item.status === "Published"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-yellow-100 text-yellow-700"
+                      }`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* SUMMARY */}
+              <div className="grid sm:grid-cols-3 gap-4 text-center">
+                {/* TOTAL */}
+                <div className="bg-indigo-50 dark:bg-indigo-500/10 p-4 rounded-2xl border border-indigo-100/30">
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                    Aggregated Score Total
+                  </p>
+
+                  <h3 className="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                    {reportCard?.summary?.total || "---"}
+                  </h3>
+                </div>
+
+                {/* PERCENTAGE */}
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 p-4 rounded-2xl border border-emerald-100/30">
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    True Percentage Scale
+                  </p>
+
+                  <h3 className="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                    {reportCard?.summary?.percentage || 0}%
+                  </h3>
+                </div>
+
+                {/* GRADE */}
+                <div className="bg-purple-50 dark:bg-purple-500/10 p-4 rounded-2xl border border-purple-100/30">
+                  <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
+                    Calculated System Grade
+                  </p>
+
+                  <h3 className="text-xl font-bold mt-1 text-slate-800 dark:text-white">
+                    {reportCard?.summary?.grade || "---"}
+                  </h3>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/*  ============================ Exams and Result Section END ====================  */}
         {/* ===================== TEACHER ANNOUNCEMENTS and NOTIFICATIONS CENTER ========================*/}
         {activeSection === "announcements" && (
           <section className="p-4 sm:p-6 space-y-6">
