@@ -669,8 +669,14 @@ def create_app():
     # ==================================================
 
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+    # Absolute folders
     SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
+
+    print("BASE_DIR:", BASE_DIR)
+    print("SUBMITTED_FOLDER:", SUBMITTED_FOLDER)
+    print("ASSIGNMENT_FOLDER:", TEACHER_ASSIGNMENT_FOLDER)
 
     # =============================
     # STUDENT SUBMITTED FILES
@@ -726,7 +732,9 @@ def create_app():
                 return jsonify({"error": "File not found"}), 404
 
             directory = os.path.dirname(full_path)
+
             actual_filename = os.path.basename(full_path)
+
             response = send_from_directory(
                 directory, actual_filename, as_attachment=False
             )
