@@ -1,7 +1,11 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BASE_URL } from "../../config/appConfig";
 
-export function useTeacherAttendance(fetchWithAuth, showToast) {
+export function useTeacherAttendance({
+    activeSection,
+    fetchWithAuth,
+    showToast
+}) {
 
     const [classes, setClasses] = useState([]);
     const [students, setStudents] = useState([]);
@@ -11,13 +15,24 @@ export function useTeacherAttendance(fetchWithAuth, showToast) {
     );
     const [selectedClass, setSelectedClass] = useState(null);
     const [selectedDate, setSelectedDate] = useState("");
-
+    const dashboardAttendanceChartRef = useRef(null);
     const [attendanceLoading, setAttendanceLoading] = useState(false);
+    const [dashboardAttendance, setDashboardAttendance] = useState({
+        totalClasses: 0,
+        totalStudents: 0,
+        todayPresent: 0,
+        todayAbsent: 0,
+        todayLate: 0,
+        attendanceRate: 0,
+        weeklyChart: [],
+        pendingAttendance: 0,
+    });
 
     const [attendanceCounts, setAttendanceCounts] = useState({
         total: 0,
         present: 0,
         absent: 0,
+        late: 0,
         pending: 0,
     });
 
@@ -51,9 +66,6 @@ export function useTeacherAttendance(fetchWithAuth, showToast) {
 
             setClasses(list);
 
-            // ✅ AUTO SELECTCLASS
-            setClasses(list);
-
         } catch (err) {
             console.error(err);
             showToast("Failed to load classes", "error");
@@ -66,12 +78,16 @@ export function useTeacherAttendance(fetchWithAuth, showToast) {
 
         const present = values.filter(v => v.status === "Present").length;
         const absent = values.filter(v => v.status === "Absent").length;
-        const pending = totalStudents - (present + absent);
+        const late = values.filter(v => v.status === "Late").length;
+
+        const pending =
+            totalStudents - (present + absent + late);
 
         setAttendanceCounts({
             total: totalStudents,
             present,
             absent,
+            late,
             pending: pending < 0 ? 0 : pending,
         });
     };
@@ -173,6 +189,229 @@ export function useTeacherAttendance(fetchWithAuth, showToast) {
         updateCounts(updated, students.length);
     };
 
+    // ================= DASHBOARD ATTENDANCE =================
+    const fetchDashboardAttendance = async () => {
+
+        try {
+
+            const user = getUser();
+
+            if (!user) return;
+
+            // ================= GET TEACHER CLASSES =================
+
+            const classRes = await fetchWithAuth(
+                `${BASE_URL}/teacher/classes/${user.id}`
+            );
+
+            const classData = await classRes.json();
+
+            const assignedClasses = classData || [];
+
+            // ================= TOTAL CLASSES =================
+
+            const uniqueClasses = [
+                ...new Map(
+                    assignedClasses.map(item => [
+                        item.academic_class_id,
+                        item
+                    ])
+                ).values()
+            ];
+
+            // ================= TOTAL STUDENTS =================
+
+            let totalStudents = 0;
+
+            for (const cls of uniqueClasses) {
+
+                try {
+
+                    const res = await fetchWithAuth(
+                        `${BASE_URL}/students/by-class/${cls.academic_class_id}`
+                    );
+
+                    const students = await res.json();
+
+                    totalStudents += students.length || 0;
+
+                } catch {
+                    // ignore
+                }
+            }
+
+            // ================= WEEKLY DATA =================
+
+            const today = new Date();
+
+            const weeklyChart = [];
+            const todayClassAttendance = [];
+
+            let totalPresent = 0;
+            let totalAbsent = 0;
+            let totalLate = 0;
+
+            for (let i = 6; i >= 0; i--) {
+
+                const d = new Date();
+
+                d.setDate(today.getDate() - i);
+
+                const formatted =
+                    d.toISOString().split("T")[0];
+
+                let dayPresent = 0;
+                let dayAbsent = 0;
+                let dayLate = 0;
+
+                for (const cls of assignedClasses) {
+
+                    try {
+
+                        const res = await fetchWithAuth(
+                            `${BASE_URL}/attendance`
+                            + `?academic_class_id=${cls.academic_class_id}`
+                            + `&subject_id=${cls.subject_id}`
+                            + `&date=${formatted}`
+                        );
+
+                        const data = await res.json();
+
+                        Object.values(data || {}).forEach((record) => {
+
+                            const status =
+                                record?.status || record;
+
+                            if (status === "Present") {
+                                dayPresent++;
+                            }
+
+                            if (status === "Absent") {
+                                dayAbsent++;
+                            }
+
+                            if (status === "Late") {
+                                dayLate++;
+                            }
+                        });
+
+                    } catch {
+                        // ignore
+                    }
+                }
+
+                totalPresent += dayPresent;
+                totalAbsent += dayAbsent;
+                totalLate += dayLate;
+
+                weeklyChart.push({
+                    day: d.toLocaleDateString("en-US", {
+                        weekday: "short"
+                    }),
+                    present: dayPresent,
+                    absent: dayAbsent,
+                    late: dayLate,
+                });
+
+                // ================= TODAY CLASS DATA =================
+
+                if (formatted === getTodayDate()) {
+
+                    for (const cls of assignedClasses) {
+
+                        try {
+
+                            const res = await fetchWithAuth(
+                                `${BASE_URL}/attendance`
+                                + `?academic_class_id=${cls.academic_class_id}`
+                                + `&subject_id=${cls.subject_id}`
+                                + `&date=${formatted}`
+                            );
+
+                            const data = await res.json();
+
+                            let present = 0;
+                            let absent = 0;
+                            let late = 0;
+
+                            Object.values(data || {}).forEach((record) => {
+
+                                const status =
+                                    record?.status || record;
+
+                                if (status === "Present") present++;
+                                if (status === "Absent") absent++;
+                                if (status === "Late") late++;
+                            });
+
+                            todayClassAttendance.push({
+                                class_name: cls.class_name,
+                                subject_name: cls.subject_name,
+                                present,
+                                absent,
+                                late,
+                                total: present + absent + late,
+                            });
+
+                        } catch {
+                            // ignore
+                        }
+                    }
+                }
+            }
+
+            // ================= TODAY COUNTS =================
+
+            const todayData =
+                weeklyChart[weeklyChart.length - 1];
+
+            const attendanceRate =
+                totalStudents > 0
+                    ? Math.round(
+                        (
+                            (
+                                todayData.present +
+                                todayData.late
+                            ) / totalStudents
+                        ) * 100
+                    )
+                    : 0;
+
+            // ================= PENDING =================
+
+            const pendingAttendance =
+                uniqueClasses.length -
+                weeklyChart.filter(
+                    d =>
+                        d.present > 0 ||
+                        d.absent > 0 ||
+                        d.late > 0
+                ).length;
+
+            setDashboardAttendance({
+                totalClasses: uniqueClasses.length,
+                totalStudents,
+                todayPresent: todayData.present,
+                todayAbsent: todayData.absent,
+                todayLate: todayData.late,
+                attendanceRate,
+                weeklyChart,
+                todayClassAttendance,
+                pendingAttendance:
+                    pendingAttendance < 0
+                        ? 0
+                        : pendingAttendance,
+            });
+
+        } catch (err) {
+
+            console.error(
+                "Dashboard Attendance Error:",
+                err
+            );
+        }
+    };
+
     // ================= SAVE =================
     const saveAttendance = async () => {
         if (!selectedClass || !selectedDate) {
@@ -226,11 +465,29 @@ export function useTeacherAttendance(fetchWithAuth, showToast) {
 
     // ================= INIT =================
     useEffect(() => {
-        const today = getTodayDate();
-        setSelectedDate(today); // ✅ AUTO SET TODAY
-        fetchClasses();
-    }, []);
 
+        if (
+            activeSection !== "attendance" &&
+            activeSection !== "dashboard"
+        ) {
+            return;
+        }
+
+        const initAttendance = async () => {
+
+            const today = getTodayDate();
+
+            setSelectedDate(today);
+
+            await fetchClasses();
+
+            await fetchDashboardAttendance();
+
+        };
+
+        initAttendance();
+
+    }, [activeSection]);
     // ================= AUTO LOAD =================
     useEffect(() => {
         if (selectedClass && selectedDate) {
@@ -382,5 +639,7 @@ export function useTeacherAttendance(fetchWithAuth, showToast) {
         getTodayDate,
         updateRemark,
         downloadAttendanceReport,
+        dashboardAttendance,
+        fetchDashboardAttendance,
     };
 }

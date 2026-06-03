@@ -10,6 +10,14 @@ export function useTeacherAssignments(
   const [teacherAssignments, setTeacherAssignments] = useState([]);
   const [assignedClasses, setAssignedClasses] = useState([]);
   const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentOverview, setAssignmentOverview] = useState({
+    totalAssignments: 0,
+    activeAssignments: 0,
+    completedAssignments: 0,
+    totalSubmissions: 0,
+    pendingReview: 0,
+    averageSubmissionRate: 0,
+  });
   const [showModal, setShowModal] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState(null);
   const [assignmentForm, setAssignmentForm] = useState({
@@ -48,8 +56,6 @@ export function useTeacherAssignments(
     }
   };
 
-
-
   // ================= FETCH CLASSES =================
   const fetchAssignedClasses = async () => {
     try {
@@ -74,6 +80,7 @@ export function useTeacherAssignments(
   const fetchTeacherAssignments = async () => {
 
     try {
+
       const { user } = getAuth();
 
       setAssignmentLoading(true);
@@ -84,7 +91,74 @@ export function useTeacherAssignments(
 
       const data = await res.json();
 
-      setTeacherAssignments(data || []);
+      const assignments = data || [];
+
+      setTeacherAssignments(assignments);
+
+      // ================= OVERVIEW =================
+
+      const today = new Date();
+
+      let activeAssignments = 0;
+      let completedAssignments = 0;
+
+      let totalSubmissions = 0;
+      let totalPending = 0;
+
+      let totalSubmissionPercent = 0;
+
+      assignments.forEach((a) => {
+
+        const submitted = a.submitted || 0;
+        const pending = a.pending || 0;
+
+        const total = submitted + pending;
+
+        totalSubmissions += submitted;
+        totalPending += pending;
+
+        // submission %
+        const percent =
+          total > 0
+            ? (submitted / total) * 100
+            : 0;
+
+        totalSubmissionPercent += percent;
+
+        // active/completed
+        if (a.due_date) {
+
+          const dueDate =
+            new Date(a.due_date);
+
+          if (dueDate >= today) {
+            activeAssignments++;
+          } else {
+            completedAssignments++;
+          }
+        }
+      });
+
+      setAssignmentOverview({
+        totalAssignments:
+          assignments.length,
+
+        activeAssignments,
+
+        completedAssignments,
+
+        totalSubmissions,
+
+        pendingReview: totalPending,
+
+        averageSubmissionRate:
+          assignments.length > 0
+            ? Math.round(
+              totalSubmissionPercent /
+              assignments.length
+            )
+            : 0,
+      });
 
     } catch (err) {
 
@@ -96,18 +170,22 @@ export function useTeacherAssignments(
       );
 
     } finally {
+
       setAssignmentLoading(false);
+
     }
   };
 
-
   useEffect(() => {
 
-    if (activeSection !== "assignments") return;
+    // LOAD FOR BOTH
+    if (
+      activeSection !== "assignments" &&
+      activeSection !== "dashboard"
+    ) return;
 
     fetchAssignedClasses();
     fetchTeacherAssignments();
-    return;
 
   }, [activeSection]);
 
@@ -485,7 +563,8 @@ export function useTeacherAssignments(
     fetchAssignmentSubmissions,
 
     // ---------------- HELPERS ----------------
-    assignmentProgress
+    assignmentProgress,
+    assignmentOverview,
 
   };
 }

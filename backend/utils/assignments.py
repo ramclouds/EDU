@@ -24,7 +24,9 @@ from utils.teacherDetails import TeacherClass, Subject
 # CONFIG
 # =============================
 ALLOWED_EXTENSIONS = {"pdf", "doc", "docx"}
-UPLOAD_BASE = "Submitted_Assignments"
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+UPLOAD_BASE = os.path.abspath(os.path.join(BASE_DIR, "..", "Submitted_Assignments"))
 
 
 # =============================
@@ -176,9 +178,9 @@ def get_student_class_info(student_id):
 
 
 def create_folder_structure(info):
+
     folder_name = f"{info['batch']}_{info['division']}_{info['section']}"
     folder_path = os.path.join(UPLOAD_BASE, folder_name)
-
     os.makedirs(folder_path, exist_ok=True)
 
     return folder_path, folder_name
@@ -222,7 +224,7 @@ class SubmitAssignmentAPI(MethodView):
             file_path = os.path.join(folder_path, filename)
             file.save(file_path)
 
-            file_url = f"/{UPLOAD_BASE}/{folder_name}/{filename}"
+            file_url = f"/Submitted_Assignments/{folder_name}/{filename}"
 
             submission = AssignmentSubmission.query.filter_by(
                 assignment_id=assignment_id, student_id=student_id
@@ -518,52 +520,73 @@ class TeacherAssignmentsAPI(MethodView):
 
         query = text("""
 SELECT
-a.id,
-a.title,
-a.due_date,
-s.subject_name,
-ac.id class_id,
-d.division_name,
-sec.section_name,
+    a.id,
+    a.title,
+    a.description,
+    a.assigned_date,
+    a.due_date,
+    a.total_marks,
+    a.academic_class_id,
+    a.subject_id,
 
-COUNT(DISTINCT sar.student_id) total_students,
+    s.subject_name,
 
-COUNT(
-DISTINCT CASE
-WHEN sub.submission_file_url IS NOT NULL
-THEN sub.student_id
-END
-) submitted
+    ac.id AS class_id,
+
+    d.division_name,
+    sec.section_name,
+
+    COUNT(DISTINCT sar.student_id) AS total_students,
+
+    COUNT(
+        DISTINCT CASE
+            WHEN sub.submission_file_url IS NOT NULL
+            THEN sub.student_id
+        END
+    ) AS submitted
 
 FROM assignments a
 
 JOIN academic_classes ac
-ON a.academic_class_id=ac.id
+    ON a.academic_class_id = ac.id
 
 JOIN divisions d
-ON ac.division_id=d.id
+    ON ac.division_id = d.id
 
 JOIN sections sec
-ON ac.section_id=sec.id
+    ON ac.section_id = sec.id
 
 JOIN subjects s
-ON a.subject_id=s.id
+    ON a.subject_id = s.id
 
 JOIN teacher_classes tc
-ON tc.academic_class_id=ac.id
-AND tc.subject_id=a.subject_id
+    ON tc.academic_class_id = ac.id
+   AND tc.subject_id = a.subject_id
 
 LEFT JOIN student_academic_records sar
-ON sar.academic_class_id=ac.id
-AND sar.is_current=1
+    ON sar.academic_class_id = ac.id
+   AND sar.is_current = 1
 
 LEFT JOIN assignment_submissions sub
-ON sub.assignment_id=a.id
+    ON sub.assignment_id = a.id
 
-WHERE tc.teacher_id=:teacher_id
+WHERE tc.teacher_id = :teacher_id
 
-GROUP BY a.id
-ORDER BY due_date DESC
+GROUP BY
+    a.id,
+    a.title,
+    a.description,
+    a.assigned_date,
+    a.due_date,
+    a.total_marks,
+    a.academic_class_id,
+    a.subject_id,
+    s.subject_name,
+    ac.id,
+    d.division_name,
+    sec.section_name
+
+ORDER BY a.due_date DESC
 """)
 
         rows = db.session.execute(query, {"teacher_id": teacher_id}).mappings().all()
@@ -572,26 +595,36 @@ ORDER BY due_date DESC
 
         for r in rows:
 
-            pending = r.total_students - r.submitted
+            submitted = int(r.submitted or 0)
+            total_students = int(r.total_students or 0)
+            pending = total_students - submitted
+            completion = (
+                round((submitted / total_students) * 100) if total_students else 0
+            )
 
             data.append(
                 {
                     "id": r.id,
                     "title": r.title,
+                    "description": r.description,
+                    "assigned_date": (
+                        str(r.assigned_date) if r.assigned_date else None
+                    ),
+                    "due_date": (str(r.due_date) if r.due_date else None),
+                    "total_marks": r.total_marks,
+                    "academic_class_id": r.academic_class_id,
+                    "subject_id": r.subject_id,
+                    "class_id": r.class_id,
                     "class_name": f"{r.division_name} {r.section_name}",
                     "subject": r.subject_name,
-                    "submitted": int(r.submitted or 0),
-                    "pending": int(pending or 0),
-                    "total_students": int(r.total_students or 0),  # ✅ ADD THIS
-                    "completion": (
-                        round(r.submitted / r.total_students * 100)
-                        if r.total_students
-                        else 0
-                    ),
+                    "submitted": submitted,
+                    "pending": pending,
+                    "total_students": total_students,
+                    "completion": completion,
                 }
             )
 
-        return jsonify(data)
+        return jsonify(data), 200
 
 
 # Assignment Detail Modal API (Submitted/Pending)
@@ -656,7 +689,7 @@ class GradeAssignmentAPI(MethodView):
     @login_required
     def put(self, submission_id):
 
-        data = request.get_json()
+        data = request.form if request.form else request.get_json(silent=True) or {}
 
         sub = AssignmentSubmission.query.get(submission_id)
 
@@ -685,37 +718,151 @@ class GradeAssignmentAPI(MethodView):
 
 
 # Add Edit/Delete for assignments
+# =============================
+# UPDATE ASSIGNMENT API
+# =============================
 class UpdateAssignmentAPI(MethodView):
 
     @login_required
     def put(self, teacher_id, assignment_id):
 
         try:
+
             assignment = Assignment.query.get_or_404(assignment_id)
 
+            # =============================
+            # AUTH CHECK
+            # =============================
             if assignment.created_by != teacher_id:
                 return jsonify({"error": "Unauthorized"}), 403
 
-            data = request.get_json()
+            # =============================
+            # SUPPORT FORM-DATA + JSON
+            # =============================
+            data = request.form if request.form else request.get_json(silent=True) or {}
+
+            print("========== UPDATE ASSIGNMENT ==========")
+            print("FORM:", request.form)
+            print("FILES:", request.files)
+            print("JSON:", request.get_json(silent=True))
+
+            # =============================
+            # UPDATE FIELDS
+            # =============================
 
             assignment.title = data.get("title", assignment.title)
 
             assignment.description = data.get("description", assignment.description)
 
-            if data.get("due_date"):
-                assignment.due_date = datetime.strptime(
-                    data["due_date"], "%Y-%m-%d"
+            # academic class
+            if data.get("academic_class_id"):
+                assignment.academic_class_id = int(data.get("academic_class_id"))
+
+            # subject
+            if data.get("subject_id"):
+                assignment.subject_id = int(data.get("subject_id"))
+
+            # assigned date
+            if data.get("assigned_date"):
+
+                assignment.assigned_date = datetime.strptime(
+                    data.get("assigned_date"), "%Y-%m-%d"
                 ).date()
 
-            if data.get("total_marks"):
-                assignment.total_marks = data["total_marks"]
+            # due date
+            if data.get("due_date"):
+
+                assignment.due_date = datetime.strptime(
+                    data.get("due_date"), "%Y-%m-%d"
+                ).date()
+
+            # total marks
+            if data.get("total_marks") is not None:
+
+                assignment.total_marks = int(data.get("total_marks"))
+
+            # =============================
+            # OPTIONAL FILE UPDATE
+            # =============================
+
+            file = request.files.get("file")
+
+            if file and file.filename:
+
+                # validate extension
+                if not allowed_file(file.filename):
+
+                    return jsonify({"error": "Invalid file type"}), 400
+
+                # create directory
+                os.makedirs("Assignment_Files", exist_ok=True)
+
+                # secure filename
+                filename = secure_filename(file.filename)
+
+                file_path = os.path.join("Assignment_Files", filename)
+
+                # save new file
+                file.save(file_path)
+
+                # =============================
+                # DELETE OLD FILES
+                # =============================
+
+                old_files = AssignmentFile.query.filter_by(
+                    assignment_id=assignment.id
+                ).all()
+
+                for old in old_files:
+
+                    try:
+
+                        if old.file_url:
+
+                            old_path = old.file_url.lstrip("/")
+
+                            if os.path.exists(old_path):
+                                os.remove(old_path)
+
+                    except Exception as e:
+                        print("OLD FILE DELETE ERROR:", e)
+
+                    db.session.delete(old)
+
+                # =============================
+                # SAVE NEW FILE RECORD
+                # =============================
+
+                db.session.add(
+                    AssignmentFile(
+                        assignment_id=assignment.id,
+                        file_name=filename,
+                        file_url=f"/Assignment_Files/{filename}",
+                    )
+                )
+
+            # =============================
+            # COMMIT
+            # =============================
 
             db.session.commit()
 
-            return jsonify({"message": "Updated"})
+            return (
+                jsonify(
+                    {
+                        "message": "Assignment updated successfully",
+                        "assignment_id": assignment.id,
+                    }
+                ),
+                200,
+            )
 
         except Exception as e:
+
+            db.session.rollback()
+
             traceback.print_exc()
+
             return jsonify({"error": str(e)}), 500
 
 

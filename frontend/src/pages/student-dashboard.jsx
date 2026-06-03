@@ -840,7 +840,6 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           </section>
         )}
         {/* ===================== DASHBOARD SECTION END =========================== */}
-
         {/* ===================== ATTENDANCE SECTION START =========================== */}
         {activeSection === "attendance" && (
           <section className="p-4 sm:p-6 space-y-6">
@@ -1368,12 +1367,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                             </span>
 
                             <span className="text-xs text-gray-500 dark:text-gray-300 text-right">
-                              {exam.date}
-                              {exam.start_time && (
-                                <div className="text-[10px]">
-                                  {exam.start_time}
-                                </div>
-                              )}
+                              {exam.start_date}
                             </span>
                           </li>
                         ))}
@@ -1391,7 +1385,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                     </h4>
 
                     <div className="flex flex-wrap gap-2 items-center">
-                      {/* YEAR FILTER */}
+                      {/* YEAR FILTER (FROM DB) */}
                       <select
                         name="year"
                         value={filters.year}
@@ -1421,7 +1415,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         ))}
                       </select>
 
-                      {/* DOWNLOAD BUTTON */}
+                      {/* DOWNLOAD */}
                       <button
                         onClick={handleDownloadResultsPDF}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm transition"
@@ -1433,14 +1427,19 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
                   {/* TABLE */}
                   <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm min-w-[600px]">
+                    <table className="w-full text-xs sm:text-sm min-w-[900px]">
                       <thead className="text-gray-500 dark:text-gray-300 border-b bg-gray-50 dark:bg-slate-700">
                         <tr>
-                          <th className="text-left py-2 px-2">Year</th>
                           <th className="text-left py-2 px-2">Exam</th>
                           <th className="text-left py-2 px-2">Subject</th>
-                          <th className="text-left py-2 px-2">Marks</th>
-                          <th className="text-left py-2 px-2">Grade</th>
+
+                          <th className="text-center py-2 px-2">Internal</th>
+                          <th className="text-center py-2 px-2">External</th>
+                          <th className="text-center py-2 px-2">Oral</th>
+                          <th className="text-center py-2 px-2">Practical</th>
+
+                          <th className="text-center py-2 px-2">Total</th>
+                          <th className="text-center py-2 px-2">Grade</th>
                           <th className="text-left py-2 px-2">Remarks</th>
                         </tr>
                       </thead>
@@ -1449,7 +1448,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         {results.length === 0 ? (
                           <tr>
                             <td
-                              colSpan="6"
+                              colSpan="9"
                               className="text-center py-6 text-gray-400 dark:text-gray-500"
                             >
                               No results found
@@ -1461,39 +1460,60 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                               key={i}
                               className="border-b hover:bg-gray-50 dark:hover:bg-slate-700 transition"
                             >
+                              {/* EXAM */}
                               <td className="py-2 px-2 text-gray-900 dark:text-gray-100">
-                                {r.year}
-                              </td>
-
-                              <td className="text-gray-900 dark:text-gray-100">
                                 {r.exam}
                               </td>
 
-                              <td className="truncate max-w-[120px] text-gray-900 dark:text-gray-100">
+                              {/* SUBJECT */}
+                              <td className="py-2 px-2 text-gray-900 dark:text-gray-100">
                                 {r.subject}
                               </td>
 
-                              <td className="font-medium text-gray-900 dark:text-gray-100">
+                              {/* INTERNAL */}
+                              <td className="text-center text-gray-900 dark:text-gray-100">
+                                {r.internal} / {r.internalOutOf || "-"}
+                              </td>
+
+                              {/* EXTERNAL */}
+                              <td className="text-center text-gray-900 dark:text-gray-100">
+                                {r.external} / {r.externalOutOf || "-"}
+                              </td>
+
+                              {/* ORAL */}
+                              <td className="text-center text-gray-900 dark:text-gray-100">
+                                {r.oral} / {r.oralOutOf || "-"}
+                              </td>
+
+                              {/* PRACTICAL */}
+                              <td className="text-center text-gray-900 dark:text-gray-100">
+                                {r.practical} / {r.practicalOutOf || "-"}
+                              </td>
+
+                              {/* TOTAL */}
+                              <td className="text-center font-semibold text-gray-900 dark:text-gray-100">
                                 {r.marks}
                               </td>
 
-                              <td>
+                              {/* GRADE */}
+                              <td className="text-center">
                                 <span
-                                  className={`px-2 py-1 rounded text-[10px] sm:text-xs font-medium ${
+                                  className={`px-2 py-1 rounded text-[10px] font-medium ${
                                     r.grade?.startsWith("A")
-                                      ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                                      ? "bg-green-100 text-green-700"
                                       : r.grade?.startsWith("B")
-                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                                        ? "bg-blue-100 text-blue-700"
                                         : r.grade?.startsWith("C")
-                                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300"
-                                          : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                                          ? "bg-yellow-100 text-yellow-700"
+                                          : "bg-red-100 text-red-700"
                                   }`}
                                 >
                                   {r.grade}
                                 </span>
                               </td>
 
-                              <td className="truncate max-w-[150px] text-gray-700 dark:text-gray-300">
+                              {/* REMARKS */}
+                              <td className="text-gray-700 dark:text-gray-300 truncate max-w-[150px]">
                                 {r.remarks}
                               </td>
                             </tr>
@@ -1508,7 +1528,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           </section>
         )}
         {/* ===================== EXAMS AND RESULTS SECTION END ========================*/}
-
+        
         {/* ===================== TIMETABLE SECTION START ========================*/}
         {activeSection === "timetable" && (
           <section className="p-4 sm:p-6 space-y-6">
@@ -2494,7 +2514,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 ) : (
                   <h3 className="font-semibold text-lg sm:text-xl text-white">
                     {student?.first_name} {student?.middle_name}{" "}
-                    {student?.first_name}
+                    {student?.last_name}
                   </h3>
                 )}
 
