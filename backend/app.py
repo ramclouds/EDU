@@ -20,6 +20,17 @@ from utils.teacherDetails import (
     ChangeTeacherPassword,
 )
 
+from utils.adminsDetails import AdminDetails, UpdateAdminProfile, ChangeAdminPassword
+from utils.assets import (
+    CreateAssetAPI,
+    GetAssetsAPI,
+    AssetDetailsAPI,
+    UpdateAssetAPI,
+    DeleteAssetAPI,
+    RestoreAssetAPI,
+    GetDeletedAssetsAPI,
+)
+
 # =================  ASSIGNMENTS =================
 from utils.assignments import (
     SubmitAssignmentAPI,
@@ -55,6 +66,8 @@ from utils.leaves import (
     StudentLeaveHistory,
     UpdateStudentLeaveStatus,
     DeleteStudentLeave,
+    AllTeacherLeaves,
+    AdminLeaveDashboard,
 )
 
 # ================= ACADEMICS =================
@@ -97,6 +110,7 @@ from utils.announcement import (
     CreateNoticeAPI,
     StudentNoticeAPI,
     TeacherNoticeAPI,
+    AdminNoticeAPI,
     MarkNoticeReadAPI,
 )
 
@@ -197,6 +211,71 @@ def create_app():
         methods=["PUT"],
     )
 
+    # ===============================================
+    # ADMIN
+    # ===============================================
+
+    app.add_url_rule(
+        "/api/<int:id>/admin",
+        view_func=AdminDetails.as_view("admin_details"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/<int:id>/admin/update",
+        view_func=UpdateAdminProfile.as_view("update_admin"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/<int:id>/change-password",
+        view_func=ChangeAdminPassword.as_view("change_admin_password"),
+        methods=["PUT"],
+    )
+
+    # ==================================================
+    # ASSETS MANAGEMENT
+    # ==================================================
+    app.add_url_rule(
+        "/api/assets",
+        view_func=GetAssetsAPI.as_view("get_assets"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/create",
+        view_func=CreateAssetAPI.as_view("create_asset"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/<int:id>",
+        view_func=AssetDetailsAPI.as_view("asset_details"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/<int:id>",
+        view_func=UpdateAssetAPI.as_view("update_asset"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/<int:id>",
+        view_func=DeleteAssetAPI.as_view("delete_asset"),
+        methods=["DELETE"],
+    )
+    app.add_url_rule(
+        "/api/assets/restore/<int:id>",
+        view_func=RestoreAssetAPI.as_view("restore_asset"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/assets/deleted",
+        view_func=GetDeletedAssetsAPI.as_view("deleted_assets"),
+        methods=["GET"],
+    )
     # ==================================================
     # TEACHER ASSIGNMENTS (NEW)
     # ==================================================
@@ -286,6 +365,12 @@ def create_app():
     )
 
     app.add_url_rule(
+        "/api/announcements/admin/<int:admin_id>",
+        view_func=AdminNoticeAPI.as_view("admin_notices"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
         "/api/announcements/read/<int:notice_id>/<int:user_id>",
         view_func=MarkNoticeReadAPI.as_view("mark_notice_read"),
         methods=["POST"],
@@ -294,7 +379,6 @@ def create_app():
     # ==================================================
     # NOTIFICATIONS
     # ==================================================
-
     app.add_url_rule(
         "/api/notifications",
         view_func=NotificationsAPI.as_view("notifications"),
@@ -334,6 +418,18 @@ def create_app():
     # ==================================================
     # LEAVES
     # ==================================================
+
+    app.add_url_rule(
+        "/api/admin/teacher/leaves",
+        view_func=AllTeacherLeaves.as_view("all_teacher_leaves"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/leaves/dashboard",
+        view_func=AdminLeaveDashboard.as_view("admin_leave_dashboard"),
+        methods=["GET"],
+    )
 
     app.add_url_rule(
         "/api/teacher/leave/apply",
@@ -441,7 +537,6 @@ def create_app():
     # ==================================================
     # ACADEMICS
     # ==================================================
-
     app.add_url_rule(
         "/api/timetable/<int:student_id>",
         view_func=StudentTimetableAPI.as_view("timetable"),
@@ -577,7 +672,6 @@ def create_app():
 
     # Absolute folders
     SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
-
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
 
     print("BASE_DIR:", BASE_DIR)

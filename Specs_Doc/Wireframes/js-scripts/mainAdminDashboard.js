@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const growthCanvas = document.getElementById('userGrowthChart');
     if (growthCanvas) {
         const ctxGrowth = growthCanvas.getContext('2d');
-        
+
         // Create a beautiful area gradient
         const growthGradient = ctxGrowth.createLinearGradient(0, 0, 0, 400);
         growthGradient.addColorStop(0, 'rgba(79, 70, 229, 0.4)');
@@ -36,13 +36,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
-                    y: { 
-                        grid: { color: gridColor }, 
+                    y: {
+                        grid: { color: gridColor },
                         ticks: { color: labelColor },
                         border: { display: false }
                     },
-                    x: { 
-                        grid: { display: false }, 
+                    x: {
+                        grid: { display: false },
                         ticks: { color: labelColor },
                         border: { display: false }
                     }
@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 plugins: { legend: { display: false } },
                 scales: {
                     y: { display: false },
-                    x: { 
-                        grid: { display: false }, 
+                    x: {
+                        grid: { display: false },
                         ticks: { color: labelColor },
                         border: { display: false }
                     }
@@ -99,13 +99,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 maintainAspectRatio: false,
                 cutout: '80%',
                 plugins: {
-                    legend: { 
-                        position: 'bottom', 
-                        labels: { 
-                            color: labelColor, 
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: labelColor,
                             usePointStyle: true,
                             padding: 20
-                        } 
+                        }
                     }
                 }
             }
@@ -1731,7 +1731,7 @@ function filterAssets(category) {
         btn.classList.remove('active', 'bg-indigo-600', 'text-white');
         btn.classList.add('text-slate-500');
     });
-    
+
     event.target.classList.add('active', 'bg-indigo-600', 'text-white');
     event.target.classList.remove('text-slate-500');
 
@@ -1741,6 +1741,24 @@ function filterAssets(category) {
 // Initial Call
 renderAssets();
 
+function openAddAssetModal() {
+    const modal = document.getElementById('addAssetModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeAddAssetModal() {
+    const modal = document.getElementById('addAssetModal');
+    modal.classList.remove('flex');
+    modal.classList.add('hidden');
+}
+
+// Optional: close modal on outside click
+document.getElementById('addAssetModal').addEventListener('click', function (e) {
+    if (e.target === this) {
+        closeAddAssetModal();
+    }
+});
 
 // ============== PAYROLL MANAGEMENT LOGIC =====================
 
@@ -1782,14 +1800,14 @@ function renderPayrollTable() {
                     </span>
                 </td>
                 <td class="p-4 text-right">
-                    ${staff.status === 'Pending' ? 
-                        `<button onclick="paySalary('${staff.id}')" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
+                    ${staff.status === 'Pending' ?
+                `<button onclick="paySalary('${staff.id}')" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
                             Pay Now
-                        </button>` : 
-                        `<button class="text-slate-400 text-xs font-bold flex items-center justify-end gap-1 ml-auto">
+                        </button>` :
+                `<button class="text-slate-400 text-xs font-bold flex items-center justify-end gap-1 ml-auto">
                             <span>Payslip</span> <span class="text-lg">↓</span>
                         </button>`
-                    }
+            }
                 </td>
             </tr>
         `;
@@ -1814,7 +1832,7 @@ function paySalary(staffId) {
 function processBulkPayroll() {
     const pendingCount = staffPayrollData.filter(s => s.status === 'Pending').length;
     if (pendingCount === 0) return alert("All staff members have already been paid.");
-    
+
     if (confirm(`Are you sure you want to disburse salary for ${pendingCount} staff members?`)) {
         staffPayrollData.forEach(s => s.status = 'Paid');
         renderPayrollTable();
@@ -1824,5 +1842,3 @@ function processBulkPayroll() {
 
 // Initial Call
 renderPayrollTable();
-
-

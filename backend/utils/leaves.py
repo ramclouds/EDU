@@ -18,7 +18,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 # Teacher
 class TeacherLeave(db.Model):
     __tablename__ = "teacher_leaves"
@@ -33,15 +32,11 @@ class TeacherLeave(db.Model):
     from_date = db.Column(db.Date, nullable=False)
     to_date = db.Column(db.Date, nullable=False)
     total_days = db.Column(db.Integer, nullable=False)
-
     reason = db.Column(db.Text)
-
     status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending")
-
     applied_at = db.Column(db.DateTime, default=datetime.utcnow)
     approved_at = db.Column(db.DateTime)
     rejected_at = db.Column(db.DateTime)
-
     approved_by = db.Column(db.Integer)
 
 
@@ -49,7 +44,6 @@ class TeacherLeaveBalance(db.Model):
     __tablename__ = "teacher_leave_balance"
 
     id = db.Column(db.Integer, primary_key=True)
-
     teacher_id = db.Column(
         db.Integer, db.ForeignKey("teachers.id", ondelete="CASCADE"), unique=True
     )
@@ -58,37 +52,26 @@ class TeacherLeaveBalance(db.Model):
     sick_leave = db.Column(db.Integer, default=8)
     used_leave = db.Column(db.Integer, default=0)
 
-
 # Student
 class StudentLeave(db.Model):
     __tablename__ = "student_leaves"
 
     id = db.Column(db.Integer, primary_key=True)
-
     student_id = db.Column(
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
 
     leave_type = db.Column(db.Enum("Sick", "Casual", "Emergency"), default="Casual")
-
     from_date = db.Column(db.Date, nullable=False)
     to_date = db.Column(db.Date, nullable=False)
-
     total_days = db.Column(db.Integer, nullable=False)
-
     reason = db.Column(db.Text)
-
     status = db.Column(db.Enum("Pending", "Approved", "Rejected"), default="Pending")
-
     applied_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     approved_at = db.Column(db.DateTime)
     rejected_at = db.Column(db.DateTime)
-
     approved_by = db.Column(db.Integer)
 
-
-# APPLY LEAVE
 # Teacher
 class ApplyLeave(MethodView):
 
@@ -101,13 +84,11 @@ class ApplyLeave(MethodView):
                 return jsonify({"error": "Invalid JSON payload"}), 400
 
             current_user = get_current_user()
-
             # 🔒 ROLE CHECK
             if current_user.role != "teacher":
                 return jsonify({"error": "Only teachers can apply"}), 403
 
             teacher_id = current_user.id
-
             leave_type = data.get("leave_type")
             from_date_str = data.get("from_date")
             to_date_str = data.get("to_date")
@@ -160,7 +141,6 @@ class ApplyLeave(MethodView):
 
 # Student
 class ApplyStudentLeave(MethodView):
-
     @login_required
     def post(self):
         try:
@@ -248,10 +228,6 @@ class ApplyStudentLeave(MethodView):
             logger.exception("Student leave apply failed")
             return jsonify({"error": "Something went wrong"}), 500
 
-
-# ===========================
-# LEAVE HISTORY
-# ===========================
 # Teacher
 class TeacherLeaveHistory(MethodView):
 
@@ -296,7 +272,6 @@ class TeacherLeaveHistory(MethodView):
 
 # Student
 class StudentLeaveHistory(MethodView):
-
     @login_required
     def get(self):
         try:
@@ -381,11 +356,8 @@ class DeleteStudentLeave(MethodView):
             return jsonify({"error": "Failed to delete leave"}), 500
 
 
-# ===========================
+
 # LEAVE BALANCE API
-# ===========================
-
-
 class TeacherLeaveBalanceAPI(MethodView):
 
     @login_required
@@ -417,8 +389,6 @@ class TeacherLeaveBalanceAPI(MethodView):
             logger.exception("Balance fetch failed")
             return jsonify({"error": "Failed to fetch balance"}), 500
 
-
-# APPROVE / REJECT LEAVE (ADMIN)
 # Student- ADMIN / TEACHER APPROVE STUDENT LEAVE
 class UpdateStudentLeaveStatus(MethodView):
 
@@ -454,9 +424,7 @@ class UpdateStudentLeaveStatus(MethodView):
             else:
                 leave.rejected_at = datetime.utcnow()
 
-            # =====================================================
             # 🔥 FETCH STUDENT + CLASS DETAILS (MAIN FEATURE)
-            # =====================================================
             student = Student.query.get(leave.student_id)
 
             student_name = "Unknown Student"
@@ -483,9 +451,8 @@ class UpdateStudentLeaveStatus(MethodView):
                         division_name = division.division_name if division else ""
                         section_name = section.section_name if section else ""
 
-            # =====================================================
+            
             # 🧾 ACTIVITY LOG (ENHANCED)
-            # =====================================================
             db.session.add(
                 ActivityLog(
                     user_id=current_user.id,
@@ -500,9 +467,9 @@ class UpdateStudentLeaveStatus(MethodView):
                 )
             )
 
-            # =====================================================
+            
             # 🔔 OPTIONAL: NOTIFY STUDENT
-            # =====================================================
+            
             create_notification(
                 user_id=leave.student_id,
                 role="student",
@@ -514,7 +481,6 @@ class UpdateStudentLeaveStatus(MethodView):
             )
 
             db.session.commit()
-
             return jsonify({"message": f"Leave {status} successfully"}), 200
 
         except Exception:
@@ -525,7 +491,6 @@ class UpdateStudentLeaveStatus(MethodView):
 
 # Teacher
 class UpdateLeaveStatus(MethodView):
-
     @login_required
     def post(self, leave_id):
         try:
@@ -594,14 +559,12 @@ class UpdateLeaveStatus(MethodView):
             )
 
             db.session.commit()  # ✅ CRITICAL FIX
-
             return jsonify({"message": f"Leave {leave.status} successfully"}), 200
 
         except Exception:
             db.session.rollback()
             logger.exception("Leave update failed")
             return jsonify({"error": "Failed to update leave"}), 500
-
 
 class AllStudentLeaves(MethodView):
 
@@ -662,3 +625,101 @@ class AllStudentLeaves(MethodView):
             )
 
         return jsonify(result)
+
+# Add Teacher Leave Listing API
+class AllTeacherLeaves(MethodView):
+
+    @login_required
+    def get(self):
+        try:
+            current_user = get_current_user()
+
+            if current_user.role != "admin":
+                return jsonify({"error": "Unauthorized"}), 403
+
+            leaves = (
+                TeacherLeave.query.order_by(
+                    TeacherLeave.applied_at.desc()
+                ).all()
+            )
+
+            result = []
+
+            for leave in leaves:
+
+                teacher = Teacher.query.get(leave.teacher_id)
+
+                teacher_name = None
+
+                if teacher:
+                    teacher_name = (
+                        f"{teacher.first_name} {teacher.last_name}"
+                    )
+
+                result.append(
+                    {
+                        "id": leave.id,
+                        "teacher_id": leave.teacher_id,
+                        "teacher_name": teacher_name,
+                        "leave_type": leave.leave_type,
+                        "from_date": leave.from_date.strftime("%Y-%m-%d"),
+                        "to_date": leave.to_date.strftime("%Y-%m-%d"),
+                        "total_days": leave.total_days,
+                        "reason": leave.reason,
+                        "status": leave.status,
+                        "applied_at": (
+                            leave.applied_at.strftime("%Y-%m-%d %H:%M")
+                            if leave.applied_at
+                            else None
+                        ),
+                    }
+                )
+
+            return jsonify(result), 200
+
+        except Exception:
+            logger.exception("Teacher leave list failed")
+            return jsonify({"error": "Failed"}), 500
+        
+# Add Combined Admin Leave Dashboard API
+class AdminLeaveDashboard(MethodView):
+
+    @login_required
+    def get(self):
+
+        current_user = get_current_user()
+
+        if current_user.role != "admin":
+            return jsonify({"error": "Unauthorized"}), 403
+
+        teacher_leaves = TeacherLeave.query.all()
+        student_leaves = StudentLeave.query.all()
+
+        return jsonify(
+            {
+                "teachers": [
+                    {
+                        "id": l.id,
+                        "teacher_id": l.teacher_id,
+                        "type": l.leave_type,
+                        "from_date": l.from_date.strftime("%Y-%m-%d"),
+                        "to_date": l.to_date.strftime("%Y-%m-%d"),
+                        "status": l.status,
+                        "reason": l.reason,
+                    }
+                    for l in teacher_leaves
+                ],
+                "students": [
+                    {
+                        "id": l.id,
+                        "student_id": l.student_id,
+                        "type": l.leave_type,
+                        "from_date": l.from_date.strftime("%Y-%m-%d"),
+                        "to_date": l.to_date.strftime("%Y-%m-%d"),
+                        "status": l.status,
+                        "reason": l.reason,
+                    }
+                    for l in student_leaves
+                ],
+            }
+        )

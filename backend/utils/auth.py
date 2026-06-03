@@ -15,8 +15,234 @@ db = SQLAlchemy()
 logger = logging.getLogger(__name__)
 
 # ===========================
-# MODELS
+# PRODUCTION READY ADMIN MODEL
 # ===========================
+class Admin(db.Model):
+    __tablename__ = "admins"
+
+    # ================= PRIMARY =================
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    user_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
+
+    # ================= PERSONAL =================
+    first_name = db.Column(db.String(100), nullable=False)
+    middle_name = db.Column(db.String(100))
+    last_name = db.Column(db.String(100), nullable=False)
+
+    profile_image = db.Column(db.String(255))
+    gender = db.Column(
+        db.Enum("Male", "Female", "Other", name="admin_gender_enum"),
+        nullable=True,
+    )
+
+    date_of_birth = db.Column(db.Date)
+
+    blood_group = db.Column(
+        db.Enum(
+            "A+",
+            "A-",
+            "B+",
+            "B-",
+            "AB+",
+            "AB-",
+            "O+",
+            "O-",
+            name="admin_blood_group_enum",
+        ),
+        nullable=True,
+    )
+
+    # ================= CONTACT =================
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    mobile = db.Column(db.String(15), unique=True, index=True)
+    alternate_mobile = db.Column(db.String(15))
+    username = db.Column(db.String(50), unique=True, nullable=False, index=True)
+
+    # ================= ADDRESS =================
+    address = db.Column(db.Text)
+    city = db.Column(db.String(100))
+    state = db.Column(db.String(100))
+    country = db.Column(db.String(100), default="India")
+    pincode = db.Column(db.String(10))
+
+    # ================= ROLE & ACCESS =================
+    role = db.Column(
+        db.Enum("admin", "super_admin", name="admin_role_enum"),
+        default="admin",
+        nullable=False,
+    )
+
+    admin_type = db.Column(
+        db.Enum(
+            "Super Admin",
+            "Academic Admin",
+            "Library Admin",
+            "Accounts Admin",
+            "Hostel Admin",
+            name="admin_type_enum",
+        ),
+        nullable=False,
+    )
+    designation = db.Column(db.String(100))
+    department = db.Column(db.String(100))
+    permissions = db.Column(db.Text)
+    access_level = db.Column(db.String(50), default="Full Control")
+
+    # ================= PROFESSIONAL =================
+    qualification = db.Column(db.String(150))
+    specialization = db.Column(db.String(100))
+    experience_years = db.Column(db.Integer, default=0)
+
+    # ================= EMPLOYMENT =================
+    joining_date = db.Column(db.Date)
+
+    employment_type = db.Column(
+        db.Enum(
+            "Full Time",
+            "Part Time",
+            "Contract",
+            "Temporary",
+            name="admin_employment_enum",
+        ),
+        default="Full Time",
+    )
+    shift = db.Column(db.String(50))
+    salary = db.Column(db.Float)
+    # ================= SCHOOL INFO =================
+    school_name = db.Column(db.String(150))
+    school_code = db.Column(db.String(50))
+    board = db.Column(db.String(50))
+    established_year = db.Column(db.String(10))
+    # ================= SYSTEM CONTROL ================
+    users_managed = db.Column(db.Integer, default=0)
+    active_sessions = db.Column(db.Integer, default=0)
+    modules_enabled = db.Column(db.String(255), default="All")
+    # ================= FINANCE =================
+    fee_access = db.Column(db.Boolean, default=True)
+    discount_authority = db.Column(db.Boolean, default=False)
+    revenue_view = db.Column(db.Boolean, default=True)
+    # ================= SECURITY =================
+    two_factor_enabled = db.Column(db.Boolean, default=False)
+    login_alerts = db.Column(db.Boolean, default=True)
+    last_login = db.Column(db.DateTime)
+    last_password_change = db.Column(db.DateTime)
+    # ================= ACTIVITY =================
+    logins_30d = db.Column(db.Integer, default=0)
+    actions_count = db.Column(db.Integer, default=0)
+    last_action = db.Column(db.String(255))
+    # ================= MEDICAL =================
+    medical_condition = db.Column(db.Text)
+    # ================= EMERGENCY =================
+    emergency_name = db.Column(db.String(100))
+    emergency_relation = db.Column(db.String(50))
+    emergency_phone = db.Column(db.String(15))
+    # ================= SYSTEM ================
+    auth_token = db.Column(db.String(255))
+    password = db.Column(db.String(255), nullable=False)
+    status = db.Column(
+        db.Enum(
+            "Active",
+            "Inactive",
+            "Suspended",
+            name="admin_status_enum",
+        ),
+        default="Active",
+        nullable=False,
+    )
+
+    is_deleted = db.Column(db.Boolean, default=False)
+    created_by = db.Column(db.String(50))
+    updated_by = db.Column(db.String(50))
+    created_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+    # ================= INDEXES =================
+    __table_args__ = (
+        db.Index("idx_admin_email", "email"),
+        db.Index("idx_admin_username", "username"),
+        db.Index("idx_admin_admin_id", "admin_id"),
+        db.Index("idx_admin_status", "status"),
+    )
+
+    # ================= SERIALIZER =================
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "admin_id": self.admin_id,
+            "user_id": self.user_id,
+            "first_name": self.first_name,
+            "middle_name": self.middle_name,
+            "last_name": self.last_name,
+            "profile_image": self.profile_image,
+            "email": self.email,
+            "mobile": self.mobile,
+            "username": self.username,
+            "gender": self.gender,
+            "date_of_birth": (
+                self.date_of_birth.isoformat()
+                if self.date_of_birth
+                else None
+            ),
+            "blood_group": self.blood_group,
+            "address": self.address,
+            "city": self.city,
+            "state": self.state,
+            "country": self.country,
+            "pincode": self.pincode,
+            "role": self.role,
+            "admin_type": self.admin_type,
+            "designation": self.designation,
+            "department": self.department,
+            "qualification": self.qualification,
+            "specialization": self.specialization,
+            "experience_years": self.experience_years,
+            "joining_date": (
+                self.joining_date.isoformat()
+                if self.joining_date
+                else None
+            ),
+            "employment_type": self.employment_type,
+            "shift": self.shift,
+            "salary": self.salary,
+            "school_name": self.school_name,
+            "school_code": self.school_code,
+            "board": self.board,
+            "established_year": self.established_year,
+            "users_managed": self.users_managed,
+            "active_sessions": self.active_sessions,
+            "modules_enabled": self.modules_enabled,
+            "fee_access": self.fee_access,
+            "discount_authority": self.discount_authority,
+            "revenue_view": self.revenue_view,
+            "two_factor_enabled": self.two_factor_enabled,
+            "login_alerts": self.login_alerts,
+            "last_login": (
+                self.last_login.isoformat()
+                if self.last_login
+                else None
+            ),
+            "logins_30d": self.logins_30d,
+            "actions_count": self.actions_count,
+            "last_action": self.last_action,
+            "medical_condition": self.medical_condition,
+            "emergency_name": self.emergency_name,
+            "emergency_relation": self.emergency_relation,
+            "emergency_phone": self.emergency_phone,
+            "status": self.status,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
 
 
 class Student(db.Model):
@@ -157,19 +383,12 @@ class Login(MethodView):
             if not identifier or not password:
                 return jsonify({"error": "Email/Username and password required"}), 400
 
-            # ---------------------------------
-            # Find user automatically
-            # checks:
-            # Student email
-            # Teacher email
-            # Teacher username
-            # Admin (stored in students table with role=admin)
-            # ---------------------------------
-
             user = (
                 Student.query.filter_by(email=identifier).first()
                 or Teacher.query.filter_by(email=identifier).first()
                 or Teacher.query.filter_by(username=identifier).first()
+                or Admin.query.filter_by(email=identifier).first()
+                or Admin.query.filter_by(username=identifier).first()
             )
 
             if not user:
@@ -215,6 +434,7 @@ class Login(MethodView):
                                 )
                             ),
                             "email": user.email,
+                            "admin_type": getattr(user, "admin_type", None),
                         },
                     }
                 ),
@@ -255,6 +475,21 @@ def generate_user_id():
         return f"USR{int(datetime.utcnow().timestamp())}"
 
 
+def generate_admin_id():
+    try:
+        last_admin = Admin.query.order_by(Admin.id.desc()).first()
+
+        if not last_admin or not last_admin.admin_id:
+            return "ADM1001"
+
+        last_id = int(last_admin.admin_id.replace("ADM", ""))
+        return f"ADM{last_id + 1}"
+
+    except Exception as e:
+        logger.error(f"Admin ID generation failed: {e}")
+        return f"ADM{int(datetime.utcnow().timestamp())}"
+
+
 # ===========================
 # SIGNUP CLASS
 # ===========================
@@ -281,18 +516,24 @@ class SignUp(MethodView):
                 return jsonify({"error": "Password must be at least 6 characters"}), 400
 
             # Check if email exists in correct table
-            if role == "student" or role == "admin":
+            if role == "student":
                 if Student.query.filter_by(email=email).first():
                     return jsonify({"error": "Email already registered"}), 400
+
             elif role == "teacher":
                 if Teacher.query.filter_by(email=email).first():
                     return jsonify({"error": "Email already registered"}), 400
+
+            elif role == "admin":
+                if Admin.query.filter_by(email=email).first():
+                    return jsonify({"error": "Email already registered"}), 400
+
             else:
                 return jsonify({"error": "Invalid role"}), 400
 
             hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
 
-            if role == "student" or role == "admin":
+            if role == "student":
                 student_id = generate_student_id()
                 user_id = generate_user_id()
 
@@ -388,6 +629,69 @@ class SignUp(MethodView):
                     ),
                     201,
                 )
+
+            elif role == "admin":
+                admin_id = generate_admin_id()
+                user_id = generate_user_id()
+
+                dob = data.get("date_of_birth")
+                joining = data.get("joining_date")
+
+                date_of_birth = (
+                    datetime.strptime(dob, "%Y-%m-%d").date() if dob else None
+                )
+
+                joining_date = (
+                    datetime.strptime(joining, "%Y-%m-%d").date() if joining else None
+                )
+
+                new_user = Admin(
+                    admin_id=admin_id,
+                    user_id=user_id,
+                    first_name=data.get("first_name"),
+                    middle_name=data.get("middle_name"),
+                    last_name=data.get("last_name"),
+                    email=email,
+                    mobile=data.get("mobile"),
+                    username=data.get("username"),
+                    gender=data.get("gender"),
+                    date_of_birth=date_of_birth,
+                    blood_group=data.get("blood_group"),
+                    address=data.get("address"),
+                    city=data.get("city"),
+                    state=data.get("state"),
+                    pincode=data.get("pincode"),
+                    admin_type=data.get("admin_type"),
+                    designation=data.get("designation"),
+                    department=data.get("department"),
+                    qualification=data.get("qualification"),
+                    specialization=data.get("specialization"),
+                    experience_years=data.get("experience_years"),
+                    joining_date=joining_date,
+                    employment_type=data.get("employment_type"),
+                    shift=data.get("shift"),
+                    salary=data.get("salary"),
+                    medical_condition=data.get("medical_condition"),
+                    emergency_name=data.get("emergency_name"),
+                    emergency_relation=data.get("emergency_relation"),
+                    emergency_phone=data.get("emergency_phone"),
+                    role="admin",
+                    password=hashed_password,
+                )
+
+                db.session.add(new_user)
+                db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "message": "Admin registered successfully",
+                        "admin_id": admin_id,
+                        "user_id": user_id,
+                    }
+                ),
+                201,
+            )
 
         except SQLAlchemyError as db_err:
             logger.error(f"Database error: {db_err}")
