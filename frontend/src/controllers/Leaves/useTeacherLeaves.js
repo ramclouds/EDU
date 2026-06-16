@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-
-const BASE_URL = "http://localhost:5000/api";
+import { BASE_URL } from "../../config/appConfig";
 
 export function useTeacherLeaves({
   activeSection,
@@ -90,7 +89,11 @@ export function useTeacherLeaves({
   const filteredLeaves = (allStudentLeaves || [])
     .filter((l) => {
       if (leaveFilter === "all") return true;
-      return l.status === leaveFilter;
+
+      return (
+        l.status?.toLowerCase() ===
+        leaveFilter?.toLowerCase()
+      );
     })
     .filter((l) => {
       if (!leaveSearch.trim()) return true;
@@ -169,10 +172,10 @@ export function useTeacherLeaves({
       [id === "leaveFrom"
         ? "from_date"
         : id === "leaveTo"
-        ? "to_date"
-        : id === "leaveType"
-        ? "leave_type"
-        : "reason"]: value,
+          ? "to_date"
+          : id === "leaveType"
+            ? "leave_type"
+            : "reason"]: value,
     }));
   };
 
@@ -186,7 +189,7 @@ export function useTeacherLeaves({
 
     const diff =
       (to - from) /
-        (1000 * 60 * 60 * 24) +
+      (1000 * 60 * 60 * 24) +
       1;
 
     return diff > 0 ? diff : 0;
@@ -234,7 +237,7 @@ export function useTeacherLeaves({
       } else {
         showToast(
           data.error ||
-            "Failed to apply leave",
+          "Failed to apply leave",
           "error"
         );
       }

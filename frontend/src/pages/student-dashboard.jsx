@@ -976,8 +976,6 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         <tr>
                           <th className="py-2 text-left">Date</th>
                           <th className="text-left">Day</th>
-                          <th className="text-left">Subject</th>
-                          <th className="text-left">Period</th>
                           <th className="text-left">Status</th>
                           <th className="text-left">Remarks</th>
                         </tr>
@@ -996,14 +994,6 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
                               <td className="text-gray-700 dark:text-gray-200">
                                 {r.day || "-"}
-                              </td>
-
-                              <td className="text-gray-700 dark:text-gray-200">
-                                {r.subject || "-"}
-                              </td>
-
-                              <td className="text-gray-700 dark:text-gray-200">
-                                {r.period_no || "-"}
                               </td>
 
                               <td
@@ -1026,7 +1016,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         ) : (
                           <tr>
                             <td
-                              colSpan="6"
+                              colSpan="4"
                               className="py-4 text-center text-gray-400"
                             >
                               No attendance records
@@ -1051,14 +1041,6 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                           </div>
 
                           <div className="mt-2 space-y-1">
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                              {r.subject || "-"}
-                            </p>
-
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              Period: {r.period_no || "-"}
-                            </p>
-
                             <p
                               className={`font-medium ${
                                 r.status === "Present"
@@ -1528,7 +1510,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           </section>
         )}
         {/* ===================== EXAMS AND RESULTS SECTION END ========================*/}
-        
+
         {/* ===================== TIMETABLE SECTION START ========================*/}
         {activeSection === "timetable" && (
           <section className="p-4 sm:p-6 space-y-6">
@@ -1578,11 +1560,28 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                             </td>
 
                             {timetable[day]?.map((slot, index) => (
-                              <td
-                                key={index}
-                                className="py-2 px-2 text-gray-800 dark:text-gray-200"
-                              >
-                                {slot.subject || "-"}
+                              <td key={index} className="py-2 px-2">
+                                <div className="bg-indigo-50 dark:bg-slate-700 rounded-xl p-3 text-left space-y-1">
+                                  <p className="font-semibold text-indigo-700 dark:text-indigo-300">
+                                    {slot.subject || "-"}
+                                  </p>
+
+                                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                                    👨‍🏫 {slot.teacher_name || "N/A"}
+                                  </p>
+
+                                  <span
+                                    className={`inline-block text-xs px-2 py-1 rounded-full ${
+                                      slot.lecture_type === "Practical"
+                                        ? "bg-green-100 text-green-700"
+                                        : slot.lecture_type === "Sports"
+                                          ? "bg-orange-100 text-orange-700"
+                                          : "bg-blue-100 text-blue-700"
+                                    }`}
+                                  >
+                                    {slot.lecture_type || "Theory"}
+                                  </span>
+                                </div>
                               </td>
                             ))}
                           </tr>
@@ -1617,15 +1616,35 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                           {timetable[day]?.map((slot, index) => (
                             <div
                               key={index}
-                              className="flex justify-between items-center bg-gray-50 dark:bg-slate-700 px-3 py-2 rounded-lg"
+                              className="bg-gray-50 dark:bg-slate-700 rounded-xl p-3 space-y-2"
                             >
-                              <span className="text-gray-600 dark:text-gray-300 text-xs">
-                                {slot.start_time}–{slot.end_time}
-                              </span>
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {slot.start_time} – {slot.end_time}
+                                </span>
 
-                              <span className="font-medium text-right text-gray-900 dark:text-gray-100">
-                                {slot.subject || "-"}
-                              </span>
+                                <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                  {slot.subject || "-"}
+                                </span>
+                              </div>
+
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                  👨‍🏫 {slot.teacher_name || "N/A"}
+                                </span>
+
+                                <span
+                                  className={`text-xs px-2 py-1 rounded-full ${
+                                    slot.lecture_type === "Practical"
+                                      ? "bg-green-100 text-green-700"
+                                      : slot.lecture_type === "Sports"
+                                        ? "bg-orange-100 text-orange-700"
+                                        : "bg-blue-100 text-blue-700"
+                                  }`}
+                                >
+                                  {slot.lecture_type || "Theory"}
+                                </span>
+                              </div>
                             </div>
                           ))}
                         </div>

@@ -25,13 +25,12 @@ export function useLeaveManagement(
     const [studentLeaves, setStudentLeaves] =
         useState([]);
 
-    const [leaveCounts, setLeaveCounts] =
-        useState({
-            pending: 0,
-            approved: 0,
-            rejected: 0,
-            total: 0,
-        });
+    const [leaveCounts, setLeaveCounts] = useState({
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        total: 0,
+    });
 
 
     // FETCH TEACHER LEAVES
@@ -44,9 +43,25 @@ export function useLeaveManagement(
             const data = await res.json();
 
             if (res.ok) {
-                setTeacherLeaves(
-                    Array.isArray(data) ? data : []
+                const formattedLeaves = (data || []).map(
+                    (leave) => ({
+                        ...leave,
+
+                        type:
+                            leave.leave_type,
+
+                        days:
+                            leave.total_days,
+
+                        from:
+                            leave.from_date,
+
+                        to:
+                            leave.to_date,
+                    })
                 );
+
+                setTeacherLeaves(formattedLeaves);
             }
         } catch (err) {
             console.error(err);
@@ -116,13 +131,13 @@ export function useLeaveManagement(
     const filteredLeaves =
         currentLeaves.filter((leave) => {
             const searchText = [
-                leave.teacher_name,
-                leave.student_name,
-                leave.reason,
-                leave.leave_type,
-                leave.batch,
-                leave.division,
-                leave.section,
+                leave.teacher_name || "",
+                leave.student_name || "",
+                leave.reason || "",
+                leave.leave_type || "",
+                leave.batch || "",
+                leave.division || "",
+                leave.section || "",
             ]
                 .join(" ")
                 .toLowerCase();
@@ -135,8 +150,12 @@ export function useLeaveManagement(
             const statusMatch =
                 leaveFilter === "all"
                     ? true
-                    : leave.status.toLowerCase() ===
-                    leaveFilter.toLowerCase();
+                    : (leave.status || "")
+                        .trim()
+                        .toLowerCase() ===
+                    leaveFilter
+                        .trim()
+                        .toLowerCase();
 
             return searchMatch && statusMatch;
         });
@@ -192,7 +211,7 @@ export function useLeaveManagement(
                     "Teacher leave approved"
                 );
 
-                fetchLeaves();
+                await fetchLeaves();
             } else {
                 showToast(
                     data.error || "Failed",
@@ -238,7 +257,7 @@ export function useLeaveManagement(
                     "Teacher leave rejected"
                 );
 
-                fetchLeaves();
+                await fetchLeaves();
             } else {
                 showToast(
                     data.error || "Failed",
@@ -285,7 +304,7 @@ export function useLeaveManagement(
                         "Student leave approved"
                     );
 
-                    fetchLeaves();
+                    await fetchLeaves();
                 } else {
                     showToast(
                         data.error || "Failed",
@@ -332,7 +351,7 @@ export function useLeaveManagement(
                         "Student leave rejected"
                     );
 
-                    fetchLeaves();
+                    await fetchLeaves();
                 } else {
                     showToast(
                         data.error || "Failed",
@@ -386,7 +405,7 @@ export function useLeaveManagement(
 
         filteredLeaves,
 
-        leaveStats: leaveCounts,
+        leaveCounts,
 
         approveTeacherLeave,
         rejectTeacherLeave,
