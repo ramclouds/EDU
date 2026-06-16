@@ -35,7 +35,6 @@ from utils.assets import (
 from utils.assignments import (
     SubmitAssignmentAPI,
     GetStudentAssignmentsAPI,
-    TeacherAssignedClassesAPI,
     CreateAssignmentAPI,
     TeacherAssignmentsAPI,
     AssignmentSubmissionListAPI,
@@ -79,12 +78,21 @@ from utils.attendance import (
     AttendanceMarkAPI,
     GetAttendanceByDateAPI,
     DownloadTeacherAttendanceReportAPI,
+    AttendanceFilterOptionsAPI,
+    AdminAttendanceStatsAPI,
+    AdminAttendanceListAPI,
+    UpdateAttendanceStatusAPI,
+    MarkAllAttendanceAPI,
 )
 
 from utils.timetable import (
     StudentTimetableAPI,
     TeacherTimetableAPI,
     DownloadTeacherTimetablePDFAPI,
+    TimetableLectureAPI,
+    AdminTimetableAPI,
+    TimetableOptionsAPI,
+    AdminTimetablePDFAPI,
 )
 
 from utils.examResult import (
@@ -149,17 +157,13 @@ def create_app():
         if request.method == "OPTIONS":
             return jsonify({"message": "OK"}), 200
 
-    # ==================================================
     # HEALTH
-    # ==================================================
 
     @app.route("/")
     def health():
         return {"status": "API Running"}, 200
 
-    # ==================================================
     # AUTH
-    # ==================================================
 
     app.add_url_rule("/api/login", view_func=Login.as_view("login"), methods=["POST"])
 
@@ -167,9 +171,7 @@ def create_app():
         "/api/signup", view_func=SignUp.as_view("signup"), methods=["POST"]
     )
 
-    # ==================================================
     # STUDENT
-    # ==================================================
 
     app.add_url_rule(
         "/api/student/<int:id>",
@@ -189,9 +191,7 @@ def create_app():
         methods=["PUT"],
     )
 
-    # ==================================================
     # TEACHER
-    # ==================================================
 
     app.add_url_rule(
         "/api/<int:id>/teacher",
@@ -233,9 +233,8 @@ def create_app():
         methods=["PUT"],
     )
 
-    # ==================================================
     # ASSETS MANAGEMENT
-    # ==================================================
+
     app.add_url_rule(
         "/api/assets",
         view_func=GetAssetsAPI.as_view("get_assets"),
@@ -276,9 +275,8 @@ def create_app():
         view_func=GetDeletedAssetsAPI.as_view("deleted_assets"),
         methods=["GET"],
     )
-    # ==================================================
+
     # TEACHER ASSIGNMENTS (NEW)
-    # ==================================================
 
     app.add_url_rule(
         "/api/teacher/<int:teacher_id>/assigned-classes",
@@ -326,9 +324,7 @@ def create_app():
         methods=["POST"],
     )
 
-    # ==================================================
     # STUDENT ASSIGNMENTS
-    # ==================================================
 
     app.add_url_rule(
         "/api/assignments/<int:student_id>",
@@ -342,9 +338,7 @@ def create_app():
         methods=["POST"],
     )
 
-    # ==================================================
     # ANNOUNCEMENTS
-    # ==================================================
 
     app.add_url_rule(
         "/api/announcements",
@@ -376,9 +370,8 @@ def create_app():
         methods=["POST"],
     )
 
-    # ==================================================
     # NOTIFICATIONS
-    # ==================================================
+
     app.add_url_rule(
         "/api/notifications",
         view_func=NotificationsAPI.as_view("notifications"),
@@ -415,9 +408,7 @@ def create_app():
         methods=["GET"],
     )
 
-    # ==================================================
     # LEAVES
-    # ==================================================
 
     app.add_url_rule(
         "/api/admin/teacher/leaves",
@@ -534,9 +525,40 @@ def create_app():
         ),
     )
 
-    # ==================================================
+    # ADMIN ATTENDANCE
+
+    app.add_url_rule(
+        "/api/admin/attendance/filters",
+        view_func=AttendanceFilterOptionsAPI.as_view("attendance_filters"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/attendance/stats",
+        view_func=AdminAttendanceStatsAPI.as_view("admin_attendance_stats"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/attendance/list",
+        view_func=AdminAttendanceListAPI.as_view("admin_attendance_list"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/attendance/update",
+        view_func=UpdateAttendanceStatusAPI.as_view("admin_attendance_update"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/attendance/mark-all",
+        view_func=MarkAllAttendanceAPI.as_view("admin_attendance_mark_all"),
+        methods=["POST"],
+    )
+
     # ACADEMICS
-    # ==================================================
+
     app.add_url_rule(
         "/api/timetable/<int:student_id>",
         view_func=StudentTimetableAPI.as_view("timetable"),
@@ -557,9 +579,48 @@ def create_app():
         methods=["GET"],
     )
 
+    # ADMIN TIMETABLE MANAGEMENT
+    app.add_url_rule(
+        "/api/admin/timetable/options",
+        view_func=TimetableOptionsAPI.as_view("timetable_options"),
+        methods=["GET"],
+    )
+    # CREATE LECTURE
+    app.add_url_rule(
+        "/api/admin/timetable",
+        view_func=TimetableLectureAPI.as_view("create_timetable_lecture"),
+        methods=["POST"],
+    )
+
+    # LOAD TIMETABLE
+    app.add_url_rule(
+        "/api/admin/timetable",
+        view_func=AdminTimetableAPI.as_view("admin_timetable"),
+        methods=["GET"],
+    )
+
+    # UPDATE LECTURE
+    app.add_url_rule(
+        "/api/admin/timetable/<int:lecture_id>",
+        view_func=TimetableLectureAPI.as_view("update_timetable_lecture"),
+        methods=["PUT"],
+    )
+
+    # DELETE LECTURE
+    app.add_url_rule(
+        "/api/admin/timetable/<int:lecture_id>",
+        view_func=TimetableLectureAPI.as_view("delete_timetable_lecture"),
+        methods=["DELETE"],
+    )
     app.add_url_rule(
         "/api/performance/<int:student_id>",
         view_func=PerformanceAPI.as_view("performance"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/timetable/pdf",
+        view_func=AdminTimetablePDFAPI.as_view("admin_timetable_pdf"),
         methods=["GET"],
     )
     # ================= TEACHER EXAM RESULT =================
@@ -633,9 +694,7 @@ def create_app():
         methods=["GET"],
     )
 
-    # ==================================================
     # LIBRARY / HOSTEL
-    # ==================================================
 
     app.add_url_rule(
         "/api/library/<int:student_id>",
@@ -664,19 +723,11 @@ def create_app():
         methods=["GET"],
     )
 
-    # ==================================================
     # FILE SERVING
-    # ==================================================
 
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-    # Absolute folders
     SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
-
-    print("BASE_DIR:", BASE_DIR)
-    print("SUBMITTED_FOLDER:", SUBMITTED_FOLDER)
-    print("ASSIGNMENT_FOLDER:", TEACHER_ASSIGNMENT_FOLDER)
 
     # =============================
     # STUDENT SUBMITTED FILES
@@ -732,9 +783,7 @@ def create_app():
                 return jsonify({"error": "File not found"}), 404
 
             directory = os.path.dirname(full_path)
-
             actual_filename = os.path.basename(full_path)
-
             response = send_from_directory(
                 directory, actual_filename, as_attachment=False
             )
@@ -752,9 +801,8 @@ def create_app():
 
             return jsonify({"error": str(e)}), 500
 
-    # ==================================================
     # ERROR HANDLERS
-    # ==================================================
+
     @app.errorhandler(404)
     def not_found(e):
         return jsonify({"error": "API not found"}), 404

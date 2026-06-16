@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { BASE_URL } from "../../config/appConfig";
 
 export function useTeacherAttendance({
@@ -15,7 +15,7 @@ export function useTeacherAttendance({
     );
     const [selectedClass, setSelectedClass] = useState(null);
     const [selectedDate, setSelectedDate] = useState("");
-    const dashboardAttendanceChartRef = useRef(null);
+    const [attendanceOwner, setAttendanceOwner] = useState(null);
     const [attendanceLoading, setAttendanceLoading] = useState(false);
     const [dashboardAttendance, setDashboardAttendance] = useState({
         totalClasses: 0,
@@ -121,17 +121,24 @@ export function useTeacherAttendance({
             // 3️⃣ Existing Attendance
             try {
                 const res2 = await fetchWithAuth(
-                    `${BASE_URL}/attendance?academic_class_id=${selectedClassObj.academic_class_id}&subject_id=${selectedClassObj.subject_id}&date=${date}`
+                    `${BASE_URL}/attendance`
+                    + `?academic_class_id=${selectedClassObj.academic_class_id}`
+                    + `&date=${date}`
                 );
 
                 const existing = await res2.json();
 
                 Object.keys(existing || {}).forEach((id) => {
+
                     initial[id] = {
                         status: existing[id].status || existing[id],
-                        remarks: existing[id].remarks || ""
+                        remarks: existing[id].remarks || "",
+                        marked_by: existing[id].marked_by || "Teacher",
+                        updated_at: existing[id].updated_at,
                     };
                 });
+
+                setAttendanceOwner(existing?.meta?.marked_by || null);
 
             } catch {
                 // no data → ignore
@@ -150,7 +157,16 @@ export function useTeacherAttendance({
 
     // ================= MARK =================
     const markAttendance = (studentId, status) => {
-        const updated = {
+
+        if (attendanceOwner === "Admin") {
+
+            showToast(
+                "Attendance already marked by Admin",
+                "warning"
+            );
+
+            return;
+        } const updated = {
             ...attendance,
             [studentId]: {
                 ...attendance[studentId],
@@ -176,6 +192,16 @@ export function useTeacherAttendance({
     };
 
     const markAll = (status) => {
+
+        if (attendanceOwner === "Admin") {
+
+            showToast(
+                "Admin attendance cannot be modified",
+                "warning"
+            );
+
+            return;
+        }
         const updated = {};
 
         students.forEach((s) => {
@@ -264,14 +290,13 @@ export function useTeacherAttendance({
                 let dayAbsent = 0;
                 let dayLate = 0;
 
-                for (const cls of assignedClasses) {
+                for (const cls of uniqueClasses) {
 
                     try {
 
                         const res = await fetchWithAuth(
                             `${BASE_URL}/attendance`
                             + `?academic_class_id=${cls.academic_class_id}`
-                            + `&subject_id=${cls.subject_id}`
                             + `&date=${formatted}`
                         );
 
@@ -317,14 +342,13 @@ export function useTeacherAttendance({
 
                 if (formatted === getTodayDate()) {
 
-                    for (const cls of assignedClasses) {
+                    for (const cls of uniqueClasses) {
 
                         try {
 
                             const res = await fetchWithAuth(
                                 `${BASE_URL}/attendance`
                                 + `?academic_class_id=${cls.academic_class_id}`
-                                + `&subject_id=${cls.subject_id}`
                                 + `&date=${formatted}`
                             );
 
@@ -346,7 +370,6 @@ export function useTeacherAttendance({
 
                             todayClassAttendance.push({
                                 class_name: cls.class_name,
-                                subject_name: cls.subject_name,
                                 present,
                                 absent,
                                 late,
@@ -414,8 +437,13 @@ export function useTeacherAttendance({
 
     // ================= SAVE =================
     const saveAttendance = async () => {
-        if (!selectedClass || !selectedDate) {
-            showToast("Select class and date", "error");
+        if (attendanceOwner === "Admin") {
+
+            showToast(
+                "Admin already marked this attendance",
+                "warning"
+            );
+
             return;
         }
 
@@ -424,13 +452,8 @@ export function useTeacherAttendance({
 
             const payload = {
                 academic_class_id: selectedClass.academic_class_id,
-
-                subject_id: selectedClass.subject_id,
-
                 teacher_id: user?.id,
-
                 date: selectedDate,
-
                 attendance: Object.keys(attendance).map((id) => ({
                     student_id: Number(id),
                     status: attendance[id]?.status,
@@ -490,10 +513,23 @@ export function useTeacherAttendance({
     }, [activeSection]);
     // ================= AUTO LOAD =================
     useEffect(() => {
-        if (selectedClass && selectedDate) {
-            fetchStudents(selectedClass, selectedDate);
+
+        if (
+            selectedClass &&
+            selectedDate
+
+        ) {
+
+            fetchStudents(
+                selectedClass,
+                selectedDate
+            );
         }
-    }, [selectedClass, selectedDate]);
+
+    }, [
+        selectedClass,
+        selectedDate
+    ]);
 
     // =============== Download Report ============
     const downloadAttendanceReport = async () => {
@@ -528,7 +564,6 @@ export function useTeacherAttendance({
             const url =
                 `${BASE_URL}/teacher/attendance/report`
                 + `?academic_class_id=${selectedClass.academic_class_id}`
-                + `&subject_id=${selectedClass.subject_id}`
                 + `&teacher_id=${user.id}`
                 + `&month=${Number(month)}`
                 + `&year=${year}`;
@@ -629,6 +664,7 @@ export function useTeacherAttendance({
         setSelectedClass,
         selectedDate,
         setSelectedDate,
+        attendanceOwner,
         selectedMonth,
         setSelectedMonth,
         attendanceCounts,

@@ -1,12 +1,13 @@
 from flask import jsonify, send_file, request
 from flask.views import MethodView
-from sqlalchemy import func, extract, case, and_
+from sqlalchemy import func, extract, case, and_, or_
 from sqlalchemy.exc import SQLAlchemyError
+from math import ceil
+from sqlalchemy.orm import joinedload
 from utils.auth import db, Student
-from utils.auth_middleware import login_required
+from utils.auth_middleware import login_required, get_current_user
 from utils.studentDetails import StudentAcademicRecord, AcademicClass, Division, Section
 from utils.teacherDetails import TeacherClass
-from utils.examResult import Subject
 from datetime import datetime
 import calendar
 import io
@@ -15,8 +16,59 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import letter, A4, landscape
 from reportlab.lib import colors
+from utils.teacherDetails import Teacher
 
 logger = logging.getLogger(__name__)
+
+
+class TeacherAttendance(db.Model):
+    __tablename__ = "teacher_attendance"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    teacher_id = db.Column(
+        db.Integer,
+        db.ForeignKey("teachers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    attendance_date = db.Column(db.Date, nullable=False)
+
+    status = db.Column(
+        db.Enum("Present", "Absent", "Late"),
+        nullable=False,
+        default="Present",
+    )
+
+    reason = db.Column(db.String(255))
+    marked_by_role = db.Column(
+        db.Enum("Teacher", "Admin"),
+        nullable=False,
+        default="Admin",
+    )
+
+    marked_by_user_id = db.Column(
+        db.Integer,
+        nullable=True,
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        server_default=db.func.now(),
+        onupdate=db.func.now(),
+    )
+    created_at = db.Column(
+        db.DateTime,
+        server_default=db.func.now(),
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "teacher_id",
+            "attendance_date",
+            name="unique_teacher_attendance",
+        ),
+    )
 
 
 class AttendanceSession(db.Model):
@@ -26,12 +78,73 @@ class AttendanceSession(db.Model):
     academic_class_id = db.Column(
         db.Integer, db.ForeignKey("academic_classes.id"), nullable=False
     )
-    subject_id = db.Column(db.Integer, db.ForeignKey("subjects.id"), nullable=False)
     session_date = db.Column(db.Date, nullable=False)
-    period_no = db.Column(db.Integer)
-    teacher_id = db.Column(db.Integer)
+    teacher_id = db.Column(
+        db.Integer,
+        db.ForeignKey("teachers.id"),
+        nullable=True,
+    )
+
+    marked_by_role = db.Column(
+        db.Enum("Teacher", "Admin"),
+        nullable=False,
+        default="Teacher",
+    )
+
+    marked_by_user_id = db.Column(
+        db.Integer,
+        nullable=True,
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        server_default=db.func.now(),
+        onupdate=db.func.now(),
+    )
     created_at = db.Column(db.DateTime, server_default=db.func.now())
-    subject = db.relationship("Subject", backref="attendance_sessions")
+    __table_args__ = (
+        db.UniqueConstraint(
+            "academic_class_id",
+            "session_date",
+            name="uq_attendance_session",
+        ),
+    )
+
+
+class AttendanceAudit(db.Model):
+
+    __tablename__ = "attendance_audit"
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True,
+    )
+
+    attendance_record_id = db.Column(
+        db.Integer,
+        nullable=False,
+    )
+
+    old_status = db.Column(
+        db.String(20),
+    )
+
+    new_status = db.Column(
+        db.String(20),
+    )
+
+    changed_by_role = db.Column(
+        db.String(20),
+    )
+
+    changed_by_user_id = db.Column(
+        db.Integer,
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        server_default=db.func.now(),
+    )
 
 
 class AttendanceRecord(db.Model):
@@ -47,7 +160,26 @@ class AttendanceRecord(db.Model):
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
     status = db.Column(db.Enum("Present", "Absent", "Late"), nullable=False)
-    remarks = db.Column(db.String(255))
+    remarks = db.Column(
+        db.Text,
+        nullable=True,
+    )
+    marked_by_role = db.Column(
+        db.Enum("Teacher", "Admin"),
+        nullable=False,
+        default="Teacher",
+    )
+
+    marked_by_user_id = db.Column(
+        db.Integer,
+        nullable=True,
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        server_default=db.func.now(),
+        onupdate=db.func.now(),
+    )
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     session = db.relationship("AttendanceSession", backref="attendance_records")
     __table_args__ = (
@@ -58,8 +190,6 @@ class AttendanceRecord(db.Model):
 # =========================================================
 # STUDENT ATTENDANCE SUMMARY API
 # =========================================================
-
-
 class StudentAttendanceAPI(MethodView):
 
     @login_required
@@ -143,12 +273,11 @@ class StudentAttendanceAPI(MethodView):
 
             # RECENT RECORDS
             records_query = (
-                db.session.query(AttendanceRecord, AttendanceSession, Subject)
+                db.session.query(AttendanceRecord, AttendanceSession)
                 .join(
                     AttendanceSession,
                     AttendanceRecord.session_id == AttendanceSession.id,
                 )
-                .join(Subject, AttendanceSession.subject_id == Subject.id)
                 .filter(AttendanceRecord.student_id == student_id)
                 .order_by(AttendanceSession.session_date.desc())
                 .limit(10)
@@ -157,14 +286,12 @@ class StudentAttendanceAPI(MethodView):
 
             records = []
 
-            for attendance, session, subject in records_query:
+            for attendance, session in records_query:
 
                 records.append(
                     {
                         "date": session.session_date.strftime("%d %b %Y"),
                         "day": session.session_date.strftime("%A"),
-                        "subject": subject.subject_name,
-                        "period_no": session.period_no,
                         "status": attendance.status,
                         "remarks": attendance.remarks or "-",
                     }
@@ -191,7 +318,6 @@ class StudentAttendanceAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-
 # =========================================================
 # TEACHER ASSIGNED CLASSES
 # =========================================================
@@ -209,7 +335,6 @@ class TeacherAssignedClassesAPI(MethodView):
             for m in mappings:
 
                 academic = AcademicClass.query.get(m.academic_class_id)
-                subject = Subject.query.get(m.subject_id)
 
                 if academic:
                     division = Division.query.get(academic.division_id)
@@ -222,8 +347,6 @@ class TeacherAssignedClassesAPI(MethodView):
                                 if division and section
                                 else None
                             ),
-                            "subject_id": subject.id if subject else None,
-                            "subject_name": subject.subject_name if subject else None,
                         }
                     )
 
@@ -283,19 +406,20 @@ class StudentsByClassAPI(MethodView):
 # MARK ATTENDANCE API
 # =========================================================
 class AttendanceMarkAPI(MethodView):
-
     @login_required
     def post(self):
 
         try:
+            current_user = get_current_user()
+            if not current_user:
+                return jsonify({"error": "Unauthorized"}), 401
+
             data = request.get_json(silent=True)
             if not data:
                 return jsonify({"error": "JSON body required"}), 400
 
             academic_class_id = data.get("academic_class_id")
-            subject_id = data.get("subject_id")
             teacher_id = data.get("teacher_id")
-            period_no = data.get("period_no")
             date = data.get("date")
 
             attendance_list = data.get("attendance", [])
@@ -303,20 +427,15 @@ class AttendanceMarkAPI(MethodView):
             if not academic_class_id:
                 return jsonify({"error": "academic_class_id required"}), 400
 
-            if not subject_id:
-                return jsonify({"error": "subject_id required"}), 400
-
             if not date:
                 return jsonify({"error": "date required"}), 400
 
             session_date = datetime.strptime(date, "%Y-%m-%d").date()
 
             # CHECK SESSION
-            session = AttendanceSession.query.filter_by(
-                academic_class_id=academic_class_id,
-                subject_id=subject_id,
-                session_date=session_date,
-                period_no=period_no,
+            session = AttendanceSession.query.filter(
+                AttendanceSession.academic_class_id == academic_class_id,
+                AttendanceSession.session_date == session_date,
             ).first()
 
             # CREATE SESSION
@@ -324,14 +443,31 @@ class AttendanceMarkAPI(MethodView):
 
                 session = AttendanceSession(
                     academic_class_id=academic_class_id,
-                    subject_id=subject_id,
                     session_date=session_date,
-                    period_no=period_no,
                     teacher_id=teacher_id,
                 )
 
-                db.session.add(session)
-                db.session.flush()
+                try:
+
+                    db.session.add(session)
+                    db.session.flush()
+
+                except SQLAlchemyError:
+
+                    db.session.rollback()
+                    session = AttendanceSession.query.filter(
+                        AttendanceSession.academic_class_id == academic_class_id,
+                        AttendanceSession.session_date == session_date,
+                    ).first()
+
+                    if not session:
+                        raise
+
+            session.marked_by_role = (
+                "Admin" if current_user.__class__.__name__ == "Admin" else "Teacher"
+            )
+
+            session.marked_by_user_id = current_user.id
 
             # SAVE RECORDS
             for item in attendance_list:
@@ -348,6 +484,8 @@ class AttendanceMarkAPI(MethodView):
 
                     existing.status = status
                     existing.remarks = remarks
+                    existing.marked_by_role = "Teacher"
+                    existing.marked_by_user_id = teacher_id
 
                 else:
 
@@ -357,6 +495,8 @@ class AttendanceMarkAPI(MethodView):
                             student_id=student_id,
                             status=status,
                             remarks=remarks,
+                            marked_by_role="Teacher",
+                            marked_by_user_id=teacher_id,
                         )
                     )
 
@@ -386,15 +526,11 @@ class GetAttendanceByDateAPI(MethodView):
     def get(self):
         try:
             academic_class_id = request.args.get("academic_class_id")
-            subject_id = request.args.get("subject_id")
-            period_no = request.args.get("period_no")
             date = request.args.get("date")
             date_obj = datetime.strptime(date, "%Y-%m-%d").date()
             session = AttendanceSession.query.filter_by(
                 academic_class_id=academic_class_id,
-                subject_id=subject_id,
                 session_date=date_obj,
-                period_no=period_no,
             ).first()
 
             if not session:
@@ -404,13 +540,29 @@ class GetAttendanceByDateAPI(MethodView):
             result = {}
 
             for r in records:
-                result[r.student_id] = {"status": r.status, "remarks": r.remarks}
+                result[r.student_id] = {
+                    "status": r.status,
+                    "remarks": r.remarks,
+                    "marked_by": getattr(
+                        r,
+                        "marked_by_role",
+                        "Teacher",
+                    ),
+                    "updated_at": (
+                        r.updated_at.strftime("%d %b %Y %I:%M %p")
+                        if getattr(
+                            r,
+                            "updated_at",
+                            None,
+                        )
+                        else None
+                    ),
+                }
             return jsonify(result), 200
 
         except Exception as e:
             logger.exception(e)
             return jsonify({"error": "Something went wrong"}), 500
-
 
 
 # =========================================================
@@ -426,12 +578,11 @@ class DownloadAttendancePDF(MethodView):
             student_id = int(student_id)
 
             records = (
-                db.session.query(AttendanceRecord, AttendanceSession, Subject)
+                db.session.query(AttendanceRecord, AttendanceSession)
                 .join(
                     AttendanceSession,
                     AttendanceRecord.session_id == AttendanceSession.id,
                 )
-                .join(Subject, AttendanceSession.subject_id == Subject.id)
                 .filter(AttendanceRecord.student_id == student_id)
                 .order_by(AttendanceSession.session_date.desc())
                 .all()
@@ -442,15 +593,14 @@ class DownloadAttendancePDF(MethodView):
 
             buffer = io.BytesIO()
             doc = SimpleDocTemplate(buffer)
-            data = [["Date", "Day", "Subject", "Period", "Status", "Remarks"]]
+            data = [["Date", "Day", "Status", "Remarks"]]
 
-            for attendance, session, subject in records:
+            for attendance, session in records:
 
                 data.append(
                     [
                         session.session_date.strftime("%d-%m-%Y"),
                         session.session_date.strftime("%A"),
-                        subject.subject_name,
                         session.period_no or "-",
                         attendance.status,
                         attendance.remarks or "-",
@@ -483,6 +633,7 @@ class DownloadAttendancePDF(MethodView):
             logger.exception(e)
             return jsonify({"error": "Something went wrong"}), 500
 
+
 # =========================================================
 # DOWNLOAD MONTHLY ATTENDANCE REPORT (TEACHER SIDE)
 # =========================================================
@@ -497,126 +648,67 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
             # QUERY PARAMS
             # =====================================================
 
-            academic_class_id = request.args.get(
-                "academic_class_id",
-                type=int
-            )
+            academic_class_id = request.args.get("academic_class_id", type=int)
 
-            subject_id = request.args.get(
-                "subject_id",
-                type=int
-            )
+            subject_id = request.args.get("subject_id", type=int)
 
-            month = request.args.get(
-                "month",
-                type=int
-            )
+            month = request.args.get("month", type=int)
 
-            year = request.args.get(
-                "year",
-                type=int
-            )
+            year = request.args.get("year", type=int)
 
-            teacher_id = request.args.get(
-                "teacher_id",
-                type=int
-            )
+            teacher_id = request.args.get("teacher_id", type=int)
 
             # =====================================================
             # VALIDATION
             # =====================================================
 
             if not academic_class_id:
-                return jsonify({
-                    "error": "academic_class_id required"
-                }), 400
+                return jsonify({"error": "academic_class_id required"}), 400
 
             if not subject_id:
-                return jsonify({
-                    "error": "subject_id required"
-                }), 400
+                return jsonify({"error": "subject_id required"}), 400
 
             if not month:
-                return jsonify({
-                    "error": "month required"
-                }), 400
+                return jsonify({"error": "month required"}), 400
 
             if not year:
-                return jsonify({
-                    "error": "year required"
-                }), 400
+                return jsonify({"error": "year required"}), 400
 
             # =====================================================
             # FETCH CLASS + SUBJECT
             # =====================================================
 
-            academic_class = AcademicClass.query.get(
-                academic_class_id
-            )
-
-            subject = Subject.query.get(subject_id)
+            academic_class = AcademicClass.query.get(academic_class_id)
 
             if not academic_class:
-                return jsonify({
-                    "error": "Class not found"
-                }), 404
+                return jsonify({"error": "Class not found"}), 404
 
-            if not subject:
-                return jsonify({
-                    "error": "Subject not found"
-                }), 404
+            division = Division.query.get(academic_class.division_id)
 
-            division = Division.query.get(
-                academic_class.division_id
-            )
+            section = Section.query.get(academic_class.section_id)
 
-            section = Section.query.get(
-                academic_class.section_id
-            )
-
-            class_name = (
-                f"{division.division_name} "
-                f"{section.section_name}"
-            )
+            class_name = f"{division.division_name} " f"{section.section_name}"
 
             # =====================================================
             # FETCH SESSIONS
             # =====================================================
 
             sessions = (
-                AttendanceSession.query
-                .filter(
-                    AttendanceSession.academic_class_id
-                    == academic_class_id,
-
-                    AttendanceSession.subject_id
-                    == subject_id,
-
-                    AttendanceSession.teacher_id
-                    == teacher_id,
-
+                AttendanceSession.query.filter(
+                    AttendanceSession.academic_class_id == academic_class_id,
+                    AttendanceSession.subject_id == subject_id,
+                    AttendanceSession.teacher_id == teacher_id,
                     and_(
-                        db.extract(
-                            "month",
-                            AttendanceSession.session_date
-                        ) == month,
-
-                        db.extract(
-                            "year",
-                            AttendanceSession.session_date
-                        ) == year
-                    )
+                        db.extract("month", AttendanceSession.session_date) == month,
+                        db.extract("year", AttendanceSession.session_date) == year,
+                    ),
                 )
-                .order_by(
-                    AttendanceSession.session_date.asc()
-                )
+                .order_by(AttendanceSession.session_date.asc())
                 .all()
             )
 
             if not sessions:
-                return jsonify({
-                    "error": "No attendance found"
-                }), 404
+                return jsonify({"error": "No attendance found"}), 404
 
             session_ids = [s.id for s in sessions]
 
@@ -625,29 +717,14 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
             # =====================================================
 
             records = (
-                db.session.query(
-                    AttendanceRecord,
-                    AttendanceSession,
-                    Student
-                )
+                db.session.query(AttendanceRecord, AttendanceSession, Student)
                 .join(
                     AttendanceSession,
-                    AttendanceRecord.session_id
-                    == AttendanceSession.id
+                    AttendanceRecord.session_id == AttendanceSession.id,
                 )
-                .join(
-                    Student,
-                    AttendanceRecord.student_id
-                    == Student.id
-                )
-                .filter(
-                    AttendanceRecord.session_id.in_(
-                        session_ids
-                    )
-                )
-                .order_by(
-                    AttendanceSession.session_date.asc()
-                )
+                .join(Student, AttendanceRecord.student_id == Student.id)
+                .filter(AttendanceRecord.session_id.in_(session_ids))
+                .order_by(AttendanceSession.session_date.asc())
                 .all()
             )
 
@@ -678,10 +755,9 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
                 f"""
                 <b>Attendance Report</b><br/>
                 Class: {class_name}<br/>
-                Subject: {subject.subject_name}<br/>
                 Month: {calendar.month_name[month]} {year}
                 """,
-                styles["Title"]
+                styles["Title"],
             )
 
             elements.append(title)
@@ -691,66 +767,43 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
             # TABLE
             # =====================================================
 
-            data = [[
-                "Date",
-                "Period",
-                "Roll No",
-                "Student Name",
-                "Status",
-                "Remarks"
-            ]]
+            data = [["Date", "Roll No", "Student Name", "Status", "Remarks"]]
 
             for attendance, session, student in records:
 
-                student_record = (
-                    StudentAcademicRecord.query
-                    .filter_by(
-                        student_id=student.id,
-                        academic_class_id=academic_class_id,
-                        is_current=True
-                    )
-                    .first()
+                student_record = StudentAcademicRecord.query.filter_by(
+                    student_id=student.id,
+                    academic_class_id=academic_class_id,
+                    is_current=True,
+                ).first()
+
+                roll_number = student_record.roll_number if student_record else "-"
+
+                data.append(
+                    [
+                        session.session_date.strftime("%d-%m-%Y"),
+                        session.period_no or "-",
+                        roll_number,
+                        f"{student.first_name} " f"{student.last_name}",
+                        attendance.status,
+                        attendance.remarks or "-",
+                    ]
                 )
-
-                roll_number = (
-                    student_record.roll_number
-                    if student_record else "-"
-                )
-
-                data.append([
-                    session.session_date.strftime(
-                        "%d-%m-%Y"
-                    ),
-
-                    session.period_no or "-",
-
-                    roll_number,
-
-                    f"{student.first_name} "
-                    f"{student.last_name}",
-
-                    attendance.status,
-
-                    attendance.remarks or "-"
-                ])
 
             table = Table(data, repeatRows=1)
 
             table.setStyle(
-                TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4F46E5")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-
-                    ("GRID", (0, 0), (-1, -1), 1, colors.black),
-
-                    ("FONTSIZE", (0, 0), (-1, -1), 9),
-
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
-
-                    ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
-                ])
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4F46E5")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                        ("FONTSIZE", (0, 0), (-1, -1), 9),
+                        ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+                        ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+                    ]
+                )
             )
 
             elements.append(table)
@@ -763,24 +816,643 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
 
             buffer.seek(0)
 
-            filename = (
-                f"attendance_"
-                f"{class_name}_"
-                f"{subject.subject_name}_"
-                f"{month}_{year}.pdf"
-            )
+            filename = f"attendance_" f"{class_name}_" f"{month}_{year}.pdf"
 
             return send_file(
                 buffer,
                 as_attachment=True,
                 download_name=filename,
-                mimetype="application/pdf"
+                mimetype="application/pdf",
             )
 
         except Exception as e:
 
             logger.exception(e)
 
-            return jsonify({
-                "error": "Failed to generate report"
-            }), 500
+            return jsonify({"error": "Failed to generate report"}), 500
+
+
+# =========================================================
+# ATTENDANCE FILTER OPTIONS API
+# =========================================================
+class AttendanceFilterOptionsAPI(MethodView):
+
+    @login_required
+    def get(self):
+
+        try:
+
+            classes = (
+                db.session.query(
+                    AcademicClass.id,
+                    Division.division_name,
+                    Section.section_name,
+                )
+                .join(
+                    Division,
+                    Division.id == AcademicClass.division_id,
+                )
+                .join(
+                    Section,
+                    Section.id == AcademicClass.section_id,
+                )
+                .order_by(
+                    Division.division_name,
+                    Section.section_name,
+                )
+                .all()
+            )
+
+            class_list = []
+            divisions = []
+
+            for cls in classes:
+
+                class_list.append(
+                    {
+                        "id": cls.id,
+                        "class_name": (f"{cls.division_name} " f"{cls.section_name}"),
+                        "division": cls.division_name,
+                        "section": cls.section_name,
+                    }
+                )
+
+                if cls.division_name not in divisions:
+                    divisions.append(cls.division_name)
+
+            return (
+                jsonify(
+                    {
+                        "classes": class_list,
+                        "divisions": divisions,
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load filters"}), 500
+
+
+# =========================================================
+# ADMIN ATTENDANCE STATS API
+# =========================================================
+class AdminAttendanceStatsAPI(MethodView):
+
+    @login_required
+    def get(self):
+
+        try:
+
+            role = request.args.get("role", "students")
+            date = request.args.get("date")
+
+            if not date:
+                return jsonify({"error": "date required"}), 400
+
+            attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
+
+            # =====================================================
+            # STUDENT ATTENDANCE
+            # =====================================================
+
+            if role == "students":
+
+                query = (
+                    db.session.query(AttendanceRecord)
+                    .join(
+                        AttendanceSession,
+                        AttendanceRecord.session_id == AttendanceSession.id,
+                    )
+                    .filter(AttendanceSession.session_date == attendance_date)
+                )
+
+                total = query.count()
+
+                present = query.filter(AttendanceRecord.status == "Present").count()
+
+                absent = query.filter(AttendanceRecord.status == "Absent").count()
+
+                late = query.filter(AttendanceRecord.status == "Late").count()
+
+                percentage = round((present / total) * 100, 2) if total else 0
+
+                return (
+                    jsonify(
+                        {
+                            "present": present,
+                            "absent": absent,
+                            "late": late,
+                            "total": total,
+                            "percentage": percentage,
+                        }
+                    ),
+                    200,
+                )
+
+            # =====================================================
+            # TEACHER ATTENDANCE
+            # =====================================================
+
+            teacher_query = TeacherAttendance.query.filter(
+                TeacherAttendance.attendance_date == attendance_date
+            )
+
+            total = teacher_query.count()
+            present = teacher_query.filter(
+                TeacherAttendance.status == "Present"
+            ).count()
+
+            absent = teacher_query.filter(TeacherAttendance.status == "Absent").count()
+            late = teacher_query.filter(TeacherAttendance.status == "Late").count()
+            percentage = round((present / total) * 100, 2) if total else 0
+
+            return (
+                jsonify(
+                    {
+                        "present": present,
+                        "absent": absent,
+                        "late": late,
+                        "total": total,
+                        "percentage": percentage,
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+
+            logger.exception(e)
+
+            return jsonify({"error": "Failed to fetch attendance stats"}), 500
+
+
+# =========================================================
+# ADMIN ATTENDANCE LIST API
+# =========================================================
+class AdminAttendanceListAPI(MethodView):
+
+    @login_required
+    def get(self):
+
+        try:
+
+            role = request.args.get("role", "students")
+            search = request.args.get("search", "").strip()
+            date = request.args.get("date")
+            status = request.args.get("status")
+            class_id = request.args.get("class_id", type=int)
+            division = request.args.get("division")
+            page = request.args.get("page", 1, type=int)
+            limit = request.args.get("limit", 20, type=int)
+
+            if page < 1:
+                page = 1
+
+            if limit > 100:
+                limit = 100
+
+            offset = (page - 1) * limit
+
+            # =====================================================
+            # STUDENTS
+            # =====================================================
+
+            if role == "students":
+
+                if not date:
+                    return jsonify({"error": "date required"}), 400
+
+                attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
+
+                query = (
+                    db.session.query(
+                        Student.id.label("student_id"),
+                        Student.first_name,
+                        Student.last_name,
+                        StudentAcademicRecord.roll_number,
+                        AcademicClass.id.label("class_id"),
+                        Division.division_name,
+                        Section.section_name,
+                        AttendanceSession.id.label("session_id"),
+                        AttendanceRecord.id.label("record_id"),
+                        AttendanceRecord.status,
+                        AttendanceRecord.remarks,
+                    )
+                    .select_from(Student)
+                    .join(
+                        StudentAcademicRecord,
+                        and_(
+                            StudentAcademicRecord.student_id == Student.id,
+                            StudentAcademicRecord.is_current.is_(True),
+                        ),
+                    )
+                    .join(
+                        AcademicClass,
+                        AcademicClass.id == StudentAcademicRecord.academic_class_id,
+                    )
+                    .join(
+                        Division,
+                        Division.id == AcademicClass.division_id,
+                    )
+                    .join(
+                        Section,
+                        Section.id == AcademicClass.section_id,
+                    )
+                    .outerjoin(
+                        AttendanceSession,
+                        and_(
+                            AttendanceSession.academic_class_id == AcademicClass.id,
+                            AttendanceSession.session_date == attendance_date,
+                        ),
+                    )
+                    .outerjoin(
+                        AttendanceRecord,
+                        and_(
+                            AttendanceRecord.session_id == AttendanceSession.id,
+                            AttendanceRecord.student_id == Student.id,
+                        ),
+                    )
+                )
+
+                if division:
+                    query = query.filter(Division.division_name == division)
+
+                if class_id:
+                    query = query.filter(AcademicClass.id == class_id)
+
+                if status:
+
+                    if status == "Not Marked":
+
+                        query = query.filter(AttendanceRecord.id.is_(None))
+
+                    else:
+
+                        query = query.filter(AttendanceRecord.status == status)
+
+                if search:
+
+                    query = query.filter(
+                        or_(
+                            Student.first_name.ilike(f"%{search}%"),
+                            Student.last_name.ilike(f"%{search}%"),
+                        )
+                    )
+                total = query.count()
+
+                records = (
+                    query.order_by(AttendanceSession.session_date.desc())
+                    .offset(offset)
+                    .limit(limit)
+                    .all()
+                )
+
+                items = []
+
+                for row in records:
+
+                    items.append(
+                        {
+                            "record_id": row.record_id,
+                            "student_id": row.student_id,
+                            "session_id": row.session_id,
+                            "name": f"{row.first_name} {row.last_name}",
+                            "role": "Student",
+                            "roll_number": row.roll_number,
+                            "class_id": row.class_id,
+                            "status": row.status if row.status else "Not Marked",
+                            "reason": row.remarks,
+                            "date": attendance_date.strftime("%d %b %Y"),
+                        }
+                    )
+
+                return (
+                    jsonify(
+                        {
+                            "items": items,
+                            "total": total,
+                            "page": page,
+                            "pages": ceil(total / limit),
+                        }
+                    ),
+                    200,
+                )
+
+            # =====================================================
+            # TEACHERS
+            # =====================================================
+            if not date:
+                return jsonify({"error": "date required"}), 400
+
+            attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
+
+            query = (
+                db.session.query(
+                    Teacher.id.label("teacher_id"),
+                    Teacher.first_name,
+                    Teacher.last_name,
+                    TeacherAttendance.id.label("record_id"),
+                    TeacherAttendance.status,
+                    TeacherAttendance.reason,
+                    TeacherAttendance.attendance_date,
+                    TeacherAttendance.marked_by_role,
+                    TeacherAttendance.updated_at,
+                )
+                .select_from(Teacher)
+                .outerjoin(
+                    TeacherAttendance,
+                    and_(
+                        TeacherAttendance.teacher_id == Teacher.id,
+                        TeacherAttendance.attendance_date == attendance_date,
+                    ),
+                )
+            )
+
+            if status:
+
+                if status == "Not Marked":
+                    query = query.filter(TeacherAttendance.id.is_(None))
+
+                else:
+
+                    query = query.filter(TeacherAttendance.status == status)
+
+            if search:
+
+                query = query.filter(
+                    or_(
+                        Teacher.first_name.ilike(f"%{search}%"),
+                        Teacher.last_name.ilike(f"%{search}%"),
+                    )
+                )
+
+            total = query.count()
+
+            records = (
+                query.order_by(Teacher.first_name.asc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+
+            items = []
+
+            for row in records:
+
+                items.append(
+                    {
+                        "record_id": row.record_id,
+                        "teacher_id": row.teacher_id,
+                        "name": f"{row.first_name} {row.last_name}",
+                        "role": "Teacher",
+                        "status": (row.status if row.status else "Not Marked"),
+                        "reason": row.reason,
+                        "date": attendance_date.strftime("%d %b %Y"),
+                        "marked_by": row.marked_by_role,
+                        "updated_at": (
+                            row.updated_at.strftime("%d %b %Y %H:%M")
+                            if row.updated_at
+                            else None
+                        ),
+                    }
+                )
+
+            return (
+                jsonify(
+                    {
+                        "items": items,
+                        "total": total,
+                        "page": page,
+                        "pages": ceil(total / limit),
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+
+            logger.exception(e)
+
+            return jsonify({"error": "Failed to fetch attendance"}), 500
+
+
+# =========================================================
+# UPDATE ATTENDANCE STATUS API
+# =========================================================
+class UpdateAttendanceStatusAPI(MethodView):
+
+    @login_required
+    def put(self):
+
+        try:
+
+            current_user = get_current_user()
+
+            if not current_user:
+                return jsonify({"error": "Unauthorized"}), 401
+
+            data = request.get_json()
+
+            role = data.get("role")
+            record_id = data.get("record_id")
+
+            status = data.get("status")
+            remarks = data.get("remarks", "")
+
+            VALID_STATUS = [
+                "Present",
+                "Absent",
+                "Late",
+            ]
+
+            if status not in VALID_STATUS:
+                return jsonify({"error": "Invalid status"}), 400
+
+            # ==========================================
+            # STUDENT ATTENDANCE
+            # ==========================================
+            if role == "students":
+
+                if record_id:
+
+                    record = AttendanceRecord.query.get(record_id)
+
+                    if not record:
+                        return jsonify({"error": "Attendance record not found"}), 404
+
+                    record.status = status
+                    record.remarks = remarks
+                    record.marked_by_role = "Admin"
+                    record.marked_by_user_id = current_user.id
+
+                else:
+
+                    student_id = data.get("student_id")
+                    session_id = data.get("session_id")
+                    class_id = data.get("class_id")
+                    date = data.get("date")
+
+                    if not student_id:
+                        return jsonify({"error": "student_id required"}), 400
+
+                    if not date:
+                        return jsonify({"error": "date required"}), 400
+
+                    attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
+
+                    session = AttendanceSession.query.filter(
+                        AttendanceSession.academic_class_id == class_id,
+                        AttendanceSession.session_date == attendance_date,
+                    ).first()
+
+                    if not session:
+
+                        session = AttendanceSession(
+                            academic_class_id=class_id,
+                            session_date=attendance_date,
+                            teacher_id=None,
+                            marked_by_role="Admin",
+                            marked_by_user_id=current_user.id,
+                        )
+
+                    db.session.add(session)
+                    db.session.flush()
+
+                record = AttendanceRecord.query.filter_by(
+                    session_id=session.id,
+                    student_id=student_id,
+                ).first()
+
+                if record:
+                    record.status = status
+                    record.remarks = remarks
+
+                else:
+
+                    record = AttendanceRecord(
+                        session_id=session.id,
+                        student_id=student_id,
+                        status=status,
+                        remarks=remarks,
+                        marked_by_role="Admin",
+                        marked_by_user_id=current_user.id,
+                    )
+
+                    db.session.add(record)
+
+            # ==========================================
+            # TEACHER ATTENDANCE
+            # ==========================================
+            else:
+
+                if record_id:
+
+                    teacher_record = TeacherAttendance.query.get(record_id)
+
+                    if not teacher_record:
+                        return (
+                            jsonify({"error": "Teacher attendance record not found"}),
+                            404,
+                        )
+
+                    teacher_record.status = status
+                    teacher_record.reason = remarks
+                    teacher_record.marked_by_role = "Admin"
+                    teacher_record.marked_by_user_id = current_user.id
+
+                else:
+
+                    teacher_id = data.get("teacher_id")
+
+                    date = data.get("date")
+
+                    if not teacher_id:
+                        return jsonify({"error": "teacher_id required"}), 400
+
+                    if not date:
+                        return jsonify({"error": "date required"}), 400
+
+                    attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
+
+                    teacher_record = TeacherAttendance(
+                        teacher_id=teacher_id,
+                        attendance_date=attendance_date,
+                        status=status,
+                        reason=remarks,
+                        marked_by_role="Admin",
+                        marked_by_user_id=current_user.id,
+                    )
+
+                    db.session.add(teacher_record)
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "message": "Attendance updated successfully",
+                        "record_id": (
+                            record.id if role == "students" else teacher_record.id
+                        ),
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+
+            db.session.rollback()
+            logger.exception(e)
+
+            return jsonify({"error": "Failed to update attendance"}), 500
+
+
+# =========================================================
+# MARK ALL ATTENDANCE API
+# =========================================================
+class MarkAllAttendanceAPI(MethodView):
+
+    @login_required
+    def post(self):
+
+        try:
+
+            data = request.get_json()
+
+            session_id = data.get("session_id")
+            status = data.get("status")
+
+            VALID_STATUS = [
+                "Present",
+                "Absent",
+                "Late",
+            ]
+
+            if status not in VALID_STATUS:
+
+                return jsonify({"error": "Invalid status"}), 400
+
+            session = AttendanceSession.query.get(session_id)
+
+            if not session:
+
+                return jsonify({"error": "Session not found"}), 404
+
+            records = AttendanceRecord.query.filter_by(session_id=session_id).all()
+
+            for record in records:
+
+                record.status = status
+
+            db.session.commit()
+
+            return jsonify({"message": f"All marked {status}"}), 200
+
+        except Exception as e:
+
+            db.session.rollback()
+            logger.exception(e)
+
+            return jsonify({"error": "Failed to mark attendance"}), 500

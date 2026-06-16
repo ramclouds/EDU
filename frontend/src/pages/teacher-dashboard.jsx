@@ -282,7 +282,6 @@ function TeacherDashboard() {
     downloadAttendanceReport,
     dashboardAttendance,
     fetchDashboardAttendance,
-    dashboardAttendanceChartRef,
   } = useTeacherAttendance({
     activeSection,
     fetchWithAuth,
@@ -1703,7 +1702,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   </h2>
 
                   <p className="text-white/80 text-sm mt-1">
-                    Manage subject-wise attendance records and monthly reports
+                    Manage class attendance records and monthly reports
                   </p>
                 </div>
 
@@ -1757,34 +1756,30 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* CLASS + SUBJECT */}
                 <div className="flex flex-col md:col-span-2">
                   <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    Assigned Class & Subject
+                    Assigned Class
                   </label>
 
                   <select
                     value={
-                      attendanceClass
-                        ? `${attendanceClass.academic_class_id}-${attendanceClass.subject_id}`
-                        : ""
+                      attendanceClass ? attendanceClass.academic_class_id : ""
                     }
                     onChange={(e) => {
                       const selected = classes.find(
-                        (c) =>
-                          `${c.academic_class_id}-${c.subject_id}` ===
-                          e.target.value,
+                        (c) => String(c.academic_class_id) === e.target.value,
                       );
 
                       setAttendanceClass(selected || null);
                     }}
                     className="px-4 py-2.5 border rounded-xl text-sm dark:bg-slate-900 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   >
-                    <option value="">Select Assigned Subject</option>
+                    <option value="">Select Class</option>
 
                     {classes.map((c) => (
                       <option
-                        key={`${c.academic_class_id}-${c.subject_id}`}
-                        value={`${c.academic_class_id}-${c.subject_id}`}
+                        key={c.academic_class_id}
+                        value={c.academic_class_id}
                       >
-                        {c.class_name} • {c.subject_name}
+                        {c.class_name}
                       </option>
                     ))}
                   </select>
@@ -1864,7 +1859,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   </h3>
 
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Mark attendance subject-wise for selected class
+                    Mark attendance for selected class
                   </p>
                 </div>
               </div>
@@ -1883,13 +1878,27 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                     >
                       {/* LEFT */}
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
-                          {s.name}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
+                            {s.name}
+                          </p>
+
+                          {attendance[s.student_id]?.marked_by === "Admin" && (
+                            <span className="px-2 py-1 text-[10px] font-medium rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                              Admin Updated
+                            </span>
+                          )}
+                        </div>
 
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Roll No: {s.roll_number} • {s.class_label}
                         </p>
+
+                        {attendance[s.student_id]?.updated_at && (
+                          <p className="text-[11px] text-gray-400 mt-1">
+                            Updated: {attendance[s.student_id].updated_at}
+                          </p>
+                        )}
                       </div>
 
                       {/* RIGHT */}
@@ -2000,10 +2009,10 @@ flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
             {/* ================= FILTERS ================= */}
             <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex flex-wrap gap-3">
               <select
-                value={selectedMyClass}
+                value={selectedClass || ""}
                 onChange={(e) => setSelectedClass(e.target.value)}
                 className="px-4 py-2 border rounded-xl text-sm
-bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100"
+  bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-gray-100"
               >
                 {classOptions.map((item) => (
                   <option key={item} value={item}>
@@ -2075,20 +2084,46 @@ text-xs text-gray-500 dark:text-gray-300 px-4 py-3"
                           return (
                             <div key={period} className="p-3">
                               {slot ? (
-                                <div className="bg-indigo-50 dark:bg-indigo-500/10 p-3 rounded-xl">
-                                  <p className="font-medium">{slot.subject}</p>
-
-                                  <p className="text-xs text-gray-500 dark:text-gray-300">
-                                    {slot.class_name}
+                                <div className="bg-indigo-50 dark:bg-indigo-500/10 p-3 rounded-xl space-y-2">
+                                  <p className="font-semibold text-indigo-700 dark:text-indigo-300">
+                                    {slot.subject}
                                   </p>
 
-                                  <p className="text-[11px] text-gray-400 mt-1">
-                                    {slot.start_time} - {slot.end_time}
+                                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                                    🏫 {slot.class_name}
+                                  </p>
+
+                                  <p className="text-xs text-gray-500">
+                                    🕒 {slot.start_time} - {slot.end_time}
                                   </p>
 
                                   {slot.room && (
-                                    <p className="text-[11px] text-gray-400">
-                                      Room {slot.room}
+                                    <p className="text-xs text-gray-500">
+                                      🚪 Room {slot.room}
+                                    </p>
+                                  )}
+
+                                  <div className="flex flex-wrap gap-2">
+                                    <span
+                                      className={`text-xs px-2 py-1 rounded-full ${
+                                        slot.lecture_type === "Practical"
+                                          ? "bg-green-100 text-green-700"
+                                          : slot.lecture_type === "Sports"
+                                            ? "bg-orange-100 text-orange-700"
+                                            : "bg-blue-100 text-blue-700"
+                                      }`}
+                                    >
+                                      {slot.lecture_type}
+                                    </span>
+
+                                    <span className="text-xs bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded-full">
+                                      Period {slot.period}
+                                    </span>
+                                  </div>
+
+                                  {slot.remarks && (
+                                    <p className="text-xs italic text-gray-500">
+                                      💬 {slot.remarks}
                                     </p>
                                   )}
                                 </div>
@@ -2134,29 +2169,53 @@ border-gray-200 dark:border-slate-700"
                             className="bg-indigo-50 dark:bg-indigo-500/10 p-3 rounded-xl
 flex justify-between items-center"
                           >
-                            <div>
-                              <p className="text-sm font-medium">
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
                                 {item.subject}
                               </p>
 
                               <p className="text-xs text-gray-500 dark:text-gray-300">
-                                {item.class_name}
+                                🏫 {item.class_name}
                               </p>
 
                               {item.room && (
-                                <p className="text-xs text-gray-400">
-                                  Room {item.room}
+                                <p className="text-xs text-gray-500">
+                                  🚪 Room {item.room}
+                                </p>
+                              )}
+
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <span
+                                  className={`text-[11px] px-2 py-1 rounded-full ${
+                                    item.lecture_type === "Practical"
+                                      ? "bg-green-100 text-green-700"
+                                      : item.lecture_type === "Sports"
+                                        ? "bg-orange-100 text-orange-700"
+                                        : "bg-blue-100 text-blue-700"
+                                  }`}
+                                >
+                                  {item.lecture_type}
+                                </span>
+
+                                <span className="text-[11px] bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded-full">
+                                  Period {item.period}
+                                </span>
+                              </div>
+
+                              {item.remarks && (
+                                <p className="text-xs italic text-gray-500 mt-2">
+                                  💬 {item.remarks}
                                 </p>
                               )}
                             </div>
 
                             <div className="text-right">
-                              <p className="text-xs text-gray-400">
+                              <p className="text-xs text-gray-500">
                                 {item.start_time}
                               </p>
 
-                              <p className="text-[11px] text-gray-400">
-                                P-{item.period}
+                              <p className="text-xs text-gray-500">
+                                {item.end_time}
                               </p>
                             </div>
                           </div>
@@ -2168,7 +2227,7 @@ flex justify-between items-center"
               </>
             )}
           </section>
-        )}{" "}
+        )}
         {/*  ============================= TIMETABLE SECTION END =============================  */}
         {/*  ============================= ASSIGNMENTS START =============================  */}
         {activeSection === "assignments" && (
