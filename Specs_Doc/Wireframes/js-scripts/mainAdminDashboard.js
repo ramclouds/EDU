@@ -745,123 +745,323 @@ function downloadCSV() {
 }
 
 // =================== Attendance Section (Admin Dashboard) ======================
-const demoData = [
-    { id: "S101", name: "Rahul Sharma", role: "Student", status: "Present" },
-    { id: "S102", name: "Aisha Khan", role: "Student", status: "Absent" },
-    { id: "T201", name: "Mr. Verma", role: "Teacher", status: "Present" },
-    { id: "ST301", name: "Office Staff", role: "Staff", status: "Present" }
+// ======================= ATTENDANCE MANAGEMENT =======================
+
+// ======================= DEMO DATA =======================
+
+const studentData = [
+    {
+        id: "S101",
+        name: "Rahul Sharma",
+        class: "10th",
+        division: "A",
+        status: "Present"
+    },
+    {
+        id: "S102",
+        name: "Aisha Khan",
+        class: "10th",
+        division: "B",
+        status: "Absent",
+        reason: "Medical Leave"
+    },
+    {
+        id: "S103",
+        name: "Aman Verma",
+        class: "9th",
+        division: "C",
+        status: "Present"
+    }
 ];
 
-function loadAttendance() {
-    const role = document.getElementById('roleFilter').value;
-    const tbody = document.getElementById('attendanceTableBody');
+const teacherData = [
+    {
+        id: "T201",
+        name: "Mr. Verma",
+        status: "Present"
+    },
+    {
+        id: "T202",
+        name: "Mrs. Joshi",
+        status: "Absent",
+        reason: "Personal Leave"
+    }
+];
 
-    tbody.innerHTML = '';
+// ======================= ELEMENTS =======================
 
-    const filtered = demoData.filter(d => {
-        if (role === 'students') return d.role === 'Student';
-        if (role === 'teachers') return d.role === 'Teacher';
-        if (role === 'staff') return d.role === 'Staff';
-    });
+const roleFilter = document.getElementById("roleFilter");
+const classFilter = document.getElementById("classFilter");
+const divisionFilter = document.getElementById("divisionFilter");
+const searchFilter = document.getElementById("searchFilter");
+const dateFilter = document.getElementById("dateFilter");
 
-    let present = 0, absent = 0;
+const tbody = document.getElementById("attendanceTableBody");
 
-    filtered.forEach(d => {
-        if (d.status === "Present") present++;
-        else absent++;
+// ======================= DEFAULT DATE =======================
 
-        tbody.innerHTML += `
-<tr class="hover:bg-gray-50 transition">
+dateFilter.value = new Date().toISOString().split("T")[0];
 
-    <td class="p-3 font-medium text-gray-700">${d.id}</td>
+// ======================= CHART =======================
 
-    <td class="p-3 flex items-center gap-3">
-        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600">
-            ${d.name.charAt(0)}
-        </div>
-        ${d.name}
-    </td>
-
-    <td class="p-3">
-        <span class="px-2 py-1 text-xs rounded-full 
-            ${d.role === 'Student' ? 'bg-blue-100 text-blue-600' :
-                d.role === 'Teacher' ? 'bg-purple-100 text-purple-600' :
-                    'bg-gray-100 text-gray-600'}">
-            ${d.role}
-        </span>
-    </td>
-
-    <td class="p-3">
-        <span class="px-2 py-1 text-xs rounded-full 
-            ${d.status === 'Present' ? 'bg-green-100 text-green-600' :
-                'bg-red-100 text-red-500'}">
-            ${d.status}
-        </span>
-    </td>
-
-    <!-- ✅ REASON COLUMN -->
-    <td class="p-3">
-        ${d.status === 'Absent'
-                ? `<span class="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">
-                    ${d.reason || 'No reason'}
-               </span>`
-                : `<span class="text-xs text-gray-400">—</span>`
-            }
-    </td>
-
-</tr>
-`;
-    });
-
-    const total = present + absent;
-    const percent = total ? ((present / total) * 100).toFixed(1) : 0;
-
-    // ✅ Update stats UI
-    document.getElementById('presentCount').innerText = present;
-    document.getElementById('absentCount').innerText = absent;
-    document.getElementById('totalCount').innerText = total;
-    document.getElementById('percentage').innerText = percent + '%';
-
-    renderChart(present, absent);
-}
-
-let chart;
+let attendanceChart;
 
 function renderChart(present, absent) {
-    const ctx = document.getElementById('attendanceChartA');
 
-    if (chart) chart.destroy();
+    const ctx = document.getElementById("attendanceChartA");
 
-    chart = new Chart(ctx, {
-        type: 'doughnut',
+    if (attendanceChart) {
+        attendanceChart.destroy();
+    }
+
+    attendanceChart = new Chart(ctx, {
+        type: "doughnut",
+
         data: {
-            labels: ['Present', 'Absent'],
+            labels: ["Present", "Absent"],
             datasets: [{
-                data: [present, absent]
+                data: [present, absent],
+                backgroundColor: [
+                    "#22c55e",
+                    "#ef4444"
+                ]
             }]
         },
+
         options: {
-            responsive: false,   // ❗ prevents auto stretching
+            responsive: false,
+
             plugins: {
                 legend: {
-                    position: 'bottom',
-                    labels: {
-                        boxWidth: 10,
-                        font: {
-                            size: 10
-                        }
-                    }
+                    position: "bottom"
                 }
             }
         }
     });
 }
 
-// load default
-loadAttendance();
+// ======================= LOAD ATTENDANCE =======================
 
-// reload on filter change
-document.getElementById('roleFilter').addEventListener('change', loadAttendance);
+function loadAttendance() {
+
+    const role = roleFilter.value;
+    const classValue = classFilter.value;
+    const divisionValue = divisionFilter.value;
+    const searchValue = searchFilter.value.toLowerCase();
+
+    // ===================== ROLE UI =====================
+
+    if (role === "teachers") {
+
+        classFilter.parentElement.style.display = "none";
+        divisionFilter.parentElement.style.display = "none";
+
+        searchFilter.placeholder = "Search Teacher...";
+
+    } else {
+
+        classFilter.parentElement.style.display = "block";
+        divisionFilter.parentElement.style.display = "block";
+
+        searchFilter.placeholder = "Search Student...";
+    }
+
+    // ===================== DATA =====================
+
+    let data = role === "students"
+        ? [...studentData]
+        : [...teacherData];
+
+    // ===================== FILTERS =====================
+
+    if (role === "students") {
+
+        if (classValue) {
+            data = data.filter(d => d.class === classValue);
+        }
+
+        if (divisionValue) {
+            data = data.filter(d => d.division === divisionValue);
+        }
+    }
+
+    if (searchValue) {
+        data = data.filter(d =>
+            d.name.toLowerCase().includes(searchValue)
+        );
+    }
+
+    // ===================== TABLE =====================
+
+    tbody.innerHTML = "";
+
+    let present = 0;
+    let absent = 0;
+
+    data.forEach((d, index) => {
+
+        if (d.status === "Present") {
+            present++;
+        } else {
+            absent++;
+        }
+
+        tbody.innerHTML += `
+
+<tr class="hover:bg-gray-50 transition">
+
+    <!-- ID -->
+    <td class="p-3 font-medium text-gray-700">
+        ${d.id}
+    </td>
+
+    <!-- NAME -->
+    <td class="p-3 flex items-center gap-3">
+
+        <div class="w-8 h-8 rounded-full bg-indigo-100 
+            flex items-center justify-center 
+            text-xs font-bold text-indigo-600">
+
+            ${d.name.charAt(0)}
+
+        </div>
+
+        <div>
+            <p class="font-medium">${d.name}</p>
+
+            ${role === "students"
+                ? `<p class="text-xs text-gray-400">
+                    ${d.class} - ${d.division}
+                   </p>`
+                : ""
+            }
+        </div>
+
+    </td>
+
+    <!-- ROLE -->
+    <td class="p-3">
+
+        <span class="px-2 py-1 text-xs rounded-full
+            ${role === "students"
+                ? "bg-blue-100 text-blue-600"
+                : "bg-purple-100 text-purple-600"
+            }">
+
+            ${role === "students" ? "Student" : "Teacher"}
+
+        </span>
+
+    </td>
+
+    <!-- STATUS -->
+    <td class="p-3">
+
+        <div class="flex gap-2">
+
+            <button
+                onclick="markAttendance('${role}', ${index}, 'Present')"
+
+                class="px-3 py-1 rounded-lg text-xs font-medium
+                ${d.status === "Present"
+                ? "bg-green-500 text-white"
+                : "bg-green-100 text-green-700"
+            }">
+
+                Present
+
+            </button>
+
+            <button
+                onclick="markAttendance('${role}', ${index}, 'Absent')"
+
+                class="px-3 py-1 rounded-lg text-xs font-medium
+                ${d.status === "Absent"
+                ? "bg-red-500 text-white"
+                : "bg-red-100 text-red-700"
+            }">
+
+                Absent
+
+            </button>
+
+        </div>
+
+    </td>
+
+    <!-- REASON -->
+    <td class="p-3">
+
+        ${d.status === "Absent"
+                ? `<span class="text-xs bg-red-50 text-red-500 px-2 py-1 rounded">
+                ${d.reason || 'No reason'}
+               </span>`
+                : `<span class="text-gray-400">—</span>`
+            }
+
+    </td>
+
+</tr>
+`;
+    });
+
+    // ===================== STATS =====================
+
+    const total = present + absent;
+
+    const percentage = total
+        ? ((present / total) * 100).toFixed(1)
+        : 0;
+
+    document.getElementById("presentCount").innerText = present;
+    document.getElementById("absentCount").innerText = absent;
+    document.getElementById("totalCount").innerText = total;
+    document.getElementById("percentage").innerText = percentage + "%";
+
+    //  CHART 
+
+    renderChart(present, absent);
+}
+
+//  MARK ATTENDANCE 
+
+function markAttendance(role, index, status) {
+
+    const dataset =
+        role === "students"
+            ? studentData
+            : teacherData;
+
+    dataset[index].status = status;
+
+    if (status === "Present") {
+        dataset[index].reason = "";
+    } else {
+
+        const reason = prompt("Enter absence reason:");
+
+        dataset[index].reason =
+            reason || "No reason";
+    }
+
+    loadAttendance();
+}
+
+//  EVENTS 
+
+roleFilter.addEventListener("change", loadAttendance);
+
+classFilter.addEventListener("change", loadAttendance);
+
+divisionFilter.addEventListener("change", loadAttendance);
+
+searchFilter.addEventListener("input", loadAttendance);
+
+dateFilter.addEventListener("change", loadAttendance);
+
+//  INITIAL LOAD 
+
+loadAttendance();
 
 
 // ======================= TIME TABLE SECTION ===========================
@@ -1842,3 +2042,146 @@ function processBulkPayroll() {
 
 // Initial Call
 renderPayrollTable();
+
+
+
+let subjects = [
+    { id: 1, name: "Mathematics", code: "MATH101", type: "Core", classes: "8-A, 9-A, 10-A", status: "Active", description: "Mathematics subject" },
+    { id: 2, name: "Science", code: "SCI101", type: "Core", classes: "8-B, 9-B", status: "Active", description: "Science subject" },
+    { id: 3, name: "Computer", code: "COMP101", type: "Practical", classes: "10-A", status: "Inactive", description: "Computer practical subject" }
+];
+
+function renderSubjects(data = subjects) {
+    const tbody = document.getElementById("subjectTableBody");
+
+    tbody.innerHTML = data.map(subject => `
+        <tr class="hover:bg-gray-50 transition">
+            <td class="p-4">
+                <p class="font-black text-gray-800">${subject.name}</p>
+                <p class="text-xs text-gray-500">${subject.description || "-"}</p>
+            </td>
+            <td class="p-4 font-bold text-indigo-600">${subject.code}</td>
+            <td class="p-4">
+                <span class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">
+                    ${subject.type}
+                </span>
+            </td>
+            <td class="p-4 text-gray-700">${subject.classes || "-"}</td>
+            <td class="p-4">
+                <span class="px-3 py-1 rounded-full text-xs font-bold ${subject.status === "Active"
+            ? "bg-emerald-50 text-emerald-700"
+            : "bg-red-50 text-red-700"
+        }">
+                    ${subject.status}
+                </span>
+            </td>
+            <td class="p-4 text-right">
+                <button onclick="editSubject(${subject.id})"
+                    class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-bold hover:bg-blue-100">
+                    Edit
+                </button>
+                <button onclick="deleteSubject(${subject.id})"
+                    class="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 font-bold hover:bg-red-100 ml-2">
+                    Delete
+                </button>
+            </td>
+        </tr>
+    `).join("");
+
+    updateSubjectStats();
+}
+
+function updateSubjectStats() {
+    document.getElementById("totalSubjectsCount").innerText = subjects.length;
+    document.getElementById("activeSubjectsCount").innerText = subjects.filter(s => s.status === "Active").length;
+    document.getElementById("inactiveSubjectsCount").innerText = subjects.filter(s => s.status === "Inactive").length;
+    document.getElementById("assignedSubjectsCount").innerText = subjects.filter(s => s.classes && s.classes.trim()).length;
+}
+
+function openSubjectModal() {
+    document.getElementById("subjectForm").reset();
+    document.getElementById("subjectId").value = "";
+    document.getElementById("subjectModalTitle").innerText = "Add Subject";
+    document.getElementById("subjectModal").classList.remove("hidden");
+}
+
+function closeSubjectModal() {
+    document.getElementById("subjectModal").classList.add("hidden");
+}
+
+function saveSubject(event) {
+    event.preventDefault();
+
+    const id = document.getElementById("subjectId").value;
+
+    const subjectData = {
+        id: id ? Number(id) : Date.now(),
+        name: document.getElementById("subjectName").value.trim(),
+        code: document.getElementById("subjectCode").value.trim(),
+        type: document.getElementById("subjectType").value,
+        status: document.getElementById("subjectStatus").value,
+        classes: document.getElementById("subjectClasses").value.trim(),
+        description: document.getElementById("subjectDescription").value.trim()
+    };
+
+    if (id) {
+        subjects = subjects.map(s => s.id === Number(id) ? subjectData : s);
+    } else {
+        subjects.push(subjectData);
+    }
+
+    closeSubjectModal();
+    renderSubjects();
+}
+
+function editSubject(id) {
+    const subject = subjects.find(s => s.id === id);
+    if (!subject) return;
+
+    document.getElementById("subjectId").value = subject.id;
+    document.getElementById("subjectName").value = subject.name;
+    document.getElementById("subjectCode").value = subject.code;
+    document.getElementById("subjectType").value = subject.type;
+    document.getElementById("subjectStatus").value = subject.status;
+    document.getElementById("subjectClasses").value = subject.classes;
+    document.getElementById("subjectDescription").value = subject.description;
+
+    document.getElementById("subjectModalTitle").innerText = "Edit Subject";
+    document.getElementById("subjectModal").classList.remove("hidden");
+}
+
+function deleteSubject(id) {
+    if (!confirm("Are you sure you want to delete this subject?")) return;
+    subjects = subjects.filter(s => s.id !== id);
+    renderSubjects();
+}
+
+function filterSubjects() {
+    const search = document.getElementById("subjectSearch").value.toLowerCase();
+    const type = document.getElementById("subjectTypeFilter").value;
+    const status = document.getElementById("subjectStatusFilter").value;
+
+    const filtered = subjects.filter(s => {
+        const matchesSearch =
+            s.name.toLowerCase().includes(search) ||
+            s.code.toLowerCase().includes(search);
+
+        const matchesType = type === "all" || s.type === type;
+        const matchesStatus = status === "all" || s.status === status;
+
+        return matchesSearch && matchesType && matchesStatus;
+    });
+
+    renderSubjects(filtered);
+}
+
+function resetSubjectFilters() {
+    document.getElementById("subjectSearch").value = "";
+    document.getElementById("subjectTypeFilter").value = "all";
+    document.getElementById("subjectStatusFilter").value = "all";
+    renderSubjects();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    renderSubjects();
+});

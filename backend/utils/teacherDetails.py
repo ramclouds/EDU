@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import or_
 import bcrypt
 from utils.studentDetails import AcademicClass, Batch, Division, Section
-from utils.examResult import Subject
+from utils.subjects import Subject
 from utils.auth import db, Teacher
 from utils.auth_middleware import login_required
 
@@ -18,19 +18,31 @@ class TeacherClass(db.Model):
     __tablename__ = "teacher_classes"
 
     id = db.Column(db.Integer, primary_key=True)
+
     teacher_id = db.Column(
         db.Integer, db.ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False
     )
+
     academic_class_id = db.Column(
         db.Integer,
         db.ForeignKey("academic_classes.id", ondelete="CASCADE"),
         nullable=False,
     )
+
     subject_id = db.Column(
         db.Integer, db.ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False
     )
 
     created_at = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "teacher_id",
+            "academic_class_id",
+            "subject_id",
+            name="uq_teacher_class_subject",
+        ),
+    )
 
 
 # ================= TEACHER PROFILE =================

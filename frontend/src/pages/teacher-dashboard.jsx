@@ -259,7 +259,11 @@ function TeacherDashboard() {
 
     activeStudents,
     inactiveStudents,
-  } = useMyClasses(activeSection, fetchWithAuth, showToast);
+  } = useMyClasses({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
 
   // ================= ATTENDANCE HOOK =================
   const {
@@ -1484,7 +1488,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
             {/* STUDENTS */}
             <div className="space-y-3 overflow-y-auto max-h-[60vh] pr-1">
               {selectedMyClass?.students?.length > 0 ? (
-                selectedMyClass.students.map((student) => (
+                filteredStudents.map((student) => (
                   <div
                     key={student.student_id || student.id}
                     className="grid grid-cols-1 md:grid-cols-12 items-center gap-3 px-4 py-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl hover:shadow-sm transition"

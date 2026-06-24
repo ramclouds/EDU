@@ -5,13 +5,13 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import traceback
 
-# ================= LOAD ENV =================
+# ==== LOAD ENV ====
 load_dotenv()
 
-# ================= CORE =================
+# ==== CORE ====
 from utils.auth import Login, SignUp, db, bcrypt
 
-# ================= STUDENT / TEACHER =================
+# ==== STUDENT / TEACHER ====
 from utils.studentDetails import StudentDetails, UpdateStudentProfile, ChangePassword
 
 from utils.teacherDetails import (
@@ -31,7 +31,7 @@ from utils.assets import (
     GetDeletedAssetsAPI,
 )
 
-# =================  ASSIGNMENTS =================
+# ====  ASSIGNMENTS ====
 from utils.assignments import (
     SubmitAssignmentAPI,
     GetStudentAssignmentsAPI,
@@ -44,7 +44,7 @@ from utils.assignments import (
     ForceResubmitAPI,
 )
 
-# ================= NOTIFICATIONS =================
+# ==== NOTIFICATIONS ====
 from utils.Notifications import (
     NotificationsAPI,
     MarkNotificationReadAPI,
@@ -54,7 +54,7 @@ from utils.Notifications import (
     ActivityLogsAPI,
 )
 
-# ================= LEAVES =================
+# ==== LEAVES ====
 from utils.leaves import (
     ApplyLeave,
     TeacherLeaveHistory,
@@ -69,7 +69,7 @@ from utils.leaves import (
     AdminLeaveDashboard,
 )
 
-# ================= ACADEMICS =================
+# ==== ACADEMICS ====
 from utils.attendance import (
     StudentAttendanceAPI,
     DownloadAttendancePDF,
@@ -111,7 +111,7 @@ from utils.examResult import (
     TeacherAnalyticsPDFAPI,
 )
 
-# ================= OTHER =================
+# ==== OTHER ====
 from utils.hostel import StudentHostelDetails, CreateHostelComplaint
 
 from utils.announcement import (
@@ -123,27 +123,41 @@ from utils.announcement import (
 )
 
 from utils.library import StudentLibraryAPI
-from utils.teacherMyClasses import TeacherMyClasses
+from utils.teacherMyClasses import TeacherMyClasses, MyClasses
+from utils.studentEnrollment import (
+    EnrollStudentAPI,
+    StudentPromotionAPI,
+    StudentEnrollmentPreviewAPI,
+    StudentEnrollmentOptionsAPI,
+)
 
-# ==================================================
+from utils.TeacherManagement import (
+    AdminTeachersAPI,
+    AdminTeacherDetailAPI,
+    AdminTeacherOptionsAPI,
+    AdminTeacherAssignmentsAPI,
+    AdminTeacherPasswordAPI,
+    AdminTeacherStatusAPI,
+)
+
+from utils.subjects import AdminSubjectsAPI, AdminSubjectDetailAPI
+
+
 # CREATE APP
-# ==================================================
-
-
 def create_app():
     app = Flask(__name__)
 
-    # ================= CONFIG =================
+    # ==== CONFIG ====
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("MYSQL_DSN")
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET", "super-secret-key")
 
-    # ================= INIT =================
+    # ==== INIT ====
     db.init_app(app)
     bcrypt.init_app(app)
     JWTManager(app)
 
-    # ================= CORS =================
+    # ==== CORS ====
     CORS(
         app,
         supports_credentials=True,
@@ -158,13 +172,11 @@ def create_app():
             return jsonify({"message": "OK"}), 200
 
     # HEALTH
-
     @app.route("/")
     def health():
         return {"status": "API Running"}, 200
 
     # AUTH
-
     app.add_url_rule("/api/login", view_func=Login.as_view("login"), methods=["POST"])
 
     app.add_url_rule(
@@ -172,7 +184,6 @@ def create_app():
     )
 
     # STUDENT
-
     app.add_url_rule(
         "/api/student/<int:id>",
         view_func=StudentDetails.as_view("student_details"),
@@ -192,7 +203,6 @@ def create_app():
     )
 
     # TEACHER
-
     app.add_url_rule(
         "/api/<int:id>/teacher",
         view_func=TeacherDetails.as_view("teacher_details"),
@@ -211,10 +221,7 @@ def create_app():
         methods=["PUT"],
     )
 
-    # ===============================================
     # ADMIN
-    # ===============================================
-
     app.add_url_rule(
         "/api/<int:id>/admin",
         view_func=AdminDetails.as_view("admin_details"),
@@ -234,7 +241,6 @@ def create_app():
     )
 
     # ASSETS MANAGEMENT
-
     app.add_url_rule(
         "/api/assets",
         view_func=GetAssetsAPI.as_view("get_assets"),
@@ -277,7 +283,6 @@ def create_app():
     )
 
     # TEACHER ASSIGNMENTS (NEW)
-
     app.add_url_rule(
         "/api/teacher/<int:teacher_id>/assigned-classes",
         view_func=TeacherAssignedClassesAPI.as_view("teacher_assigned_classes"),
@@ -325,7 +330,6 @@ def create_app():
     )
 
     # STUDENT ASSIGNMENTS
-
     app.add_url_rule(
         "/api/assignments/<int:student_id>",
         view_func=GetStudentAssignmentsAPI.as_view("student_assignments"),
@@ -339,7 +343,6 @@ def create_app():
     )
 
     # ANNOUNCEMENTS
-
     app.add_url_rule(
         "/api/announcements",
         view_func=CreateNoticeAPI.as_view("create_notice"),
@@ -371,7 +374,6 @@ def create_app():
     )
 
     # NOTIFICATIONS
-
     app.add_url_rule(
         "/api/notifications",
         view_func=NotificationsAPI.as_view("notifications"),
@@ -409,7 +411,6 @@ def create_app():
     )
 
     # LEAVES
-
     app.add_url_rule(
         "/api/admin/teacher/leaves",
         view_func=AllTeacherLeaves.as_view("all_teacher_leaves"),
@@ -476,7 +477,7 @@ def create_app():
         methods=["POST"],
     )
 
-    # ================= STUDENT ATTENDANCE =================
+    # ==== STUDENT ATTENDANCE ====
     app.add_url_rule(
         "/api/student/attendance/<int:student_id>",
         view_func=StudentAttendanceAPI.as_view("student_attendance"),
@@ -489,7 +490,7 @@ def create_app():
         methods=["GET"],
     )
 
-    # ================= TEACHER ATTENDANCE =================
+    # ==== TEACHER ATTENDANCE ====
     # 1️⃣ Get teacher assigned classes
     app.add_url_rule(
         "/api/teacher/classes/<int:teacher_id>",
@@ -526,7 +527,6 @@ def create_app():
     )
 
     # ADMIN ATTENDANCE
-
     app.add_url_rule(
         "/api/admin/attendance/filters",
         view_func=AttendanceFilterOptionsAPI.as_view("attendance_filters"),
@@ -558,7 +558,6 @@ def create_app():
     )
 
     # ACADEMICS
-
     app.add_url_rule(
         "/api/timetable/<int:student_id>",
         view_func=StudentTimetableAPI.as_view("timetable"),
@@ -623,7 +622,7 @@ def create_app():
         view_func=AdminTimetablePDFAPI.as_view("admin_timetable_pdf"),
         methods=["GET"],
     )
-    # ================= TEACHER EXAM RESULT =================
+    # ==== TEACHER EXAM RESULT ====
     app.add_url_rule(
         "/api/teacher/students",
         view_func=TeacherStudentsAPI.as_view("teacher_exam_students"),
@@ -669,7 +668,7 @@ def create_app():
         "/api/teacher/analytics/pdf",
         view_func=TeacherAnalyticsPDFAPI.as_view("teacher_analytics_pdf"),
     )
-    # ================== Student Exam and Result ===============
+    # ===== Student Exam and Result ==
     app.add_url_rule(
         "/api/results/<int:student_id>",
         view_func=StudentExamResultsAPI.as_view("results"),
@@ -695,7 +694,6 @@ def create_app():
     )
 
     # LIBRARY / HOSTEL
-
     app.add_url_rule(
         "/api/library/<int:student_id>",
         view_func=StudentLibraryAPI.as_view("library"),
@@ -714,31 +712,106 @@ def create_app():
         methods=["POST"],
     )
 
-    # ==================================
     # MY CLASSES
-    # ==================================
+    app.add_url_rule(
+        "/api/my-classes/<role>/<int:user_id>",
+        view_func=MyClasses.as_view("my_classes"),
+        methods=["GET"],
+    )
+
     app.add_url_rule(
         "/api/teacher/my-classes/<int:teacher_id>",
         view_func=TeacherMyClasses.as_view("teacher_my_classes"),
         methods=["GET"],
     )
 
-    # FILE SERVING
+    # STUDENT ENROLLMENT
+    app.add_url_rule(
+        "/api/admin/student/enrollment-options",
+        view_func=StudentEnrollmentOptionsAPI.as_view("student_enrollment_options"),
+        methods=["GET"],
+    )
 
+    app.add_url_rule(
+        "/api/admin/student/enrollment-preview",
+        view_func=StudentEnrollmentPreviewAPI.as_view("student_enrollment_preview"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/student/enroll",
+        view_func=EnrollStudentAPI.as_view("enroll_student"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/student/promote",
+        view_func=StudentPromotionAPI.as_view("promote_student"),
+        methods=["POST"],
+    )
+
+    # ADMIN TEACHER MANAGEMENT
+    app.add_url_rule(
+        "/api/admin/teachers/options",
+        view_func=AdminTeacherOptionsAPI.as_view("admin_teacher_options"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/teachers",
+        view_func=AdminTeachersAPI.as_view("admin_teachers"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/teachers/<int:teacher_id>",
+        view_func=AdminTeacherDetailAPI.as_view("admin_teacher_detail"),
+        methods=["GET", "PUT", "DELETE"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/teachers/<int:teacher_id>/assignments",
+        view_func=AdminTeacherAssignmentsAPI.as_view("admin_teacher_assignments"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/teachers/<int:teacher_id>/password",
+        view_func=AdminTeacherPasswordAPI.as_view("admin_teacher_password"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/teachers/<int:teacher_id>/status",
+        view_func=AdminTeacherStatusAPI.as_view("admin_teacher_status"),
+        methods=["PUT"],
+    )
+
+    # SUBJECT MANAGEMENT
+    app.add_url_rule(
+        "/api/admin/subjects",
+        view_func=AdminSubjectsAPI.as_view("admin_subjects"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/subjects/<int:subject_id>",
+        view_func=AdminSubjectDetailAPI.as_view("admin_subject_detail"),
+        methods=["GET", "PUT", "DELETE"],
+    )
+
+    # FILE SERVING
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
     SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
 
-    # =============================
     # STUDENT SUBMITTED FILES
-    # =============================
     @app.route("/Submitted_Assignments/<path:filename>")
     def submitted_files(filename):
 
         try:
 
             safe_filename = os.path.normpath(filename)
-
             full_path = os.path.join(SUBMITTED_FOLDER, safe_filename)
 
             if not os.path.exists(full_path):
@@ -746,9 +819,7 @@ def create_app():
                 return jsonify({"error": "File not found"}), 404
 
             directory = os.path.dirname(full_path)
-
             actual_filename = os.path.basename(full_path)
-
             response = send_from_directory(
                 directory, actual_filename, as_attachment=False
             )
@@ -761,21 +832,16 @@ def create_app():
             return response
 
         except Exception as e:
-
             traceback.print_exc()
-
             return jsonify({"error": str(e)}), 500
 
-    # =============================
     # TEACHER ASSIGNMENT FILES
-    # =============================
     @app.route("/Assignment_Files/<path:filename>")
     def assignment_files(filename):
 
         try:
 
             safe_filename = os.path.normpath(filename)
-
             full_path = os.path.join(TEACHER_ASSIGNMENT_FOLDER, safe_filename)
 
             if not os.path.exists(full_path):
@@ -796,13 +862,10 @@ def create_app():
             return response
 
         except Exception as e:
-
             traceback.print_exc()
-
             return jsonify({"error": str(e)}), 500
 
     # ERROR HANDLERS
-
     @app.errorhandler(404)
     def not_found(e):
         return jsonify({"error": "API not found"}), 404
@@ -814,10 +877,7 @@ def create_app():
     return app
 
 
-# ==================================================
 # RUN
-# ==================================================
-
 app = create_app()
 
 if __name__ == "__main__":

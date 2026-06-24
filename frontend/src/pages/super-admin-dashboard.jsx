@@ -14,6 +14,10 @@ import { useAssets } from "../controllers/Assets/useAssets";
 import { useLeaveManagement } from "../controllers/Leaves/useLeaveManagement";
 import { useAttendanceManagement } from "../controllers/Attendance/useAttendanceManagement";
 import { useTimeTableManagement } from "../controllers/TimeTable/useTimetableManagement";
+import { useStudentEnrollment } from "../controllers/Enrollments/useStudentEnrollment";
+import { useMyClasses } from "../controllers/MyClasses/useMyClass";
+import { useTeacherManagement } from "../controllers/MyClasses/useTeachersManagement";
+import { useSubjectManagements } from "../controllers/Subjects/useSubjectManagements";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -77,6 +81,146 @@ function AdminDashboard() {
     toast,
   } = useAdminDashboard(activeSection);
 
+  // ================= ENROLLMENT HOOK =================
+  const {
+    enrollmentActiveTab,
+    setEnrollmentActiveTab,
+
+    studentEnrollmentForm,
+    setStudentEnrollmentForm,
+    handleStudentEnrollmentChange,
+    submitStudentEnrollment,
+    resetStudentEnrollmentForm,
+
+    studentEnrollmentLoading,
+    latestEnrolledStudent,
+
+    enrollmentAcademicClasses,
+    enrollmentBatches,
+    enrollmentDivisions,
+    enrollmentSections,
+
+    studentPromotionForm,
+    setStudentPromotionForm,
+    studentPromotionLoading,
+    promoteWholeClassStudents,
+
+    studentReportFilters,
+    setStudentReportFilters,
+    studentReportRows,
+    studentReportLoading,
+    loadStudentReportRows,
+    downloadStudentReportCSV,
+  } = useStudentEnrollment({
+    fetchWithAuth,
+    showToast,
+  });
+
+  // ================= SUBJECTS HOOK =================
+  const {
+    subjects,
+    subjectsLoading,
+    subjectSaving,
+    subjectForm,
+    handleSubjectChange,
+    isSubjectModalOpen,
+    openSubjectModal,
+    closeSubjectModal,
+    subjectSearch,
+    setSubjectSearch,
+    subjectTypeFilter,
+    setSubjectTypeFilter,
+    subjectStatusFilter,
+    setSubjectStatusFilter,
+    resetSubjectFilters,
+    loadSubjects,
+    saveSubject,
+    deleteSubject,
+    subjectTypeOptions,
+    subjectStats,
+  } = useSubjectManagements({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
+  // ================= STUDENTS HOOK =================
+  const {
+    myclasses,
+    classesLoading,
+    selectedMyClass,
+    selectedStudent,
+    myClassStudentSearch,
+    setMyClassStudentSearch,
+    isClassDetailOpen,
+    isStudentProfileOpen,
+    openClassDetail,
+    closeClassDetail,
+    openStudentProfile,
+    closeStudentProfile,
+    filteredStudents,
+    divisionOptions,
+    sectionOptions,
+    classSearch,
+    setClassSearch,
+    divisionFilter,
+    setDivisionFilter,
+    sectionFilter,
+    setSectionFilter,
+    resetClassFilters,
+    allClasses,
+  } = useMyClasses({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
+  // ================= Teacher Management HOOK =================
+  const {
+    teacherManagementTeachers,
+    teacherManagementOptions,
+    teacherManagementForm,
+    teacherManagementSelectedTeacher,
+
+    teacherManagementModalOpen,
+    teacherManagementViewModalOpen,
+
+    teacherManagementLoading,
+    teacherManagementSaving,
+
+    teacherManagementFilters,
+
+    teacherManagementStats,
+
+    updateTeacherManagementFilter,
+    resetTeacherManagementFilter,
+
+    loadTeacherManagementTeachers,
+    loadTeacherManagementOptions,
+
+    updateTeacherManagementForm,
+    BLOOD_GROUPS,
+
+    openTeacherManagementAddModal,
+    openTeacherManagementEditModal,
+    closeTeacherManagementModal,
+
+    openTeacherManagementViewModal,
+    closeTeacherManagementViewModal,
+
+    addTeacherManagementAssignment,
+    updateTeacherManagementAssignment,
+    removeTeacherManagementAssignment,
+
+    saveTeacherManagementTeacher,
+    deleteTeacherManagementTeacher,
+    updateTeacherManagementStatus,
+  } = useTeacherManagement({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
   // ================= LEAVE HOOK =================
   const {
     teacherLeaves,
@@ -109,7 +253,7 @@ function AdminDashboard() {
     divisions: TTDivisions,
     sections: TTsections,
 
-    subjects,
+    subjects: TTSubjects, 
     teachers,
     rooms,
 
@@ -321,7 +465,7 @@ function AdminDashboard() {
             {
               title: "ACADEMIC",
               items: [
-                ["classes", "bi-easel", "Classes & Sections"],
+                // ["classes", "bi-easel", "Classes & Sections"],
                 ["subjects", "bi-book", "Subjects"],
                 ["timetable", "bi-clock", "Timetable"],
                 ["attendance", "bi-calendar-check", "Attendance"],
@@ -759,24 +903,24 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           </section>
         )}
 
-        {/* <!-- =========================== TEACHERS SECTION START ============================ --> */}
+        {/* =========================== TEACHERS SECTION START ============================ */}
         {activeSection === "teachers" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                {/* <!-- TEXT --> */}
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
                     Teachers Management
                   </h2>
                   <p className="text-xs sm:text-sm opacity-90">
-                    View teachers, attendance & leave overview
+                    Add, update, delete and assign teachers to classes and
+                    subjects
                   </p>
                 </div>
 
-                {/* <!-- BUTTON --> */}
                 <button
-                  onclick="openAddTeacher()"
+                  type="button"
+                  onClick={openTeacherManagementAddModal}
                   className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow"
                 >
                   + Add Teacher
@@ -784,80 +928,78 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
               </div>
             </div>
 
-            {/* <!-- STATS --> */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Total Teachers</p>
-                <h2 id="totalTeachers" className="font-bold text-lg">
-                  0
+                <h2 className="font-bold text-lg">
+                  {teacherManagementStats.total}
                 </h2>
               </div>
 
               <div className="bg-white p-4 rounded-xl shadow text-center">
-                <p className="text-xs text-gray-500">Present Today</p>
-                <h2
-                  id="presentTeachers"
-                  className="font-bold text-green-600 text-lg"
-                >
-                  0
+                <p className="text-xs text-gray-500">Active</p>
+                <h2 className="font-bold text-green-600 text-lg">
+                  {teacherManagementStats.active}
                 </h2>
               </div>
 
               <div className="bg-white p-4 rounded-xl shadow text-center">
-                <p className="text-xs text-gray-500">On Leave</p>
-                <h2
-                  id="leaveTeachers"
-                  className="font-bold text-red-500 text-lg"
-                >
-                  0
+                <p className="text-xs text-gray-500">Inactive</p>
+                <h2 className="font-bold text-red-500 text-lg">
+                  {teacherManagementStats.inactive}
                 </h2>
               </div>
 
               <div className="bg-white p-4 rounded-xl shadow text-center">
-                <p className="text-xs text-gray-500">Avg Attendance</p>
-                <h2
-                  id="avgAttendance"
-                  className="font-bold text-indigo-600 text-lg"
-                >
-                  0%
+                <p className="text-xs text-gray-500">Suspended</p>
+                <h2 className="font-bold text-indigo-600 text-lg">
+                  {teacherManagementStats.suspended}
                 </h2>
               </div>
             </div>
 
-            {/* <!-- FILTER --> */}
             <div className="bg-white p-4 rounded-2xl shadow flex flex-col sm:flex-row sm:items-end gap-4">
-              {/* <!-- SEARCH --> */}
               <div className="flex-1">
                 <label className="text-xs text-gray-500">Search Teacher</label>
                 <input
                   type="text"
-                  id="searchTeacher"
-                  placeholder="Enter name..."
+                  value={teacherManagementFilters.q}
+                  onChange={(e) =>
+                    updateTeacherManagementFilter("q", e.target.value)
+                  }
+                  placeholder="Search name, email, mobile, username..."
                   className="input mt-1 w-full"
                 />
               </div>
 
-              {/* <!-- STATUS FILTER --> */}
               <div className="w-full sm:w-48">
                 <label className="text-xs text-gray-500">Status</label>
-                <select id="statusFilter" className="input mt-1 w-full">
+                <select
+                  value={teacherManagementFilters.status}
+                  onChange={(e) =>
+                    updateTeacherManagementFilter("status", e.target.value)
+                  }
+                  className="input mt-1 w-full"
+                >
                   <option value="">All</option>
-                  <option value="Present">Present</option>
-                  <option value="Leave">On Leave</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                  <option value="Suspended">Suspended</option>
                 </select>
               </div>
 
-              {/* <!-- ACTION BUTTONS --> */}
               <div className="flex gap-2">
                 <button
-                  onclick="applyFilter()"
+                  type="button"
+                  onClick={loadTeacherManagementTeachers}
                   className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700"
                 >
                   Apply
                 </button>
 
                 <button
-                  onclick="resetFilter()"
+                  type="button"
+                  onClick={resetTeacherManagementFilter}
                   className="border px-4 py-2 rounded-lg text-sm hover:bg-gray-100"
                 >
                   Reset
@@ -865,272 +1007,2515 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
               </div>
             </div>
 
-            {/* <!-- TEACHER LIST --> */}
             <div className="bg-white rounded-xl shadow p-4">
-              <h3 className="font-semibold mb-3">Teacher List</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">Teacher List</h3>
 
-              <div id="teacherList" className="space-y-3"></div>
+                {teacherManagementLoading && (
+                  <span className="text-xs text-gray-500">Loading...</span>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {!teacherManagementLoading &&
+                  teacherManagementTeachers.length === 0 && (
+                    <div className="text-center py-10 text-sm text-gray-500">
+                      No teachers found
+                    </div>
+                  )}
+
+                {teacherManagementTeachers.map((teacher) => (
+                  <div
+                    key={teacher.id}
+                    className="border rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+                  >
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-gray-800">
+                        {teacher.full_name ||
+                          `${teacher.first_name || ""} ${teacher.last_name || ""}`}
+                      </h4>
+
+                      <p className="text-xs text-gray-500">
+                        {teacher.teacher_id} • {teacher.email || "No email"} •{" "}
+                        {teacher.mobile || "No mobile"}
+                      </p>
+
+                      <p className="text-xs text-gray-500">
+                        {teacher.designation || "Teacher"} •{" "}
+                        {teacher.specialization || "No specialization"}
+                      </p>
+
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {(teacher.assignments || []).length === 0 ? (
+                          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">
+                            No class assigned
+                          </span>
+                        ) : (
+                          teacher.assignments.map((a) => (
+                            <span
+                              key={
+                                a.id || `${a.academic_class_id}-${a.subject_id}`
+                              }
+                              className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded"
+                            >
+                              {a.class_name || "Class"} •{" "}
+                              {a.subject_name || "Subject"}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={teacher.status || "Active"}
+                        onChange={(e) =>
+                          updateTeacherManagementStatus(
+                            teacher.id,
+                            e.target.value,
+                          )
+                        }
+                        className="input text-xs"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Suspended">Suspended</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => openTeacherManagementViewModal(teacher)}
+                        className="px-3 py-2 rounded-lg border text-xs hover:bg-gray-100"
+                      >
+                        View
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => openTeacherManagementEditModal(teacher)}
+                        className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          deleteTeacherManagementTeacher(teacher.id)
+                        }
+                        className="px-3 py-2 rounded-lg bg-red-600 text-white text-xs hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
         )}
 
-        {/* <!-- MODAL --> */}
-        <div
-          id="teacherModal"
-          className="hidden fixed inset-0 md:pl-64 z-50 flex items-center justify-center 
-    bg-black/40 backdrop-blur-sm p-4"
-        >
-          <div className="bg-white w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl p-4 relative">
-            {/* <!-- CLOSE --> */}
-            <button
-              onclick="closeModal()"
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl"
-            >
-              ✕
-            </button>
+        {/* ADD / EDIT TEACHER MODAL */}
+        {teacherManagementModalOpen && (
+          <div className="fixed inset-0 md:pl-64 z-50 bg-slate-950/60 backdrop-blur-md p-2 sm:p-4">
+            <div className="h-full w-full flex items-center justify-center">
+              <div className="w-full max-w-7xl max-h-[95vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-white/20 dark:border-slate-700">
+                {/* HEADER */}
+                <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+                        Teacher Management
+                      </p>
+                      <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                        {teacherManagementForm.id
+                          ? "Update Teacher"
+                          : "Add New Teacher"}
+                      </h2>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Fill teacher profile, employment details and assign
+                        classes with subjects.
+                      </p>
+                    </div>
 
-            {/* <!-- PROFILE CONTENT --> */}
-            <div id="modalContent"></div>
+                    <button
+                      type="button"
+                      onClick={closeTeacherManagementModal}
+                      className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto max-h-[calc(95vh-84px)] p-4 sm:p-6 space-y-6">
+                  {/* NAME HERO */}
+                  <div className="rounded-3xl p-4 sm:p-6 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">
+                          First Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.first_name || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "first_name",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border-0 bg-white/95 px-4 py-2.5 text-slate-900 text-sm outline-none focus:ring-2 focus:ring-white"
+                          placeholder="Enter first name"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">
+                          Middle Name
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.middle_name || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "middle_name",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border-0 bg-white/95 px-4 py-2.5 text-slate-900 text-sm outline-none focus:ring-2 focus:ring-white"
+                          placeholder="Enter middle name"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">
+                          Last Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.last_name || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "last_name",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border-0 bg-white/95 px-4 py-2.5 text-slate-900 text-sm outline-none focus:ring-2 focus:ring-white"
+                          placeholder="Enter last name"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FORM GRID */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+                    {/* Personal */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        👤 Personal Info
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Date of Birth
+                        </label>
+                        <input
+                          type="date"
+                          value={teacherManagementForm.date_of_birth || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "date_of_birth",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Gender
+                        </label>
+                        <select
+                          value={teacherManagementForm.gender || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "gender",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Mobile Number
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.mobile || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "mobile",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="Enter mobile number"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          value={teacherManagementForm.email || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm("email", e.target.value)
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="teacher@example.com"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Professional */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        💼 Professional
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Teacher ID
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.teacher_id || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "teacher_id",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="Auto generated if empty"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Designation
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.designation || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "designation",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="Math Teacher"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Specialization
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.specialization || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "specialization",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="Mathematics"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Status
+                        </label>
+                        <select
+                          value={teacherManagementForm.status || "Active"}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "status",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                          <option value="Suspended">Suspended</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Academic */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        🎓 Academic
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Highest Degree
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.degree || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "degree",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          University
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.university || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "university",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Experience Years
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={teacherManagementForm.experience_years || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "experience_years",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <select
+                        value={teacherManagementForm.blood_group || ""}
+                        onChange={(e) =>
+                          updateTeacherManagementForm(
+                            "blood_group",
+                            e.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                      >
+                        <option value="">Select Blood Group</option>
+
+                        {BLOOD_GROUPS.map((group) => (
+                          <option key={group} value={group}>
+                            {group}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Employment */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        🏢 Employment
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Joining Date
+                        </label>
+                        <input
+                          type="date"
+                          value={teacherManagementForm.joining_date || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "joining_date",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Employment Type
+                        </label>
+                        <select
+                          value={
+                            teacherManagementForm.employment_type || "Full Time"
+                          }
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "employment_type",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        >
+                          <option value="Full Time">Full Time</option>
+                          <option value="Part Time">Part Time</option>
+                          <option value="Contract">Contract</option>
+                          <option value="Temporary">Temporary</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Shift
+                        </label>
+                        <select
+                          value={teacherManagementForm.shift || "Morning"}
+                          onChange={(e) =>
+                            updateTeacherManagementForm("shift", e.target.value)
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        >
+                          <option value="Morning">Morning</option>
+                          <option value="Evening">Evening</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        📍 Address
+                      </h3>
+
+                      {["address", "city", "state", "pincode"].map((field) => (
+                        <div key={field}>
+                          <label className="block text-xs font-medium text-slate-500 mb-1 capitalize">
+                            {field === "pincode" ? "Pincode" : field}
+                          </label>
+                          <input
+                            type="text"
+                            value={teacherManagementForm[field] || ""}
+                            onChange={(e) =>
+                              updateTeacherManagementForm(field, e.target.value)
+                            }
+                            className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Health + Emergency + System */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        🆘 Health & System
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Medical Conditions
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.medical_condition || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "medical_condition",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Emergency Name
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.emergency_name || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "emergency_name",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Emergency Relation
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.emergency_relation || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "emergency_relation",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Emergency Phone
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.emergency_phone || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "emergency_phone",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.username || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "username",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Password
+                        </label>
+                        <input
+                          type="password"
+                          value={teacherManagementForm.password || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "password",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder={
+                            teacherManagementForm.id
+                              ? "Leave blank to keep old password"
+                              : "Enter password"
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ASSIGNMENTS */}
+                  <div className="rounded-3xl border border-indigo-100 dark:border-slate-700 bg-indigo-50/70 dark:bg-slate-800 p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                          Multiple Class & Subject Assignments
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Add multiple classes and subjects for this teacher.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={addTeacherManagementAssignment}
+                        className="w-full sm:w-auto rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 text-sm font-semibold"
+                      >
+                        + Add Class & Subject
+                      </button>
+                    </div>
+
+                    {(teacherManagementForm.assignments || []).length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-900/40 p-6 text-center text-sm text-slate-500">
+                        No assignment added yet. Click “Add Class & Subject”.
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {(teacherManagementForm.assignments || []).map(
+                        (assignment, index) => (
+                          <div
+                            key={index}
+                            className="grid grid-cols-1 md:grid-cols-12 gap-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4"
+                          >
+                            <div className="md:col-span-1 flex items-center">
+                              <span className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                                {index + 1}
+                              </span>
+                            </div>
+
+                            <div className="md:col-span-5">
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Class
+                              </label>
+                              <select
+                                value={assignment.academic_class_id || ""}
+                                onChange={(e) =>
+                                  updateTeacherManagementAssignment(
+                                    index,
+                                    "academic_class_id",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                              >
+                                <option value="">Select Class</option>
+                                {(
+                                  teacherManagementOptions.academic_classes ||
+                                  []
+                                ).map((cls) => (
+                                  <option key={cls.id} value={cls.id}>
+                                    {cls.display_name}
+                                    {cls.batch_name
+                                      ? ` (${cls.batch_name})`
+                                      : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="md:col-span-4">
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Subject
+                              </label>
+                              <select
+                                value={assignment.subject_id || ""}
+                                onChange={(e) =>
+                                  updateTeacherManagementAssignment(
+                                    index,
+                                    "subject_id",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                              >
+                                <option value="">Select Subject</option>
+                                {(teacherManagementOptions.subjects || []).map(
+                                  (subject) => (
+                                    <option key={subject.id} value={subject.id}>
+                                      {subject.subject_name}
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            </div>
+
+                            <div className="md:col-span-2 flex items-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removeTeacherManagementAssignment(index)
+                                }
+                                className="w-full rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 px-4 py-2.5 text-sm font-semibold hover:bg-red-100"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+
+                  {/* FOOTER */}
+                  <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-4">
+                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={closeTeacherManagementModal}
+                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={saveTeacherManagementTeacher}
+                        disabled={teacherManagementSaving}
+                        className="w-full sm:w-auto px-7 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm disabled:opacity-60"
+                      >
+                        {teacherManagementSaving
+                          ? "Saving..."
+                          : teacherManagementForm.id
+                            ? "Update Teacher"
+                            : "Save Teacher"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* <!-- ADD TEACHER MODAL --> */}
+        {/* VIEW TEACHER MODAL */}
+        {teacherManagementViewModalOpen && teacherManagementSelectedTeacher && (
+          <div className="fixed inset-0 md:pl-64 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 relative">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold">
+                    {teacherManagementSelectedTeacher.full_name}
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    {teacherManagementSelectedTeacher.teacher_id} •{" "}
+                    {teacherManagementSelectedTeacher.status}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeTeacherManagementViewModal}
+                  className="text-gray-500 text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">Contact</h4>
+                  <p>Email: {teacherManagementSelectedTeacher.email || "-"}</p>
+                  <p>
+                    Mobile: {teacherManagementSelectedTeacher.mobile || "-"}
+                  </p>
+                  <p>
+                    Username: {teacherManagementSelectedTeacher.username || "-"}
+                  </p>
+                </div>
+
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">Professional</h4>
+                  <p>
+                    Designation:{" "}
+                    {teacherManagementSelectedTeacher.designation || "-"}
+                  </p>
+                  <p>
+                    Specialization:{" "}
+                    {teacherManagementSelectedTeacher.specialization || "-"}
+                  </p>
+                  <p>
+                    Experience:{" "}
+                    {teacherManagementSelectedTeacher.experience_years || 0}{" "}
+                    years
+                  </p>
+                </div>
+
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">Employment</h4>
+                  <p>
+                    Joining:{" "}
+                    {teacherManagementSelectedTeacher.joining_date || "-"}
+                  </p>
+                  <p>
+                    Type:{" "}
+                    {teacherManagementSelectedTeacher.employment_type || "-"}
+                  </p>
+                  <p>Shift: {teacherManagementSelectedTeacher.shift || "-"}</p>
+                </div>
+
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">Emergency</h4>
+                  <p>
+                    Name:{" "}
+                    {teacherManagementSelectedTeacher.emergency_name || "-"}
+                  </p>
+                  <p>
+                    Relation:{" "}
+                    {teacherManagementSelectedTeacher.emergency_relation || "-"}
+                  </p>
+                  <p>
+                    Phone:{" "}
+                    {teacherManagementSelectedTeacher.emergency_phone || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border rounded-xl p-4 mt-4">
+                <h4 className="font-semibold mb-2">
+                  Assigned Classes & Subjects
+                </h4>
+
+                {(teacherManagementSelectedTeacher.assignments || []).length ===
+                0 ? (
+                  <p className="text-sm text-gray-500">No assignments</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {teacherManagementSelectedTeacher.assignments.map((a) => (
+                      <span
+                        key={a.id || `${a.academic_class_id}-${a.subject_id}`}
+                        className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded"
+                      >
+                        {a.class_name || "Class"} •{" "}
+                        {a.subject_name || "Subject"}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 mt-5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeTeacherManagementViewModal();
+                    openTeacherManagementEditModal(
+                      teacherManagementSelectedTeacher,
+                    );
+                  }}
+                  className="px-5 py-2 bg-blue-600 text-white rounded-lg"
+                >
+                  Edit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={closeTeacherManagementViewModal}
+                  className="px-5 py-2 border rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* =========================== TEACHERS SECTION END ============================ */}
+        {/*  ============================= MY CLASSES START =============================  */}
+        {activeSection === "students" && (
+          <section className="section p-4 sm:p-6 space-y-6 hidden active">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 text-white">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Students Management
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Manage students, profiles and academic records
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveSection("admissions");
+                    // setEnrollmentActiveTab("enrollment"); // optional
+                  }}
+                  className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-indigo-50 transition-all duration-200"
+                >
+                  <i className="bi bi-person-plus-fill me-2"></i>
+                  Add Student
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
+              <input
+                type="text"
+                placeholder="Search class, batch, subject..."
+                value={classSearch}
+                onChange={(e) => setClassSearch(e.target.value)}
+                className="px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl text-sm outline-none"
+              />
+
+              <select
+                value={divisionFilter}
+                onChange={(e) => setDivisionFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl text-sm outline-none"
+              >
+                <option value="">All Divisions</option>
+                {(divisionOptions || []).map((division) => (
+                  <option key={division} value={division}>
+                    {division}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl text-sm outline-none"
+              >
+                <option value="">All Sections</option>
+                {(sectionOptions || []).map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={resetClassFilters}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm font-medium"
+              >
+                Reset
+              </button>
+            </div>
+
+            {/* LOADING */}
+            {classesLoading && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center shadow-sm">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Loading classes...
+                </p>
+              </div>
+            )}
+
+            {/* EMPTY */}
+            {!classesLoading && myclasses?.length === 0 && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center shadow-sm">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No assigned classes found
+                </p>
+              </div>
+            )}
+
+            {/* CLASS CARDS */}
+            {!classesLoading && myclasses?.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {myclasses.map((item) => {
+                  const activeStudents =
+                    item.students?.filter((s) => s.status === "Active")
+                      .length || 0;
+
+                  return (
+                    <div
+                      key={item.teacher_class_id}
+                      onClick={() => openClassDetail(item)}
+                      className="cursor-pointer bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm space-y-4 hover:shadow-md transition-all duration-200 hover:-translate-y-1"
+                    >
+                      {/* TOP */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <h3 className="font-semibold text-lg">
+                            {item.class_name}
+                          </h3>
+
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {item.subject_name}
+                          </p>
+                        </div>
+
+                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-1 rounded-full whitespace-nowrap">
+                          Active
+                        </span>
+                      </div>
+
+                      {/* STATS */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-center">
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                            Students
+                          </p>
+
+                          <h4 className="font-semibold text-lg">
+                            {item.total_students || 0}
+                          </h4>
+                        </div>
+
+                        <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-xl text-center">
+                          <p className="text-xs text-indigo-600">Active</p>
+
+                          <h4 className="font-semibold text-indigo-600 text-lg">
+                            {activeStudents}
+                          </h4>
+                        </div>
+                      </div>
+
+                      {/* PROGRESS */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>Class Strength</span>
+
+                          <span>{item.total_students || 0}</span>
+                        </div>
+
+                        <div className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full"
+                            style={{
+                              width: `${
+                                item.total_students > 0
+                                  ? (activeStudents / item.total_students) * 100
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+        {/* ================= CLASS DETAIL MODAL ================= */}
         <div
-          id="addTeacherSection"
-          className="hidden fixed inset-0 md:pl-64 z-50 flex items-center justify-center 
-    bg-black/40 backdrop-blur-sm p-4"
+          className={`${
+            isClassDetailOpen ? "flex" : "hidden"
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-50 p-2 sm:p-4`}
         >
-          <div
-            className="bg-white w-full max-w-6xl max-h-[90vh] overflow-y-auto 
-    rounded-2xl shadow-lg p-5 space-y-6"
-          >
-            {/* <!-- HEADER --> */}
+          <div className="w-full max-w-6xl mx-auto bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 space-y-5 max-h-[95vh] overflow-hidden">
+            {/* HEADER */}
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-semibold">Add New Teacher</h2>
-                <p className="text-xs text-gray-500">Fill teacher details</p>
+                <h2 className="text-lg sm:text-xl font-semibold">
+                  {selectedMyClass?.class_name}
+                </h2>
+
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                  {selectedMyClass?.subject_name} • Student Directory
+                </p>
               </div>
+
               <button
-                onclick="closeAddTeacher()"
-                className="text-gray-500 text-lg"
+                onClick={closeClassDetail}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl"
               >
                 ✕
               </button>
             </div>
 
-            {/* <!-- PROFILE HEADER --> */}
-            <div className="rounded-2xl p-6 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white">
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="flex flex-col items-center">
-                  <img
-                    id="previewImage"
-                    src="https://i.pravatar.cc/120"
-                    className="w-24 h-24 rounded-full border-4 border-white shadow-lg"
-                  />
+            {/* SEARCH + STATS */}
+            <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+              <input
+                type="text"
+                placeholder="Search student..."
+                value={myClassStudentSearch}
+                onChange={(e) => setMyClassStudentSearch(e.target.value)}
+                className="w-full lg:w-72 px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-800 dark:text-white rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+              />
 
-                  <input
-                    type="file"
-                    className="mt-2 text-xs"
-                    onchange="previewImg(event)"
-                  />
-                </div>
+              <div className="flex gap-2 text-xs flex-wrap">
+                <span className="bg-gray-100 dark:bg-slate-700 px-3 py-1 rounded-full">
+                  Total: {selectedMyClass?.total_students || 0}
+                </span>
 
-                <div className="flex-1 space-y-2">
-                  <div>
-                    <label className="text-xs">Full Name</label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Enter full name"
-                    />
-                  </div>
+                <span className="bg-green-100 dark:bg-green-900/30 text-green-600 px-3 py-1 rounded-full">
+                  Active:{" "}
+                  {selectedMyClass?.students?.filter(
+                    (s) => s.status === "Active",
+                  ).length || 0}
+                </span>
 
-                  <div>
-                    <label className="text-xs">Designation & Department</label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="e.g. Lecturer • Mathematics"
-                    />
-                  </div>
-                </div>
+                <span className="bg-red-100 dark:bg-red-900/30 text-red-600 px-3 py-1 rounded-full">
+                  Inactive:{" "}
+                  {selectedMyClass?.students?.filter(
+                    (s) => s.status === "Inactive",
+                  ).length || 0}
+                </span>
               </div>
             </div>
 
-            {/* <!-- FORM GRID --> */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {/* <!-- PERSONAL --> */}
-              <div className="card">
-                <h4>👤 Personal Info</h4>
-
-                <label>DOB</label>
-                <input type="date" className="input" />
-
-                <label>Gender</label>
-                <select className="input">
-                  <option>Select</option>
-                  <option>Male</option>
-                  <option>Female</option>
-                </select>
-
-                <label>Mobile</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Phone number"
-                />
-
-                <label>Email</label>
-                <input type="email" className="input" placeholder="Email" />
-              </div>
-
-              {/* <!-- PROFESSIONAL --> */}
-              <div className="card">
-                <h4>💼 Professional</h4>
-
-                <label>Teacher ID</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Auto / Manual"
-                />
-
-                <label>Designation</label>
-                <input type="text" className="input" placeholder="Lecturer" />
-
-                <label>Department</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Mathematics"
-                />
-
-                <label>Subjects</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Math, Physics"
-                />
-
-                <label>Assigned Classes</label>
-                <input type="text" className="input" placeholder="10-A, 9-B" />
-              </div>
-
-              {/* <!-- ACADEMIC --> */}
-              <div className="card">
-                <h4>🎓 Academic</h4>
-
-                <label>Highest Degree</label>
-                <input type="text" className="input" placeholder="M.Sc" />
-
-                <label>University</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="University Name"
-                />
-
-                <label>Experience (Years)</label>
-                <input type="number" className="input" />
-
-                <label>Specialization</label>
-                <input type="text" className="input" placeholder="Algebra" />
-              </div>
-
-              {/* <!-- EMPLOYMENT --> */}
-              <div className="card">
-                <h4>🏢 Employment</h4>
-
-                <label>Joining Date</label>
-                <input type="date" className="input" />
-
-                <label>Employment Type</label>
-                <select className="input">
-                  <option>Full-Time</option>
-                  <option>Part-Time</option>
-                </select>
-
-                <label>Shift</label>
-                <select className="input">
-                  <option>Morning</option>
-                  <option>Evening</option>
-                </select>
-
-                <label>Status</label>
-                <select className="input">
-                  <option>Active</option>
-                  <option>Inactive</option>
-                </select>
-              </div>
-
-              {/* <!-- ADDRESS --> */}
-              <div className="card">
-                <h4>📍 Address</h4>
-
-                <label>Address</label>
-                <input type="text" className="input" />
-
-                <label>City</label>
-                <input type="text" className="input" />
-
-                <label>Pincode</label>
-                <input type="text" className="input" />
-              </div>
-
-              {/* <!-- HEALTH --> */}
-              <div className="card">
-                <h4>🩺 Health</h4>
-
-                <label>Blood Group</label>
-                <input type="text" className="input" />
-
-                <label>Medical Conditions</label>
-                <input type="text" className="input" />
-              </div>
-
-              {/* <!-- EMERGENCY --> */}
-              <div className="card">
-                <h4>🆘 Emergency Contact</h4>
-
-                <label>Name</label>
-                <input type="text" className="input" />
-
-                <label>Relation</label>
-                <input type="text" className="input" />
-
-                <label>Phone</label>
-                <input type="text" className="input" />
-              </div>
-
-              {/* <!-- SYSTEM --> */}
-              <div className="card">
-                <h4>⚙️ System</h4>
-
-                <label>Username</label>
-                <input type="text" className="input" />
-
-                <label>Password</label>
-                <input type="password" className="input" />
-              </div>
+            {/* TABLE HEADER */}
+            <div className="hidden md:grid grid-cols-12 text-xs text-gray-500 dark:text-gray-400 px-4 py-3 bg-gray-50 dark:bg-slate-700 rounded-xl">
+              <div className="col-span-3">Student</div>
+              <div className="col-span-2">Roll No</div>
+              <div className="col-span-2">Mobile</div>
+              <div className="col-span-2">Parent</div>
+              <div className="col-span-2">Status</div>
+              <div className="col-span-1 text-right">Action</div>
             </div>
 
-            {/* <!-- ACTION --> */}
-            <div className="flex justify-end gap-3">
-              <button
-                onclick="closeAddTeacher()"
-                className="px-5 py-2 border rounded-lg"
-              >
-                Cancel
-              </button>
+            {/* STUDENTS */}
+            <div className="space-y-3 overflow-y-auto max-h-[60vh] pr-1">
+              {filteredStudents?.length > 0 ? (
+                filteredStudents.map((student) => (
+                  <div
+                    key={student.student_id || student.id}
+                    className="grid grid-cols-1 md:grid-cols-12 items-center gap-3 px-4 py-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl hover:shadow-sm transition"
+                  >
+                    {/* STUDENT */}
+                    <div className="md:col-span-3 flex items-center gap-3">
+                      <img
+                        src={`https://i.pravatar.cc/150?u=${student.student_id}`}
+                        alt={student.full_name}
+                        className="w-11 h-11 rounded-full object-cover"
+                      />
 
-              <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg">
-                Save Teacher
-              </button>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {student.full_name}
+                        </p>
+
+                        <p className="text-xs text-gray-400">
+                          {student.gender || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* ROLL */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.roll_number || "-"}
+                    </div>
+
+                    {/* MOBILE */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.mobile || "-"}
+                    </div>
+
+                    {/* PARENT */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.parent_name || "-"}
+                    </div>
+
+                    {/* STATUS */}
+                    <div className="md:col-span-2">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          student.status === "Active"
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-600"
+                            : "bg-red-100 dark:bg-red-900/30 text-red-600"
+                        }`}
+                      >
+                        {student.status}
+                      </span>
+                    </div>
+
+                    {/* ACTION */}
+                    <div className="md:col-span-1 md:text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openStudentProfile(student);
+                        }}
+                        className="text-indigo-600 text-xs font-medium hover:underline"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="bg-gray-50 dark:bg-slate-700 rounded-2xl p-6 text-center">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No students found
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
-        {/* <!-- =========================== TEACHERS SECTION END ============================ --> */}
+        {/* ================= STUDENT PROFILE MODAL ================= */}
+        <div
+          className={`${
+            isStudentProfileOpen ? "flex" : "hidden"
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[60] p-2 sm:p-4`}
+        >
+          <div className="bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 w-full max-w-5xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
+            {/* HEADER */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Student Profile</h2>
 
+              <button
+                onClick={closeStudentProfile}
+                className="text-gray-400 text-2xl hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* PROFILE */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+              <img
+                src={`https://i.pravatar.cc/150?u=${selectedStudent?.student_id}`}
+                alt={selectedStudent?.full_name}
+                className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm"
+              />
+
+              <div className="text-center sm:text-left">
+                <h3 className="text-xl font-semibold">
+                  {selectedStudent?.full_name}
+                </h3>
+
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Student ID: {selectedStudent?.student_id || "N/A"}
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
+                  <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.status || "Unknown"}
+                  </span>
+
+                  <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.gender || "N/A"}
+                  </span>
+
+                  <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.blood_group || "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* INFO */}
+            <div className="grid sm:grid-cols-2 gap-6 text-sm">
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Contact Info
+                </h4>
+
+                <div>Email: {selectedStudent?.email || "-"}</div>
+
+                <div>Mobile: {selectedStudent?.mobile || "-"}</div>
+
+                <div>Address: {selectedStudent?.address || "-"}</div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Academic
+                </h4>
+
+                <div>DOB: {selectedStudent?.date_of_birth || "-"}</div>
+
+                <div>Roll No: {selectedStudent?.roll_number || "-"}</div>
+
+                <div>
+                  Previous School: {selectedStudent?.previous_school || "-"}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Family
+                </h4>
+
+                <div>Father: {selectedStudent?.father_name || "-"}</div>
+
+                <div>Mother: {selectedStudent?.mother_name || "-"}</div>
+
+                <div>Parent: {selectedStudent?.parent_name || "-"}</div>
+
+                <div>
+                  Parent Mobile: {selectedStudent?.parent_mobile || "-"}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Emergency
+                </h4>
+
+                <div>
+                  Contact: {selectedStudent?.emergency_contact_name || "-"}
+                </div>
+
+                <div>
+                  Number: {selectedStudent?.emergency_contact_number || "-"}
+                </div>
+
+                <div>
+                  Relation: {selectedStudent?.emergency_contact_relation || "-"}
+                </div>
+              </div>
+            </div>
+
+            {/* MEDICAL */}
+            <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-xl text-sm">
+              <h4 className="font-medium text-red-600 mb-2">Medical Info</h4>
+
+              <p>
+                Medical Conditions:{" "}
+                {selectedStudent?.medical_conditions || "None"}
+              </p>
+
+              <p>Allergies: {selectedStudent?.allergies || "None"}</p>
+            </div>
+          </div>
+        </div>
+        {/*  ============================= MY CLASS SECTION END =============================  */}
+        {/* ================== ENROLLMENT SECTION START ================= */}
+        {activeSection === "admissions" && (
+          <section
+            className="section active p-4 sm:p-6 space-y-6"
+            id="admissionsSection"
+          >
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 text-white shadow-lg">
+              <h2 className="text-xl sm:text-2xl font-semibold">
+                Student Admissions
+              </h2>
+              <p className="text-xs sm:text-sm opacity-90">
+                Manage students, promotions & reports
+              </p>
+            </div>
+
+            {/* TABS */}
+            <div className="flex flex-wrap gap-2 bg-white p-2 rounded-xl shadow text-sm">
+              {["enroll", "promote", "report"].map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setEnrollmentActiveTab(tab)}
+                  className={`tab-btn px-4 py-2 rounded-lg transition-all ${
+                    enrollmentActiveTab === tab
+                      ? "bg-indigo-600 text-white shadow"
+                      : "hover:bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {tab === "enroll" && "Enroll Student"}
+                  {tab === "promote" && "Promote Students"}
+                  {tab === "report" && "Download Reports"}
+                </button>
+              ))}
+            </div>
+
+            {/* ENROLL TAB */}
+            {enrollmentActiveTab === "enroll" && (
+              <div className="rounded-3xl bg-white dark:bg-slate-900 shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in duration-300">
+                <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-5 sm:p-7 text-white">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-indigo-100">
+                        Student Application
+                      </p>
+                      <h2 className="text-2xl sm:text-3xl font-bold mt-1">
+                        New Student Enrollment
+                      </h2>
+                      <p className="text-sm text-indigo-100 mt-2 max-w-2xl">
+                        Add student personal details, parent information,
+                        academic assignment and login credentials.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
+                      <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3">
+                        <p className="text-[11px] text-indigo-100">
+                          Student ID
+                        </p>
+                        <h4 className="font-bold text-sm">
+                          {studentEnrollmentForm.studentID || "Auto"}
+                        </h4>
+                      </div>
+
+                      <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3">
+                        <p className="text-[11px] text-indigo-100">User ID</p>
+                        <h4 className="font-bold text-sm">
+                          {studentEnrollmentForm.userID || "Auto"}
+                        </h4>
+                      </div>
+
+                      <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3 col-span-2 sm:col-span-1">
+                        <p className="text-[11px] text-indigo-100">Roll No</p>
+                        <h4 className="font-bold text-sm">
+                          {studentEnrollmentForm.rollNumber || "Auto"}
+                        </h4>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <form
+                  className="p-4 sm:p-6 lg:p-8 space-y-8"
+                  onSubmit={submitStudentEnrollment}
+                >
+                  {/* BASIC INFORMATION */}
+                  <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/70 p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-10 w-10 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                        <i className="bi bi-person-fill"></i>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                          Basic Information
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Student identity and contact details
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          First Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="firstName"
+                          value={studentEnrollmentForm.firstName}
+                          onChange={handleStudentEnrollmentChange}
+                          type="text"
+                          placeholder="Enter first name"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Middle Name
+                        </label>
+                        <input
+                          id="middleName"
+                          value={studentEnrollmentForm.middleName}
+                          onChange={handleStudentEnrollmentChange}
+                          type="text"
+                          placeholder="Enter middle name"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Last Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="lastName"
+                          value={studentEnrollmentForm.lastName}
+                          onChange={handleStudentEnrollmentChange}
+                          type="text"
+                          placeholder="Enter last name"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Email Address
+                        </label>
+                        <input
+                          id="studentEmail"
+                          value={studentEnrollmentForm.studentEmail}
+                          onChange={handleStudentEnrollmentChange}
+                          type="email"
+                          placeholder="student@example.com"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Mobile Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="studentMobile"
+                          value={studentEnrollmentForm.studentMobile}
+                          onChange={handleStudentEnrollmentChange}
+                          type="text"
+                          placeholder="Enter mobile number"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Gender
+                        </label>
+                        <select
+                          id="gender"
+                          value={studentEnrollmentForm.gender}
+                          onChange={handleStudentEnrollmentChange}
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="">Select gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Date of Birth
+                        </label>
+                        <input
+                          id="dob"
+                          value={studentEnrollmentForm.dob}
+                          onChange={handleStudentEnrollmentChange}
+                          type="date"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Blood Group
+                        </label>
+                        <select
+                          id="bloodGroup"
+                          value={studentEnrollmentForm.bloodGroup}
+                          onChange={handleStudentEnrollmentChange}
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="">Select blood group</option>
+                          {[
+                            "A+",
+                            "A-",
+                            "B+",
+                            "B-",
+                            "AB+",
+                            "AB-",
+                            "O+",
+                            "O-",
+                          ].map((group) => (
+                            <option key={group} value={group}>
+                              {group}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PARENT DETAILS */}
+                  <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-10 w-10 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                        <i className="bi bi-people-fill"></i>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                          Parent Details
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Father and mother contact information
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {[
+                        [
+                          "fatherName",
+                          "Father Name",
+                          "Enter father name",
+                          "text",
+                        ],
+                        [
+                          "fatherMobile",
+                          "Father Mobile",
+                          "Enter father mobile",
+                          "text",
+                        ],
+                        [
+                          "fatherEmail",
+                          "Father Email",
+                          "father@example.com",
+                          "email",
+                        ],
+                        [
+                          "motherName",
+                          "Mother Name",
+                          "Enter mother name",
+                          "text",
+                        ],
+                        [
+                          "motherMobile",
+                          "Mother Mobile",
+                          "Enter mother mobile",
+                          "text",
+                        ],
+                        [
+                          "motherEmail",
+                          "Mother Email",
+                          "mother@example.com",
+                          "email",
+                        ],
+                      ].map(([id, label, placeholder, type]) => (
+                        <div key={id}>
+                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                            {label}
+                          </label>
+                          <input
+                            id={id}
+                            value={studentEnrollmentForm[id]}
+                            onChange={handleStudentEnrollmentChange}
+                            type={type}
+                            placeholder={placeholder}
+                            className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ACADEMIC ASSIGNMENT */}
+                  <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/70 p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-10 w-10 rounded-2xl bg-pink-100 text-pink-600 flex items-center justify-center">
+                        <i className="bi bi-mortarboard-fill"></i>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                          Academic Assignment
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Select batch, division and section. Roll number is
+                          auto assigned.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Batch <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="enrollBatch"
+                          value={studentEnrollmentForm.enrollBatch}
+                          onChange={handleStudentEnrollmentChange}
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-pink-500"
+                          required
+                        >
+                          <option value="">Select batch</option>
+                          {enrollmentBatches.map((batch) => (
+                            <option key={batch} value={batch}>
+                              {batch}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Division / Class{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="enrollDivision"
+                          value={studentEnrollmentForm.enrollDivision}
+                          onChange={handleStudentEnrollmentChange}
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-pink-500"
+                          required
+                        >
+                          <option value="">Select division</option>
+                          {enrollmentDivisions.map((division) => (
+                            <option key={division} value={division}>
+                              {division}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Section <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="enrollSection"
+                          value={studentEnrollmentForm.enrollSection}
+                          onChange={handleStudentEnrollmentChange}
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-pink-500"
+                          required
+                        >
+                          <option value="">Select section</option>
+                          {enrollmentSections.map((section) => (
+                            <option key={section} value={section}>
+                              {section}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Roll Number
+                        </label>
+                        <input
+                          id="rollNumber"
+                          value={studentEnrollmentForm.rollNumber}
+                          readOnly
+                          type="number"
+                          placeholder="Auto roll number"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 px-4 py-3 text-sm outline-none text-slate-500 cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ADDITIONAL INFO */}
+                  <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-10 w-10 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                        <i className="bi bi-file-earmark-text-fill"></i>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                          Additional Information
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Admission, address and medical details
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Admission Date
+                        </label>
+                        <input
+                          id="admissionDate"
+                          value={studentEnrollmentForm.admissionDate}
+                          onChange={handleStudentEnrollmentChange}
+                          type="date"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Previous School
+                        </label>
+                        <input
+                          id="prevSchool"
+                          value={studentEnrollmentForm.prevSchool}
+                          onChange={handleStudentEnrollmentChange}
+                          type="text"
+                          placeholder="Enter previous school"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Residential Address
+                        </label>
+                        <textarea
+                          id="address"
+                          value={studentEnrollmentForm.address}
+                          onChange={handleStudentEnrollmentChange}
+                          placeholder="Enter full residential address"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500 min-h-[110px] resize-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Medical Conditions / Allergies
+                        </label>
+                        <textarea
+                          id="medical"
+                          value={studentEnrollmentForm.medical}
+                          onChange={handleStudentEnrollmentChange}
+                          placeholder="Enter medical conditions, allergies or notes"
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500 min-h-[110px] resize-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SYSTEM CREDENTIALS */}
+                  <div className="rounded-3xl border border-indigo-100 dark:border-slate-700 bg-indigo-50/70 dark:bg-slate-800 p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center">
+                        <i className="bi bi-shield-lock-fill"></i>
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                          System Credentials
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Student ID and User ID are generated automatically
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Student ID
+                        </label>
+                        <input
+                          id="studentID"
+                          value={studentEnrollmentForm.studentID}
+                          readOnly
+                          type="text"
+                          placeholder="Auto student ID"
+                          className="w-full rounded-xl border border-indigo-100 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none text-slate-500 cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          User ID / Username
+                        </label>
+                        <input
+                          id="userID"
+                          value={studentEnrollmentForm.userID}
+                          readOnly
+                          type="text"
+                          placeholder="Auto username"
+                          className="w-full rounded-xl border border-indigo-100 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none text-slate-500 cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Password
+                        </label>
+                        <input
+                          id="password"
+                          value={studentEnrollmentForm.password}
+                          onChange={handleStudentEnrollmentChange}
+                          type="password"
+                          placeholder="Enter password"
+                          className="w-full rounded-xl border border-indigo-100 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Account Status
+                        </label>
+                        <select
+                          id="status"
+                          value={studentEnrollmentForm.status}
+                          onChange={handleStudentEnrollmentChange}
+                          className="w-full rounded-xl border border-indigo-100 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {latestEnrolledStudent && (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 p-4 text-sm flex items-start gap-3">
+                      <i className="bi bi-check-circle-fill text-lg"></i>
+                      <div>
+                        <p className="font-semibold">
+                          Student enrolled successfully
+                        </p>
+                        <p className="mt-1">
+                          Student ID: <b>{latestEnrolledStudent.student_id}</b>
+                          {latestEnrolledStudent.password && (
+                            <>
+                              {" "}
+                              | Password:{" "}
+                              <b>{latestEnrolledStudent.password}</b>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ACTION BUTTONS */}
+                  <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:-mx-8 -mb-4 sm:-mb-6 lg:-mb-8 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 p-4 sm:p-6">
+                    <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={resetStudentEnrollmentForm}
+                        className="w-full sm:w-auto px-6 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                      >
+                        Reset Form
+                      </button>
+
+                      <button
+                        disabled={studentEnrollmentLoading}
+                        type="submit"
+                        className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl shadow-lg font-bold transition"
+                      >
+                        {studentEnrollmentLoading
+                          ? "Enrolling..."
+                          : "Enroll Student"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* PROMOTE TAB */}
+            {enrollmentActiveTab === "promote" && (
+              <div className="bg-white p-6 rounded-xl shadow animate-in fade-in duration-300">
+                <h3 className="font-bold text-lg mb-4 text-orange-600">
+                  Mass Promotion Module
+                </h3>
+
+                <div className="bg-orange-50 p-4 rounded-lg mb-6 text-sm text-orange-800 border border-orange-100">
+                  ⚠️ This will move all current students from selected class to
+                  destination class.
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <p className="font-semibold text-gray-500 uppercase text-xs">
+                      From Current
+                    </p>
+
+                    <select
+                      value={studentPromotionForm.source_class_id}
+                      onChange={(e) =>
+                        setStudentPromotionForm((p) => ({
+                          ...p,
+                          source_class_id: e.target.value,
+                        }))
+                      }
+                      className="input w-full border p-2 rounded-lg"
+                    >
+                      <option value="">Select Source Class</option>
+                      {enrollmentAcademicClasses.map((cls) => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.batch_name} - {cls.division_name} -{" "}
+                          {cls.section_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-4">
+                    <p className="font-semibold text-gray-500 uppercase text-xs">
+                      To Destination
+                    </p>
+
+                    <select
+                      value={studentPromotionForm.target_class_id}
+                      onChange={(e) =>
+                        setStudentPromotionForm((p) => ({
+                          ...p,
+                          target_class_id: e.target.value,
+                        }))
+                      }
+                      className="input w-full border p-2 rounded-lg"
+                    >
+                      <option value="">Select Target Class</option>
+                      {enrollmentAcademicClasses.map((cls) => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.batch_name} - {cls.division_name} -{" "}
+                          {cls.section_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={studentPromotionLoading}
+                  onClick={promoteWholeClassStudents}
+                  className="mt-8 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-6 py-3 rounded-xl font-bold w-full shadow-md"
+                >
+                  {studentPromotionLoading
+                    ? "Promoting..."
+                    : "Confirm & Promote All Students"}
+                </button>
+              </div>
+            )}
+
+            {/* REPORT TAB */}
+            {enrollmentActiveTab === "report" && (
+              <div className="bg-white p-5 rounded-xl shadow animate-in fade-in duration-300">
+                <h3 className="font-bold mb-4">Export Student Data</h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-6">
+                  <select
+                    value={studentReportFilters.batch}
+                    onChange={(e) =>
+                      setStudentReportFilters((p) => ({
+                        ...p,
+                        batch: e.target.value,
+                      }))
+                    }
+                    className="input border p-2 rounded-lg"
+                  >
+                    <option value="">All Batches</option>
+                    {enrollmentBatches.map((batch) => (
+                      <option key={batch} value={batch}>
+                        {batch}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={studentReportFilters.division}
+                    onChange={(e) =>
+                      setStudentReportFilters((p) => ({
+                        ...p,
+                        division: e.target.value,
+                      }))
+                    }
+                    className="input border p-2 rounded-lg"
+                  >
+                    <option value="">All Divisions</option>
+                    {enrollmentDivisions.map((division) => (
+                      <option key={division} value={division}>
+                        {division}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={studentReportFilters.section}
+                    onChange={(e) =>
+                      setStudentReportFilters((p) => ({
+                        ...p,
+                        section: e.target.value,
+                      }))
+                    }
+                    className="input border p-2 rounded-lg"
+                  >
+                    <option value="">All Sections</option>
+                    {enrollmentSections.map((section) => (
+                      <option key={section} value={section}>
+                        {section}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    value={studentReportFilters.date}
+                    onChange={(e) =>
+                      setStudentReportFilters((p) => ({
+                        ...p,
+                        date: e.target.value,
+                      }))
+                    }
+                    type="date"
+                    className="input border p-2 rounded-lg"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={loadStudentReportRows}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow font-medium"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-gray-600">
+                      <tr>
+                        <th className="p-4">ID</th>
+                        <th className="p-4">Student Name</th>
+                        <th className="p-4">Batch</th>
+                        <th className="p-4">Class</th>
+                        <th className="p-4">Section</th>
+                        <th className="p-4">Roll</th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-50">
+                      {studentReportRows.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="6"
+                            className="text-center p-10 text-gray-400 italic"
+                          >
+                            No students loaded. Use filters above.
+                          </td>
+                        </tr>
+                      ) : (
+                        studentReportRows.map((student) => (
+                          <tr key={student.id}>
+                            <td className="p-4">{student.student_id}</td>
+                            <td className="p-4">
+                              {student.first_name} {student.last_name}
+                            </td>
+                            <td className="p-4">{student.batch_name || "-"}</td>
+                            <td className="p-4">
+                              {student.division_name || "-"}
+                            </td>
+                            <td className="p-4">
+                              {student.section_name || "-"}
+                            </td>
+                            <td className="p-4">
+                              {student.roll_number || "-"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={downloadStudentReportCSV}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg shadow"
+                  >
+                    Excel/CSV Download
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+        {/* ================== ENROLLMENT SECTION END ================= */}
+
+        {/* ============================= SUBJECT MANAGEMENT SECTION START ============================= */}
+        {activeSection === "subjects" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-4 bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 rounded-2xl p-6 text-white shadow-lg flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+                <div>
+                  <h2 className="text-2xl font-bold">Subject Management</h2>
+                  <p className="text-sm opacity-90">
+                    Create, update and manage academic subjects
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openSubjectModal()}
+                  className="bg-white text-indigo-700 px-5 py-3 rounded-xl font-black shadow hover:bg-indigo-50 transition"
+                >
+                  + Add Subject
+                </button>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-500">
+                <p className="text-xs text-gray-500 font-bold uppercase">
+                  Total Subjects
+                </p>
+                <p className="text-xl font-bold text-gray-800">
+                  {subjectStats.total}
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-emerald-500">
+                <p className="text-xs text-gray-500 font-bold uppercase">
+                  Active Subjects
+                </p>
+                <p className="text-xl font-bold text-gray-800">
+                  {subjectStats.active}
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-red-500">
+                <p className="text-xs text-gray-500 font-bold uppercase">
+                  Inactive Subjects
+                </p>
+                <p className="text-xl font-bold text-gray-800">
+                  {subjectStats.inactive}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-end">
+              <div className="flex-1 min-w-[220px]">
+                <label className="text-xs font-bold text-gray-500 uppercase ml-1">
+                  Search Subject
+                </label>
+                <input
+                  type="text"
+                  value={subjectSearch}
+                  onChange={(e) => setSubjectSearch(e.target.value)}
+                  placeholder="Search by subject name or code"
+                  className="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex-1 min-w-[200px]">
+                <label className="text-xs font-bold text-gray-500 uppercase ml-1">
+                  Subject Type
+                </label>
+                <select
+                  value={subjectTypeFilter}
+                  onChange={(e) => setSubjectTypeFilter(e.target.value)}
+                  className="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Types</option>
+                  {subjectTypeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex-1 min-w-[200px]">
+                <label className="text-xs font-bold text-gray-500 uppercase ml-1">
+                  Status
+                </label>
+                <select
+                  value={subjectStatusFilter}
+                  onChange={(e) => setSubjectStatusFilter(e.target.value)}
+                  className="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Status</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={loadSubjects}
+                className="bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-black transition"
+              >
+                Filter
+              </button>
+
+              <button
+                type="button"
+                onClick={resetSubjectFilters}
+                className="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition"
+              >
+                Reset
+              </button>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+                <div>
+                  <h3 className="font-black text-gray-800">Subject List</h3>
+                  <p className="text-xs text-gray-500">
+                    Manage all subjects from one place
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-[10px]">
+                    <tr>
+                      <th className="p-4">Subject</th>
+                      <th className="p-4">Code</th>
+                      <th className="p-4">Type</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-50">
+                    {subjectsLoading ? (
+                      <tr>
+                        <td
+                          colSpan="5"
+                          className="p-6 text-center text-gray-500"
+                        >
+                          Loading subjects...
+                        </td>
+                      </tr>
+                    ) : subjects.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="5"
+                          className="p-6 text-center text-gray-500"
+                        >
+                          No subjects found
+                        </td>
+                      </tr>
+                    ) : (
+                      subjects.map((subject) => (
+                        <tr
+                          key={subject.id}
+                          className="hover:bg-gray-50 transition"
+                        >
+                          <td className="p-4">
+                            <p className="font-black text-gray-800">
+                              {subject.subject_name}
+                            </p>
+                          </td>
+
+                          <td className="p-4">
+                            <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs">
+                              {subject.subject_code}
+                            </span>
+                          </td>
+
+                          <td className="p-4 text-gray-700">
+                            {subject.subject_type || "Core"}
+                          </td>
+
+                          <td className="p-4">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                subject.status === "Inactive"
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-emerald-50 text-emerald-700"
+                              }`}
+                            >
+                              {subject.status || "Active"}
+                            </span>
+                          </td>
+
+                          <td className="p-4">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openSubjectModal(subject)}
+                                className="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100"
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => deleteSubject(subject.id)}
+                                className="px-3 py-2 rounded-lg bg-red-50 text-red-700 font-bold hover:bg-red-100"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {isSubjectModalOpen && (
+              <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden">
+                  <div className="p-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex justify-between items-center">
+                    <div>
+                      <h3 className="text-xl font-black">
+                        {subjectForm.id ? "Update Subject" : "Add Subject"}
+                      </h3>
+                      <p className="text-sm opacity-90">
+                        Enter subject details carefully
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closeSubjectModal}
+                      className="text-white text-2xl font-black"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <form
+                    onSubmit={saveSubject}
+                    className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4"
+                  >
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">
+                        Subject Name
+                      </label>
+                      <input
+                        name="subject_name"
+                        value={subjectForm.subject_name}
+                        onChange={handleSubjectChange}
+                        required
+                        placeholder="Example: Mathematics"
+                        className="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">
+                        Subject Code
+                      </label>
+                      <input
+                        name="subject_code"
+                        value={subjectForm.subject_code}
+                        onChange={handleSubjectChange}
+                        required
+                        placeholder="Example: MATH101"
+                        className="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">
+                        Subject Type
+                      </label>
+                      <select
+                        name="subject_type"
+                        value={subjectForm.subject_type}
+                        onChange={handleSubjectChange}
+                        className="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="Core">Core</option>
+                        <option value="Optional">Optional</option>
+                        <option value="Practical">Practical</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase">
+                        Status
+                      </label>
+                      <select
+                        name="status"
+                        value={subjectForm.status}
+                        onChange={handleSubjectChange}
+                        className="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2 flex justify-end gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={closeSubjectModal}
+                        className="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={subjectSaving}
+                        className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {subjectSaving
+                          ? "Saving..."
+                          : subjectForm.id
+                            ? "Update Subject"
+                            : "Save Subject"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+        {/* ============================= SUBJECT MANAGEMENT SECTION END ============================= */}
         {/* =========================== PREMIUM TIMETABLE SECTION ============================ */}
         {activeSection === "timetable" && (
           <section className="space-y-6 animate-in fade-in duration-500">
@@ -1196,7 +3581,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 >
                   <option value="">All Subjects</option>
 
-                  {subjects?.map((subject) => (
+                  {TTSubjects?.map((subject) => (
                     <option key={subject.id} value={subject.id}>
                       {subject.subject_name}
                     </option>
@@ -1811,7 +4196,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   >
                     <option value="">Select Subject</option>
 
-                    {subjects?.map((item) => (
+                    {TTSubjects?.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.subject_name}
                       </option>

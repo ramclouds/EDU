@@ -1,125 +1,186 @@
 import logging
-
 from flask import jsonify
 from flask.views import MethodView
 
-from utils.auth import db, Teacher, Student
+from utils.auth import db, Teacher, Student, Admin
 from utils.auth_middleware import login_required
-
 from utils.teacherDetails import TeacherClass
 from utils.studentDetails import (
     StudentAcademicRecord,
     AcademicClass,
+    Batch,
     Division,
     Section,
 )
-
-from utils.examResult import Subject
+from utils.subjects import Subject
 
 logger = logging.getLogger(__name__)
 
 
-class TeacherMyClasses(MethodView):
+def build_student_payload(student, record):
+    return {
+        "id": student.id,
+        "student_id": student.student_id,
+        "full_name": " ".join(
+            filter(
+                None,
+                [
+                    student.first_name,
+                    student.middle_name,
+                    student.last_name,
+                ],
+            )
+        ),
+        "roll_number": record.roll_number,
+        "mobile": student.mobile,
+        "parent_name": student.parent_name,
+        "parent_mobile": student.parent_mobile,
+        "status": student.status,
+        "gender": student.gender,
+        "date_of_birth": str(student.date_of_birth) if student.date_of_birth else None,
+        "blood_group": student.blood_group,
+        "email": student.email,
+        "address": student.address,
+        "father_name": student.father_name,
+        "mother_name": student.mother_name,
+        "medical_conditions": student.medical_conditions,
+        "allergies": student.allergies,
+    }
 
+
+def build_class_payload(academic, subject=None, teacher_class_id=None):
+    batch = Batch.query.get(academic.batch_id)
+    division = Division.query.get(academic.division_id)
+    section = Section.query.get(academic.section_id)
+
+    division_name = division.division_name if division else None
+    section_name = section.section_name if section else None
+    batch_name = batch.batch_name if batch else None
+
+    class_name = (
+        f"{division_name}-{section_name}"
+        if division_name and section_name
+        else f"Class {academic.id}"
+    )
+
+    records = (
+        StudentAcademicRecord.query.filter_by(
+            academic_class_id=academic.id,
+            is_current=True,
+        )
+        .order_by(
+            StudentAcademicRecord.roll_number.is_(None),
+            StudentAcademicRecord.roll_number.asc(),
+        )
+        .all()
+    )
+
+    students = []
+    for record in records:
+        student = Student.query.get(record.student_id)
+        if student:
+            students.append(build_student_payload(student, record))
+
+    return {
+        "teacher_class_id": teacher_class_id or f"admin-class-{academic.id}",
+        "class_id": academic.id,
+        "academic_class_id": academic.id,
+        "batch_id": academic.batch_id,
+        "division_id": academic.division_id,
+        "section_id": academic.section_id,
+        "batch_name": batch_name,
+        "division_name": division_name,
+        "section_name": section_name,
+        "class_name": class_name,
+        "display_name": class_name,
+        "subject_name": subject.subject_name if subject else "All Subjects",
+        "total_students": len(students),
+        "students": students,
+    }
+
+
+class MyClasses(MethodView):
     @login_required
-    def get(self, teacher_id):
+    def get(self, role=None, user_id=None):
+        if role is None or user_id is None:
+            return (
+                jsonify(
+                    {
+                        "error": "Missing role/user_id. Use /api/my-classes/<role>/<user_id>"
+                    }
+                ),
+                400,
+            )
 
         try:
-            teacher_id = int(teacher_id)
+            role = str(role).lower().strip()
+            user_id = int(user_id)
 
-            teacher = Teacher.query.get(teacher_id)
+            # ================= ADMIN: SHOW ALL CLASSES =================
+            if role == "admin":
+                admin = Admin.query.get(user_id)
+                if not admin:
+                    return jsonify({"error": "Admin not found"}), 404
 
-            if not teacher:
-                return jsonify({"error": "Teacher not found"}), 404
-
-            # ===============================
-            # FETCH ASSIGNED CLASSES
-            # ===============================
-            teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
-
-            response = []
-
-            for tc in teacher_classes:
-
-                academic = AcademicClass.query.get(tc.academic_class_id)
-
-                if not academic:
-                    continue
-
-                division = Division.query.get(academic.division_id)
-                section = Section.query.get(academic.section_id)
-
-                subject = Subject.query.get(tc.subject_id)
-
-                class_name = ""
-
-                if division and section:
-                    class_name = f"{division.division_name}-{section.section_name}"
-
-                # ===============================
-                # FETCH STUDENTS
-                # ===============================
-                records = StudentAcademicRecord.query.filter_by(
-                    academic_class_id=academic.id, is_current=True
+                academic_classes = AcademicClass.query.order_by(
+                    AcademicClass.batch_id.asc(),
+                    AcademicClass.division_id.asc(),
+                    AcademicClass.section_id.asc(),
                 ).all()
 
-                students = []
+                response = [
+                    build_class_payload(academic) for academic in academic_classes
+                ]
 
-                for record in records:
+                return jsonify(response), 200
 
-                    student = Student.query.get(record.student_id)
+            # ================= TEACHER: ONLY ASSIGNED CLASSES =================
+            if role == "teacher":
+                teacher = Teacher.query.get(user_id)
+                if not teacher:
+                    return jsonify({"error": "Teacher not found"}), 404
 
-                    if not student:
+                teacher_classes = TeacherClass.query.filter_by(teacher_id=user_id).all()
+
+                response = []
+
+                for tc in teacher_classes:
+                    academic_class_id = getattr(
+                        tc, "academic_class_id", None
+                    ) or getattr(tc, "class_id", None)
+
+                    if not academic_class_id:
                         continue
 
-                    students.append(
-                        {
-                            "id": student.id,
-                            "student_id": student.student_id,
-                            "full_name": " ".join(
-                                filter(
-                                    None,
-                                    [
-                                        student.first_name,
-                                        student.middle_name,
-                                        student.last_name,
-                                    ],
-                                )
-                            ),
-                            "roll_number": record.roll_number,
-                            "mobile": student.mobile,
-                            "parent_name": student.parent_name,
-                            "status": student.status,
-                            "gender": student.gender,
-                            "date_of_birth": (
-                                str(student.date_of_birth)
-                                if student.date_of_birth
-                                else None
-                            ),
-                            "blood_group": student.blood_group,
-                            "email": student.email,
-                            "address": student.address,
-                            "father_name": student.father_name,
-                            "mother_name": student.mother_name,
-                            "parent_mobile": student.parent_mobile,
-                            "medical_conditions": student.medical_conditions,
-                            "allergies": student.allergies,
-                        }
+                    academic = AcademicClass.query.get(academic_class_id)
+                    if not academic:
+                        continue
+
+                    subject_id = getattr(tc, "subject_id", None)
+                    subject = Subject.query.get(subject_id) if subject_id else None
+
+                    response.append(
+                        build_class_payload(
+                            academic=academic,
+                            subject=subject,
+                            teacher_class_id=getattr(tc, "id", None),
+                        )
                     )
 
-                response.append(
-                    {
-                        "teacher_class_id": tc.id,
-                        "class_id": academic.id,
-                        "class_name": class_name,
-                        "subject_name": (subject.subject_name if subject else None),
-                        "total_students": len(students),
-                        "students": students,
-                    }
-                )
+                return jsonify(response), 200
 
-            return jsonify(response), 200
+            return jsonify({"error": "Invalid role"}), 400
+
+        except ValueError:
+            return jsonify({"error": "Invalid user id"}), 400
 
         except Exception as e:
-            logger.exception(e)
-            return jsonify({"error": "Something went wrong"}), 500
+            logger.exception("MyClasses API failed")
+            return jsonify({"error": str(e)}), 500
+
+
+# Backward compatible old teacher route
+class TeacherMyClasses(MethodView):
+    @login_required
+    def get(self, teacher_id):
+        return MyClasses().get("teacher", teacher_id)

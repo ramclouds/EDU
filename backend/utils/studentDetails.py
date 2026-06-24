@@ -15,43 +15,67 @@ class StudentAcademicRecord(db.Model):
     __tablename__ = "student_academic_records"
 
     id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer)
-    academic_class_id = db.Column(db.Integer)
+
+    student_id = db.Column(
+        db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
+    )
+
+    academic_class_id = db.Column(
+        db.Integer,
+        db.ForeignKey("academic_classes.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
     roll_number = db.Column(db.Integer)
-    is_current = db.Column(db.Boolean)
+    is_current = db.Column(db.Boolean, default=True)
 
 
 class AcademicClass(db.Model):
     __tablename__ = "academic_classes"
 
     id = db.Column(db.Integer, primary_key=True)
-    batch_id = db.Column(db.Integer)
-    division_id = db.Column(db.Integer)
-    section_id = db.Column(db.Integer)
+
+    batch_id = db.Column(
+        db.Integer, db.ForeignKey("batches.id", ondelete="CASCADE"), nullable=False
+    )
+
+    division_id = db.Column(
+        db.Integer, db.ForeignKey("divisions.id", ondelete="CASCADE"), nullable=False
+    )
+
+    section_id = db.Column(
+        db.Integer, db.ForeignKey("sections.id", ondelete="CASCADE"), nullable=False
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "batch_id", "division_id", "section_id", name="uq_batch_division_section"
+        ),
+    )
 
 
 class Batch(db.Model):
     __tablename__ = "batches"
 
     id = db.Column(db.Integer, primary_key=True)
+    batch_name = db.Column(db.String(20), nullable=False, unique=True)
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
-    created_at = db.Column(db.DateTime)
-    batch_name = db.Column(db.String(20))
+    created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
 
 
 class Division(db.Model):
     __tablename__ = "divisions"
 
     id = db.Column(db.Integer, primary_key=True)
-    division_name = db.Column(db.String(20))
+    division_name = db.Column(db.String(20), nullable=False, unique=True)
 
 
 class Section(db.Model):
     __tablename__ = "sections"
 
     id = db.Column(db.Integer, primary_key=True)
-    section_name = db.Column(db.String(10))
+    section_name = db.Column(db.String(10), nullable=False, unique=True)
 
 
 # API
@@ -313,11 +337,8 @@ class ChangePassword(MethodView):
 
             # ================= SAVE NEW PASSWORD =================
             hashed = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt())
-
             student.password = hashed.decode("utf-8")
-
             db.session.commit()
-
             logger.info(f"Password changed for student_id={student.id}")
 
             return jsonify({"message": "Password changed successfully"}), 200

@@ -55,8 +55,6 @@ class BookIssue(db.Model):
 # =========================
 # SERVICE LAYER
 # =========================
-
-
 class LibraryService:
 
     @staticmethod

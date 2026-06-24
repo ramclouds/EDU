@@ -1,5 +1,8 @@
-import { useState, useMemo, useEffect, useRef, } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { BASE_URL } from "../../config/appConfig";
+
+let timetableOptionsCache = null;
+let timetableOptionsRequest = null;
 
 export function useTimeTableManagement({ showToast, fetchWithAuth, activeSection, }) {
     const [lectureModalOpen, setLectureModalOpen] = useState(false);
@@ -545,115 +548,97 @@ export function useTimeTableManagement({ showToast, fetchWithAuth, activeSection
         );
     };
 
-    const loadTimetable = async (
-        academicClassId
-    ) => {
+    const loadTimetable = useCallback(async (academicClassId = "") => {
         try {
-
             setLoading(true);
 
-            const response =
-                await fetchWithAuth(
-                    academicClassId
-                        ? `${BASE_URL}/admin/timetable?academic_class_id=${academicClassId}`
-                        : `${BASE_URL}/admin/timetable`
-                );
+            const response = await fetchWithAuth(
+                academicClassId
+                    ? `${BASE_URL}/admin/timetable?academic_class_id=${academicClassId}`
+                    : `${BASE_URL}/admin/timetable`
+            );
 
-            const data =
-                await response.json();
+            const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(
-                    data.error ||
-                    "Failed to load timetable"
-                );
+                throw new Error(data.error || "Failed to load timetable");
             }
 
-            setLectures(data);
+            setLectures(Array.isArray(data) ? data : []);
 
         } catch (error) {
             console.error(error);
-            showToast?.(
-                error.message,
-                "error"
-            );
-
+            showToast?.(error.message, "error");
         } finally {
             setLoading(false);
         }
-    };
-    const loadTimetableOptions =
-        async () => {
+    }, [fetchWithAuth, showToast]);
 
-            try {
+    const loadTimetableOptions = useCallback(async () => {
+        try {
+            if (timetableOptionsCache) {
+                const data = timetableOptionsCache;
 
-                const response =
-                    await fetchWithAuth(
-                        `${BASE_URL}/admin/timetable/options`
-                    );
-
-                const data =
-                    await response.json();
-
-                if (!response.ok) {
-                    throw new Error(
-                        data.error ||
-                        "Failed to load options"
-                    );
-                }
-
-                setTeachers(
-                    data.teachers || []
-                );
-
-                setSubjects(
-                    data.subjects || []
-                );
-
-                setClasses(
-                    data.classes || []
-                );
-
-                setDivisions(
-                    data.divisions || []
-                );
-
-                setSections(
-                    data.sections || []
-                );
-
-                setRooms(
-                    data.rooms || []
-                );
-
-
-            } catch (error) {
-
-                console.error(error);
-
-                showToast?.(
-                    "Failed to load timetable options",
-                    "error"
-                );
+                setTeachers(data.teachers || []);
+                setSubjects(data.subjects || []);
+                setClasses(data.classes || []);
+                setDivisions(data.divisions || []);
+                setSections(data.sections || []);
+                setRooms(data.rooms || []);
+                return;
             }
-        };
+
+            if (!timetableOptionsRequest) {
+                timetableOptionsRequest = fetchWithAuth(
+                    `${BASE_URL}/admin/timetable/options`
+                )
+                    .then(async (response) => {
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || "Failed to load options");
+                        }
+
+                        timetableOptionsCache = data;
+                        return data;
+                    })
+                    .finally(() => {
+                        timetableOptionsRequest = null;
+                    });
+            }
+
+            const data = await timetableOptionsRequest;
+
+            setTeachers(data.teachers || []);
+            setSubjects(data.subjects || []);
+            setClasses(data.classes || []);
+            setDivisions(data.divisions || []);
+            setSections(data.sections || []);
+            setRooms(data.rooms || []);
+
+        } catch (error) {
+            console.error(error);
+            showToast?.("Failed to load timetable options", "error");
+        }
+    }, [fetchWithAuth, showToast]);
+
+    const didInitRef = useRef(false);
 
     useEffect(() => {
+        if (activeSection !== "timetable") return;
+        if (didInitRef.current) return;
 
-        if (activeSection !== "timetable")
-            return;
+        didInitRef.current = true;
 
-        const initialize = async () => {
+        loadTimetableOptions();
+        loadTimetable(filters.academic_class_id);
 
-            await loadTimetableOptions();
-            await loadTimetable(
-                filters.academic_class_id
-            );
-        };
-
-        initialize();
-
-    }, [activeSection]);
+    }, [
+        activeSection,
+        loadTimetableOptions,
+        loadTimetable,
+        filters.academic_class_id,
+    ]);
 
     // REFRESH
     const refreshTimetable = async () => {
