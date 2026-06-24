@@ -13,11 +13,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask import request
 from utils.auth import db, Teacher
 from utils.auth_middleware import login_required
+from utils.subjects import Subject
 from utils.studentDetails import (
     StudentAcademicRecord,
     Student,
     AcademicClass,
-    Batch,
     Division,
     Section,
 )
@@ -47,15 +47,6 @@ class Exam(db.Model):
             "academic_class_id", "academic_year", "exam_name", name="uq_exam"
         ),
     )
-
-
-class Subject(db.Model):
-    __tablename__ = "subjects"
-
-    id = db.Column(db.Integer, primary_key=True)
-    subject_code = db.Column(db.String(20), unique=True)
-    subject_name = db.Column(db.String(100), nullable=False, unique=True)
-    created_at = db.Column(db.DateTime, server_default=func.now())
 
 
 class ExamSubject(db.Model):

@@ -14,6 +14,7 @@ db = SQLAlchemy()
 
 logger = logging.getLogger(__name__)
 
+
 # ===========================
 # PRODUCTION READY ADMIN MODEL
 # ===========================
@@ -190,9 +191,7 @@ class Admin(db.Model):
             "username": self.username,
             "gender": self.gender,
             "date_of_birth": (
-                self.date_of_birth.isoformat()
-                if self.date_of_birth
-                else None
+                self.date_of_birth.isoformat() if self.date_of_birth else None
             ),
             "blood_group": self.blood_group,
             "address": self.address,
@@ -208,9 +207,7 @@ class Admin(db.Model):
             "specialization": self.specialization,
             "experience_years": self.experience_years,
             "joining_date": (
-                self.joining_date.isoformat()
-                if self.joining_date
-                else None
+                self.joining_date.isoformat() if self.joining_date else None
             ),
             "employment_type": self.employment_type,
             "shift": self.shift,
@@ -227,11 +224,7 @@ class Admin(db.Model):
             "revenue_view": self.revenue_view,
             "two_factor_enabled": self.two_factor_enabled,
             "login_alerts": self.login_alerts,
-            "last_login": (
-                self.last_login.isoformat()
-                if self.last_login
-                else None
-            ),
+            "last_login": (self.last_login.isoformat() if self.last_login else None),
             "logins_30d": self.logins_30d,
             "actions_count": self.actions_count,
             "last_action": self.last_action,
@@ -410,7 +403,7 @@ class Login(MethodView):
                 dashboard = "student_dashboard"
             elif user.role == "teacher":
                 dashboard = "teacher_dashboard"
-            elif user.role == "admin":
+            elif user.role in ["admin", "super_admin"]:
                 dashboard = "admin_dashboard"
             else:
                 dashboard = "dashboard"
@@ -423,6 +416,8 @@ class Login(MethodView):
                         "dashboard": dashboard,
                         "user": {
                             "id": user.id,
+                            "role": user.role,
+                            "user_type": user.role,
                             "name": " ".join(
                                 filter(
                                     None,

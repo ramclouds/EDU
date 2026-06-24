@@ -175,13 +175,10 @@ class UpdateAdminProfile(MethodView):
             ).first()
 
             if existing_admin:
-
                 if new_email and existing_admin.email == new_email:
                     return jsonify({"error": "Email already exists"}), 400
-
                 if new_mobile and existing_admin.mobile == new_mobile:
                     return jsonify({"error": "Mobile already exists"}), 400
-
                 if new_username and existing_admin.username == new_username:
                     return jsonify({"error": "Username already exists"}), 400
 

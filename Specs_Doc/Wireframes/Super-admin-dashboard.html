@@ -95,7 +95,7 @@
                     <!-- ACADEMIC -->
                     <p class="text-xs text-gray-400 px-2 mt-4">ACADEMIC</p>
 
-                    <!-- <button data-section="classes"
+                    <button data-section="classes"
                         class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800">
                         <i class="bi bi-easel"></i> Classes & Sections
                     </button>
@@ -103,7 +103,7 @@
                     <button data-section="subjects"
                         class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800">
                         <i class="bi bi-book"></i> Subjects
-                    </button> -->
+                    </button>
 
                     <button data-section="timetable"
                         class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800">
@@ -1342,91 +1342,163 @@
             <!-- =========================== TIME-TABLE SECTION START ============================ -->
             <section class="section hidden p-4 sm:p-6 space-y-6" id="timetableSection">
 
-                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+                <!-- HEADER -->
+                <div
+                    class="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 rounded-2xl p-6 text-white shadow-lg">
 
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 
-                        <!-- TEXT -->
                         <div>
-                            <h2 class="text-xl sm:text-2xl font-semibold">Timetable Management</h2>
-                            <p class="text-xs opacity-90">
-                                Manage class schedules & teacher lectures
+                            <h2 class="text-2xl font-bold">
+                                Timetable Management
+                            </h2>
+
+                            <p class="text-sm opacity-90 mt-1">
+                                Create and manage class schedules,
+                                teacher lectures and classroom allocation.
                             </p>
                         </div>
 
-                        <!-- BUTTON -->
-                        <button onclick="openLectureModal()"
-                            class="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow">
-                            + Add Lecture
+                        <div class="flex flex-wrap gap-2">
+
+                            <button onclick="openLectureModal()"
+                                class="bg-white text-indigo-600 px-4 py-2 rounded-xl font-medium shadow">
+
+                                + Schedule Lecture
+                            </button>
+
+                            <button onclick="copyTimetable()" class="bg-indigo-800 px-4 py-2 rounded-xl">
+
+                                Copy Timetable
+                            </button>
+
+                            <button onclick="exportTimetablePDF()" class="bg-green-600 px-4 py-2 rounded-xl">
+
+                                Export PDF
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-5">
+
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+
+                        <select id="filterBatch" class="input">
+                            <option value="">Academic Batch</option>
+                        </select>
+
+                        <select id="filterClass" class="input">
+                            <option value="">Class</option>
+                        </select>
+
+                        <select id="filterDivision" class="input">
+                            <option value="">Division</option>
+                        </select>
+
+                        <select id="filterSection" class="input">
+                            <option value="">Section</option>
+                        </select>
+
+                        <select id="filterTeacher" class="input">
+                            <option value="">Teacher</option>
+                        </select>
+
+                        <button onclick="loadTimetable()" class="bg-indigo-600 text-white rounded-xl">
+
+                            Load Timetable
                         </button>
 
                     </div>
 
                 </div>
 
-
-                <!-- FILTER -->
-                <div class="bg-white p-4 rounded-xl shadow grid grid-cols-1 sm:grid-cols-4 gap-4">
-
-                    <select class="input">
-                        <option>Select Batch</option>
-                    </select>
-
-                    <select class="input">
-                        <option>Select Division</option>
-                    </select>
-
-                    <select class="input">
-                        <option>Select Section</option>
-                    </select>
-
-                    <button class="bg-indigo-600 text-white rounded-lg">
-                        Load Timetable
-                    </button>
-
-                </div>
-
                 <!-- STATS -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
 
-                    <div class="bg-white p-4 rounded-xl shadow text-center">
-                        <p class="text-xs text-gray-500">Total Lectures</p>
-                        <h2 id="totalLectures" class="font-bold text-lg">0</h2>
+                    <div class="bg-white rounded-xl shadow p-4 text-center">
+                        <p class="text-gray-500 text-xs">Total Lectures</p>
+                        <h3 id="totalLectures" class="text-xl font-bold">0</h3>
                     </div>
 
-                    <div class="bg-white p-4 rounded-xl shadow text-center">
-                        <p class="text-xs text-gray-500">Subjects</p>
-                        <h2 id="totalSubjects" class="font-bold text-lg">0</h2>
+                    <div class="bg-white rounded-xl shadow p-4 text-center">
+                        <p class="text-gray-500 text-xs">Subjects</p>
+                        <h3 id="totalSubjects" class="text-xl font-bold">0</h3>
                     </div>
 
-                    <div class="bg-white p-4 rounded-xl shadow text-center">
-                        <p class="text-xs text-gray-500">Teachers</p>
-                        <h2 id="totalTeachers" class="font-bold text-lg">0</h2>
+                    <div class="bg-white rounded-xl shadow p-4 text-center">
+                        <p class="text-gray-500 text-xs">Teachers</p>
+                        <h3 id="totalTeachers" class="text-xl font-bold">0</h3>
                     </div>
 
-                    <div class="bg-white p-4 rounded-xl shadow text-center">
-                        <p class="text-xs text-gray-500">Daily Load</p>
-                        <h2 id="dailyLoad" class="font-bold text-lg">0</h2>
+                    <div class="bg-white rounded-xl shadow p-4 text-center">
+                        <p class="text-gray-500 text-xs">Rooms</p>
+                        <h3 id="totalRooms" class="text-xl font-bold">0</h3>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow p-4 text-center">
+                        <p class="text-gray-500 text-xs">Weekly Load</p>
+                        <h3 id="weeklyLoad" class="text-xl font-bold">0</h3>
                     </div>
 
                 </div>
 
-                <!-- TIMETABLE GRID -->
-                <div class="bg-white rounded-xl shadow p-4 overflow-x-auto">
+                <!-- TIMETABLE -->
+                <div class="bg-white rounded-2xl shadow p-5 overflow-x-auto">
 
-                    <h3 class="font-semibold mb-3">Weekly Timetable</h3>
+                    <div class="flex justify-between items-center mb-4">
 
-                    <table class="w-full text-sm border text-center">
+                        <h3 class="font-semibold text-lg">
+                            Weekly Timetable
+                        </h3>
+
+                        <button onclick="refreshTimetable()" class="text-indigo-600">
+
+                            Refresh
+                        </button>
+
+                    </div>
+
+                    <table class="min-w-full border text-sm">
+
                         <thead class="bg-gray-100">
+
                             <tr>
-                                <th class="p-2 border">Time</th>
-                                <th class="p-2 border">Mon</th>
-                                <th class="p-2 border">Tue</th>
-                                <th class="p-2 border">Wed</th>
-                                <th class="p-2 border">Thu</th>
-                                <th class="p-2 border">Fri</th>
-                                <th class="p-2 border">Sat</th>
+
+                                <th class="border p-3">
+                                    Time Slot
+                                </th>
+
+                                <th class="border p-3">
+                                    Monday
+                                </th>
+
+                                <th class="border p-3">
+                                    Tuesday
+                                </th>
+
+                                <th class="border p-3">
+                                    Wednesday
+                                </th>
+
+                                <th class="border p-3">
+                                    Thursday
+                                </th>
+
+                                <th class="border p-3">
+                                    Friday
+                                </th>
+
+                                <th class="border p-3">
+                                    Saturday
+                                </th>
+
                             </tr>
+
                         </thead>
 
                         <tbody id="timetableBody"></tbody>
@@ -1436,261 +1508,574 @@
                 </div>
 
             </section>
-            <div id="lectureModal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <!-- ================= LECTURE MODAL ================= -->
 
-                <div class="bg-white w-full max-w-lg rounded-2xl p-5 space-y-5">
+            <div id="lectureModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+
+                <div class="bg-white rounded-2xl w-full max-w-3xl p-6 max-h-[95vh] overflow-y-auto">
 
                     <!-- HEADER -->
-                    <div class="flex justify-between items-center">
+
+                    <div class="flex justify-between items-center mb-6">
+
                         <div>
-                            <h2 class="font-semibold text-lg">Add Lecture</h2>
-                            <p class="text-xs text-gray-500">Schedule class timetable</p>
-                        </div>
-                        <button onclick="closeLectureModal()" class="text-gray-500 hover:text-black">✕</button>
-                    </div>
 
-                    <!-- DAY -->
-                    <div>
-                        <label class="text-xs text-gray-600">Select Day</label>
-                        <select id="lecDay" class="input w-full">
-                            <option value="">Choose Day</option>
-                            <option>Monday</option>
-                            <option>Tuesday</option>
-                            <option>Wednesday</option>
-                            <option>Thursday</option>
-                            <option>Friday</option>
-                            <option>Saturday</option>
-                        </select>
-                    </div>
+                            <h2 class="text-xl font-semibold">
+                                Schedule Lecture
+                            </h2>
 
-                    <!-- TIME SLOT -->
-                    <div>
-                        <label class="text-xs text-gray-600">Lecture Time Slot</label>
-                        <div class="grid grid-cols-2 gap-2 mt-1">
-
-                            <div>
-                                <label class="text-[11px] text-gray-500">Start Time</label>
-                                <input id="startTime" type="time" class="input w-full" required>
-                            </div>
-
-                            <div>
-                                <label class="text-[11px] text-gray-500">End Time</label>
-                                <input id="endTime" type="time" class="input w-full" required>
-                            </div>
+                            <p class="text-sm text-gray-500">
+                                Create class timetable entry
+                            </p>
 
                         </div>
 
-                        <p id="timeError" class="text-xs text-red-500 hidden mt-1">
-                            End time must be after start time
-                        </p>
+                        <button onclick="closeLectureModal()" class="text-xl">
+                            ✕
+                        </button>
+
                     </div>
 
-                    <!-- SUBJECT -->
-                    <div>
-                        <label class="text-xs text-gray-600">Subject</label>
-                        <select id="lecSubject" class="input w-full">
-                            <option value="">Select Subject</option>
-                            <option value="Mathematics">Mathematics</option>
-                            <option value="Science">Science</option>
-                            <option value="Physics">Physics</option>
-                            <option value="Chemistry">Chemistry</option>
-                            <option value="English">English</option>
-                            <option value="Computer">Computer</option>
-                        </select>
+                    <!-- FORM -->
+
+                    <div class="grid md:grid-cols-2 gap-4">
+
+                        <!-- ACADEMIC -->
+
+                        <div>
+                            <label class="text-xs">Batch</label>
+                            <select id="lecBatch" class="input w-full"></select>
+                        </div>
+
+                        <div>
+                            <label class="text-xs">Class</label>
+                            <select id="lecClass" class="input w-full"></select>
+                        </div>
+
+                        <div>
+                            <label class="text-xs">Division</label>
+                            <select id="lecDivision" class="input w-full"></select>
+                        </div>
+
+                        <div>
+                            <label class="text-xs">Section</label>
+                            <select id="lecSection" class="input w-full"></select>
+                        </div>
+
+                        <!-- DAY -->
+
+                        <div>
+                            <label class="text-xs">Day</label>
+
+                            <select id="lecDay" class="input w-full">
+
+                                <option value="">
+                                    Select Day
+                                </option>
+
+                                <option>Monday</option>
+                                <option>Tuesday</option>
+                                <option>Wednesday</option>
+                                <option>Thursday</option>
+                                <option>Friday</option>
+                                <option>Saturday</option>
+
+                            </select>
+
+                        </div>
+
+                        <!-- TYPE -->
+
+                        <div>
+                            <label class="text-xs">
+                                Lecture Type
+                            </label>
+
+                            <select id="lectureType" class="input w-full">
+
+                                <option>Theory</option>
+                                <option>Practical</option>
+                                <option>Lab</option>
+                                <option>Sports</option>
+                                <option>Activity</option>
+                                <option>Exam</option>
+
+                            </select>
+                        </div>
+
+                        <!-- TIME -->
+
+                        <div>
+
+                            <label class="text-xs">
+                                Start Time
+                            </label>
+
+                            <input id="startTime" type="time" class="input w-full">
+
+                        </div>
+
+                        <div>
+
+                            <label class="text-xs">
+                                End Time
+                            </label>
+
+                            <input id="endTime" type="time" class="input w-full">
+
+                        </div>
+
+                        <!-- SUBJECT -->
+
+                        <div>
+
+                            <label class="text-xs">
+                                Subject
+                            </label>
+
+                            <select id="lecSubject" class="input w-full">
+
+                            </select>
+
+                        </div>
+
+                        <!-- TEACHER -->
+
+                        <div>
+
+                            <label class="text-xs">
+                                Assigned Teacher
+                            </label>
+
+                            <select id="lecTeacher" class="input w-full">
+
+                            </select>
+
+                        </div>
+
+                        <!-- ROOM -->
+
+                        <div>
+
+                            <label class="text-xs">
+                                Classroom
+                            </label>
+
+                            <select id="lecRoom" class="input w-full">
+
+                            </select>
+
+                        </div>
+
+                        <!-- CAPACITY -->
+
+                        <div>
+
+                            <label class="text-xs">
+                                Room Capacity
+                            </label>
+
+                            <input readonly id="roomCapacity" class="input w-full">
+
+                        </div>
+
+                        <!-- REMARKS -->
+
+                        <div class="md:col-span-2">
+
+                            <label class="text-xs">
+                                Remarks
+                            </label>
+
+                            <textarea id="lectureRemarks" rows="3" class="input w-full">
+
+                            </textarea>
+
+                        </div>
+
                     </div>
 
-                    <!-- TEACHER -->
-                    <div>
-                        <label class="text-xs text-gray-600">Assigned Teacher</label>
-                        <select id="lecTeacher" class="input w-full">
-                            <option value="">Select Teacher</option>
-                            <option value="Rahul Sharma">Rahul Sharma - Mathematics</option>
-                            <option value="Aisha Khan">Aisha Khan - Science</option>
-                            <option value="John Mathew">John Mathew - English</option>
-                            <option value="Priya Desai">Priya Desai - Physics</option>
-                        </select>
+                    <!-- CONFLICT ALERT -->
+
+                    <div id="lectureConflict"
+                        class="hidden bg-red-50 text-red-600 border border-red-200 p-3 rounded-lg mt-4">
+
                     </div>
 
-                    <!-- ACTION -->
-                    <button onclick="addLecture()"
-                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg transition">
-                        Save Lecture
-                    </button>
+                    <!-- FOOTER -->
+
+                    <div class="flex justify-end gap-3 mt-6">
+
+                        <button onclick="closeLectureModal()" class="px-4 py-2 border rounded-lg">
+
+                            Cancel
+                        </button>
+
+                        <button onclick="saveLecture()" class="px-5 py-2 bg-indigo-600 text-white rounded-lg">
+
+                            Save Lecture
+                        </button>
+
+                    </div>
 
                 </div>
+
             </div>
             <!-- =========================== TIME-TABLE SECTION END ============================ -->
 
-            <!-- =========================== ATTENDACE SECTION START ============================ -->
-            <section class="section hidden p-4 sm:p-6 space-y-6" id="attendanceSection">
+            <!-- =========================== ATTENDANCE SECTION START ============================ -->
+            <section class="section hidden p-3 sm:p-5 lg:p-6 space-y-6 bg-gray-50 min-h-screen" id="attendanceSection">
 
-                <!-- HEADER -->
-                <div class="bg-gradient-to-r from-blue-500 to-indigo-600
-    rounded-2xl p-5 text-white shadow-lg">
-                    <h2 class="text-xl sm:text-2xl font-semibold">Attendance Management</h2>
-                    <p class="text-xs sm:text-sm opacity-90">
-                        View and analyze attendance records
-                    </p>
-                </div>
+                <!--  HEADER  -->
+                <div
+                    class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 p-6 sm:p-8 shadow-xl">
 
-                <!-- CHART -->
+                    <div class="relative z-10">
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-white">
+                            Attendance Management
+                        </h2>
 
-                    <!-- CHART CARD -->
-                    <div class="bg-white rounded-xl shadow p-4">
-
-                        <h3 class="font-semibold mb-3 text-sm">Attendance Overview</h3>
-
-                        <div class="flex justify-center">
-                            <canvas id="attendanceChartA" width="150" height="150"></canvas>
-                        </div>
+                        <p class="text-blue-100 mt-2 text-sm sm:text-base">
+                            Monitor and manage students & teachers attendance records
+                        </p>
 
                     </div>
 
-                    <!-- STATS CARD -->
-                    <div class="bg-white rounded-xl shadow p-4">
+                    <!-- Decoration -->
+                    <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
 
-                        <h3 class="font-semibold mb-3 text-sm">Quick Stats</h3>
+                    <div class="absolute right-20 bottom-0 w-28 h-28 bg-cyan-300/20 rounded-full blur-2xl"></div>
 
-                        <div class="grid grid-cols-2 gap-4 text-center">
+                </div>
 
-                            <!-- Present -->
-                            <div class="bg-green-50 p-3 rounded-lg">
-                                <p class="text-xs text-gray-500">Present</p>
-                                <h2 id="presentCount" class="text-lg font-bold text-green-600">0</h2>
-                            </div>
+                <!-- ================= STATS + CHART ================= -->
 
-                            <!-- Absent -->
-                            <div class="bg-red-50 p-3 rounded-lg">
-                                <p class="text-xs text-gray-500">Absent</p>
-                                <h2 id="absentCount" class="text-lg font-bold text-red-500">0</h2>
-                            </div>
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
 
-                            <!-- Total -->
-                            <div class="bg-blue-50 p-3 rounded-lg">
-                                <p class="text-xs text-gray-500">Total</p>
-                                <h2 id="totalCount" class="text-lg font-bold text-blue-600">0</h2>
-                            </div>
+                    <!-- LEFT SECTION -->
+                    <div class="xl:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-4">
 
-                            <!-- Percentage -->
-                            <div class="bg-purple-50 p-3 rounded-lg">
-                                <p class="text-xs text-gray-500">Attendance %</p>
-                                <h2 id="percentage" class="text-lg font-bold text-purple-600">0%</h2>
+                        <!-- PRESENT -->
+                        <div
+                            class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+
+                            <div class="flex items-center justify-between">
+
+                                <div>
+
+                                    <p class="text-gray-500 text-sm">
+                                        Present
+                                    </p>
+
+                                    <h2 id="presentCount" class="text-2xl font-bold text-green-600 mt-1">
+                                        0
+                                    </h2>
+
+                                </div>
+
+                                <div class="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+
+                                    <i class="fas fa-check text-green-600"></i>
+
+                                </div>
+
                             </div>
 
                         </div>
 
+                        <!-- ABSENT -->
+                        <div
+                            class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+
+                            <div class="flex items-center justify-between">
+
+                                <div>
+
+                                    <p class="text-gray-500 text-sm">
+                                        Absent
+                                    </p>
+
+                                    <h2 id="absentCount" class="text-2xl font-bold text-red-500 mt-1">
+                                        0
+                                    </h2>
+
+                                </div>
+
+                                <div class="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+
+                                    <i class="fas fa-times text-red-500"></i>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <!-- TOTAL -->
+                        <div
+                            class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">
+                                        Total
+                                    </p>
+
+                                    <h2 id="totalCount" class="text-2xl font-bold text-blue-600 mt-1">
+                                        0
+                                    </h2>
+
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+
+                                    <i class="fas fa-users text-blue-600"></i>
+
+                                </div>
+                            </div>
+                        </div>
+                        <!-- PERCENTAGE -->
+                        <div
+                            class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-gray-500 text-sm">
+                                        Attendance %
+                                    </p>
+                                    <h2 id="percentage" class="text-2xl font-bold text-purple-600 mt-1">
+                                        0%
+                                    </h2>
+                                </div>
+                                <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                                    <i class="fas fa-chart-pie text-purple-600"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-
                 </div>
 
-                <!-- FILTERS -->
-                <div class="bg-white p-4 rounded-xl shadow grid grid-cols-1 sm:grid-cols-5 gap-4">
+                <!-- ================= FILTERS ================= -->
 
-                    <select id="roleFilter" class="input">
-                        <option value="students">Students</option>
-                        <option value="teachers">Teachers</option>
-                        <option value="staff">Staff</option>
-                    </select>
+                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
 
-                    <select class="input">
-                        <option>Select Batch</option>
-                    </select>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
 
-                    <select class="input">
-                        <option>Select Division</option>
-                    </select>
+                        <!-- ROLE -->
+                        <div>
 
-                    <select class="input">
-                        <option>Select Section</option>
-                    </select>
+                            <label class="text-xs font-medium text-gray-500 mb-1 block">
+                                Role
+                            </label>
 
-                    <input type="date" id="dateFilter" class="input">
+                            <select id="roleFilter"
+                                class="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
 
-                </div>
+                                <option value="students">Students</option>
+                                <option value="teachers">Teachers</option>
 
+                            </select>
 
-                <div class="bg-white rounded-2xl shadow-lg p-5">
+                        </div>
 
-                    <!-- HEADER -->
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
-                        <h3 class="font-semibold text-gray-800 text-lg">Attendance List</h3>
+                        <!-- CLASS -->
+                        <div id="classFilterWrapper">
+
+                            <label class="text-xs font-medium text-gray-500 mb-1 block">
+                                Class
+                            </label>
+
+                            <select id="classFilter"
+                                class="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+
+                                <option value="">All Classes</option>
+                                <option value="9th">9th</option>
+                                <option value="10th">10th</option>
+
+                            </select>
+
+                        </div>
+
+                        <!-- DIVISION -->
+                        <div id="divisionFilterWrapper">
+
+                            <label class="text-xs font-medium text-gray-500 mb-1 block">
+                                Division
+                            </label>
+
+                            <select id="divisionFilter"
+                                class="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+
+                                <option value="">All Divisions</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+
+                            </select>
+
+                        </div>
+
+                        <!-- DATE -->
+                        <div>
+
+                            <label class="text-xs font-medium text-gray-500 mb-1 block">
+                                Date
+                            </label>
+
+                            <input type="date" id="dateFilter"
+                                class="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+
+                        </div>
 
                         <!-- SEARCH -->
-                        <input type="text" placeholder="Search student..."
-                            class="px-3 py-2 border rounded-lg text-sm w-full sm:w-64 focus:ring-2 focus:ring-indigo-400 outline-none">
+                        <div>
+
+                            <label class="text-xs font-medium text-gray-500 mb-1 block">
+                                Search
+                            </label>
+
+                            <div class="relative">
+
+                                <i
+                                    class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+
+                                <input type="text" id="searchFilter" placeholder="Search..."
+                                    class="w-full h-11 rounded-xl border border-gray-200 pl-11 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- ================= TABLE ================= -->
+
+                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+
+                    <!-- TOP -->
+                    <div
+                        class="p-5 border-b border-gray-100 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+
+                        <div>
+
+                            <h3 class="font-semibold text-lg text-gray-800">
+                                Attendance List
+                            </h3>
+
+                            <p class="text-sm text-gray-500 mt-1">
+                                Manage daily attendance records
+                            </p>
+
+                        </div>
+
+                        <!-- BULK ACTION -->
+                        <div class="flex gap-3">
+
+                            <button
+                                class="px-4 h-10 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition">
+
+                                Mark All Present
+
+                            </button>
+
+                            <button
+                                class="px-4 h-10 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition">
+
+                                Mark All Absent
+
+                            </button>
+
+                        </div>
+
                     </div>
 
                     <!-- TABLE -->
-                    <div class="overflow-x-auto rounded-xl border">
-                        <table class="w-full text-sm">
+                    <div class="overflow-auto">
+
+                        <table class="w-full min-w-[900px] text-sm">
 
                             <!-- HEADER -->
-                            <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                            <thead class="bg-gray-50 sticky top-0 z-10 text-gray-600">
+
                                 <tr>
-                                    <th class="p-3 text-left">ID</th>
-                                    <th class="p-3 text-left">Name</th>
-                                    <th class="p-3 text-left">Role</th>
-                                    <th class="p-3 text-left">Status</th>
-                                    <th class="p-3 text-center">Reason</th>
+
+                                    <th class="p-4 text-left font-semibold">
+                                        ID
+                                    </th>
+
+                                    <th class="p-4 text-left font-semibold">
+                                        Name
+                                    </th>
+
+                                    <th class="p-4 text-left font-semibold">
+                                        Role
+                                    </th>
+
+                                    <th class="p-4 text-left font-semibold">
+                                        Status
+                                    </th>
+
+                                    <th class="p-4 text-left font-semibold">
+                                        Reason
+                                    </th>
+
                                 </tr>
+
                             </thead>
 
                             <!-- BODY -->
-                            <tbody id="attendanceTableBody" class="divide-y">
-
-                                <!-- SAMPLE ROW -->
-                                <tr class="hover:bg-gray-50 transition">
-
-                                    <td class="p-3 font-medium text-gray-700">S101</td>
-
-                                    <td class="p-3 flex items-center gap-3">
-                                        <div
-                                            class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600">
-                                            R
-                                        </div>
-                                        Rahul Sharma
-                                    </td>
-
-                                    <td class="p-3">
-                                        <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600">
-                                            Student
-                                        </span>
-                                    </td>
-
-                                    <td class="p-3">
-                                        <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">
-                                            Present
-                                        </span>
-                                    </td>
-
-                                    <td class="p-3 text-center">
-                                        <button class="text-indigo-600 hover:underline text-xs">
-                                            View
-                                        </button>
-                                    </td>
-
-                                </tr>
+                            <tbody id="attendanceTableBody" class="divide-y divide-gray-100 bg-white">
 
                             </tbody>
 
                         </table>
+
                     </div>
 
                     <!-- FOOTER -->
-                    <div class="flex justify-between items-center mt-4 text-xs text-gray-500">
-                        <span>Showing 1-10 of 50</span>
+                    <div
+                        class="p-4 border-t border-gray-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
 
+                        <p class="text-sm text-gray-500">
+                            Showing attendance records
+                        </p>
+
+                        <!-- PAGINATION -->
                         <div class="flex gap-2">
-                            <button class="px-3 py-1 border rounded-lg hover:bg-gray-100">Prev</button>
-                            <button class="px-3 py-1 border rounded-lg hover:bg-gray-100">Next</button>
+
+                            <button class="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition">
+
+                                <i class="fas fa-chevron-left text-xs"></i>
+
+                            </button>
+
+                            <button class="w-10 h-10 rounded-xl bg-indigo-600 text-white">
+
+                                1
+
+                            </button>
+
+                            <button class="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition">
+
+                                2
+
+                            </button>
+
+                            <button class="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition">
+
+                                <i class="fas fa-chevron-right text-xs"></i>
+
+                            </button>
+
                         </div>
+
                     </div>
 
                 </div>
+
             </section>
-            <!-- =========================== ATTENDACE SECTION END ============================ -->
+
+            <!-- =========================== ATTENDANCE SECTION END ============================ -->
 
             <!-- ================= EXAM & RESULT SECTION START ================= -->
             <section id="examsSection" class="section hidden p-4 sm:p-6 space-y-6">
@@ -2098,6 +2483,169 @@
             </section>
             <!-- ============================= ENROLLMENT SECTION END ============================= -->
 
+            <!-- ============================= SUBJECT MANAGEMENT SECTION START ============================= -->
+            <section class="section hidden p-4 sm:p-6 space-y-6" id="subjectsSection">
+
+                <!-- Header -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div
+                        class="md:col-span-4 bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 rounded-2xl p-6 text-white shadow-lg flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+                        <div>
+                            <h2 class="text-2xl font-bold">Subject Management</h2>
+                            <p class="text-sm opacity-90">Create, update and manage academic subjects</p>
+                        </div>
+
+                        <button onclick="openSubjectModal()"
+                            class="bg-white text-indigo-700 px-5 py-3 rounded-xl font-black shadow hover:bg-indigo-50 transition">
+                            + Add Subject
+                        </button>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-500">
+                        <p class="text-xs text-gray-500 font-bold uppercase">Total Subjects</p>
+                        <p class="text-xl font-bold text-gray-800" id="totalSubjectsCount">0</p>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-emerald-500">
+                        <p class="text-xs text-gray-500 font-bold uppercase">Active Subjects</p>
+                        <p class="text-xl font-bold text-gray-800" id="activeSubjectsCount">0</p>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-red-500">
+                        <p class="text-xs text-gray-500 font-bold uppercase">Inactive Subjects</p>
+                        <p class="text-xl font-bold text-gray-800" id="inactiveSubjectsCount">0</p>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-end">
+                    <div class="flex-1 min-w-[220px]">
+                        <label class="text-xs font-bold text-gray-500 uppercase ml-1">Search Subject</label>
+                        <input id="subjectSearch" type="text" placeholder="Search by subject name or code"
+                            class="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="text-xs font-bold text-gray-500 uppercase ml-1">Subject Type</label>
+                        <select id="subjectTypeFilter"
+                            class="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="all">All Types</option>
+                            <option value="Core">Core</option>
+                            <option value="Optional">Optional</option>
+                            <option value="Practical">Practical</option>
+                        </select>
+                    </div>
+
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="text-xs font-bold text-gray-500 uppercase ml-1">Status</label>
+                        <select id="subjectStatusFilter"
+                            class="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="all">All Status</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+
+                    <button onclick="filterSubjects()"
+                        class="bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-black transition">
+                        Filter
+                    </button>
+
+                    <button onclick="resetSubjectFilters()"
+                        class="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition">
+                        Reset
+                    </button>
+                </div>
+
+                <!-- Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-black text-gray-800">Subject List</h3>
+                            <p class="text-xs text-gray-500">Manage all subjects from one place</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-600 font-bold uppercase text-[10px]">
+                                <tr>
+                                    <th class="p-4">Subject</th>
+                                    <th class="p-4">Code</th>
+                                    <th class="p-4">Type</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subjectTableBody" class="divide-y divide-gray-50"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Modal -->
+                <div id="subjectModal"
+                    class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden">
+                        <div
+                            class="p-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex justify-between items-center">
+                            <div>
+                                <h3 class="text-xl font-black" id="subjectModalTitle">Add Subject</h3>
+                                <p class="text-sm opacity-90">Enter subject details carefully</p>
+                            </div>
+                            <button onclick="closeSubjectModal()"
+                                class="text-white text-2xl font-black">&times;</button>
+                        </div>
+
+                        <form id="subjectForm" onsubmit="saveSubject(event)"
+                            class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <input type="hidden" id="subjectId">
+
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase">Subject Name</label>
+                                <input id="subjectName" required placeholder="Example: Mathematics"
+                                    class="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase">Subject Code</label>
+                                <input id="subjectCode" required placeholder="Example: MATH101"
+                                    class="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase">Subject Type</label>
+                                <select id="subjectType"
+                                    class="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="Core">Core</option>
+                                    <option value="Optional">Optional</option>
+                                    <option value="Practical">Practical</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase">Status</label>
+                                <select id="subjectStatus"
+                                    class="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-2 flex justify-end gap-3 pt-4">
+                                <button type="button" onclick="closeSubjectModal()"
+                                    class="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200">
+                                    Cancel
+                                </button>
+                                <button type="submit"
+                                    class="px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow">
+                                    Save Subject
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+            <!-- ============================= SUBJECT MANAGEMENT SECTION END ============================= -->
             <!-- ============================= FEES MANAGEMENT SECTION START ============================= -->
             <section class="section hidden p-4 sm:p-6 space-y-6" id="feesSection">
 

@@ -5,7 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from utils.auth import db, Teacher
 from utils.auth_middleware import login_required
 from utils.studentDetails import StudentAcademicRecord, AcademicClass, Division, Section
-from utils.examResult import Subject
+from utils.subjects import Subject
 
 from io import BytesIO
 from flask import send_file
