@@ -18,6 +18,7 @@ import { useStudentEnrollment } from "../controllers/Enrollments/useStudentEnrol
 import { useMyClasses } from "../controllers/MyClasses/useMyClass";
 import { useTeacherManagement } from "../controllers/MyClasses/useTeachersManagement";
 import { useSubjectManagements } from "../controllers/Subjects/useSubjectManagements";
+import { useExamResultManagement } from "../controllers/ExamResult/useExamResultManagement";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -28,27 +29,31 @@ function AdminDashboard() {
   // ================= DASHBOARD HOOK =================
   const {
     navigate,
-    // state
+
     sidebarOpen,
+    sidebarHover,
+    sidebarExpanded,
     profileOpen,
     mobileSearchOpen,
     showPassword,
     showNotifications,
     darkMode,
 
-    // setters
     setSidebarOpen,
+    setSidebarHover,
     setProfileOpen,
     setMobileSearchOpen,
     setShowPassword,
     setShowNotifications,
     setDarkMode,
 
-    // refs
     bellRef,
 
-    // actions
     toggleTheme,
+    toggleSidebar,
+    closeSidebarOnMobile,
+    handleSidebarMouseEnter,
+    handleSidebarMouseLeave,
   } = useDashboardUI();
 
   // ================= Admin DASHBOARD HOOK =================
@@ -80,6 +85,55 @@ function AdminDashboard() {
 
     toast,
   } = useAdminDashboard(activeSection);
+
+  // ================== Exam And Result Hook =================
+  const {
+    updateAdminResultMarks,
+    updateMarksEntryPermission,
+    examManagementOptions,
+    examManagementStats,
+    examManagementClasses,
+    examManagementTerms,
+    examManagementFilteredResults,
+
+    examManagementForm,
+    examManagementPublishForm,
+    examManagementSelectedDetails,
+
+    examManagementModalOpen,
+    examManagementDetailsModalOpen,
+    examManagementLoading,
+    examManagementSaving,
+    examManagementActionLoading,
+
+    examManagementFilters,
+    updateExamManagementFilter,
+    resetExamManagementFilters,
+    refreshExamManagement,
+
+    updateExamManagementForm,
+    toggleExamManagementFormArrayValue,
+    openExamManagementModal,
+    closeExamManagementModal,
+    saveExamManagementExam,
+
+    openExamManagementDetails,
+    closeExamManagementDetails,
+    verifyExamManagementExam,
+    publishExamManagementExam,
+
+    openExamManagementPublishModal,
+    closeExamManagementPublishModal,
+    updateExamManagementPublishForm,
+    scheduleExamManagementPublish,
+
+    exportExamManagementReportsPDF,
+    exportExamManagementReportCardsPDF,
+  } = useExamResultManagement({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
 
   // ================= ENROLLMENT HOOK =================
   const {
@@ -253,7 +307,7 @@ function AdminDashboard() {
     divisions: TTDivisions,
     sections: TTsections,
 
-    subjects: TTSubjects, 
+    subjects: TTSubjects,
     teachers,
     rooms,
 
@@ -333,9 +387,18 @@ function AdminDashboard() {
     handlePasswordChange,
     handleChangePassword,
 
+    // access
+    isSuperAdmin,
+    isHostelAdmin,
+    isAccountsAdmin,
+    isHRAdmin,
+    canAccess,
+    dashboardType,
+    modules,
+
     // auth
     handleLogout,
-  } = useAdminProfile({ fetchWithAuth });
+  } = useAdminProfile({ fetchWithAuth, showToast });
 
   // ================= ASSETS HOOK =================
   const {
@@ -407,43 +470,41 @@ function AdminDashboard() {
       )}
 
       <aside
-        className={`sidebar fixed top-0 left-0 h-screen 
-  bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl 
-  border-r border-gray-200 dark:border-slate-700 
-  shadow-2xl z-[60] flex flex-col
-  transition-all duration-300
-
-  /* 📱 MOBILE */
-  ${sidebarOpen ? "translate-x-0 w-64" : "-translate-x-full w-64"}
-
-  /* 💻 DESKTOP */
-  md:translate-x-0
-  ${sidebarOpen ? "md:w-64" : "md:w-20"}
-`}
-      >
-        {/* ================= LOGO ================= */}
-        <div
-          className={`border-b border-gray-100 dark:border-slate-700 
-    flex items-center transition-all duration-300
-    ${sidebarOpen ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={handleSidebarMouseLeave}
+        className={`sidebar fixed top-0 left-0 h-screen
+    bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl
+    border-r border-gray-200 dark:border-slate-700
+    shadow-2xl z-[60] flex flex-col
+    transition-[width,transform] duration-300 ease-in-out
+    ${sidebarOpen ? "translate-x-0 w-64" : "-translate-x-full w-64"}
+    md:translate-x-0
+    ${sidebarExpanded ? "md:w-64" : "md:w-20"}
   `}
+      >
+        {/* LOGO */}
+        <div
+          className={`border-b border-gray-100 dark:border-slate-700
+      flex items-center transition-all duration-300 ease-in-out
+      ${sidebarExpanded ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
+    `}
         >
           <i
             className="bi bi-mortarboard text-purple-600 text-xl"
-            title={!sidebarOpen ? APP_NAME : ""}
-          ></i>
+            title={!sidebarExpanded ? APP_NAME : ""}
+          />
 
           <span
-            className={`font-bold text-lg text-purple-600 transition-all duration-200
-      ${sidebarOpen ? "opacity-100 ml-2" : "opacity-0 w-0 overflow-hidden"}
-      md:${sidebarOpen ? "block" : "hidden"}
-    `}
+            className={`font-bold text-lg text-purple-600 whitespace-nowrap
+        transition-all duration-300 ease-in-out overflow-hidden
+        ${sidebarExpanded ? "opacity-100 max-w-[180px] ml-2" : "opacity-0 max-w-0 ml-0"}
+      `}
           >
             {APP_NAME}
           </span>
         </div>
 
-        {/* ================= NAV ================= */}
+        {/* NAV */}
         <nav className="flex-1 overflow-y-auto no-scrollbar scroll-smooth px-2 py-4 space-y-2 text-sm">
           {[
             {
@@ -465,7 +526,6 @@ function AdminDashboard() {
             {
               title: "ACADEMIC",
               items: [
-                // ["classes", "bi-easel", "Classes & Sections"],
                 ["subjects", "bi-book", "Subjects"],
                 ["timetable", "bi-clock", "Timetable"],
                 ["attendance", "bi-calendar-check", "Attendance"],
@@ -481,6 +541,7 @@ function AdminDashboard() {
               items: [
                 ["fees", "bi-cash-stack", "Fee Management"],
                 ["reports", "bi-receipt", "Financial Reports"],
+                ["accounts-dashboard", "bi-bank", "Accounts Dashboard"],
               ],
             },
             {
@@ -497,13 +558,15 @@ function AdminDashboard() {
                 ["staff", "bi-person-lines-fill", "Staff"],
                 ["payroll", "bi-wallet2", "Payroll"],
                 ["leave", "bi-calendar-plus", "Leave Management"],
+                ["hr-dashboard", "bi-people-fill", "HR Dashboard"],
               ],
             },
             {
               title: "RESOURCES",
               items: [
-                ["library", "bi-journal-bookmark", "Library"],
+                ["library-dashboard", "bi-journal-bookmark", "Library"],
                 ["assets", "bi-box-seam", "Assets"],
+                ["hostels-dashboard", "bi-building", "Hostel"],
               ],
             },
             {
@@ -513,49 +576,112 @@ function AdminDashboard() {
                 ["security", "bi-shield-check", "Security & Logs"],
               ],
             },
-          ].map((section, i) => (
-            <div key={i}>
-              {/* SECTION TITLE */}
-              {sidebarOpen && (
-                <p className="text-xs text-gray-400 px-3 mt-4">
+          ].map((section) => (
+            <div key={section.title}>
+              {sidebarExpanded && (
+                <p className="text-xs text-gray-400 px-3 mt-4 transition-all duration-300">
                   {section.title}
                 </p>
               )}
 
-              {/* MENU ITEMS */}
               {section.items.map(([key, icon, label]) => {
-                const isActive = activeSection === key;
+                const isDashboardLink = [
+                  "library-dashboard",
+                  "accounts-dashboard",
+                  "hostels-dashboard",
+                  "hr-dashboard",
+                ].includes(key);
+
+                const isActive = !isDashboardLink && activeSection === key;
 
                 return (
                   <button
                     key={key}
-                    title={!sidebarOpen ? label : ""}
+                    type="button"
+                    title={!sidebarExpanded ? label : ""}
                     onClick={() => {
+                      if (key === "library-dashboard") {
+                        navigate("/library-admin-dashboard", {
+                          state: {
+                            from: "super-admin-dashboard",
+                            accessBy: "super_admin",
+                            activeSection: "dashboard",
+                          },
+                        });
+
+                        closeSidebarOnMobile();
+                        return;
+                      }
+
+                      if (key === "accounts-dashboard") {
+                        navigate("/accounts-admin-dashboard", {
+                          state: {
+                            from: "super-admin-dashboard",
+                            accessBy: "super_admin",
+                            activeSection: "dashboard",
+                          },
+                        });
+
+                        closeSidebarOnMobile();
+                        return;
+                      }
+
+                      if (key === "hostels-dashboard") {
+                        navigate("/hostel-admin-dashboard", {
+                          state: {
+                            from: "super-admin-dashboard",
+                            accessBy: "super_admin",
+                            activeSection: "dashboard",
+                          },
+                        });
+
+                        closeSidebarOnMobile();
+                        return;
+                      }
+
+                      if (key === "hr-dashboard") {
+                        navigate("/hr-admin-dashboard", {
+                          state: {
+                            from: "super-admin-dashboard",
+                            accessBy: "super_admin",
+                            activeSection: "dashboard",
+                          },
+                        });
+
+                        closeSidebarOnMobile();
+                        return;
+                      }
+
                       setActiveSection(key);
-                      setSidebarOpen(false);
+                      closeSidebarOnMobile();
                     }}
                     className={`relative group flex w-full items-center
-              ${sidebarOpen ? "gap-3 px-4 justify-start" : "justify-center"}
-              py-3 rounded-xl transition-all duration-200
+              ${
+                sidebarExpanded
+                  ? "gap-3 px-4 justify-start"
+                  : "justify-center px-0"
+              }
+              py-3 rounded-xl transition-all duration-300 ease-in-out
               ${
                 isActive
                   ? "bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-500/20 dark:to-indigo-500/20 text-purple-700 dark:text-purple-300 font-semibold shadow-sm"
                   : "text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white"
               }`}
                   >
-                    {/* ACTIVE INDICATOR */}
                     {isActive && (
-                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-purple-600 rounded-r-full"></span>
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-purple-600 rounded-r-full" />
                     )}
 
-                    {/* ICON */}
-                    <i className={`bi ${icon} text-base`}></i>
+                    <i className={`bi ${icon} text-base shrink-0`} />
 
-                    {/* LABEL */}
                     <span
-                      className={`${
-                        sidebarOpen ? "md:block" : "md:hidden"
-                      } truncate`}
+                      className={`whitespace-nowrap truncate overflow-hidden
+                transition-all duration-300 ease-in-out
+                ${
+                  sidebarExpanded
+                    ? "opacity-100 max-w-[180px]"
+                    : "opacity-0 max-w-0"
+                }`}
                     >
                       {label}
                     </span>
@@ -565,37 +691,33 @@ function AdminDashboard() {
             </div>
           ))}
         </nav>
-        {/* ================= FOOTER ================= */}
+        {/* FOOTER */}
         <div
-          className={`border-t border-gray-100 dark:border-slate-700 
-    text-xs text-gray-400 dark:text-gray-500 
-    transition-all duration-300
-    ${sidebarOpen ? "p-4 text-center" : "py-4 flex justify-center"}
-  `}
-        >
-          <span
-            className={`transition-all duration-200
-      ${sidebarOpen ? "opacity-100" : "opacity-0 w-0 overflow-hidden"}
-      md:${sidebarOpen ? "block" : "hidden"}
+          className={`border-t border-gray-100 dark:border-slate-700
+      text-xs text-gray-400 dark:text-gray-500
+      transition-all duration-300 ease-in-out
+      ${sidebarExpanded ? "p-4 text-center" : "py-4 flex justify-center"}
     `}
-          >
-            {APP_NAME} © {APP_YEAR}
-          </span>
-
-          {!sidebarOpen && (
+        >
+          {sidebarExpanded ? (
+            <span className="whitespace-nowrap transition-all duration-300">
+              {APP_NAME} © {APP_YEAR}
+            </span>
+          ) : (
             <i
               className="bi bi-mortarboard text-purple-500"
               title={`${APP_NAME} © ${APP_YEAR}`}
-            ></i>
+            />
           )}
         </div>
       </aside>
+
       {/* MAIN */}
       <main
-        className={`flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8 
-${sidebarOpen ? "md:ml-64" : "md:ml-20"}
-maincolor transition-all duration-300 
-dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
+        className={`flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8
+    ${sidebarOpen ? "md:ml-64" : "md:ml-20"}
+    maincolor transition-all duration-300
+    dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
       >
         {/* CENTER WRAPPER */}
         <div className="max-w-7xl mx-auto space-y-6">
@@ -604,9 +726,11 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
             <div className="fixed top-[90px] right-6 z-[9999] flex flex-col gap-3">
               <div
                 className={`min-w-[260px] max-w-sm px-5 py-3 rounded-2xl shadow-2xl text-white text-sm
-      backdrop-blur-xl border border-white/20
-      animate-slideInRight transition-all duration-500
-      ${toast.type === "success" ? "bg-emerald-500/90" : "bg-indigo-500/90"}`}
+          backdrop-blur-xl border border-white/20
+          animate-slideInRight transition-all duration-500
+          ${
+            toast.type === "success" ? "bg-emerald-500/90" : "bg-indigo-500/90"
+          }`}
               >
                 {toast.message}
               </div>
@@ -614,247 +738,246 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           )}
 
           {/* HEADER */}
-          <div
-            className="sticky top-0 z-40 px-4 sm:px-6 py-3 
-  bg-gradient-to-r from-white/70 via-white/60 to-white/70 
-  dark:from-slate-800/80 dark:via-slate-800/70 dark:to-slate-800/80
-  backdrop-blur-2xl 
-  border border-white/40 dark:border-slate-700
-  shadow-[0_10px_40px_rgba(0,0,0,0.08)]
-  rounded-2xl transition-all duration-300 flex items-center justify-between gap-4"
+          <header
+            className="sticky top-0 z-40 flex items-center justify-between gap-4
+      rounded-2xl border border-white/40 dark:border-slate-700
+      bg-gradient-to-r from-white/75 via-white/65 to-white/75
+      px-4 py-3 shadow-[0_10px_40px_rgba(0,0,0,0.08)]
+      backdrop-blur-2xl transition-all duration-300
+      dark:from-slate-800/85 dark:via-slate-800/75 dark:to-slate-800/85
+      sm:px-6"
           >
-            <div className="flex items-center justify-between gap-4 w-full">
-              {/* 🏫 SCHOOL NAME */}
-              <div className="flex items-center gap-2 md:hidden">
-                <i className="bi bi-mortarboard text-indigo-600 text-lg"></i>
+            <div className="flex w-full items-center justify-between gap-3 sm:gap-4">
+              {/* MOBILE BRAND */}
+              <div className="flex shrink-0 items-center gap-2 md:hidden">
+                <i className="bi bi-mortarboard text-lg text-indigo-600" />
+                <span className="max-w-[145px] truncate text-sm font-bold text-indigo-600">
+                  {APP_NAME}
+                </span>
               </div>
 
-              {/* DESKTOP SIDEBAR TOGGLE */}
+              {/* DESKTOP SIDEBAR BUTTON */}
               <button
-                onClick={() => setSidebarOpen((prev) => !prev)}
-                className="sidebar-toggle hidden md:flex items-center justify-center
-  bg-white/70 dark:bg-slate-700/70
-  backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
-  transition p-2.5 rounded-full shadow-md hover:scale-105"
+                type="button"
+                onClick={toggleSidebar}
+                aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+                className="sidebar-toggle hidden h-10 w-10 shrink-0 items-center justify-center
+          rounded-full bg-white/70 shadow-md backdrop-blur-md
+          transition-all duration-300 hover:scale-105 hover:bg-white
+          dark:bg-slate-700/70 dark:hover:bg-slate-600 md:flex"
               >
                 <i
-                  className={`bi ${sidebarOpen ? "bi-chevron-left" : "bi-list"} text-lg`}
-                ></i>
+                  className={`bi ${
+                    sidebarOpen ? "bi-chevron-left" : "bi-list"
+                  } text-lg text-gray-700 transition-transform duration-300 dark:text-gray-200`}
+                />
               </button>
 
-              {/* SEARCH */}
-              <div className="hidden md:flex w-1/2 relative group px-4">
-                <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+              {/* DESKTOP SEARCH */}
+              <div className="relative hidden w-full max-w-xl flex-1 px-2 md:block">
+                <i className="bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
 
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-full
-        bg-white/70 dark:bg-slate-700/70
-        backdrop-blur-md border border-gray-200 dark:border-slate-600
-        text-gray-800 dark:text-white
-        placeholder-gray-400 dark:placeholder-gray-400
-        focus:bg-white dark:focus:bg-slate-700
-        outline-none focus:ring-2 focus:ring-indigo-500
-        shadow-sm hover:shadow-md transition-all duration-300"
+                  className="w-full rounded-full border border-gray-200 bg-white/70 py-2.5 pl-10 pr-4
+            text-sm text-gray-800 shadow-sm outline-none backdrop-blur-md
+            transition-all duration-300 placeholder:text-gray-400
+            hover:shadow-md focus:bg-white focus:ring-2 focus:ring-indigo-500
+            dark:border-slate-600 dark:bg-slate-700/70 dark:text-white
+            dark:placeholder:text-gray-400 dark:focus:bg-slate-700"
                   placeholder="Search anything here..."
                 />
               </div>
 
-              {/* RIGHT */}
-              <div className="flex items-center gap-2 sm:gap-4">
-                {/* MOBILE MENU */}
+              {/* RIGHT ACTIONS */}
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                {/* MOBILE SIDEBAR BUTTON */}
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setSidebarOpen(true);
                   }}
-                  className="md:hidden bg-white/70 dark:bg-slate-700/70 
-        backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
-        transition p-2.5 rounded-full shadow-md hover:scale-105"
+                  aria-label="Open sidebar"
+                  className="rounded-full bg-white/70 p-2.5 shadow-md backdrop-blur-md
+            transition-all duration-300 hover:scale-105 hover:bg-white
+            dark:bg-slate-700/70 dark:hover:bg-slate-600 md:hidden"
                 >
-                  <i className="bi bi-list text-lg text-gray-700 dark:text-gray-200"></i>
+                  <i className="bi bi-list text-lg text-gray-700 dark:text-gray-200" />
                 </button>
 
-                {/* MOBILE SEARCH */}
+                {/* MOBILE SEARCH BUTTON */}
                 <button
-                  onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
-                  className="md:hidden bg-white/70 dark:bg-slate-700/70 
-        backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
-        transition p-2.5 rounded-full shadow-md hover:scale-105"
+                  type="button"
+                  onClick={() => setMobileSearchOpen((prev) => !prev)}
+                  aria-label="Toggle search"
+                  className="rounded-full bg-white/70 p-2.5 shadow-md backdrop-blur-md
+            transition-all duration-300 hover:scale-105 hover:bg-white
+            dark:bg-slate-700/70 dark:hover:bg-slate-600 md:hidden"
                 >
-                  <i className="bi bi-search text-lg text-gray-700 dark:text-gray-200"></i>
+                  <i className="bi bi-search text-lg text-gray-700 dark:text-gray-200" />
                 </button>
 
                 {/* NOTIFICATIONS */}
                 <div ref={bellRef} className="relative">
-                  <div
-                    className="relative cursor-pointer bg-white/70 dark:bg-slate-700/70
-          backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
-          transition p-2.5 rounded-full shadow-md hover:scale-105"
+                  <button
+                    type="button"
                     onClick={() => setShowNotifications((prev) => !prev)}
+                    aria-label="Notifications"
+                    className="relative rounded-full bg-white/70 p-2.5 shadow-md backdrop-blur-md
+              transition-all duration-300 hover:scale-105 hover:bg-white
+              dark:bg-slate-700/70 dark:hover:bg-slate-600"
                   >
-                    <i className="bi bi-bell text-lg text-gray-700 dark:text-gray-200"></i>
+                    <i className="bi bi-bell text-lg text-gray-700 dark:text-gray-200" />
 
                     {totalUnread > 0 && (
                       <span
-                        className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 
-              text-[10px] flex items-center justify-center 
-              bg-gradient-to-r from-red-500 to-pink-500 
-              text-white rounded-full animate-pulse shadow"
+                        className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px]
+                  items-center justify-center rounded-full bg-gradient-to-r
+                  from-red-500 to-pink-500 px-1 text-[10px] text-white shadow animate-pulse"
                       >
                         {totalUnread > 99 ? "99+" : totalUnread}
                       </span>
                     )}
-                  </div>
+                  </button>
 
-                  {/* DROPDOWN */}
                   {showNotifications && (
                     <div
-                      className="fixed top-20 left-1/2 -translate-x-1/2 
-            w-[92vw] max-w-md 
-            bg-white/95 dark:bg-slate-800/95
-            backdrop-blur-2xl 
-            rounded-2xl shadow-2xl 
-            border border-white/40 dark:border-slate-700
-            z-[70] overflow-hidden animate-fadeIn"
+                      className="fixed left-1/2 top-20 z-[70] w-[92vw] max-w-md
+                -translate-x-1/2 overflow-hidden rounded-2xl border border-white/40
+                bg-white/95 shadow-2xl backdrop-blur-2xl animate-fadeIn
+                dark:border-slate-700 dark:bg-slate-800/95 md:absolute md:left-auto
+                md:right-0 md:top-[calc(100%+12px)] md:w-96 md:translate-x-0"
                     >
-                      <div className="p-4 border-b dark:border-slate-700 font-semibold flex justify-between items-center text-gray-800 dark:text-white">
-                        Notifications
+                      <div className="flex items-center justify-between border-b p-4 font-semibold text-gray-800 dark:border-slate-700 dark:text-white">
+                        <span>Notifications</span>
+
                         <button
+                          type="button"
                           onClick={() => setShowNotifications(false)}
-                          className="text-xs text-gray-500 hover:text-red-500"
+                          className="text-xs text-gray-500 transition hover:text-red-500"
                         >
                           ✕
                         </button>
                       </div>
 
                       <div className="max-h-80 overflow-y-auto">
-                        {(sortedNotifications || []).filter((n) => !n.is_read)
-                          .length === 0 ? (
-                          <p className="p-4 text-sm text-gray-500 text-center">
+                        {(sortedNotifications || []).filter(
+                          (item) => !item.is_read,
+                        ).length === 0 ? (
+                          <p className="p-4 text-center text-sm text-gray-500">
                             🎉 You're all caught up
                           </p>
                         ) : (
                           (sortedNotifications || [])
-                            .filter((n) => !n.is_read)
+                            .filter((item) => !item.is_read)
                             .slice(0, 5)
-                            .map((n) => (
-                              <div
-                                key={`${n.source}-${n.id}-${n.time || n.date}`} // ✅ FIX HERE
+                            .map((item) => (
+                              <button
+                                type="button"
+                                key={`${item.source}-${item.id}-${item.time || item.date}`}
                                 onClick={() =>
                                   handleNotificationClick &&
-                                  handleNotificationClick(n)
+                                  handleNotificationClick(item)
                                 }
-                                className="p-4 border-b dark:border-slate-700 text-sm 
-      hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
+                                className="w-full border-b p-4 text-left text-sm transition
+                          hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-700"
                               >
-                                <p className="truncate text-gray-800 dark:text-white flex items-center gap-2">
-                                  {n.source === "leave" ? "📩" : "📢"} {n.title}
+                                <p className="flex items-center gap-2 truncate text-gray-800 dark:text-white">
+                                  {item.source === "leave" ? "📩" : "📢"}{" "}
+                                  {item.title}
                                 </p>
 
-                                <p className="text-xs text-gray-500 truncate">
-                                  {n.message || ""}
+                                <p className="mt-1 truncate text-xs text-gray-500">
+                                  {item.message || ""}
                                 </p>
 
-                                <p className="text-xs text-gray-400">
-                                  {n.time}
+                                <p className="mt-1 text-xs text-gray-400">
+                                  {item.time}
                                 </p>
-                              </div>
+                              </button>
                             ))
                         )}
                       </div>
-
-                      {/* <div
-                        className="p-3 text-center text-sm text-indigo-600 
-              hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer font-medium"
-                        onClick={() => {
-                          navigate("/admin/announcements "); // ✅ better route
-                          setShowNotifications(false);
-                        }}
-                      >
-                        View All Notices →
-                      </div> */}
                     </div>
                   )}
                 </div>
 
                 {/* PROFILE */}
-                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="profile-menu relative"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
-                    onClick={() => setProfileOpen(!profileOpen)}
-                    className="flex items-center gap-2 
-    bg-gradient-to-r from-white/70 to-white/60 
-    dark:from-slate-700/70 dark:to-slate-700/60
-    backdrop-blur-md px-2 py-1.5 rounded-full 
-    transition shadow-md hover:scale-105"
+                    type="button"
+                    onClick={() => setProfileOpen((prev) => !prev)}
+                    className="flex items-center gap-2 rounded-full
+              bg-gradient-to-r from-white/70 to-white/60 px-2 py-1.5 shadow-md
+              backdrop-blur-md transition-all duration-300 hover:scale-105
+              dark:from-slate-700/70 dark:to-slate-700/60"
                   >
                     <img
                       src="https://i.pravatar.cc/100"
-                      className="rounded-full w-9 h-9 border-2 border-white dark:border-slate-600 shadow"
+                      alt="Admin profile"
+                      className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600"
                     />
 
-                    <span className="font-medium hidden sm:inline text-sm text-gray-800 dark:text-gray-200">
-                      {admin?.first_name}
+                    <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 dark:text-gray-200 sm:inline">
+                      {admin?.first_name || "Admin"}
                     </span>
+
+                    <i className="bi bi-chevron-down hidden text-xs text-gray-500 sm:inline dark:text-gray-400" />
                   </button>
 
                   {profileOpen && (
                     <div
-                      className="absolute right-0 mt-4 w-56 
-      bg-white/95 dark:bg-slate-800/95
-      backdrop-blur-2xl 
-      rounded-2xl shadow-2xl 
-      border border-white/40 dark:border-slate-700 
-      z-50"
+                      className="absolute right-0 z-50 mt-4 w-56 overflow-hidden rounded-2xl
+                border border-white/40 bg-white/95 shadow-2xl backdrop-blur-2xl
+                dark:border-slate-700 dark:bg-slate-800/95"
                     >
-                      {/* USER INFO */}
-                      <div className="px-4 py-4 border-b border-gray-200 dark:border-slate-700">
+                      <div className="border-b px-4 py-4 dark:border-slate-700">
                         <p className="font-semibold text-gray-800 dark:text-white">
                           {admin?.first_name} {admin?.last_name}
                         </p>
                       </div>
 
-                      {/* MENU */}
                       <ul className="py-2 text-sm">
-                        {/* 👤 PROFILE */}
                         <li
                           onClick={() => {
                             setActiveSection("profile");
                             setProfileOpen(false);
                           }}
-                          className="flex items-center gap-2 px-4 py-2 
-          hover:bg-gray-100 dark:hover:bg-slate-700 
-          cursor-pointer text-gray-700 dark:text-gray-200"
+                          className="flex cursor-pointer items-center gap-2 px-4 py-2
+                    text-gray-700 transition hover:bg-gray-100 dark:text-gray-200
+                    dark:hover:bg-slate-700"
                         >
-                          <i className="fa-solid fa-user text-gray-500 dark:text-gray-400"></i>
+                          <i className="fa-solid fa-user text-gray-500 dark:text-gray-400" />
                           My Profile
                         </li>
 
-                        {/* 🔐 PASSWORD */}
                         <li
                           onClick={() => {
                             setPasswordModalOpen(true);
                             setProfileOpen(false);
                           }}
-                          className="flex items-center gap-2 px-4 py-2 
-          hover:bg-gray-100 dark:hover:bg-slate-700 
-          cursor-pointer text-gray-700 dark:text-gray-200"
+                          className="flex cursor-pointer items-center gap-2 px-4 py-2
+                    text-gray-700 transition hover:bg-gray-100 dark:text-gray-200
+                    dark:hover:bg-slate-700"
                         >
-                          <i className="fa-solid fa-lock text-gray-500 dark:text-gray-400"></i>
+                          <i className="fa-solid fa-lock text-gray-500 dark:text-gray-400" />
                           Password Change
                         </li>
 
-                        {/* 🌙 DARK MODE */}
                         <li
                           onClick={toggleTheme}
-                          className="flex items-center justify-between px-4 py-2 
-          hover:bg-gray-100 dark:hover:bg-slate-700 
-          cursor-pointer"
+                          className="flex cursor-pointer items-center justify-between px-4 py-2
+                    transition hover:bg-gray-100 dark:hover:bg-slate-700"
                         >
                           <div className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
-                            <i className="bi bi-moon text-gray-500 dark:text-gray-400"></i>
+                            <i className="bi bi-moon text-gray-500 dark:text-gray-400" />
                             <span>Dark Mode</span>
                           </div>
 
@@ -864,14 +987,14 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         </li>
                       </ul>
 
-                      {/* LOGOUT */}
-                      <div className="border-t border-gray-200 dark:border-slate-700">
+                      <div className="border-t dark:border-slate-700">
                         <button
+                          type="button"
                           onClick={handleLogout}
-                          className="w-full px-4 py-3 text-red-600 
-          hover:bg-red-50 dark:hover:bg-red-500/10 
-          transition"
+                          className="w-full px-4 py-3 text-left text-sm text-red-600
+                    transition hover:bg-red-50 dark:hover:bg-red-500/10"
                         >
+                          <i className="bi bi-box-arrow-right me-2" />
                           Logout
                         </button>
                       </div>
@@ -880,19 +1003,25 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 </div>
               </div>
             </div>
-          </div>
+          </header>
 
           {/* MOBILE SEARCH */}
           {mobileSearchOpen && (
-            <div className="md:hidden px-4">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full px-5 py-3 rounded-full bg-white shadow-md 
-        outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Search anything here..."
-              />
+            <div className="animate-fadeIn md:hidden">
+              <div className="relative">
+                <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 pl-11
+            text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500
+            dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                  placeholder="Search anything here..."
+                  autoFocus
+                />
+              </div>
             </div>
           )}
         </div>
@@ -3519,7 +3648,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* =========================== PREMIUM TIMETABLE SECTION ============================ */}
         {activeSection === "timetable" && (
           <section className="space-y-6 animate-in fade-in duration-500">
-            {/* <!-- HEADER --> */}
+            {/*  HEADER  */}
             <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
@@ -4909,6 +5038,1287 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           </section>
         )}
         {/* ============================= LEAVE MANAGEMENT SECTION END ============================= */}
+
+        {/* ================= EXAM & RESULT SECTION START ================= */}
+        {activeSection === "exams" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                    Exam & Result Control Center
+                  </h2>
+                  <p className="text-indigo-100 text-sm mt-1">
+                    Manage exams, marks entry, verification, publishing, report
+                    cards, and analytics.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={exportExamManagementReportsPDF}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20"
+                  >
+                    Export Reports
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={exportExamManagementReportCardsPDF}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20"
+                  >
+                    Export Report Cards
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openExamManagementModal()}
+                    className="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md"
+                  >
+                    + Create Examination
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Academic Year
+                  </label>
+                  <select
+                    value={examManagementFilters.academic_year}
+                    onChange={(e) =>
+                      updateExamManagementFilter(
+                        "academic_year",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Years</option>
+                    {(examManagementOptions.batches || []).map((batch) => (
+                      <option key={batch.id} value={batch.batch_name}>
+                        {batch.batch_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Exam
+                  </label>
+                  <select
+                    value={examManagementFilters.exam_name}
+                    onChange={(e) =>
+                      updateExamManagementFilter("exam_name", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Exams</option>
+                    {(examManagementOptions.exams || []).map((exam) => (
+                      <option key={exam} value={exam}>
+                        {exam}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Class
+                  </label>
+                  <select
+                    value={examManagementFilters.academic_class_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter(
+                        "academic_class_id",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Classes</option>
+                    {(examManagementOptions.classes || []).map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.display_name ||
+                          cls.class_name ||
+                          `${cls.division_name}-${cls.section_name}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Subject
+                  </label>
+                  <select
+                    value={examManagementFilters.subject_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter("subject_id", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Subjects</option>
+                    {(examManagementOptions.subjects || []).map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name || subject.subject_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Teacher
+                  </label>
+                  <select
+                    value={examManagementFilters.teacher_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter("teacher_id", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Teachers</option>
+                    {(examManagementOptions.teachers || []).map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.name ||
+                          `${teacher.first_name || ""} ${teacher.last_name || ""}`.trim() ||
+                          teacher.teacher_id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={examManagementFilters.status}
+                    onChange={(e) =>
+                      updateExamManagementFilter("status", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Status</option>
+                    {(examManagementOptions.statuses || []).map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Search Student
+                  </label>
+                  <input
+                    type="text"
+                    value={examManagementFilters.search}
+                    onChange={(e) =>
+                      updateExamManagementFilter("search", e.target.value)
+                    }
+                    placeholder="Name, roll no, class..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={refreshExamManagement}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700"
+                >
+                  {examManagementLoading ? "Loading..." : "Apply / Refresh"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetExamManagementFilters}
+                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+              {[
+                ["Total Exams", examManagementStats.totalExams],
+                ["Classes Covered", examManagementStats.classesCovered],
+                ["Students", examManagementStats.students],
+                ["Published", examManagementStats.resultsPublished],
+                ["Pending Marks", examManagementStats.pendingMarks],
+                ["Pass %", `${examManagementStats.passPercentage || 0}%`],
+                ["Average Score", `${examManagementStats.averageScore || 0}%`],
+                ["At Risk", examManagementStats.atRiskStudents],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm"
+                >
+                  <p className="text-xs text-gray-500 font-medium">{label}</p>
+                  <h5 className="text-xl font-bold text-gray-800">
+                    {value || 0}
+                  </h5>
+                </div>
+              ))}
+            </div>
+
+            {/* Workflow */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <h3 className="font-bold text-gray-800 mb-4">
+                Exam Result Workflow
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-3 text-sm">
+                {[
+                  "Create Exam",
+                  "Assign Subjects",
+                  "Schedule Exam",
+                  "Marks Entry",
+                  "Verification",
+                  "Approval",
+                  "Publish",
+                ].map((step, index) => (
+                  <div
+                    key={step}
+                    className="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-center"
+                  >
+                    <p className="font-bold text-indigo-700">{index + 1}</p>
+                    <p className="font-semibold">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Class Progress */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                  <div>
+                    <h3 className="font-bold text-gray-800">
+                      Class Wise Exam Progress
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Track marks entry, verification, and publishing status.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshExamManagement}
+                    className="text-sm text-indigo-600 font-semibold hover:underline"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
+                  {(examManagementClasses || []).length === 0 ? (
+                    <div className="md:col-span-2 text-sm text-gray-500 text-center py-8">
+                      No exam class progress found.
+                    </div>
+                  ) : (
+                    examManagementClasses.map((item) => (
+                      <div
+                        key={item.exam_id}
+                        className="border border-gray-200 rounded-2xl p-5 hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-800">
+                              {item.class_name}
+                            </h3>
+                            <p className="text-xs text-gray-500">
+                              {item.exam_name} • {item.academic_session}
+                            </p>
+                          </div>
+                          <span className="bg-indigo-100 text-indigo-700 text-[10px] uppercase font-bold px-2 py-1 rounded-full">
+                            {item.status || "Pending"}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Progress</span>
+                            <span className="font-semibold text-indigo-600">
+                              {item.marks_submitted_percentage || 0}%
+                            </span>
+                          </div>
+
+                          <div className="w-full bg-gray-100 rounded-full h-2.5">
+                            <div
+                              className="bg-indigo-600 h-2.5 rounded-full"
+                              style={{
+                                width: `${item.marks_submitted_percentage || 0}%`,
+                              }}
+                            />
+                          </div>
+
+                          <p className="text-xs text-gray-400">
+                            {item.marked || 0}/{item.expected || 0} marks
+                            submitted • {item.subject_count || 0} subjects
+                          </p>
+
+                          <p
+                            className={`inline-flex mt-2 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                              item.marks_entry_enabled
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {item.marks_entry_enabled
+                              ? "Teacher Marks Entry Open"
+                              : "Teacher Marks Entry Locked"}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+                          <button
+                            type="button"
+                            onClick={() => openExamManagementDetails(item)}
+                            className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-gray-200"
+                          >
+                            Details
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateMarksEntryPermission(
+                                item.exam_id,
+                                !item.marks_entry_enabled,
+                              )
+                            }
+                            disabled={
+                              item.is_published || examManagementActionLoading
+                            }
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold disabled:bg-gray-300 disabled:text-gray-500 ${
+                              item.marks_entry_enabled
+                                ? "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                                : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                            }`}
+                            title={
+                              item.is_published
+                                ? "Published exam cannot be changed"
+                                : item.marks_entry_enabled
+                                  ? "Disable teacher marks entry"
+                                  : "Allow teacher marks entry"
+                            }
+                          >
+                            {item.marks_entry_enabled
+                              ? "Lock Entry"
+                              : "Allow Entry"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              verifyExamManagementExam(item.exam_id)
+                            }
+                            disabled={
+                              item.is_verified || examManagementActionLoading
+                            }
+                            className="bg-blue-600 disabled:bg-gray-300 text-white px-3 py-2 rounded-lg text-xs font-semibold"
+                          >
+                            Verify
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              publishExamManagementExam(item.exam_id)
+                            }
+                            disabled={
+                              !item.is_verified ||
+                              item.is_published ||
+                              examManagementActionLoading
+                            }
+                            className="bg-emerald-600 disabled:bg-gray-300 text-white px-3 py-2 rounded-lg text-xs font-semibold"
+                          >
+                            Publish
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Publish Panel */}
+              <div className="bg-gray-900 rounded-2xl p-6 text-white shadow-xl">
+                <h4 className="text-lg font-bold mb-1">Result Publishing</h4>
+                <p className="text-sm text-gray-300 mb-5">
+                  Schedule verified exam results for publishing.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] uppercase text-gray-400 mb-1">
+                      Select Exam
+                    </label>
+                    <select
+                      value={examManagementPublishForm.exam_id}
+                      onChange={(e) =>
+                        updateExamManagementPublishForm(
+                          "exam_id",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm"
+                    >
+                      <option value="">Select Exam</option>
+                      {(examManagementTerms || []).map((exam) => (
+                        <option key={exam.id} value={exam.id}>
+                          {exam.class_name} • {exam.exam_name} •{" "}
+                          {exam.academic_year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase text-gray-400 mb-1">
+                      Publish At
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={examManagementPublishForm.publish_at}
+                      onChange={(e) =>
+                        updateExamManagementPublishForm(
+                          "publish_at",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 text-sm text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(examManagementPublishForm.force)}
+                      onChange={(e) =>
+                        updateExamManagementPublishForm(
+                          "force",
+                          e.target.checked,
+                        )
+                      }
+                    />
+                    Force schedule even if not fully complete
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={scheduleExamManagementPublish}
+                    disabled={examManagementActionLoading}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white py-2 rounded-lg text-sm font-semibold"
+                  >
+                    {examManagementActionLoading
+                      ? "Saving..."
+                      : "Schedule Publish"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Exam Terms Table */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 bg-gray-50">
+                <h3 className="font-bold text-gray-800">
+                  Created Examinations
+                </h3>
+                <p className="text-xs text-gray-500">
+                  All created exam terms by class and academic year.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="px-4 py-3">Class</th>
+                      <th className="px-4 py-3">Exam</th>
+                      <th className="px-4 py-3">Year</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Dates</th>
+                      <th className="px-4 py-3">Verified</th>
+                      <th className="px-4 py-3">Published</th>
+                      <th className="px-4 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 text-sm">
+                    {(examManagementTerms || []).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="8"
+                          className="px-4 py-8 text-center text-gray-500"
+                        >
+                          No exams found.
+                        </td>
+                      </tr>
+                    ) : (
+                      examManagementTerms.map((exam) => (
+                        <tr key={exam.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-semibold">
+                            {exam.class_name}
+                          </td>
+                          <td className="px-4 py-3">{exam.exam_name}</td>
+                          <td className="px-4 py-3">{exam.academic_year}</td>
+                          <td className="px-4 py-3">
+                            {exam.exam_type || "N/A"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {exam.start_date || "-"} to {exam.end_date || "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {exam.is_verified ? "Yes" : "No"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {exam.is_published ? "Yes" : "No"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => openExamManagementDetails(exam)}
+                              className="text-indigo-600 font-semibold hover:underline text-xs"
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Result Rows */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 bg-gray-50">
+                <h3 className="font-bold text-gray-800">Student Result Rows</h3>
+                <p className="text-xs text-gray-500">
+                  Searchable result data from submitted marks.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="px-4 py-3">Roll</th>
+                      <th className="px-4 py-3">Student</th>
+                      <th className="px-4 py-3">Class</th>
+                      <th className="px-4 py-3">Exam</th>
+                      <th className="px-4 py-3">Subject</th>
+                      <th className="px-4 py-3">Total</th>
+                      <th className="px-4 py-3">%</th>
+                      <th className="px-4 py-3">Grade</th>
+                      <th className="px-4 py-3">Status</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 text-sm">
+                    {(examManagementFilteredResults || []).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="9"
+                          className="px-4 py-8 text-center text-gray-500"
+                        >
+                          No result rows found.
+                        </td>
+                      </tr>
+                    ) : (
+                      examManagementFilteredResults.map((row, index) => (
+                        <tr
+                          key={
+                            row.result_id ||
+                            `${row.student_id}-${row.subject_id}-${index}`
+                          }
+                        >
+                          <td className="px-4 py-3">{row.roll_no || "-"}</td>
+                          <td className="px-4 py-3 font-semibold">
+                            {row.student_name}
+                          </td>
+                          <td className="px-4 py-3">{row.class_name}</td>
+                          <td className="px-4 py-3">{row.exam_name}</td>
+                          <td className="px-4 py-3">{row.subject}</td>
+                          <td className="px-4 py-3">{row.total_marks || 0}</td>
+                          <td className="px-4 py-3">{row.percentage || 0}%</td>
+                          <td className="px-4 py-3">{row.grade || "-"}</td>
+                          <td className="px-4 py-3">
+                            {row.status || "Pending"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+        {/* ================= EXAM & RESULT SECTION END ================= */}
+
+        {/* ================= CREATE EXAM MODAL START ================= */}
+        {examManagementModalOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-3 sm:p-5">
+            <div className="relative w-full max-w-5xl max-h-[94vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
+              {/* Header */}
+              <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-slate-200">
+                <div className="flex items-start justify-between gap-4 px-5 sm:px-7 py-5">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+                      Exam Management
+                    </p>
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+                      Create Examination
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Configure exam details, assign classes, and select
+                      subjects.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closeExamManagementModal}
+                    className="h-10 w-10 shrink-0 rounded-full bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600 transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveExamManagementExam();
+                }}
+                className="overflow-y-auto max-h-[calc(94vh-92px)]"
+              >
+                <div className="p-5 sm:p-7 space-y-6">
+                  {/* Exam Basic Details */}
+                  <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-5 sm:p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-11 w-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg">
+                        <i className="bi bi-award text-lg"></i>
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-900">
+                          Basic Exam Details
+                        </h4>
+                        <p className="text-xs text-slate-500">
+                          Add exam name, year, type, and schedule dates.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      <div className="xl:col-span-2">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Exam Name *
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          value={examManagementForm.exam_name}
+                          onChange={(e) =>
+                            updateExamManagementForm(
+                              "exam_name",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Annual Examination"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Academic Year *
+                        </label>
+                        <select
+                          required
+                          value={examManagementForm.academic_year}
+                          onChange={(e) =>
+                            updateExamManagementForm(
+                              "academic_year",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        >
+                          <option value="">Select Academic Batch</option>
+                          {(examManagementOptions.batches || []).map(
+                            (batch) => (
+                              <option key={batch.id} value={batch.batch_name}>
+                                {batch.batch_name}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Exam Type
+                        </label>
+                        <select
+                          value={examManagementForm.exam_type}
+                          onChange={(e) =>
+                            updateExamManagementForm(
+                              "exam_type",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        >
+                          <option value="Unit Test">Unit Test</option>
+                          <option value="Mid Term">Mid Term</option>
+                          <option value="Annual">Annual</option>
+                          <option value="Practical">Practical</option>
+                          <option value="Internal">Internal</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Start Date
+                        </label>
+                        <input
+                          type="date"
+                          value={examManagementForm.start_date}
+                          onChange={(e) =>
+                            updateExamManagementForm(
+                              "start_date",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          End Date
+                        </label>
+                        <input
+                          type="date"
+                          value={examManagementForm.end_date}
+                          onChange={(e) =>
+                            updateExamManagementForm("end_date", e.target.value)
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Assignment Details */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Classes */}
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                          <h4 className="font-black text-slate-900">
+                            Assign Classes
+                          </h4>
+                          <p className="text-xs text-slate-500">
+                            Select one or more classes for this exam.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                          {(examManagementForm.academic_class_ids || []).length}{" "}
+                          Selected
+                        </span>
+                      </div>
+
+                      <select
+                        multiple
+                        value={(
+                          examManagementForm.academic_class_ids || []
+                        ).map(String)}
+                        onChange={(e) => {
+                          const values = Array.from(
+                            e.target.selectedOptions,
+                          ).map((option) => Number(option.value));
+                          updateExamManagementForm(
+                            "academic_class_ids",
+                            values,
+                          );
+                        }}
+                        className="w-full min-h-[180px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                      >
+                        {(examManagementOptions.classes || []).map((cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.display_name ||
+                              cls.class_name ||
+                              `${cls.division_name}-${cls.section_name}`}
+                          </option>
+                        ))}
+                      </select>
+
+                      <p className="mt-3 text-xs text-slate-400">
+                        Hold Ctrl on Windows or Cmd on Mac to select multiple
+                        classes.
+                      </p>
+                    </div>
+
+                    {/* Subjects */}
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                          <h4 className="font-black text-slate-900">
+                            Assign Subjects
+                          </h4>
+                          <p className="text-xs text-slate-500">
+                            Select subjects included in this examination.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                          {(examManagementForm.subject_ids || []).length}{" "}
+                          Selected
+                        </span>
+                      </div>
+
+                      <select
+                        multiple
+                        value={(examManagementForm.subject_ids || []).map(
+                          String,
+                        )}
+                        onChange={(e) => {
+                          const values = Array.from(
+                            e.target.selectedOptions,
+                          ).map((option) => Number(option.value));
+                          updateExamManagementForm("subject_ids", values);
+                        }}
+                        className="w-full min-h-[180px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                      >
+                        {(examManagementOptions.subjects || []).map(
+                          (subject) => (
+                            <option key={subject.id} value={subject.id}>
+                              {subject.name || subject.subject_name}
+                            </option>
+                          ),
+                        )}
+                      </select>
+
+                      <p className="mt-3 text-xs text-slate-400">
+                        Hold Ctrl on Windows or Cmd on Mac to select multiple
+                        subjects.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="sticky bottom-0 -mx-5 sm:-mx-7 -mb-5 sm:-mb-7 border-t border-slate-200 bg-white/95 backdrop-blur-xl px-5 sm:px-7 py-4">
+                    <div className="flex flex-col-reverse sm:flex-row justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={closeExamManagementModal}
+                        className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={examManagementSaving}
+                        className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-200 hover:from-indigo-700 hover:to-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                      >
+                        {examManagementSaving
+                          ? "Saving Examination..."
+                          : "Save Examination"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* ================= CREATE EXAM MODAL END ================= */}
+
+        {/* ================= EXAM DETAILS MODAL START ================= */}
+        {examManagementDetailsModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">
+                    {examManagementSelectedDetails?.exam?.class_name || "Exam"}{" "}
+                    Details
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {examManagementSelectedDetails?.exam?.name} •{" "}
+                    {examManagementSelectedDetails?.exam?.academic_year}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeExamManagementDetails}
+                  className="text-gray-400 hover:text-gray-600 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto max-h-[75vh] space-y-6">
+                {examManagementActionLoading ? (
+                  <div className="text-center text-gray-500 py-10">
+                    Loading details...
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <h4 className="font-bold text-gray-800 mb-3">
+                        Subject Status
+                      </h4>
+                      <div className="overflow-x-auto border rounded-xl">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                            <tr>
+                              <th className="px-4 py-3">Subject</th>
+                              <th className="px-4 py-3">Teacher</th>
+                              <th className="px-4 py-3">Submitted</th>
+                              <th className="px-4 py-3">Pending</th>
+                              <th className="px-4 py-3">Total Students</th>
+                              <th className="px-4 py-3">Status</th>
+                            </tr>
+                          </thead>
+
+                          <tbody className="divide-y divide-gray-100">
+                            {(
+                              examManagementSelectedDetails?.subjects || []
+                            ).map((subject) => (
+                              <tr
+                                key={subject.subject_id}
+                                onClick={() =>
+                                  openExamManagementDetails({
+                                    exam_id:
+                                      examManagementSelectedDetails?.exam?.id,
+                                    subject_id: subject.subject_id,
+                                  })
+                                }
+                                className="cursor-pointer hover:bg-indigo-50"
+                              >
+                                <td className="px-4 py-3 font-semibold">
+                                  {subject.subject}
+                                </td>
+                                <td className="px-4 py-3">{subject.teacher}</td>
+                                <td className="px-4 py-3">
+                                  {subject.submitted_marks || 0}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {subject.pending_marks || 0}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {subject.total_students || 0}
+                                </td>
+                                <td className="px-4 py-3">{subject.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {(examManagementSelectedDetails?.students || []).length >
+                      0 && (
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-3">
+                          Student Marks
+                        </h4>
+                        <div className="overflow-x-auto border rounded-xl">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                              <tr>
+                                <th className="px-4 py-3">Roll</th>
+                                <th className="px-4 py-3">Student</th>
+                                <th className="px-4 py-3">Subject</th>
+                                <th className="px-4 py-3">Internal</th>
+                                <th className="px-4 py-3">External</th>
+                                <th className="px-4 py-3">Oral</th>
+                                <th className="px-4 py-3">Practical</th>
+                                <th className="px-4 py-3">Total</th>
+                                <th className="px-4 py-3">%</th>
+                                <th className="px-4 py-3">Grade</th>
+                                <th className="px-4 py-3">Verification</th>
+                              </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {examManagementSelectedDetails.students.map(
+                                (student, index) => {
+                                  const hasResult = Boolean(student.result_id);
+                                  const isSavingThisRow =
+                                    examManagementActionLoading ===
+                                    student.result_id;
+
+                                  const saveMarksField = async (
+                                    fieldName,
+                                    value,
+                                  ) => {
+                                    if (!hasResult) {
+                                      showToast?.(
+                                        "Marks are not submitted by the teacher for this student yet.",
+                                        "warning",
+                                      );
+                                      return;
+                                    }
+
+                                    const numericValue = Number(value);
+
+                                    if (
+                                      Number.isNaN(numericValue) ||
+                                      numericValue < 0
+                                    ) {
+                                      showToast?.(
+                                        "Please enter a valid marks value.",
+                                        "error",
+                                      );
+                                      return;
+                                    }
+
+                                    await updateAdminResultMarks(
+                                      student.result_id,
+                                      {
+                                        [fieldName]: numericValue,
+                                      },
+                                    );
+                                  };
+
+                                  const marksInputClass =
+                                    "w-[72px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400";
+
+                                  return (
+                                    <tr
+                                      key={
+                                        student.result_id ||
+                                        `${student.student_id}-${index}`
+                                      }
+                                      className="transition hover:bg-indigo-50/40"
+                                    >
+                                      <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                                        {student.roll_no || "-"}
+                                      </td>
+
+                                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                                        {student.student_name}
+                                      </td>
+
+                                      <td className="px-4 py-3 text-sm font-medium text-slate-700">
+                                        {student.subject}
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          defaultValue={
+                                            student.internal_marks ?? 0
+                                          }
+                                          disabled={
+                                            !hasResult || isSavingThisRow
+                                          }
+                                          onBlur={(event) =>
+                                            saveMarksField(
+                                              "internal_marks",
+                                              event.target.value,
+                                            )
+                                          }
+                                          className={marksInputClass}
+                                          title={
+                                            hasResult
+                                              ? "Update internal marks"
+                                              : "Teacher has not submitted marks yet"
+                                          }
+                                        />
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          defaultValue={
+                                            student.external_marks ?? 0
+                                          }
+                                          disabled={
+                                            !hasResult || isSavingThisRow
+                                          }
+                                          onBlur={(event) =>
+                                            saveMarksField(
+                                              "external_marks",
+                                              event.target.value,
+                                            )
+                                          }
+                                          className={marksInputClass}
+                                          title={
+                                            hasResult
+                                              ? "Update external marks"
+                                              : "Teacher has not submitted marks yet"
+                                          }
+                                        />
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          defaultValue={student.oral_marks ?? 0}
+                                          disabled={
+                                            !hasResult || isSavingThisRow
+                                          }
+                                          onBlur={(event) =>
+                                            saveMarksField(
+                                              "oral_marks",
+                                              event.target.value,
+                                            )
+                                          }
+                                          className={marksInputClass}
+                                          title={
+                                            hasResult
+                                              ? "Update oral marks"
+                                              : "Teacher has not submitted marks yet"
+                                          }
+                                        />
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          defaultValue={
+                                            student.practical_marks ?? 0
+                                          }
+                                          disabled={
+                                            !hasResult || isSavingThisRow
+                                          }
+                                          onBlur={(event) =>
+                                            saveMarksField(
+                                              "practical_marks",
+                                              event.target.value,
+                                            )
+                                          }
+                                          className={marksInputClass}
+                                          title={
+                                            hasResult
+                                              ? "Update practical marks"
+                                              : "Teacher has not submitted marks yet"
+                                          }
+                                        />
+                                      </td>
+
+                                      <td className="px-4 py-3 text-sm font-bold text-slate-900">
+                                        {student.total_marks ?? 0}
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <span
+                                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                                            Number(student.percentage || 0) >=
+                                            35
+                                              ? "bg-emerald-100 text-emerald-700"
+                                              : "bg-rose-100 text-rose-700"
+                                          }`}
+                                        >
+                                          {student.percentage ?? 0}%
+                                        </span>
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <span
+                                          className={`inline-flex min-w-[42px] justify-center rounded-lg px-2 py-1 text-xs font-bold ${
+                                            student.grade === "Fail"
+                                              ? "bg-rose-100 text-rose-700"
+                                              : "bg-indigo-100 text-indigo-700"
+                                          }`}
+                                        >
+                                          {student.grade || "-"}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        {!hasResult ? (
+                                          <span className="inline-flex rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
+                                            Pending
+                                          </span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            disabled={isSavingThisRow}
+                                            onClick={async () => {
+                                              const nextStatus =
+                                                student.status === "Verified"
+                                                  ? "Submitted"
+                                                  : "Verified";
+
+                                              const actionLabel =
+                                                nextStatus === "Verified"
+                                                  ? "verify"
+                                                  : "unverify";
+
+                                              const confirmed = window.confirm(
+                                                `Do you want to ${actionLabel} marks for ${student.student_name}?`,
+                                              );
+
+                                              if (!confirmed) return;
+
+                                              await updateAdminResultMarks(
+                                                student.result_id,
+                                                {
+                                                  status: nextStatus,
+                                                },
+                                              );
+                                            }}
+                                            className={`inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                              student.status === "Verified"
+                                                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                                : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                            }`}
+                                            title={
+                                              student.status === "Verified"
+                                                ? "Click to move this result back to Submitted"
+                                                : "Click to verify this student's marks"
+                                            }
+                                          >
+                                            {isSavingThisRow
+                                              ? "Saving..."
+                                              : student.status === "Verified"
+                                                ? "✓ Verified"
+                                                : "Verify Marks"}
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                },
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ================= EXAM DETAILS MODAL END ================= */}
+
         {/* ============================= Asset Inventory START ============================= */}
         {activeSection === "assets" && (
           <section className="section active p-4 sm:p-6 space-y-6">

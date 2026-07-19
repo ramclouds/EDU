@@ -176,26 +176,31 @@ function TeacherDashboard() {
 
   // ================= EXAM RESULT HOOK =================
   const {
+    loading: examResultLoading,
+
+    students: examStudents,
     filteredStudents: ExamfilteredStudents,
 
-    subjects,
+    subjects: ExamSubjects,
     classes: ExamClasses,
+    exams: ExamExams,
 
     selectedClass: ExamselectedClass,
     setSelectedClass: ExamsetselectedClass,
 
     selectedSubject: ExamselectedSubject,
     setSelectedSubject: ExamsetselectedSubject,
-
+    selectedExamDetails,
+    canEnterMarks,
     selectedExam,
     setSelectedExam,
-
+    selectedAcademicYear,
+    setSelectedAcademicYear,
     search: ExamSearch,
     setSearch: ExamsetSearch,
 
     marksModalOpen,
     reportModalOpen,
-
     currentStudent,
 
     marks,
@@ -207,17 +212,14 @@ function TeacherDashboard() {
 
     openMarksModal,
     closeMarksModal,
-
     saveMarks,
 
     nextStudent,
     prevStudent,
 
     reportCard,
-
     openReportCard,
     closeReportCard,
-
     printReport,
   } = useTeacherExamResult(fetchWithAuth, activeSection, showToast);
 
@@ -2900,311 +2902,457 @@ bg-gray-50 dark:bg-slate-700
           </div>
         )}
         {/* ============================= ASSIGNMENTS END ============================= */}
-        {/*  ============================= EXAM + RESULT SYSTEM =============================  */}
+        {/* ================= TEACHER EXAM & RESULT SECTION START ================= */}
         {activeSection === "exams" && (
-          <section className="section active p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
-            {/*  HEADER  */}
-            <div className="rounded-3xl p-5 text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 shadow-lg flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h2 className="text-xl font-semibold tracking-wide">
-                  Exam Marks Entry Desk
-                </h2>
-                <p className="text-xs opacity-90">
-                  Admin Approved Target Subject Entry Matrix
-                </p>
-              </div>
-              <div
-                id="adminPermissionBadge"
-                className="bg-white/20 text-white text-xs px-3 py-1.5 rounded-full font-medium backdrop-blur-md"
-              >
-                Status: Assessment Window Active
-              </div>
-            </div>
-
-            {/*  CONTROLS & FILTERING PIPELINE  */}
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm flex flex-wrap gap-3 items-center">
-              {/* CLASS FILTER */}
-              <select
-                value={ExamselectedClass}
-                onChange={(e) => ExamsetselectedClass(e.target.value)}
-                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
-              >
-                <option value="all">All Classes</option>
-
-                {Array.isArray(ExamClasses) &&
-                  ExamClasses.map((cls) => (
-                    <option key={cls.id} value={cls.name}>
-                      {cls.name}
-                    </option>
-                  ))}
-              </select>
-
-              {/* SUBJECT FILTER */}
-              <select
-                value={ExamselectedSubject}
-                onChange={(e) => ExamsetselectedSubject(e.target.value)}
-                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
-              >
-                {Array.isArray(subjects) &&
-                  subjects.map((subject) => (
-                    <option key={subject.id} value={subject.name}>
-                      {subject.name}
-                    </option>
-                  ))}
-              </select>
-
-              {/* EXAM FILTER */}
-              <select
-                value={selectedExam}
-                onChange={(e) => setSelectedExam(e.target.value)}
-                className="px-4 py-2 border rounded-xl text-sm bg-white dark:bg-slate-700"
-              >
-                <option value="Unit Test 1">Unit Test 1</option>
-
-                <option value="Half Yearly">Half Yearly</option>
-
-                <option value="Unit Test 2">Unit Test 2</option>
-
-                <option value="Final Exam">Final Exam</option>
-              </select>
-
-              {/* SEARCH */}
-              <input
-                type="text"
-                value={ExamSearch}
-                onChange={(e) => ExamsetSearch(e.target.value)}
-                placeholder="Search student..."
-                className="px-4 py-2 border rounded-xl flex-1"
-              />
-            </div>
-
-            {/*  STUDENT CONTAINER MATRIX  */}
-            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-lg overflow-hidden divide-y">
-              {ExamfilteredStudents.length === 0 ? (
-                <div className="p-8 text-center text-gray-400">
-                  No students found
-                </div>
-              ) : (
-                ExamfilteredStudents.map((student, index) => (
-                  <div
-                    key={student.id}
-                    className="p-4 flex flex-wrap justify-between items-center gap-4 hover:bg-gray-50 dark:hover:bg-slate-700/20"
-                  >
-                    <div>
-                      <p className="font-semibold">{student.name}</p>
-
-                      <p className="text-xs text-gray-500">
-                        {student.className}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {/* STATUS */}
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium
-              ${
-                student.status === "Completed"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}
-                      >
-                        {student.status || "Pending"}
-                      </span>
-
-                      {/* ENTER MARKS */}
-                      <button
-                        onClick={() => openMarksModal(student, index)}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs"
-                      >
-                        Enter Marks
-                      </button>
-
-                      {/* REPORT CARD */}
-                      <button
-                        onClick={() => openReportCard(student)}
-                        className="px-4 py-2 border rounded-xl text-xs"
-                      >
-                        View Ledger
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        )}
-        {/*  RESULT MARKING DIALOG CONTROL MODAL  */}
-        {marksModalOpen && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xl space-y-5">
-              {/* HEADER */}
-              <div className="flex justify-between items-start border-b pb-3">
+          <section className="section active p-4 sm:p-6 space-y-6">
+            <div className="rounded-3xl bg-gradient-to-r from-indigo-600 via-blue-600 to-violet-600 p-6 text-white shadow-xl">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
-                  <h2 className="font-semibold">{currentStudent?.name}</h2>
-                  <p className="text-xs text-gray-500">
-                    Roll {currentStudent?.roll}
+                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-indigo-100">
+                    Teacher Assessment Desk
+                  </p>
+                  <h2 className="mt-1 text-2xl sm:text-3xl font-black">
+                    Exam Marks & Result Entry
+                  </h2>
+                  <p className="mt-1 text-sm text-indigo-100">
+                    Enter marks, review student status, and generate student
+                    ledgers.
                   </p>
                 </div>
 
-                <button onClick={closeMarksModal} className="text-red-500">
-                  ✕
-                </button>
-              </div>
-
-              {/* SUBJECT + EXAM */}
-              <div className="bg-indigo-50 p-3 rounded-xl text-sm text-center">
-                {selectedSubject} - {selectedExam}
-              </div>
-
-              {/* MARKS GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* INTERNAL */}
-                <div>
-                  <label className="text-xs font-medium">Internal</label>
-                  <input
-                    type="number"
-                    name="internal"
-                    value={marks.internal}
-                    onChange={handleMarkChange}
-                    className="w-full border rounded-xl px-3 py-2"
-                  />
-
-                  <input
-                    type="number"
-                    name="internalOutOf"
-                    value={marks.internalOutOf}
-                    onChange={handleMarkChange}
-                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
-                    placeholder="Out of"
-                  />
-                </div>
-
-                {/* EXTERNAL */}
-                <div>
-                  <label className="text-xs font-medium">External</label>
-                  <input
-                    type="number"
-                    name="external"
-                    value={marks.external}
-                    onChange={handleMarkChange}
-                    className="w-full border rounded-xl px-3 py-2"
-                  />
-
-                  <input
-                    type="number"
-                    name="externalOutOf"
-                    value={marks.externalOutOf}
-                    onChange={handleMarkChange}
-                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
-                    placeholder="Out of"
-                  />
-                </div>
-
-                {/* ORAL */}
-                <div>
-                  <label className="text-xs font-medium">Oral</label>
-                  <input
-                    type="number"
-                    name="oral"
-                    value={marks.oral}
-                    onChange={handleMarkChange}
-                    className="w-full border rounded-xl px-3 py-2"
-                  />
-
-                  <input
-                    type="number"
-                    name="oralOutOf"
-                    value={marks.oralOutOf}
-                    onChange={handleMarkChange}
-                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
-                    placeholder="Out of"
-                  />
-                </div>
-
-                {/* PRACTICAL */}
-                <div>
-                  <label className="text-xs font-medium">Practical</label>
-                  <input
-                    type="number"
-                    name="practical"
-                    value={marks.practical}
-                    onChange={handleMarkChange}
-                    className="w-full border rounded-xl px-3 py-2"
-                  />
-
-                  <input
-                    type="number"
-                    name="practicalOutOf"
-                    value={marks.practicalOutOf}
-                    onChange={handleMarkChange}
-                    className="w-full border rounded-xl px-3 py-2 mt-2 bg-gray-50"
-                    placeholder="Out of"
-                  />
+                <div className="rounded-2xl bg-white/15 border border-white/20 px-4 py-3 backdrop-blur">
+                  <p className="text-xs text-indigo-100">Current Matrix</p>
+                  <h4 className="font-bold">
+                    {ExamselectedSubject || "Subject"} • {selectedExam}
+                  </h4>
                 </div>
               </div>
+            </div>
 
-              {/* REMARKS */}
-              <div>
-                <label className="text-xs font-medium">Remarks</label>
-                <textarea
-                  name="remarks"
-                  value={marks.remarks}
-                  onChange={handleMarkChange}
-                  className="w-full border rounded-xl px-3 py-2"
-                  placeholder="Enter remarks..."
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+                <p className="text-xs font-semibold text-slate-500">
+                  Total Students
+                </p>
+                <h3 className="mt-1 text-2xl font-black text-slate-900">
+                  {examStudents?.length || 0}
+                </h3>
               </div>
 
-              {/* SUMMARY */}
-              <div className="grid grid-cols-3 gap-3 text-center bg-gray-50 rounded-2xl p-4">
+              <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+                <p className="text-xs font-semibold text-slate-500">
+                  Filtered Students
+                </p>
+                <h3 className="mt-1 text-2xl font-black text-indigo-600">
+                  {ExamfilteredStudents?.length || 0}
+                </h3>
+              </div>
+
+              <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+                <p className="text-xs font-semibold text-slate-500">
+                  Completed
+                </p>
+                <h3 className="mt-1 text-2xl font-black text-emerald-600">
+                  {
+                    (ExamfilteredStudents || []).filter(
+                      (s) => s.status === "Completed",
+                    ).length
+                  }
+                </h3>
+              </div>
+
+              <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+                <p className="text-xs font-semibold text-slate-500">Pending</p>
+                <h3 className="mt-1 text-2xl font-black text-amber-600">
+                  {
+                    (ExamfilteredStudents || []).filter(
+                      (s) => s.status !== "Completed",
+                    ).length
+                  }
+                </h3>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white border border-slate-200 shadow-sm p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500">Total</p>
-                  <p className="font-bold">{totalMarks}</p>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    Class
+                  </label>
+                  <select
+                    value={ExamselectedClass}
+                    onChange={(e) => ExamsetselectedClass(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                  >
+                    <option value="all">All Classes</option>
+                    {Array.isArray(ExamClasses) &&
+                      ExamClasses.map((cls) => (
+                        <option key={cls.id} value={cls.name}>
+                          {cls.name}
+                        </option>
+                      ))}
+                  </select>
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500">Percentage</p>
-                  <p className="font-bold text-indigo-600">{percentage}%</p>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    Subject
+                  </label>
+                  <select
+                    value={ExamselectedSubject}
+                    onChange={(e) => ExamsetselectedSubject(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                  >
+                    {Array.isArray(ExamSubjects) &&
+                      ExamSubjects.map((subject) => (
+                        <option key={subject.id} value={subject.name}>
+                          {subject.name}
+                        </option>
+                      ))}
+                  </select>
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-500">Grade</p>
-                  <p className="font-bold text-green-600">{grade}</p>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    Exam
+                  </label>
+
+                  <select
+                    value={`${selectedExam}__${selectedAcademicYear}`}
+                    onChange={(e) => {
+                      const [examName, academicYear] =
+                        e.target.value.split("__");
+                      setSelectedExam(examName || "");
+                      setSelectedAcademicYear(academicYear || "");
+                    }}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                  >
+                    <option value="">Select Exam</option>
+
+                    {(ExamExams || []).map((exam) => (
+                      <option
+                        key={`${exam.id}-${exam.exam_name}-${exam.exam_type}-${exam.academic_year}`}
+                        value={`${exam.exam_name}__${exam.academic_year}`}
+                      >
+                        {exam.exam_name} - {exam.exam_type || "Exam"} -{" "}
+                        {exam.academic_year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    Search Student
+                  </label>
+                  <input
+                    type="text"
+                    value={ExamSearch}
+                    onChange={(e) => ExamsetSearch(e.target.value)}
+                    placeholder="Search by student name..."
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50 px-5 py-4">
+                <div>
+                  <h3 className="font-black text-slate-900">
+                    Student Marks Entry
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Select a student to enter marks for{" "}
+                    {ExamselectedSubject || "selected subject"}.
+                  </p>
+                </div>
+
+                {examResultLoading && (
+                  <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
+                    Loading...
+                  </span>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-5 py-3">Student</th>
+                      <th className="px-5 py-3">Roll No</th>
+                      <th className="px-5 py-3">Class</th>
+                      <th className="px-5 py-3">Status</th>
+                      <th className="px-5 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100">
+                    {(ExamfilteredStudents || []).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="5"
+                          className="px-5 py-10 text-center text-sm text-slate-500"
+                        >
+                          No students found.
+                        </td>
+                      </tr>
+                    ) : (
+                      ExamfilteredStudents.map((student, index) => (
+                        <tr key={student.id} className="hover:bg-indigo-50/40">
+                          <td className="px-5 py-4">
+                            <p className="font-bold text-slate-900">
+                              {student.name}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Student ID: {student.id}
+                            </p>
+                          </td>
+
+                          <td className="px-5 py-4 text-sm text-slate-700">
+                            {student.rollNo || student.roll || "-"}
+                          </td>
+
+                          <td className="px-5 py-4 text-sm font-semibold text-slate-700">
+                            {student.className}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                                student.status === "Completed"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {student.status || "Pending"}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openMarksModal(student, index)}
+                                disabled={!canEnterMarks}
+                                title={
+                                  canEnterMarks
+                                    ? "Enter marks"
+                                    : "Marks entry is disabled by admin"
+                                }
+                                className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                                  canEnterMarks
+                                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                    : "cursor-not-allowed bg-slate-200 text-slate-500"
+                                }`}
+                              >
+                                {canEnterMarks
+                                  ? "Enter Marks"
+                                  : "Marks Entry Locked"}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => openReportCard(student)}
+                                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                              >
+                                View Ledger
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+        {/* ================= TEACHER EXAM & RESULT SECTION END ================= */}
+
+        {marksModalOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-3 sm:p-5">
+            <div className="w-full max-w-4xl max-h-[94vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
+              <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-xl px-5 sm:px-7 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+                      Marks Entry
+                    </p>
+                    <h3 className="mt-1 text-xl sm:text-2xl font-black text-slate-900">
+                      {currentStudent?.name}
+                    </h3>
+                    <p className="text-sm text-slate-500">
+                      {currentStudent?.className} • Roll{" "}
+                      {currentStudent?.rollNo || currentStudent?.roll || "-"}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closeMarksModal}
+                    className="h-10 w-10 rounded-full bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
 
-              {/* ACTIONS */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={saveMarks}
-                  className="bg-green-600 text-white py-3 rounded-xl"
-                >
-                  Save Marks
-                </button>
+              <div className="overflow-y-auto max-h-[calc(94vh-92px)] p-5 sm:p-7 space-y-6">
+                <div className="rounded-3xl bg-gradient-to-br from-indigo-50 via-white to-blue-50 border border-indigo-100 p-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">
+                        Subject
+                      </p>
+                      <h4 className="mt-1 font-black text-slate-900">
+                        {ExamselectedSubject}
+                      </h4>
+                    </div>
 
-                <button
-                  onClick={closeMarksModal}
-                  className="border py-3 rounded-xl"
-                >
-                  Cancel
-                </button>
-              </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">Exam</p>
+                      <h4 className="mt-1 font-black text-slate-900">
+                        {selectedExam}
+                      </h4>
+                    </div>
 
-              {/* NAVIGATION */}
-              <div className="flex justify-between">
-                <button
-                  onClick={prevStudent}
-                  className="px-4 py-2 border rounded-xl"
-                >
-                  ← Previous
-                </button>
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">
+                        Grade Preview
+                      </p>
+                      <h4 className="mt-1 font-black text-indigo-600">
+                        {grade}
+                      </h4>
+                    </div>
+                  </div>
+                </div>
 
-                <button
-                  onClick={nextStudent}
-                  className="px-4 py-2 border rounded-xl"
-                >
-                  Next →
-                </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {[
+                    ["Internal", "internal", "internalOutOf"],
+                    ["External", "external", "externalOutOf"],
+                    ["Oral", "oral", "oralOutOf"],
+                    ["Practical", "practical", "practicalOutOf"],
+                  ].map(([label, markName, outOfName]) => (
+                    <div
+                      key={markName}
+                      className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                    >
+                      <label className="block text-sm font-black text-slate-900 mb-3">
+                        {label}
+                      </label>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="mb-1 text-[11px] font-bold uppercase text-slate-400">
+                            Obtained
+                          </p>
+                          <input
+                            type="number"
+                            name={markName}
+                            value={marks[markName]}
+                            onChange={handleMarkChange}
+                            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                          />
+                        </div>
+
+                        <div>
+                          <p className="mb-1 text-[11px] font-bold uppercase text-slate-400">
+                            Out Of
+                          </p>
+                          <input
+                            type="number"
+                            name={outOfName}
+                            value={marks[outOfName]}
+                            onChange={handleMarkChange}
+                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <label className="block text-sm font-black text-slate-900 mb-2">
+                    Remarks
+                  </label>
+                  <textarea
+                    name="remarks"
+                    value={marks.remarks}
+                    onChange={handleMarkChange}
+                    rows={3}
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    placeholder="Enter remarks..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="rounded-3xl bg-slate-50 p-5 text-center">
+                    <p className="text-xs font-bold text-slate-500">Total</p>
+                    <h3 className="mt-1 text-2xl font-black text-slate-900">
+                      {totalMarks} / {totalOutOf}
+                    </h3>
+                  </div>
+
+                  <div className="rounded-3xl bg-indigo-50 p-5 text-center">
+                    <p className="text-xs font-bold text-indigo-500">
+                      Percentage
+                    </p>
+                    <h3 className="mt-1 text-2xl font-black text-indigo-700">
+                      {percentage}%
+                    </h3>
+                  </div>
+
+                  <div className="rounded-3xl bg-emerald-50 p-5 text-center">
+                    <p className="text-xs font-bold text-emerald-500">Grade</p>
+                    <h3 className="mt-1 text-2xl font-black text-emerald-700">
+                      {grade}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="sticky bottom-0 -mx-5 sm:-mx-7 -mb-5 sm:-mb-7 border-t border-slate-200 bg-white/95 backdrop-blur-xl px-5 sm:px-7 py-4">
+                  <div className="flex flex-col sm:flex-row justify-between gap-3">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={prevStudent}
+                        className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                      >
+                        ← Previous
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={nextStudent}
+                        className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                      >
+                        Next →
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={closeMarksModal}
+                        className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={saveMarks}
+                        className="rounded-2xl bg-gradient-to-r from-emerald-600 to-green-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-200 hover:from-emerald-700 hover:to-green-700"
+                      >
+                        Save Marks
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

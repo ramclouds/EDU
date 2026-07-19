@@ -81,6 +81,7 @@ class Admin(db.Model):
             "Library Admin",
             "Accounts Admin",
             "Hostel Admin",
+            "HR Admin",
             name="admin_type_enum",
         ),
         nullable=False,
@@ -398,15 +399,36 @@ class Login(MethodView):
             user.auth_token = token
             db.session.commit()
 
-            # Auto dashboard based on role
+            # Auto dashboard based on role and admin type
             if user.role == "student":
-                dashboard = "student_dashboard"
+                dashboard = "/student-dashboard"
+
             elif user.role == "teacher":
-                dashboard = "teacher_dashboard"
-            elif user.role in ["admin", "super_admin"]:
-                dashboard = "admin_dashboard"
+                dashboard = "/teacher-dashboard"
+
+            elif (
+                user.role == "super_admin"
+                or getattr(user, "admin_type", None) == "Super Admin"
+            ):
+                dashboard = "/super-admin-dashboard"
+
+            elif getattr(user, "admin_type", None) == "Hostel Admin":
+                dashboard = "/hostel-admin-dashboard"
+
+            elif getattr(user, "admin_type", None) == "Library Admin":
+                dashboard = "/library-admin-dashboard"
+
+            elif getattr(user, "admin_type", None) == "Accounts Admin":
+                dashboard = "/accounts-admin-dashboard"
+
+            elif getattr(user, "admin_type", None) == "HR Admin":
+                dashboard = "/hr-admin-dashboard"
+
+            elif user.role == "admin":
+                dashboard = "/admin-dashboard"
+
             else:
-                dashboard = "dashboard"
+                dashboard = "/"
 
             return (
                 jsonify(
@@ -418,6 +440,16 @@ class Login(MethodView):
                             "id": user.id,
                             "role": user.role,
                             "user_type": user.role,
+                            "admin_type": getattr(user, "admin_type", None),
+                            "permissions": getattr(user, "permissions", None),
+                            "modules_enabled": getattr(user, "modules_enabled", None),
+                            "fee_access": getattr(user, "fee_access", False),
+                            "discount_authority": getattr(
+                                user,
+                                "discount_authority",
+                                False,
+                            ),
+                            "revenue_view": getattr(user, "revenue_view", False),
                             "name": " ".join(
                                 filter(
                                     None,
@@ -429,7 +461,6 @@ class Login(MethodView):
                                 )
                             ),
                             "email": user.email,
-                            "admin_type": getattr(user, "admin_type", None),
                         },
                     }
                 ),
