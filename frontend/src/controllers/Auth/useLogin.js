@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BASE_URL } from "../../config/appConfig";
 
 export function useLogin() {
   const [identifier, setIdentifier] = useState("");
@@ -20,7 +21,7 @@ export function useLogin() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/login",
+        `${BASE_URL}/login`,
         {
           method: "POST",
           headers: {
@@ -43,15 +44,11 @@ export function useLogin() {
       // ================= STORE AUTH =================
 
       localStorage.setItem("token", data.token);
-
       localStorage.setItem("role", data.role);
-
       localStorage.setItem(
         "user",
         JSON.stringify(data.user)
       );
-
-      // ================= STORE ADMIN TYPE =================
 
       if (data.user?.admin_type) {
         localStorage.setItem(
@@ -64,43 +61,83 @@ export function useLogin() {
 
       console.log("LOGIN SUCCESS", data);
 
+      // Prefer backend-provided dashboard
+      if (data.dashboard) {
+        window.location.href = data.dashboard;
+        return;
+      }
+
+      // Fallback redirects
+      const fallbackRoutes = {
+        student: "/student-dashboard",
+        teacher: "/teacher-dashboard",
+      };
+
+      if (fallbackRoutes[data.role]) {
+        window.location.href =
+          fallbackRoutes[data.role];
+        return;
+      }
+
+      if (data.role === "admin") {
+        const adminRoutes = {
+          "Super Admin": "/super-admin-dashboard",
+          "Library Admin": "/library-admin-dashboard",
+          "Accounts Admin": "/accounts-admin-dashboard",
+          "Hostel Admin": "/hostel-admin-dashboard",
+          "HR Admin": "/hr-admin-dashboard",
+        };
+
+        const route =
+          adminRoutes[data.user?.admin_type];
+
+        if (route) {
+          window.location.href = route;
+          return;
+        }
+      }
+
+      alert("No dashboard route configured");
+
       // ================= ROLE BASED REDIRECT =================
 
+      if (data.dashboard) {
+        window.location.href = data.dashboard;
+        return;
+      }
+
       if (data.role === "student") {
-        window.location.href =
-          "/student-dashboard";
+        window.location.href = "/student-dashboard";
+        return;
       }
 
-      else if (data.role === "teacher") {
-        window.location.href =
-          "/teacher-dashboard";
+      if (data.role === "teacher") {
+        window.location.href = "/teacher-dashboard";
+        return;
       }
 
-      else if (data.role === "admin") {
+      if (data.role === "admin") {
+        const adminDashboardRoutes = {
+          "Super Admin": "/super-admin-dashboard",
+          "Library Admin": "/library-admin-dashboard",
+          "Accounts Admin": "/accounts-admin-dashboard",
+          "Hostel Admin": "/hostel-admin-dashboard",
+          "HR Admin": "/hr-admin-dashboard",
+        };
 
-        switch (data.user?.admin_type) {
+        const dashboard =
+          adminDashboardRoutes[data.user?.admin_type];
 
-          case "Super Admin":
-            window.location.href =
-              "/super-admin-dashboard";
-            break;
-
-          case "Library Admin":
-            window.location.href =
-              "/library-admin-dashboard";
-            break;
-
-          case "Accounts Admin":
-            window.location.href =
-              "/accounts-admin-dashboard";
-            break;
-
-          case "Hostel Admin":
-            window.location.href =
-              "/hostel-admin-dashboard";
-            break;
+        if (!dashboard) {
+          console.error(
+            "Unknown admin type:",
+            data.user?.admin_type
+          );
+          alert("Dashboard access is not configured");
+          return;
         }
-      
+
+        window.location.href = dashboard;
       }
 
     } catch (error) {

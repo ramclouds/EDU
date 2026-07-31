@@ -51,7 +51,6 @@ class BookIssue(db.Model):
 
     book = db.relationship("Book")
 
-
 # =========================
 # SERVICE LAYER
 # =========================

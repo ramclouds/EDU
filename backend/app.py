@@ -109,10 +109,26 @@ from utils.examResult import (
     TeacherReportCardAPI,
     TeacherAnalyticsAPI,
     TeacherAnalyticsPDFAPI,
+    AdminExamOptionsAPI,
+    AdminExamTermAPI,
+    AdminExamDashboardAPI,
+    AdminExamClassDetailsAPI,
+    AdminExamVerifyAPI,
+    AdminExamPublishAPI,
+    AdminExamSchedulePublishAPI,
+    AdminExamBulkEditAPI,
+    AdminExamResultsAPI,
+    AdminExamReportsPDFAPI,
+    AdminExamReportCardsPDFAPI,
+    TeacherExamsAPI,
+    AdminExamMarksEntryPermissionAPI,
 )
 
 # ==== OTHER ====
-from utils.hostel import StudentHostelDetails, CreateHostelComplaint
+from utils.hostel import (
+    StudentHostelDetails,
+    CreateHostelComplaint,
+)
 
 from utils.announcement import (
     CreateNoticeAPI,
@@ -688,8 +704,87 @@ def create_app():
     )
 
     app.add_url_rule(
+        "/api/teacher/exams",
+        view_func=TeacherExamsAPI.as_view("teacher_exams_api"),
+    )
+
+    app.add_url_rule(
         "/api/upcoming-exams/<int:student_id>",
         view_func=UpcomingExamsAPI.as_view("upcoming_exams"),
+        methods=["GET"],
+    )
+
+    # ==== ADMIN EXAM & RESULT CONTROL CENTER ====
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/marks-entry-permission",
+        view_func=AdminExamMarksEntryPermissionAPI.as_view(
+            "admin_exam_marks_entry_permission"
+        ),
+        methods=["PUT"],
+    )
+    app.add_url_rule(
+        "/api/admin/exams/options",
+        view_func=AdminExamOptionsAPI.as_view("admin_exam_options"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams",
+        view_func=AdminExamTermAPI.as_view("admin_exam_terms"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/dashboard",
+        view_func=AdminExamDashboardAPI.as_view("admin_exam_dashboard"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/details",
+        view_func=AdminExamClassDetailsAPI.as_view("admin_exam_class_details"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/verify",
+        view_func=AdminExamVerifyAPI.as_view("admin_exam_verify"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/publish",
+        view_func=AdminExamPublishAPI.as_view("admin_exam_publish"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/schedule-publish",
+        view_func=AdminExamSchedulePublishAPI.as_view("admin_exam_schedule_publish"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/results",
+        view_func=AdminExamResultsAPI.as_view("admin_exam_results"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/results/bulk-edit",
+        view_func=AdminExamBulkEditAPI.as_view("admin_exam_bulk_edit"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/reports/pdf",
+        view_func=AdminExamReportsPDFAPI.as_view("admin_exam_reports_pdf"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/report-cards/pdf",
+        view_func=AdminExamReportCardsPDFAPI.as_view("admin_exam_report_cards_pdf"),
         methods=["GET"],
     )
 
@@ -700,17 +795,74 @@ def create_app():
         methods=["GET"],
     )
 
+    # Hostels
     app.add_url_rule(
         "/api/student/<int:student_id>/hostel",
-        view_func=StudentHostelDetails.as_view("hostel"),
+        view_func=StudentHostelDetails.as_view("student_hostel_details"),
         methods=["GET"],
     )
 
     app.add_url_rule(
         "/api/student/<int:student_id>/hostel/complaint",
-        view_func=CreateHostelComplaint.as_view("hostel_complaint"),
+        view_func=CreateHostelComplaint.as_view("student_hostel_complaint"),
         methods=["POST"],
     )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/rooms",
+    #     view_func=AdminRoomsAPI.as_view("admin_hostel_rooms"),
+    #     methods=["GET", "POST"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/rooms/<int:room_id>",
+    #     view_func=AdminRoomDetailAPI.as_view("admin_hostel_room_detail"),
+    #     methods=["GET", "PUT", "DELETE"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/room-allotments",
+    #     view_func=AdminRoomAllotmentsAPI.as_view("admin_hostel_room_allotments"),
+    #     methods=["GET", "POST"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/room-allotments/<int:allocation_id>",
+    #     view_func=AdminRoomAllotmentDetailAPI.as_view(
+    #         "admin_hostel_room_allotment_detail"
+    #     ),
+    #     methods=["GET", "PUT", "DELETE"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/room-allotments/<int:allocation_id>/transfer",
+    #     view_func=AdminRoomTransferAPI.as_view("admin_hostel_room_allotment_transfer"),
+    #     methods=["POST"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/beds",
+    #     view_func=AdminHostelBedsAPI.as_view("admin_hostel_beds"),
+    #     methods=["GET", "POST"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/beds/<int:bed_id>",
+    #     view_func=AdminHostelBedDetailAPI.as_view("admin_hostel_bed_detail"),
+    #     methods=["GET", "PUT", "DELETE"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/blocks",
+    #     view_func=AdminHostelBlocksAPI.as_view("admin_hostel_blocks"),
+    #     methods=["GET", "POST"],
+    # )   
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/blocks/<int:block_id>",
+    #     view_func=AdminHostelBlockDetailAPI.as_view("admin_hostel_block_detail"),
+    #     methods=["PUT", "DELETE"],
+    # )
 
     # MY CLASSES
     app.add_url_rule(

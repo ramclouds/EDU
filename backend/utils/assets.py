@@ -10,7 +10,6 @@ from utils.auth_middleware import login_required
 
 logger = logging.getLogger(__name__)
 
-
 # =========================================================
 # ASSET MODEL
 # =========================================================
