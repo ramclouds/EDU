@@ -977,6 +977,62 @@ def create_app():
         methods=["POST"],
     )
 
+    # app.add_url_rule(
+    #     "/api/admin/hostel/rooms",
+    #     view_func=AdminRoomsAPI.as_view("admin_hostel_rooms"),
+    #     methods=["GET", "POST"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/rooms/<int:room_id>",
+    #     view_func=AdminRoomDetailAPI.as_view("admin_hostel_room_detail"),
+    #     methods=["GET", "PUT", "DELETE"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/room-allotments",
+    #     view_func=AdminRoomAllotmentsAPI.as_view("admin_hostel_room_allotments"),
+    #     methods=["GET", "POST"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/room-allotments/<int:allocation_id>",
+    #     view_func=AdminRoomAllotmentDetailAPI.as_view(
+    #         "admin_hostel_room_allotment_detail"
+    #     ),
+    #     methods=["GET", "PUT", "DELETE"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/room-allotments/<int:allocation_id>/transfer",
+    #     view_func=AdminRoomTransferAPI.as_view("admin_hostel_room_allotment_transfer"),
+    #     methods=["POST"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/beds",
+    #     view_func=AdminHostelBedsAPI.as_view("admin_hostel_beds"),
+    #     methods=["GET", "POST"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/beds/<int:bed_id>",
+    #     view_func=AdminHostelBedDetailAPI.as_view("admin_hostel_bed_detail"),
+    #     methods=["GET", "PUT", "DELETE"],
+    # )
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/blocks",
+    #     view_func=AdminHostelBlocksAPI.as_view("admin_hostel_blocks"),
+    #     methods=["GET", "POST"],
+    # )   
+
+    # app.add_url_rule(
+    #     "/api/admin/hostel/blocks/<int:block_id>",
+    #     view_func=AdminHostelBlockDetailAPI.as_view("admin_hostel_block_detail"),
+    #     methods=["PUT", "DELETE"],
+    # )
+
     # MY CLASSES
     app.add_url_rule(
         "/api/my-classes/<role>/<int:user_id>",
