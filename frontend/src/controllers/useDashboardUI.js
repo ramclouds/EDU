@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function useDashboardUI() {
   const navigate = useNavigate();
 
-  // UI STATES
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarHover, setSidebarHover] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -14,15 +14,41 @@ export function useDashboardUI() {
     localStorage.getItem("theme") === "dark"
   );
 
-  // REFS
   const bellRef = useRef(null);
 
-  // 🌙 Toggle Theme
+  const isDesktop = () => window.innerWidth >= 768;
+
+  const sidebarExpanded = useMemo(() => {
+    return sidebarOpen || sidebarHover;
+  }, [sidebarOpen, sidebarHover]);
+
+  const handleSidebarMouseEnter = () => {
+    if (isDesktop() && !sidebarOpen) {
+      setSidebarHover(true);
+    }
+  };
+
+  const handleSidebarMouseLeave = () => {
+    if (isDesktop()) {
+      setSidebarHover(false);
+    }
+  };
+
+  const toggleSidebar = () => {
+    setSidebarHover(false);
+    setSidebarOpen((prev) => !prev);
+  };
+
+  const closeSidebarOnMobile = () => {
+    if (!isDesktop()) {
+      setSidebarOpen(false);
+    }
+  };
+
   const toggleTheme = () => {
     setDarkMode((prev) => !prev);
   };
 
-  // 🌙 Apply Theme
   useEffect(() => {
     const root = document.documentElement;
 
@@ -35,7 +61,6 @@ export function useDashboardUI() {
     }
   }, [darkMode]);
 
-  // 🔔 Close Notifications on Outside Click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (bellRef.current && !bellRef.current.contains(e.target)) {
@@ -44,11 +69,9 @@ export function useDashboardUI() {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 📱 Close Sidebar/Profile on Outside Click
   useEffect(() => {
     const handleClick = (e) => {
       if (
@@ -60,7 +83,8 @@ export function useDashboardUI() {
       }
 
       setProfileOpen(false);
-      if (window.innerWidth < 768) {
+
+      if (!isDesktop()) {
         setSidebarOpen(false);
       }
     };
@@ -69,30 +93,32 @@ export function useDashboardUI() {
     return () => window.removeEventListener("click", handleClick);
   }, []);
 
-  // ✅ RETURN EVERYTHING YOU NEED
   return {
     navigate,
 
-    // state
     sidebarOpen,
+    sidebarHover,
+    sidebarExpanded,
     profileOpen,
     mobileSearchOpen,
     showPassword,
     showNotifications,
     darkMode,
 
-    // setters
     setSidebarOpen,
+    setSidebarHover,
     setProfileOpen,
     setMobileSearchOpen,
     setShowPassword,
     setShowNotifications,
     setDarkMode,
 
-    // refs
     bellRef,
 
-    // actions
     toggleTheme,
+    toggleSidebar,
+    closeSidebarOnMobile,
+    handleSidebarMouseEnter,
+    handleSidebarMouseLeave,
   };
 }

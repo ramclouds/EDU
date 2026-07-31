@@ -109,10 +109,26 @@ from utils.examResult import (
     TeacherReportCardAPI,
     TeacherAnalyticsAPI,
     TeacherAnalyticsPDFAPI,
+    AdminExamOptionsAPI,
+    AdminExamTermAPI,
+    AdminExamDashboardAPI,
+    AdminExamClassDetailsAPI,
+    AdminExamVerifyAPI,
+    AdminExamPublishAPI,
+    AdminExamSchedulePublishAPI,
+    AdminExamBulkEditAPI,
+    AdminExamResultsAPI,
+    AdminExamReportsPDFAPI,
+    AdminExamReportCardsPDFAPI,
+    TeacherExamsAPI,
+    AdminExamMarksEntryPermissionAPI,
 )
 
 # ==== OTHER ====
-from utils.hostel import StudentHostelDetails, CreateHostelComplaint
+from utils.hostel import (
+    StudentHostelDetails,
+    CreateHostelComplaint,
+)
 
 from utils.announcement import (
     CreateNoticeAPI,
@@ -122,7 +138,22 @@ from utils.announcement import (
     MarkNoticeReadAPI,
 )
 
-from utils.library import StudentLibraryAPI
+from utils.library import (
+    StudentLibraryAPI,
+    LibraryCategoryListAPI,
+    LibraryCategoryDetailAPI,
+    LibraryCategoryStatusAPI,
+    LibraryCategoryOptionsAPI,
+    LibraryAuthorListAPI,
+    LibraryAuthorDetailAPI,
+    LibraryAuthorStatusAPI,
+    LibraryAuthorOptionsAPI,
+    LibraryBookListAPI,
+    LibraryBookOptionsAPI,
+    LibraryBookDetailAPI,
+    LibraryBookStatusAPI,
+)
+
 from utils.teacherMyClasses import TeacherMyClasses, MyClasses
 from utils.studentEnrollment import (
     EnrollStudentAPI,
@@ -141,6 +172,19 @@ from utils.TeacherManagement import (
 )
 
 from utils.subjects import AdminSubjectsAPI, AdminSubjectDetailAPI
+
+from utils.rolePermissionManagement import (
+    MyRBACAccessAPI,
+    RBACBootstrapAPI,
+    RBACRoleDetailAPI,
+    RBACRoleListAPI,
+    RBACRolePermissionAPI,
+    RBACUserAccessAPI,
+    RBACUserListAPI,
+    RBACUserOverrideAPI,
+    RBACUserRoleAPI,
+    seed_rbac_defaults,
+)
 
 
 # CREATE APP
@@ -163,7 +207,14 @@ def create_app():
         supports_credentials=True,
         origins=["http://localhost:5173"],
         allow_headers=["Content-Type", "Authorization"],
-        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        methods=[
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS",
+        ],
     )
 
     @app.before_request
@@ -181,6 +232,64 @@ def create_app():
 
     app.add_url_rule(
         "/api/signup", view_func=SignUp.as_view("signup"), methods=["POST"]
+    )
+
+    # =========================================================
+    # RBAC ROUTES
+    # =========================================================
+
+    app.add_url_rule(
+        "/api/rbac/bootstrap",
+        view_func=RBACBootstrapAPI.as_view("rbac_bootstrap_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/roles",
+        view_func=RBACRoleListAPI.as_view("rbac_role_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/roles/<int:role_id>",
+        view_func=RBACRoleDetailAPI.as_view("rbac_role_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/roles/<int:role_id>/permissions",
+        view_func=RBACRolePermissionAPI.as_view("rbac_role_permission_api"),
+        methods=["PUT", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/users",
+        view_func=RBACUserListAPI.as_view("rbac_user_list_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/users/<string:user_type>/<int:user_id>/access",
+        view_func=RBACUserAccessAPI.as_view("rbac_user_access_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/users/<string:user_type>/<int:user_id>/role",
+        view_func=RBACUserRoleAPI.as_view("rbac_user_role_api"),
+        methods=["PUT", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/users/<string:user_type>/<int:user_id>/overrides",
+        view_func=RBACUserOverrideAPI.as_view("rbac_user_override_api"),
+        methods=["PUT", "DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/my-access",
+        view_func=MyRBACAccessAPI.as_view("my_rbac_access_api"),
+        methods=["GET", "OPTIONS"],
     )
 
     # STUDENT
@@ -688,27 +797,183 @@ def create_app():
     )
 
     app.add_url_rule(
+        "/api/teacher/exams",
+        view_func=TeacherExamsAPI.as_view("teacher_exams_api"),
+    )
+
+    app.add_url_rule(
         "/api/upcoming-exams/<int:student_id>",
         view_func=UpcomingExamsAPI.as_view("upcoming_exams"),
         methods=["GET"],
     )
 
-    # LIBRARY / HOSTEL
+    # ==== ADMIN EXAM & RESULT CONTROL CENTER ====
     app.add_url_rule(
-        "/api/library/<int:student_id>",
-        view_func=StudentLibraryAPI.as_view("library"),
+        "/api/admin/exams/<int:exam_id>/marks-entry-permission",
+        view_func=AdminExamMarksEntryPermissionAPI.as_view(
+            "admin_exam_marks_entry_permission"
+        ),
+        methods=["PUT"],
+    )
+    app.add_url_rule(
+        "/api/admin/exams/options",
+        view_func=AdminExamOptionsAPI.as_view("admin_exam_options"),
         methods=["GET"],
     )
 
     app.add_url_rule(
+        "/api/admin/exams",
+        view_func=AdminExamTermAPI.as_view("admin_exam_terms"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/dashboard",
+        view_func=AdminExamDashboardAPI.as_view("admin_exam_dashboard"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/details",
+        view_func=AdminExamClassDetailsAPI.as_view("admin_exam_class_details"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/verify",
+        view_func=AdminExamVerifyAPI.as_view("admin_exam_verify"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/publish",
+        view_func=AdminExamPublishAPI.as_view("admin_exam_publish"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/<int:exam_id>/schedule-publish",
+        view_func=AdminExamSchedulePublishAPI.as_view("admin_exam_schedule_publish"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/results",
+        view_func=AdminExamResultsAPI.as_view("admin_exam_results"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/results/bulk-edit",
+        view_func=AdminExamBulkEditAPI.as_view("admin_exam_bulk_edit"),
+        methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/reports/pdf",
+        view_func=AdminExamReportsPDFAPI.as_view("admin_exam_reports_pdf"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/exams/report-cards/pdf",
+        view_func=AdminExamReportCardsPDFAPI.as_view("admin_exam_report_cards_pdf"),
+        methods=["GET"],
+    )
+
+    # =========================================================
+    # LIBRARY CATEGORY MANAGEMENT
+    # =========================================================
+
+    app.add_url_rule(
+        "/api/admin/library/categories",
+        view_func=LibraryCategoryListAPI.as_view("library_category_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/categories/<int:category_id>",
+        view_func=LibraryCategoryDetailAPI.as_view("library_category_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/categories/<int:category_id>/status",
+        view_func=LibraryCategoryStatusAPI.as_view("library_category_status_api"),
+        methods=["PATCH", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/category-options",
+        view_func=LibraryCategoryOptionsAPI.as_view("library_category_options_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    # =========================================================
+    # LIBRARY AUTHOR MANAGEMENT
+    # =========================================================
+    app.add_url_rule(
+        "/api/admin/library/authors",
+        view_func=LibraryAuthorListAPI.as_view("library_author_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/authors/<int:author_id>",
+        view_func=LibraryAuthorDetailAPI.as_view("library_author_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/authors/<int:author_id>/status",
+        view_func=LibraryAuthorStatusAPI.as_view("library_author_status_api"),
+        methods=["PATCH", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/authors/options",
+        view_func=LibraryAuthorOptionsAPI.as_view("library_author_options_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    # =========================================================
+    # LIBRARY BOOK MANAGEMENT
+    # =========================================================
+    app.add_url_rule(
+        "/api/admin/library/books",
+        view_func=LibraryBookListAPI.as_view("library_book_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/books/options",
+        view_func=LibraryBookOptionsAPI.as_view("library_book_options_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    # NEW ROUTES ADDED BELOW
+    app.add_url_rule(
+        "/api/admin/library/books/<int:book_id>",
+        view_func=LibraryBookDetailAPI.as_view("library_book_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/books/<int:book_id>/status",
+        view_func=LibraryBookStatusAPI.as_view("library_book_status_api"),
+        methods=["PATCH", "OPTIONS"],
+    )
+
+    # Hostels
+    app.add_url_rule(
         "/api/student/<int:student_id>/hostel",
-        view_func=StudentHostelDetails.as_view("hostel"),
+        view_func=StudentHostelDetails.as_view("student_hostel_details"),
         methods=["GET"],
     )
 
     app.add_url_rule(
         "/api/student/<int:student_id>/hostel/complaint",
-        view_func=CreateHostelComplaint.as_view("hostel_complaint"),
+        view_func=CreateHostelComplaint.as_view("student_hostel_complaint"),
         methods=["POST"],
     )
 
@@ -873,6 +1138,17 @@ def create_app():
     @app.errorhandler(500)
     def internal_error(e):
         return jsonify({"error": "Internal server error"}), 500
+
+    # =========================================================
+    # RBAC INITIALIZATION
+    # =========================================================
+    # This updates only RBAC default modules/roles. It is idempotent and
+    # does not change login, routing, dashboard, or other application logic.
+    with app.app_context():
+        try:
+            seed_rbac_defaults()
+        except Exception:
+            app.logger.exception("RBAC defaults initialization failed")
 
     return app
 

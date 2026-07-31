@@ -1,53 +1,88 @@
 from functools import wraps
-from flask import request, jsonify
-from utils.auth import Student, Teacher, Admin
 
-def login_required(f):
-    @wraps(f)
+from flask import jsonify, request
+
+from utils.auth import Admin, Student, Teacher
+
+try:
+    from utils.auth import Staff
+except ImportError:
+    Staff = None
+
+
+def _extract_bearer_token():
+    auth_header = str(request.headers.get("Authorization") or "").strip()
+
+    if not auth_header:
+        return None
+
+    if auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip()
+
+    return auth_header
+
+
+def _find_user_by_token(token):
+    models = [Student, Teacher, Admin]
+
+    if Staff is not None:
+        models.append(Staff)
+
+    for model in models:
+        if not hasattr(model, "auth_token"):
+            continue
+
+        user = model.query.filter_by(auth_token=token).first()
+        if user is not None:
+            return user
+
+    return None
+
+
+def login_required(function):
+    @wraps(function)
     def wrapper(*args, **kwargs):
-
-        # ✅ Allow CORS preflight
         if request.method == "OPTIONS":
             return jsonify({"message": "OK"}), 200
 
-        auth_header = request.headers.get("Authorization")
-
-        if not auth_header:
+        token = _extract_bearer_token()
+        if not token:
             return jsonify({"error": "Unauthorized - Token missing"}), 401
 
         try:
-            # ✅ Extract token
-            if auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1]
-            else:
-                token = auth_header
+            user = _find_user_by_token(token)
 
-            user = None
-
-            # ✅ Student
-            user = Student.query.filter_by(auth_token=token).first()
-
-            # ✅ Teacher
-            if not user:
-                user = Teacher.query.filter_by(auth_token=token).first()
-
-            # ✅ Admin
-            if not user:
-                user = Admin.query.filter_by(auth_token=token).first()
-
-            if not user:
+            if user is None:
                 return jsonify({"error": "Invalid token"}), 401
 
-            # ✅ Attach current user
+            if str(getattr(user, "status", "Active")).lower() != "active":
+                return jsonify({"error": "Account inactive"}), 403
+
             request.user = user
+            request.auth_token = token
 
-        except Exception as e:
-            return jsonify({"error": str(e)}), 401
+            if isinstance(user, Admin):
+                request.user_type = "admin"
+            elif isinstance(user, Teacher):
+                request.user_type = "teacher"
+            elif isinstance(user, Student):
+                request.user_type = "student"
+            elif Staff is not None and isinstance(user, Staff):
+                request.user_type = "staff"
+            else:
+                request.user_type = None
 
-        return f(*args, **kwargs)
+        except Exception:
+            return jsonify({"error": "Unable to validate authentication token"}), 401
+
+        return function(*args, **kwargs)
 
     return wrapper
 
 
 def get_current_user():
     return getattr(request, "user", None)
+
+
+def get_current_user_type():
+    return getattr(request, "user_type", None)

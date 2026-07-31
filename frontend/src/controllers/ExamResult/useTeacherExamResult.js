@@ -22,8 +22,9 @@ export function useTeacherExamResult(
   const [selectedSubject, setSelectedSubject] =
     useState("");
 
-  const [selectedExam, setSelectedExam] =
-    useState("Unit Test 1");
+  const [exams, setExams] = useState([]);
+  const [selectedExam, setSelectedExam] = useState("");
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
 
   const [search, setSearch] = useState("");
 
@@ -96,20 +97,12 @@ export function useTeacherExamResult(
       try {
         setLoading(true);
 
-        const [studentRes, subjectRes, classRes] =
-          await Promise.all([
-            fetchWithAuth(
-              `${BASE_URL}/teacher/students?teacher_id=${user.id}`
-            ),
-
-            fetchWithAuth(
-              `${BASE_URL}/teacher/subjects?teacher_id=${user.id}`
-            ),
-
-            fetchWithAuth(
-              `${BASE_URL}/teacher/classes?teacher_id=${user.id}`
-            ),
-          ]);
+        const [studentRes, subjectRes, classRes, examRes] = await Promise.all([
+          fetchWithAuth(`${BASE_URL}/teacher/students?teacher_id=${user.id}`),
+          fetchWithAuth(`${BASE_URL}/teacher/subjects?teacher_id=${user.id}`),
+          fetchWithAuth(`${BASE_URL}/teacher/classes?teacher_id=${user.id}`),
+          fetchWithAuth(`${BASE_URL}/teacher/exams?teacher_id=${user.id}`),
+        ]);
 
         const studentData =
           await studentRes.json();
@@ -120,20 +113,7 @@ export function useTeacherExamResult(
         const classData =
           await classRes.json();
 
-        // console.log(
-        //   "Teacher Students =>",
-        //   studentData
-        // );
-
-        // console.log(
-        //   "Teacher Subjects =>",
-        //   subjectData
-        // );
-
-        // console.log(
-        //   "Teacher Classes =>",
-        //   classData
-        // );
+        const examData = await examRes.json();
 
         // ================= SAFE ARRAY =================
         const safeStudents = Array.isArray(
@@ -154,10 +134,16 @@ export function useTeacherExamResult(
           ? classData
           : [];
 
+        const safeExams = Array.isArray(examData) ? examData : [];
         setStudents(safeStudents);
         setSubjects(safeSubjects);
         setClasses(safeClasses);
+        setExams(safeExams);
 
+        if (safeExams.length > 0 && !selectedExam) {
+          setSelectedExam(safeExams[0].exam_name || "");
+          setSelectedAcademicYear(safeExams[0].academic_year || "");
+        }
         // ================= DEFAULT SUBJECT =================
         if (
           safeSubjects.length > 0 &&
@@ -194,13 +180,30 @@ export function useTeacherExamResult(
     fetchData();
   }, [activeSection]);
 
+  const selectedExamDetails = useMemo(() => {
+    return (exams || []).find(
+      (exam) =>
+        exam.exam_name === selectedExam &&
+        exam.academic_year === selectedAcademicYear
+    );
+  }, [exams, selectedExam, selectedAcademicYear]);
+
+  const canEnterMarks =
+    Boolean(selectedExamDetails?.marks_entry_enabled) &&
+    !Boolean(selectedExamDetails?.is_published);
+
   // ========================= OPEN MARKS MODAL =========================
-  const openMarksModal = async (
-    student,
-    index = 0
-  ) => {
+  const openMarksModal = async (student, index = 0) => {
     try {
       if (!student) return;
+
+      if (!canEnterMarks) {
+        showToast(
+          "Marks entry is currently disabled by admin for this exam.",
+          "error"
+        );
+        return;
+      }
 
       setCurrentStudent(student);
 
@@ -409,6 +412,8 @@ export function useTeacherExamResult(
           studentId: currentStudent.id,
           subject: selectedSubject,
           examType: selectedExam,
+          academicYear: selectedAcademicYear,
+          academic_year: selectedAcademicYear,
           internal: Number(marks.internal || 0),
           external: Number(marks.external || 0),
           oral: Number(marks.oral || 0),
@@ -523,7 +528,7 @@ export function useTeacherExamResult(
 
     students,
     filteredStudents,
-
+    exams,
     subjects,
     classes,
 
@@ -535,6 +540,8 @@ export function useTeacherExamResult(
 
     selectedExam,
     setSelectedExam,
+    selectedAcademicYear,
+    setSelectedAcademicYear,
 
     search,
     setSearch,
@@ -550,10 +557,12 @@ export function useTeacherExamResult(
     totalMarks,
     percentage,
     grade,
-
+    totalOutOf,
     openMarksModal,
     closeMarksModal,
 
+    selectedExamDetails,
+    canEnterMarks,
     saveMarks,
 
     nextStudent,

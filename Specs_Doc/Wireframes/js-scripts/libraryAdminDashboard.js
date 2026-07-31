@@ -8,31 +8,55 @@ const books = [
     { id: "B006", title: "Data Structures", author: "Mark Allen", category: "Programming", available: 0, total: 4 },
 ];
 
-function renderBooks(data) {
+function renderBooks(data = []) {
     const table = document.getElementById("booksTable");
-    table.innerHTML = "";
+    if (!table) return;
 
-    data.forEach(book => {
-
-        let status = book.available === 0
-            ? `<span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">Out of Stock</span>`
-            : `<span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">Available</span>`;
-
-        table.innerHTML += `
+    if (!data.length) {
+        table.innerHTML = `
             <tr>
-                <td class="p-3">${book.id}</td>
-                <td class="p-3 font-medium">${book.title}</td>
-                <td class="p-3">${book.author}</td>
-                <td class="p-3">${book.category}</td>
-                <td class="p-3">${book.available}/${book.total}</td>
-                <td class="p-3">${status}</td>
-                <td class="p-3 flex gap-2">
-                    <button class="text-blue-600">Edit</button>
-                    <button class="text-red-600">Delete</button>
+                <td colspan="7" class="p-6 text-center text-gray-500">
+                    No books found
                 </td>
             </tr>
         `;
-    });
+        return;
+    }
+
+    table.innerHTML = data.map(book => {
+        const available = Number(book.available) || 0;
+        const total = Number(book.total) || 0;
+
+        const status = available <= 0
+            ? `<span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs">Out of Stock</span>`
+            : `<span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs">Available</span>`;
+
+        return `
+            <tr>
+                <td class="p-3">${book.id || "-"}</td>
+                <td class="p-3 font-medium">${book.title || "-"}</td>
+                <td class="p-3">${book.author || "-"}</td>
+                <td class="p-3">${book.category || "-"}</td>
+                <td class="p-3">${available}/${total}</td>
+                <td class="p-3">${status}</td>
+                <td class="p-3">
+                    <div class="flex gap-2">
+                        <button type="button"
+                            onclick="editBook('${book.id}')"
+                            class="text-blue-600 text-xs">
+                            Edit
+                        </button>
+
+                        <button type="button"
+                            onclick="deleteBook('${book.id}')"
+                            class="text-red-600 text-xs">
+                            Delete
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
 }
 
 // initial render
@@ -148,24 +172,7 @@ let categories = [
 ];
 
 // Render Categories
-function renderCategories() {
-    const table = document.getElementById("categoryTable");
-    table.innerHTML = "";
-
-    categories.forEach((cat, index) => {
-        table.innerHTML += `
-            <tr>
-                <td class="p-3">${index + 1}</td>
-                <td class="p-3 font-medium">${cat.name}</td>
-                <td class="p-3">${cat.count}</td>
-                <td class="p-3">
-                    <button onclick="deleteCategory(${cat.id})"
-                        class="text-red-600">Delete</button>
-                </td>
-            </tr>
-        `;
-    });
-}
+z
 
 // Add Category
 function addCategory() {

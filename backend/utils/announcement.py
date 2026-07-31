@@ -10,16 +10,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 # ================= NOTICE MODEL =================
-
-
 class Notice(db.Model):
     __tablename__ = "announcements"
 
     id = db.Column(db.Integer, primary_key=True)
-
     title = db.Column(db.String(255), nullable=False)
-
     description = db.Column(db.Text, nullable=False)
 
     category = db.Column(
@@ -44,7 +41,6 @@ class Notice(db.Model):
     )
 
     expiry_date = db.Column(db.Date)
-
     audience = db.Column(
         db.Enum(
             "All",
@@ -60,7 +56,6 @@ class Notice(db.Model):
 
     # ✅ CREATED BY ADMIN / TEACHER
     created_by = db.Column(db.Integer)
-
     created_role = db.Column(
         db.Enum("admin", "teacher"),
         default="admin",
@@ -78,8 +73,6 @@ class Notice(db.Model):
 
 
 # ================= READ MODEL =================
-
-
 class NoticeRead(db.Model):
     __tablename__ = "announcement_reads"
 
@@ -120,8 +113,6 @@ class NoticeRead(db.Model):
 
 
 # ================= HELPERS =================
-
-
 def serialize_notice(n, is_read=False):
 
     return {
@@ -154,8 +145,6 @@ def validate_notice_data(data):
 
 
 # ================= CREATE NOTICE =================
-
-
 class CreateNoticeAPI(MethodView):
 
     @login_required
@@ -255,8 +244,6 @@ class CreateNoticeAPI(MethodView):
 
 
 # ================= STUDENT NOTICES =================
-
-
 class StudentNoticeAPI(MethodView):
 
     @login_required
@@ -320,8 +307,6 @@ class StudentNoticeAPI(MethodView):
 
 
 # ================= TEACHER NOTICES =================
-
-
 class TeacherNoticeAPI(MethodView):
 
     @login_required
@@ -385,7 +370,6 @@ class TeacherNoticeAPI(MethodView):
 
 
 # ================= ADMIN NOTICES =================
-
 class AdminNoticeAPI(MethodView):
 
     @login_required
@@ -448,8 +432,6 @@ class AdminNoticeAPI(MethodView):
 
 
 # ================= MARK NOTICE READ =================
-
-
 class MarkNoticeReadAPI(MethodView):
 
     @login_required
@@ -460,7 +442,6 @@ class MarkNoticeReadAPI(MethodView):
             user = request.user
 
             # ================= STUDENT =================
-
             if user.__class__.__name__ == "Student":
 
                 existing = NoticeRead.query.filter_by(
@@ -477,7 +458,6 @@ class MarkNoticeReadAPI(MethodView):
                 )
 
             # ================= TEACHER =================
-
             elif user.__class__.__name__ == "Teacher":
 
                 existing = NoticeRead.query.filter_by(
@@ -494,7 +474,6 @@ class MarkNoticeReadAPI(MethodView):
                 )
 
             # ================= ADMIN =================
-
             else:
 
                 existing = NoticeRead.query.filter_by(

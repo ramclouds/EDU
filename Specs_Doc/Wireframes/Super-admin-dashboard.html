@@ -1161,175 +1161,442 @@
             <section id="parentsSection" class="section hidden p-4 sm:p-6 space-y-6">
 
                 <!-- HEADER -->
-                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
-                    <h2 class="text-lg sm:text-xl font-semibold">Parent Management</h2>
-                    <p class="text-xs sm:text-sm opacity-90">
-                        Manage parents and their linked student details
-                    </p>
+                <div
+                    class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-blue-600 to-sky-500 p-5 sm:p-7 text-white shadow-xl">
+
+                    <div class="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.25em] text-blue-100">
+                                Parents Directory
+                            </p>
+                            <h2 class="mt-2 text-2xl sm:text-3xl font-black">
+                                Parent Management
+                            </h2>
+                            <p class="mt-1 max-w-xl text-sm text-blue-50">
+                                Manage parent profiles, relations, contact details and linked student information.
+                            </p>
+                        </div>
+
+                        <button onclick="openParentModal()"
+                            class="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-bold text-indigo-700 shadow-lg hover:bg-blue-50 transition">
+                            <span class="text-lg">+</span>
+                            Add Parent
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STATS CARDS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div class="rounded-3xl bg-white p-5 shadow-sm border border-slate-100">
+                        <p class="text-xs font-bold uppercase text-slate-400">Total Parents</p>
+                        <h3 id="totalParentsCount" class="mt-2 text-3xl font-black text-slate-900">0</h3>
+                    </div>
+
+                    <div class="rounded-3xl bg-white p-5 shadow-sm border border-slate-100">
+                        <p class="text-xs font-bold uppercase text-slate-400">Active Parents</p>
+                        <h3 id="activeParentsCount" class="mt-2 text-3xl font-black text-emerald-600">0</h3>
+                    </div>
+
+                    <div class="rounded-3xl bg-white p-5 shadow-sm border border-slate-100">
+                        <p class="text-xs font-bold uppercase text-slate-400">Linked Students</p>
+                        <h3 id="linkedStudentsCount" class="mt-2 text-3xl font-black text-blue-600">0</h3>
+                    </div>
+
+                    <div class="rounded-3xl bg-white p-5 shadow-sm border border-slate-100">
+                        <p class="text-xs font-bold uppercase text-slate-400">Guardians</p>
+                        <h3 id="guardianParentsCount" class="mt-2 text-3xl font-black text-purple-600">0</h3>
+                    </div>
                 </div>
 
                 <!-- FILTER -->
-                <div class="bg-white p-4 rounded-2xl shadow grid grid-cols-1 sm:grid-cols-5 gap-4">
+                <div class="rounded-3xl bg-white p-4 sm:p-5 shadow-sm border border-slate-100">
+                    <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                            <h3 class="text-lg font-black text-slate-900">Search & Filters</h3>
+                            <p class="text-sm text-slate-500">Filter parents by name, relation, class and status.</p>
+                        </div>
 
-                    <input type="text" id="searchParent" placeholder="Search parent..." class="input">
+                        <button onclick="resetParentFilter && resetParentFilter()"
+                            class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
+                            Reset
+                        </button>
+                    </div>
 
-                    <select id="relationFilter" class="input">
-                        <option value="">All Relations</option>
-                        <option value="Father">Father</option>
-                        <option value="Mother">Mother</option>
-                        <option value="Guardian">Guardian</option>
-                    </select>
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
 
-                    <select id="statusFilterParent" class="input">
-                        <option value="">All Status</option>
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
+                        <div>
+                            <label for="searchParent" class="mb-1 block text-xs font-bold uppercase text-slate-500">
+                                Search Parent
+                            </label>
+                            <input type="text" id="searchParent" placeholder="Search by name, phone or email..."
+                                class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100">
+                        </div>
 
-                    <select id="classFilter" class="input">
-                        <option value="">All Classes</option>
-                        <option value="10-A">10-A</option>
-                        <option value="9-B">9-B</option>
-                    </select>
+                        <div>
+                            <label for="relationFilter" class="mb-1 block text-xs font-bold uppercase text-slate-500">
+                                Relation
+                            </label>
+                            <select id="relationFilter"
+                                class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100">
+                                <option value="">All Relations</option>
+                                <option value="Father">Father</option>
+                                <option value="Mother">Mother</option>
+                                <option value="Guardian">Guardian</option>
+                            </select>
+                        </div>
 
-                    <button onclick="applyParentFilter()" class="bg-indigo-600 text-white rounded-lg">
-                        Apply
-                    </button>
+                        <div>
+                            <label for="statusFilterParent"
+                                class="mb-1 block text-xs font-bold uppercase text-slate-500">
+                                Status
+                            </label>
+                            <select id="statusFilterParent"
+                                class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100">
+                                <option value="">All Status</option>
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
 
+                        <div>
+                            <label for="classFilter" class="mb-1 block text-xs font-bold uppercase text-slate-500">
+                                Class
+                            </label>
+                            <select id="classFilter"
+                                class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100">
+                                <option value="">All Classes</option>
+                                <option value="10-A">10-A</option>
+                                <option value="9-B">9-B</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-end">
+                            <button onclick="applyParentFilter()"
+                                class="w-full rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 active:scale-[0.98]">
+                                Apply Filter
+                            </button>
+                        </div>
+
+                    </div>
                 </div>
 
                 <!-- PARENT LIST -->
-                <div class="bg-white rounded-xl shadow p-4">
-                    <h3 class="font-semibold mb-3">Parent List</h3>
-                    <div id="parentList" class="space-y-3"></div>
+                <div class="rounded-3xl bg-white shadow-sm border border-slate-100 overflow-hidden">
+                    <div
+                        class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 p-4 sm:p-5">
+                        <div>
+                            <h3 class="text-lg font-black text-slate-900">Parent List</h3>
+                            <p class="text-sm text-slate-500">View parent records and linked student details.</p>
+                        </div>
+
+                        <div class="rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600">
+                            Live Records
+                        </div>
+                    </div>
+
+                    <div class="p-4 sm:p-5">
+                        <div id="parentList" class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+                            <!-- Parent cards will render here using JS -->
+                        </div>
+
+                        <div id="emptyParentState" class="hidden py-14 text-center">
+                            <div
+                                class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-3xl">
+                                👨‍👩‍👧
+                            </div>
+                            <h4 class="text-lg font-black text-slate-800">No parents found</h4>
+                            <p class="mt-1 text-sm text-slate-500">
+                                Try changing filters or add a new parent record.
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
             </section>
 
-            <div id="parentModal" class="hidden fixed inset-0 md:pl-64 z-50 flex items-center justify-center 
-    bg-black/40 backdrop-blur-sm">
+            <!-- PARENT MODAL -->
+            <div id="parentModal"
+                class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/50 backdrop-blur-sm p-0 sm:p-4 md:pl-64">
+                <div
+                    class="relative w-full sm:max-w-5xl max-h-[92vh] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl">
 
-                <div class="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 relative">
+                    <!-- MODAL HEADER -->
+                    <div
+                        class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur">
+                        <div>
+                            <h3 class="text-lg font-black text-slate-900">Parent Details</h3>
+                            <p class="text-xs text-slate-500">View or update parent and student linked information.</p>
+                        </div>
 
-                    <button onclick="closeParentModal()" class="absolute top-3 right-3">✕</button>
+                        <button onclick="closeParentModal()"
+                            class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-red-50 hover:text-red-600">
+                            ✕
+                        </button>
+                    </div>
 
-                    <div id="parentModalContent"></div>
+                    <!-- MODAL BODY -->
+                    <div class="max-h-[calc(92vh-73px)] overflow-y-auto p-5">
+                        <div id="parentModalContent" class="space-y-5"></div>
+                    </div>
 
                 </div>
-
             </div>
             <!-- ============================= PARENT SECTION END ============================= -->
-
             <!-- ================= ROLE & PERMISSION SECTION START ================= -->
             <section id="rolesSection" class="section hidden p-4 sm:p-6 space-y-6">
 
+                <!-- Header -->
                 <div
-                    class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-xl flex justify-between items-center">
+                    class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h2 class="text-2xl font-bold tracking-tight">Access Management</h2>
-                        <p class="text-indigo-200 text-xs mt-1 font-medium uppercase tracking-wider">Identity Governance
-                            & System Security</p>
+                        <h2 class="text-2xl font-bold tracking-tight">
+                            Access Management
+                        </h2>
+
+                        <p class="text-indigo-100 text-xs mt-1 font-medium uppercase tracking-wider">
+                            Identity Governance & System Security
+                        </p>
                     </div>
-                    <button onclick="openRoleModal()"
-                        class="bg-indigo-500 hover:bg-indigo-400 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all hover:scale-105 active:scale-95">
+
+                    <button type="button" onclick="openRoleModal()"
+                        class="bg-white/15 hover:bg-white/25 border border-white/20 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all hover:scale-105 active:scale-95">
                         + New Role
                     </button>
                 </div>
 
+                <!-- Role Management -->
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
-                    <div class="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-4">
-                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
-                            <span class="w-1.5 h-5 bg-indigo-600 rounded-full"></span>
-                            System Roles
-                        </h3>
-                        <div id="roleList" class="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                    <!-- Role List -->
+                    <div class="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+                        <div class="flex items-center justify-between gap-3 mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <span class="w-1.5 h-5 bg-indigo-600 rounded-full"></span>
+                                System Roles
+                            </h3>
+
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                Select Role
+                            </span>
+                        </div>
+
+                        <div id="roleList" class="space-y-2 max-h-[520px] overflow-y-auto pr-2">
+                            <!-- Roles rendered by JavaScript -->
                         </div>
                     </div>
 
+                    <!-- Role Permission Table -->
                     <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <div
+                            class="p-5 border-b border-slate-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50/50">
                             <div>
-                                <h3 id="selectedRoleTitle" class="font-bold text-slate-800 text-lg text-indigo-600">
-                                    Select a Role</h3>
-                                <p class="text-xs text-slate-500">Define what this role can perform across modules</p>
+                                <h3 id="selectedRoleTitle" class="font-bold text-lg text-indigo-600">
+                                    Select a Role
+                                </h3>
+
+                                <p class="text-xs text-slate-500 mt-1">
+                                    Define what this role can perform across every system module.
+                                </p>
                             </div>
-                            <button onclick="savePermissions()"
-                                class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg text-sm font-semibold transition shadow-md">
-                                Save Role Config
-                            </button>
+
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="setAllRolePermissions(true)"
+                                    class="border border-indigo-200 bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-50 transition">
+                                    Select All
+                                </button>
+
+                                <button type="button" onclick="setAllRolePermissions(false)"
+                                    class="border border-slate-200 bg-white text-slate-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-100 transition">
+                                    Clear All
+                                </button>
+
+                                <button type="button" onclick="savePermissions()"
+                                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-semibold transition shadow-md">
+                                    Save Role Config
+                                </button>
+                            </div>
                         </div>
 
                         <div class="overflow-x-auto">
-                            <table class="w-full text-sm text-left">
+                            <table class="w-full min-w-[680px] text-sm text-left">
                                 <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
                                     <tr>
-                                        <th class="p-4 tracking-widest">Module Name</th>
-                                        <th class="p-4 text-center">View</th>
-                                        <th class="p-4 text-center">Create</th>
-                                        <th class="p-4 text-center">Edit</th>
-                                        <th class="p-4 text-center">Delete</th>
+                                        <th class="p-4 tracking-widest">
+                                            Module Name
+                                        </th>
+
+                                        <th class="p-4 text-center">
+                                            View
+                                        </th>
+
+                                        <th class="p-4 text-center">
+                                            Create
+                                        </th>
+
+                                        <th class="p-4 text-center">
+                                            Edit
+                                        </th>
+
+                                        <th class="p-4 text-center">
+                                            Delete
+                                        </th>
                                     </tr>
                                 </thead>
+
                                 <tbody id="permissionTable" class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td colspan="5" class="p-10 text-center text-sm text-slate-400">
+                                            Select a role to manage permissions.
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <h3 class="font-bold text-slate-800 text-lg">Individual User Overrides</h3>
+                <!-- Individual User Overrides -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div
+                        class="p-6 border-b border-slate-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-lg">
+                                Individual User Overrides
+                            </h3>
 
-                        <div class="flex flex-wrap gap-3">
+                            <p class="text-xs text-slate-500 mt-1">
+                                Grant or restrict specific permissions without changing the user's base role.
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
                             <select id="staffTypeFilter" onchange="filterUsers()"
-                                class="border border-slate-200 px-4 py-2 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50">
-                                <option value="">All Staff Types</option>
-                                <option value="teaching">Teaching</option>
-                                <option value="nonTeaching">Non-Teaching</option>
+                                class="w-full sm:w-auto border border-slate-200 px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-slate-50">
+                                <option value="">
+                                    All Staff Types
+                                </option>
+
+                                <option value="teaching">
+                                    Teaching
+                                </option>
+
+                                <option value="nonTeaching">
+                                    Non-Teaching
+                                </option>
                             </select>
+
                             <select id="userSelect" onchange="selectUser(this.value)"
-                                class="border border-slate-200 px-4 py-2 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50 min-w-[200px]">
+                                class="w-full sm:min-w-[240px] border border-slate-200 px-4 py-2.5 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-slate-50">
+                                <option value="">
+                                    Choose User...
+                                </option>
                             </select>
                         </div>
                     </div>
 
-                    <div id="userOverridePanel" class="hidden space-y-4 animate-in fade-in duration-300">
-                        <div class="flex items-center gap-4 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
-                            <div
-                                class="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold shadow-inner">
-                                <span id="userInitial">U</span>
+                    <!-- Empty State -->
+                    <div id="userOverrideEmptyState" class="p-10 text-center">
+                        <div
+                            class="w-16 h-16 mx-auto rounded-full bg-indigo-50 flex items-center justify-center text-2xl mb-4">
+                            👤
+                        </div>
+
+                        <h4 class="font-bold text-slate-700">
+                            Select a user
+                        </h4>
+
+                        <p class="text-sm text-slate-400 mt-1">
+                            Choose a staff member to review inherited and manual permissions.
+                        </p>
+                    </div>
+
+                    <!-- User Override Panel -->
+                    <div id="userOverridePanel" class="hidden p-6 space-y-5">
+                        <!-- User Summary -->
+                        <div
+                            class="flex flex-col md:flex-row md:items-center gap-4 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
+                            <div class="flex items-center gap-4">
+                                <div
+                                    class="w-12 h-12 shrink-0 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold shadow-inner">
+                                    <span id="userInitial">
+                                        U
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <p id="userName" class="font-bold text-slate-900 text-lg"></p>
+
+                                    <p id="userBaseRole"
+                                        class="text-xs font-semibold text-indigo-600 uppercase tracking-wider"></p>
+                                </div>
                             </div>
-                            <div>
-                                <p id="userName" class="font-bold text-slate-900 text-lg"></p>
-                                <p id="userBaseRole"
-                                    class="text-xs font-semibold text-indigo-600 uppercase tracking-tighter"></p>
-                            </div>
-                            <div class="ml-auto">
-                                <span
-                                    class="bg-amber-100 text-amber-700 text-[10px] font-black px-3 py-1 rounded-full uppercase">Custom
-                                    Override Active</span>
+
+                            <div class="md:ml-auto">
+                                <span id="overrideStatusBadge"
+                                    class="inline-flex bg-emerald-100 text-emerald-700 text-[10px] font-black px-3 py-1.5 rounded-full uppercase">
+                                    Using Base Role
+                                </span>
                             </div>
                         </div>
 
+                        <!-- Information Note -->
+                        <div class="flex items-start gap-3 p-4 rounded-xl border border-amber-100 bg-amber-50">
+                            <div class="text-amber-600 text-lg leading-none">
+                                ℹ
+                            </div>
+
+                            <div>
+                                <p class="text-sm font-semibold text-amber-800">
+                                    How individual overrides work
+                                </p>
+
+                                <p class="text-xs text-amber-700 mt-1 leading-relaxed">
+                                    Permissions marked as Role are inherited from the selected user's base role.
+                                    Permissions marked as Manual are custom overrides applied only to that user.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- User Permission Table -->
                         <div class="overflow-x-auto border border-slate-100 rounded-xl">
-                            <table class="w-full text-sm text-left">
+                            <table class="w-full min-w-[680px] text-sm text-left">
                                 <thead class="bg-slate-50 text-slate-400 text-[10px] font-black uppercase">
                                     <tr>
-                                        <th class="p-3">Module</th>
-                                        <th class="p-3 text-center">View</th>
-                                        <th class="p-3 text-center">Create</th>
-                                        <th class="p-3 text-center">Edit</th>
-                                        <th class="p-3 text-center">Delete</th>
+                                        <th class="p-3">
+                                            Module
+                                        </th>
+
+                                        <th class="p-3 text-center">
+                                            View
+                                        </th>
+
+                                        <th class="p-3 text-center">
+                                            Create
+                                        </th>
+
+                                        <th class="p-3 text-center">
+                                            Edit
+                                        </th>
+
+                                        <th class="p-3 text-center">
+                                            Delete
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody id="userPermissionTable" class="divide-y divide-slate-50"></tbody>
+
+                                <tbody id="userPermissionTable" class="divide-y divide-slate-50">
+                                </tbody>
                             </table>
                         </div>
 
-                        <div class="flex justify-end">
-                            <button onclick="saveUserPermissions()"
+                        <!-- User Actions -->
+                        <div class="flex flex-col sm:flex-row justify-end gap-3 pt-1">
+                            <button type="button" onclick="resetUserOverrides()"
+                                class="border border-amber-200 bg-amber-50 text-amber-700 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-amber-100 transition">
+                                Reset to Base Role
+                            </button>
+
+                            <button type="button" onclick="saveUserPermissions()"
                                 class="bg-indigo-600 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 transition shadow-lg">
                                 Update User Permissions
                             </button>
@@ -2080,85 +2347,431 @@
             <!-- ================= EXAM & RESULT SECTION START ================= -->
             <section id="examsSection" class="section hidden p-4 sm:p-6 space-y-6">
 
+                <!-- Header -->
                 <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                         <div>
-                            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Exam & Result Control Center</h2>
-                            <p class="text-indigo-200 text-sm mt-1">Manage grading progress, verify marks, and schedule
-                                publishing.</p>
+                            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">
+                                Exam & Result Control Center
+                            </h2>
+                            <p class="text-indigo-100 text-sm mt-1">
+                                Manage exams, marks entry, verification, publishing, report cards, and analytics.
+                            </p>
                         </div>
-                        <div class="flex gap-3">
-                            <button
+
+                        <div class="flex flex-wrap gap-3">
+                            <button onclick="exportExamReports()"
                                 class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20">
-                                Export All Reports
+                                Export Reports
                             </button>
-                            <button
+
+                            <button onclick="openExamModal()"
                                 class="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md">
-                                + New Exam Term
+                                + Create Examination
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium">Topper of the Term</p>
-                        <h5 class="text-lg font-bold text-gray-800">Sarah Jenkins (98.4%)</h5>
+                <!-- Filters -->
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Academic Year</label>
+                            <select id="examAcademicYearFilter"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="">All Years</option>
+                                <option>2026-27</option>
+                                <option>2025-26</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Exam</label>
+                            <select id="examFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="">All Exams</option>
+                                <option>Unit Test 1</option>
+                                <option>Mid Term</option>
+                                <option>Annual Examination</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Class</label>
+                            <select id="examClassFilter"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="">All Classes</option>
+                                <option>8-A</option>
+                                <option>9-A</option>
+                                <option>10-A</option>
+                                <option>11-B</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Subject</label>
+                            <select id="examSubjectFilter"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="">All Subjects</option>
+                                <option>Mathematics</option>
+                                <option>Science</option>
+                                <option>English</option>
+                                <option>Physics</option>
+                                <option>Chemistry</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Teacher</label>
+                            <select id="examTeacherFilter"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="">All Teachers</option>
+                                <option>Robert Fox</option>
+                                <option>John Smith</option>
+                                <option>Emma Wilson</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Status</label>
+                            <select id="examStatusFilter"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="">All Status</option>
+                                <option>Draft</option>
+                                <option>Scheduled</option>
+                                <option>Marks Entry</option>
+                                <option>Verification</option>
+                                <option>Published</option>
+                            </select>
+                        </div>
+
+                        <div class="xl:col-span-2">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Search Student</label>
+                            <input id="examStudentSearch" type="text"
+                                placeholder="Search by name, roll no, student ID..."
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
                     </div>
-                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium text-red-500">At-Risk Students</p>
-                        <h5 class="text-lg font-bold text-gray-800">12 Students <span
-                                class="text-xs font-normal text-gray-400">&lt; 35%</span></h5>
-                    </div>
-                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium">Subject Average (High)</p>
-                        <h5 class="text-lg font-bold text-indigo-600">Literature (82%)</h5>
-                    </div>
-                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
-                        <p class="text-xs text-gray-500 font-medium">Subject Average (Low)</p>
-                        <h5 class="text-lg font-bold text-rose-500">Chemistry (54%)</h5>
+
+                    <div class="flex flex-wrap gap-3 mt-4">
+                        <button onclick="applyExamFilters()"
+                            class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700">
+                            Apply Filters
+                        </button>
+
+                        <button onclick="resetExamFilters()"
+                            class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200">
+                            Reset
+                        </button>
                     </div>
                 </div>
 
-                <div id="classDetails"
+                <!-- Stats -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <p class="text-xs text-gray-500 font-medium">Total Exams</p>
+                        <h5 id="totalExamsCount" class="text-xl font-bold text-gray-800">8</h5>
+                    </div>
+
+                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <p class="text-xs text-gray-500 font-medium">Classes Covered</p>
+                        <h5 id="classesCoveredCount" class="text-xl font-bold text-gray-800">24</h5>
+                    </div>
+
+                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <p class="text-xs text-gray-500 font-medium">Students</p>
+                        <h5 id="examStudentsCount" class="text-xl font-bold text-gray-800">2,864</h5>
+                    </div>
+
+                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <p class="text-xs text-gray-500 font-medium">Published</p>
+                        <h5 id="publishedResultCount" class="text-xl font-bold text-emerald-600">16</h5>
+                    </div>
+
+                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <p class="text-xs text-red-500 font-medium">Pending Marks</p>
+                        <h5 id="pendingMarksCount" class="text-xl font-bold text-red-500">312</h5>
+                    </div>
+
+                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <p class="text-xs text-gray-500 font-medium">Pass %</p>
+                        <h5 id="passPercentage" class="text-xl font-bold text-indigo-600">92.84%</h5>
+                    </div>
+
+                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <p class="text-xs text-gray-500 font-medium">Average Score</p>
+                        <h5 id="averageScore" class="text-xl font-bold text-gray-800">71.32%</h5>
+                    </div>
+
+                    <div class="p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <p class="text-xs text-gray-500 font-medium">At Risk</p>
+                        <h5 id="atRiskCount" class="text-xl font-bold text-rose-500">12</h5>
+                    </div>
+                </div>
+
+                <!-- Workflow -->
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <h3 class="font-bold text-gray-800 mb-4">Exam Result Workflow</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-7 gap-3 text-sm">
+                        <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-center">
+                            <p class="font-bold text-indigo-700">1</p>
+                            <p class="font-semibold">Create Exam</p>
+                        </div>
+                        <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-center">
+                            <p class="font-bold text-indigo-700">2</p>
+                            <p class="font-semibold">Assign Subjects</p>
+                        </div>
+                        <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-center">
+                            <p class="font-bold text-indigo-700">3</p>
+                            <p class="font-semibold">Schedule Exam</p>
+                        </div>
+                        <div class="p-4 rounded-xl bg-amber-50 border border-amber-100 text-center">
+                            <p class="font-bold text-amber-700">4</p>
+                            <p class="font-semibold">Marks Entry</p>
+                        </div>
+                        <div class="p-4 rounded-xl bg-blue-50 border border-blue-100 text-center">
+                            <p class="font-bold text-blue-700">5</p>
+                            <p class="font-semibold">Verification</p>
+                        </div>
+                        <div class="p-4 rounded-xl bg-purple-50 border border-purple-100 text-center">
+                            <p class="font-bold text-purple-700">6</p>
+                            <p class="font-semibold">Principal Approval</p>
+                        </div>
+                        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-100 text-center">
+                            <p class="font-bold text-emerald-700">7</p>
+                            <p class="font-semibold">Publish</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Grid -->
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+                    <!-- Class Progress -->
+                    <div class="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <div>
+                                <h3 class="font-bold text-gray-800">Class Wise Exam Progress</h3>
+                                <p class="text-xs text-gray-500">Track marks entry, verification, and publishing status.
+                                </p>
+                            </div>
+                            <button onclick="refreshExamDashboard()"
+                                class="text-sm text-indigo-600 font-semibold hover:underline">
+                                Refresh
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5" id="examClassCards">
+
+                            <div class="border border-gray-200 rounded-2xl p-5 hover:shadow-md transition">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-800">10-A</h3>
+                                        <p class="text-xs text-gray-500">Annual Examination 2026</p>
+                                    </div>
+                                    <span
+                                        class="bg-green-100 text-green-700 text-[10px] uppercase font-bold px-2 py-1 rounded-full">
+                                        Ready
+                                    </span>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-gray-600">Progress</span>
+                                        <span class="font-semibold text-indigo-600">100%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-100 rounded-full h-2.5">
+                                        <div class="bg-indigo-600 h-2.5 rounded-full" style="width:100%"></div>
+                                    </div>
+                                    <p class="text-xs text-gray-400">40/40 students marked • 8/8 subjects verified</p>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2 mt-4">
+                                    <button onclick="viewClassExamDetails('10-A')"
+                                        class="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                                        View Details
+                                    </button>
+                                    <button onclick="publishClassResult('10-A')"
+                                        class="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-semibold">
+                                        Publish
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="border border-gray-200 rounded-2xl p-5 hover:shadow-md transition">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-800">11-B</h3>
+                                        <p class="text-xs text-gray-500">Annual Examination 2026</p>
+                                    </div>
+                                    <span
+                                        class="bg-amber-100 text-amber-700 text-[10px] uppercase font-bold px-2 py-1 rounded-full">
+                                        Pending
+                                    </span>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-gray-600">Progress</span>
+                                        <span class="font-semibold text-amber-600">65%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-100 rounded-full h-2.5">
+                                        <div class="bg-amber-500 h-2.5 rounded-full" style="width:65%"></div>
+                                    </div>
+                                    <p class="text-xs text-gray-400">26/40 students marked • 6/9 subjects verified</p>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2 mt-4">
+                                    <button onclick="viewClassExamDetails('11-B')"
+                                        class="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold">
+                                        View Details
+                                    </button>
+                                    <button onclick="notifyPendingTeachers('11-B')"
+                                        class="bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs font-semibold">
+                                        Notify
+                                    </button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Publish Panel -->
+                    <div class="bg-gray-900 rounded-2xl p-6 text-white shadow-xl">
+                        <h4 class="text-lg font-bold mb-1">Result Publishing</h4>
+                        <p class="text-sm text-gray-300 mb-5">
+                            Schedule or publish verified results.
+                        </p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-[10px] uppercase text-gray-400 mb-1">Academic Year</label>
+                                <select id="publishAcademicYear"
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm">
+                                    <option>2026-27</option>
+                                    <option>2025-26</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] uppercase text-gray-400 mb-1">Exam</label>
+                                <select id="publishExam"
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm">
+                                    <option>Annual Examination</option>
+                                    <option>Mid Term</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] uppercase text-gray-400 mb-1">Classes</label>
+                                <select id="publishClass"
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm">
+                                    <option>All Verified Classes</option>
+                                    <option>10-A</option>
+                                    <option>11-B</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[10px] uppercase text-gray-400 mb-1">Release Date</label>
+                                    <input id="publishDate" type="date"
+                                        class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] uppercase text-gray-400 mb-1">Release Time</label>
+                                    <input id="publishTime" type="time"
+                                        class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm">
+                                </div>
+                            </div>
+
+                            <label class="flex items-center gap-2 text-sm text-gray-300">
+                                <input id="notifyParents" type="checkbox" checked>
+                                Notify parents
+                            </label>
+
+                            <label class="flex items-center gap-2 text-sm text-gray-300">
+                                <input id="generatePDF" type="checkbox" checked>
+                                Generate PDF report cards
+                            </label>
+
+                            <button onclick="scheduleResultPublishing()"
+                                class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3 rounded-xl font-bold tracking-wide hover:opacity-90 transition">
+                                Set Live Schedule
+                            </button>
+
+                            <button onclick="publishNow()"
+                                class="w-full bg-white text-gray-900 py-3 rounded-xl font-bold tracking-wide hover:bg-gray-100 transition">
+                                Publish Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Details Table -->
+                <div id="classExamDetailsPanel"
                     class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden hidden">
                     <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                        <h3 class="font-bold text-gray-800">Detailed Subject Status: <span id="selectedClassName"
-                                class="text-indigo-600">Grade 10-A</span></h3>
-                        <button class="text-gray-400 hover:text-gray-600" onclick="hideDetails()">✕</button>
+                        <div>
+                            <h3 class="font-bold text-gray-800">
+                                Detailed Subject Status:
+                                <span id="selectedExamClassName" class="text-indigo-600">10-A</span>
+                            </h3>
+                            <p class="text-xs text-gray-500">Teacher submission and verification status.</p>
+                        </div>
+
+                        <button class="text-gray-400 hover:text-gray-600 text-xl"
+                            onclick="hideClassExamDetails()">✕</button>
                     </div>
+
                     <div class="overflow-x-auto">
                         <table class="w-full text-left">
                             <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
                                 <tr>
                                     <th class="px-6 py-4 font-semibold">Subject</th>
                                     <th class="px-6 py-4 font-semibold">Teacher</th>
+                                    <th class="px-6 py-4 font-semibold">Students</th>
+                                    <th class="px-6 py-4 font-semibold">Submitted</th>
+                                    <th class="px-6 py-4 font-semibold">Pending</th>
                                     <th class="px-6 py-4 font-semibold">Status</th>
-                                    <th class="px-6 py-4 font-semibold text-center">Pending Marks</th>
                                     <th class="px-6 py-4 font-semibold">Action</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100 text-sm">
+
+                            <tbody class="divide-y divide-gray-100 text-sm" id="subjectStatusTableBody">
                                 <tr>
-                                    <td class="px-6 py-4 font-medium">Advanced Mathematics</td>
+                                    <td class="px-6 py-4 font-medium">Mathematics</td>
                                     <td class="px-6 py-4 text-gray-600">Robert Fox</td>
-                                    <td class="px-6 py-4"><span
-                                            class="text-green-600 flex items-center gap-1 font-medium">●
-                                            Submitted</span></td>
-                                    <td class="px-6 py-4 text-center text-gray-400">0</td>
-                                    <td class="px-6 py-4"><button class="text-indigo-600 hover:underline">View
-                                            Marks</button></td>
+                                    <td class="px-6 py-4">40</td>
+                                    <td class="px-6 py-4 text-green-600 font-semibold">40</td>
+                                    <td class="px-6 py-4">0</td>
+                                    <td class="px-6 py-4">
+                                        <span class="text-green-600 font-medium">● Verified</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <button onclick="openMarksEntry('Mathematics')"
+                                            class="text-indigo-600 hover:underline font-semibold">
+                                            View Marks
+                                        </button>
+                                    </td>
                                 </tr>
+
                                 <tr>
                                     <td class="px-6 py-4 font-medium">Physics</td>
-                                    <td class="px-6 py-4 text-gray-600">Albert Einstein Jr.</td>
-                                    <td class="px-6 py-4"><span
-                                            class="text-amber-600 flex items-center gap-1 font-medium">● Pending</span>
+                                    <td class="px-6 py-4 text-gray-600">John Smith</td>
+                                    <td class="px-6 py-4">40</td>
+                                    <td class="px-6 py-4 text-amber-600 font-semibold">22</td>
+                                    <td class="px-6 py-4 text-red-500 font-bold">18</td>
+                                    <td class="px-6 py-4">
+                                        <span class="text-amber-600 font-medium">● Pending</span>
                                     </td>
-                                    <td class="px-6 py-4 text-center font-bold text-red-500">14</td>
-                                    <td class="px-6 py-4"><button
-                                            class="text-white bg-indigo-500 px-3 py-1 rounded text-xs">Notify
-                                            Teacher</button>
+                                    <td class="px-6 py-4">
+                                        <button onclick="notifyTeacher('John Smith')"
+                                            class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs">
+                                            Notify
+                                        </button>
                                     </td>
                                 </tr>
                             </tbody>
@@ -2166,96 +2779,282 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-indigo-50 rounded-2xl p-6 border border-indigo-100">
-                        <h4 class="text-lg font-bold text-indigo-900 mb-2">Admin Verification Hub</h4>
-                        <p class="text-sm text-indigo-700 mb-4">Confirm all data integrity before the final release.
-                            Locked marks cannot be changed by teachers.</p>
-                        <div class="flex flex-wrap gap-3">
-                            <button
-                                class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm hover:bg-indigo-700 transition">Verify
-                                All Data</button>
-                            <button
-                                class="bg-white border border-indigo-200 text-indigo-700 px-5 py-2.5 rounded-xl font-medium hover:bg-indigo-100 transition">Bulk
-                                Edit Marks</button>
+                <!-- Marks Entry + At Risk -->
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+                    <!-- Marks Entry -->
+                    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div class="p-5 border-b border-gray-100 bg-gray-50">
+                            <h3 class="font-bold text-gray-800">Student Marks Entry / Verification</h3>
+                            <p class="text-xs text-gray-500">Theory, practical, internal, total, grade, and result.</p>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                                    <tr>
+                                        <th class="px-4 py-3">Roll</th>
+                                        <th class="px-4 py-3">Student</th>
+                                        <th class="px-4 py-3">Theory</th>
+                                        <th class="px-4 py-3">Practical</th>
+                                        <th class="px-4 py-3">Internal</th>
+                                        <th class="px-4 py-3">Total</th>
+                                        <th class="px-4 py-3">Grade</th>
+                                        <th class="px-4 py-3">Result</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="divide-y divide-gray-100 text-sm">
+                                    <tr>
+                                        <td class="px-4 py-3">01</td>
+                                        <td class="px-4 py-3 font-medium">Aarav Sharma</td>
+                                        <td class="px-4 py-3">78</td>
+                                        <td class="px-4 py-3">18</td>
+                                        <td class="px-4 py-3">9</td>
+                                        <td class="px-4 py-3 font-bold">105</td>
+                                        <td class="px-4 py-3 text-indigo-600 font-bold">A+</td>
+                                        <td class="px-4 py-3 text-green-600 font-semibold">PASS</td>
+                                    </tr>
+
+                                    <tr>
+                                        <td class="px-4 py-3">02</td>
+                                        <td class="px-4 py-3 font-medium">Riya Patil</td>
+                                        <td class="px-4 py-3">28</td>
+                                        <td class="px-4 py-3">12</td>
+                                        <td class="px-4 py-3">7</td>
+                                        <td class="px-4 py-3 font-bold">47</td>
+                                        <td class="px-4 py-3 text-rose-600 font-bold">D</td>
+                                        <td class="px-4 py-3 text-red-600 font-semibold">FAIL</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="p-5 flex flex-wrap gap-3">
+                            <button onclick="saveMarks()"
+                                class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                Save Marks
+                            </button>
+
+                            <button onclick="verifyMarks()"
+                                class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                Verify Marks
+                            </button>
+
+                            <button onclick="bulkImportMarks()"
+                                class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold">
+                                Bulk Import
+                            </button>
                         </div>
                     </div>
 
-                    <div class="bg-gray-900 rounded-2xl p-6 text-white shadow-xl">
-                        <h4 class="text-lg font-bold mb-2">Publishing Schedule</h4>
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-[10px] uppercase text-gray-400 mb-1">Release Date</label>
-                                    <input type="date"
-                                        class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] uppercase text-gray-400 mb-1">Release Time</label>
-                                    <input type="time"
-                                        class="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm">
-                                </div>
-                            </div>
-                            <button
-                                class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3 rounded-xl font-bold tracking-wide hover:opacity-90 transition">
-                                Set Live Schedule
+                    <!-- At Risk Students -->
+                    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div class="p-5 border-b border-gray-100 bg-gray-50">
+                            <h3 class="font-bold text-gray-800">At-Risk Students</h3>
+                            <p class="text-xs text-gray-500">Students below passing threshold or failing subjects.</p>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                                    <tr>
+                                        <th class="px-4 py-3">Roll</th>
+                                        <th class="px-4 py-3">Student</th>
+                                        <th class="px-4 py-3">Class</th>
+                                        <th class="px-4 py-3">Failed Subjects</th>
+                                        <th class="px-4 py-3">Attendance</th>
+                                        <th class="px-4 py-3">Action</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="divide-y divide-gray-100 text-sm">
+                                    <tr>
+                                        <td class="px-4 py-3">02</td>
+                                        <td class="px-4 py-3 font-medium">Riya Patil</td>
+                                        <td class="px-4 py-3">10-A</td>
+                                        <td class="px-4 py-3 text-red-600 font-semibold">Math, Science</td>
+                                        <td class="px-4 py-3">68%</td>
+                                        <td class="px-4 py-3">
+                                            <button onclick="notifyParent('Riya Patil')"
+                                                class="text-indigo-600 font-semibold hover:underline">
+                                                Notify Parent
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="p-5 flex flex-wrap gap-3">
+                            <button onclick="scheduleRemedialClass()"
+                                class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                Schedule Remedial
+                            </button>
+
+                            <button onclick="assignMentor()"
+                                class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold">
+                                Assign Mentor
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition cursor-pointer group"
-                        onclick="toggleDetails('grade10A')">
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 class="text-lg font-bold text-gray-800 tracking-tight">Grade 10-A</h3>
-                                <p class="text-xs text-gray-500">Academic Session 2025-26</p>
-                            </div>
-                            <span
-                                class="bg-green-100 text-green-700 text-[10px] uppercase font-bold px-2 py-1 rounded-full">Ready
-                                to Verify</span>
-                        </div>
+                <!-- Analytics + Reports -->
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-                        <div class="space-y-2">
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="text-gray-600">Marks Submitted</span>
-                                <span class="font-semibold text-indigo-600">100%</span>
+                    <div class="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                        <h3 class="font-bold text-gray-800 mb-4">Result Analytics</h3>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
+                                <p class="text-xs text-indigo-600 font-semibold">Top Performing Class</p>
+                                <h4 class="text-xl font-bold text-gray-800">10-A</h4>
+                                <p class="text-sm text-gray-500">Average Score: 84.6%</p>
                             </div>
-                            <div class="w-full bg-gray-100 rounded-full h-2.5">
-                                <div class="bg-indigo-600 h-2.5 rounded-full" style="width: 100%"></div>
+
+                            <div class="p-4 rounded-xl bg-rose-50 border border-rose-100">
+                                <p class="text-xs text-rose-600 font-semibold">Lowest Performing Subject</p>
+                                <h4 class="text-xl font-bold text-gray-800">Chemistry</h4>
+                                <p class="text-sm text-gray-500">Average Score: 54%</p>
                             </div>
-                            <p class="text-xs text-gray-400 mt-2">40/40 Students Marked • 8 Subjects</p>
+
+                            <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                                <p class="text-xs text-emerald-600 font-semibold">School Topper</p>
+                                <h4 class="text-xl font-bold text-gray-800">Sarah Jenkins</h4>
+                                <p class="text-sm text-gray-500">98.4%</p>
+                            </div>
+
+                            <div class="p-4 rounded-xl bg-amber-50 border border-amber-100">
+                                <p class="text-xs text-amber-600 font-semibold">Improvement Needed</p>
+                                <h4 class="text-xl font-bold text-gray-800">12 Students</h4>
+                                <p class="text-sm text-gray-500">Below 35%</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition cursor-pointer"
-                        onclick="toggleDetails('grade11B')">
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 class="text-lg font-bold text-gray-800">Grade 11-B</h3>
-                                <p class="text-xs text-gray-500 text-indigo-500">In Progress</p>
-                            </div>
-                            <span
-                                class="bg-amber-100 text-amber-700 text-[10px] uppercase font-bold px-2 py-1 rounded-full">3
-                                Pending</span>
-                        </div>
+                    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                        <h3 class="font-bold text-gray-800 mb-4">Reports</h3>
 
-                        <div class="space-y-2">
-                            <div class="flex justify-between text-sm mb-1">
-                                <span class="text-gray-600">Marks Submitted</span>
-                                <span class="font-semibold text-gray-800">65%</span>
-                            </div>
-                            <div class="w-full bg-gray-100 rounded-full h-2.5">
-                                <div class="bg-amber-500 h-2.5 rounded-full" style="width: 65%"></div>
-                            </div>
-                            <p class="text-xs text-gray-400 mt-2">26/40 Students Marked • 6/9 Subjects</p>
+                        <div class="space-y-3">
+                            <button onclick="downloadReport('summary')"
+                                class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-semibold text-left">
+                                Result Summary
+                            </button>
+
+                            <button onclick="downloadReport('subject')"
+                                class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-semibold text-left">
+                                Subject Wise Report
+                            </button>
+
+                            <button onclick="downloadReport('teacher')"
+                                class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-semibold text-left">
+                                Teacher Performance
+                            </button>
+
+                            <button onclick="downloadReport('rank')"
+                                class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-semibold text-left">
+                                Rank Report
+                            </button>
+
+                            <button onclick="generateReportCards()"
+                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl text-sm font-semibold text-left">
+                                Generate Report Cards
+                            </button>
                         </div>
                     </div>
                 </div>
 
             </section>
-            <!-- ================= EXAM & RESULT SECTION END================= -->
+            <!-- ================= EXAM & RESULT SECTION END ================= -->
+
+
+            <!-- ================= EXAM MODAL START ================= -->
+            <div id="examModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
+                    <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-gray-800">Create Examination</h3>
+                        <button onclick="closeExamModal()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+                    </div>
+
+                    <form onsubmit="saveExam(event)" class="p-5 space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Exam Name</label>
+                                <input id="examName" required type="text" placeholder="Annual Examination"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Academic Year</label>
+                                <select id="examAcademicYear" required
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                    <option value="">Select Year</option>
+                                    <option>2026-27</option>
+                                    <option>2025-26</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Exam Type</label>
+                                <select id="examType" required
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                    <option value="">Select Type</option>
+                                    <option>Unit Test</option>
+                                    <option>Mid Term</option>
+                                    <option>Half Yearly</option>
+                                    <option>Annual</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Status</label>
+                                <select id="examStatus" required
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                    <option>Draft</option>
+                                    <option>Scheduled</option>
+                                    <option>Marks Entry</option>
+                                    <option>Verification</option>
+                                    <option>Published</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">Start Date</label>
+                                <input id="examStartDate" required type="date"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">End Date</label>
+                                <input id="examEndDate" required type="date"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+                            <textarea id="examDescription" rows="3"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                                placeholder="Exam instructions, grading rules, remarks..."></textarea>
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                            <button type="button" onclick="closeExamModal()"
+                                class="bg-gray-100 text-gray-700 px-5 py-2 rounded-lg text-sm font-semibold">
+                                Cancel
+                            </button>
+
+                            <button type="submit"
+                                class="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-semibold">
+                                Save Examination
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <!-- ================= EXAM MODAL END ================= -->
 
             <!-- ================== ENROLLMENT SECTION START ================= -->
             <section class="section hidden p-4 sm:p-6 space-y-6" id="admissionsSection">
@@ -4434,6 +5233,7 @@
             <script src="./js-scripts/main.js"></script>
             <script src="./js-scripts/mainAdminDashboard.js"></script>
             <script src="./js-scripts/teachDashboard.js"></script>
+            <script src="./js-scripts/RP.js"></script>
 
             <!-- NOTIFICATION CONTAINER -->
             <div id="notificationContainer" class="fixed top-5 right-5 space-y-3 z-[9999]"></div>

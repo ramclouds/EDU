@@ -8,6 +8,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 import logging
+from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from flask import request
@@ -20,6 +21,7 @@ from utils.studentDetails import (
     AcademicClass,
     Division,
     Section,
+    Batch,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,13 @@ class Exam(db.Model):
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
     is_published = db.Column(db.Boolean, default=False)
+    is_verified = db.Column(db.Boolean, default=False)
+    publish_at = db.Column(db.DateTime)
+    published_at = db.Column(db.DateTime)
+    verified_at = db.Column(db.DateTime)
+    # Admin permission for teachers to enter/update marks
+    marks_entry_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    verified_by = db.Column(db.Integer, db.ForeignKey("teachers.id"))
     created_at = db.Column(db.DateTime, server_default=func.now())
     updated_at = db.Column(db.DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -280,6 +289,56 @@ class UpcomingExamsAPI(MethodView):
         except Exception as e:
             logger.exception(f"Upcoming exams error: {e}")
             return jsonify({"error": "Something went wrong"}), 500
+
+
+class TeacherExamsAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            from utils.teacherDetails import TeacherClass
+
+            teacher_id = request.args.get("teacher_id")
+            class_id = request.args.get("class_id")
+            subject_id = request.args.get("subject_id")
+
+            if not teacher_id:
+                return jsonify({"error": "teacher_id required"}), 400
+
+            teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
+            assigned_class_ids = list(
+                set([tc.academic_class_id for tc in teacher_classes])
+            )
+
+            query = Exam.query.filter(Exam.academic_class_id.in_(assigned_class_ids))
+
+            if class_id and class_id != "all":
+                query = query.filter(Exam.academic_class_id == int(class_id))
+
+            exams = query.order_by(Exam.created_at.desc()).all()
+
+            data = [
+                {
+                    "id": exam.id,
+                    "exam_id": exam.id,
+                    "exam_name": exam.exam_name,
+                    "academic_year": exam.academic_year,
+                    "exam_type": exam.exam_type,
+                    "academic_class_id": exam.academic_class_id,
+                    "label": f"{exam.exam_name} - {exam.exam_type or 'Exam'} - {exam.academic_year}",
+                    "marks_entry_enabled": bool(
+                        getattr(exam, "marks_entry_enabled", False)
+                    ),
+                    "is_verified": bool(getattr(exam, "is_verified", False)),
+                    "is_published": bool(getattr(exam, "is_published", False)),
+                }
+                for exam in exams
+            ]
+
+            return jsonify(data), 200
+
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load teacher exams"}), 500
 
 
 # FILTER OPTIONS API
@@ -824,22 +883,42 @@ class SaveTeacherMarksAPI(MethodView):
                 return jsonify({"error": "Student academic record missing"}), 404
 
             # ================= EXAM =================
-
-            exam = Exam.query.filter_by(
+            academic_year = data.get("academicYear") or data.get("academic_year")
+            exam_query = Exam.query.filter_by(
                 academic_class_id=academic_record.academic_class_id,
                 exam_name=exam_name,
-            ).first()
+            )
+
+            if academic_year:
+                exam_query = exam_query.filter_by(academic_year=academic_year)
+
+            exam = exam_query.order_by(Exam.created_at.desc()).first()
 
             if not exam:
-
-                exam = Exam(
-                    academic_class_id=academic_record.academic_class_id,
-                    academic_year="2025-26",
-                    exam_name=exam_name,
+                return (
+                    jsonify(
+                        {
+                            "error": "Exam is not created by admin for this class and academic year."
+                        }
+                    ),
+                    404,
                 )
 
-                db.session.add(exam)
-                db.session.flush()
+            if not exam.marks_entry_enabled:
+                return (
+                    jsonify(
+                        {
+                            "error": "Marks entry is currently disabled by admin for this exam."
+                        }
+                    ),
+                    403,
+                )
+
+            if exam.is_published:
+                return (
+                    jsonify({"error": "Published exam results cannot be edited."}),
+                    403,
+                )
 
             # ================= CHECK EXISTING =================
 
@@ -866,7 +945,7 @@ class SaveTeacherMarksAPI(MethodView):
                 result.total_marks = total
                 result.percentage = percentage
                 result.grade = grade
-                result.status = "Published"
+                result.status = "Submitted"
                 result.remarks = remarks
 
                 audit = ExamResultAudit(
@@ -896,7 +975,7 @@ class SaveTeacherMarksAPI(MethodView):
                     total_marks=total,
                     percentage=percentage,
                     grade=grade,
-                    status="Published",
+                    status="Submitted",
                     remarks=remarks,
                     created_by=data.get("teacherId"),
                 )
@@ -1283,17 +1362,11 @@ class TeacherAnalyticsPDFAPI(MethodView):
                 return jsonify({"error": "teacher_id required"}), 400
 
             # ================= ASSIGNED CLASSES =================
-            teacher_classes = TeacherClass.query.filter_by(
-                teacher_id=teacher_id
-            ).all()
+            teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
 
-            assigned_class_ids = [
-                tc.academic_class_id for tc in teacher_classes
-            ]
+            assigned_class_ids = [tc.academic_class_id for tc in teacher_classes]
 
-            assigned_subject_ids = [
-                tc.subject_id for tc in teacher_classes
-            ]
+            assigned_subject_ids = [tc.subject_id for tc in teacher_classes]
 
             # ================= QUERY =================
             query = (
@@ -1342,9 +1415,7 @@ class TeacherAnalyticsPDFAPI(MethodView):
 
             avg_marks = round(sum(percentages) / len(percentages), 2)
 
-            pass_students = len([
-                p for p in percentages if p >= 35
-            ])
+            pass_students = len([p for p in percentages if p >= 35])
 
             pass_rate = round(
                 (pass_students / len(percentages)) * 100,
@@ -1362,36 +1433,31 @@ class TeacherAnalyticsPDFAPI(MethodView):
                 if student.id not in student_map:
 
                     student_map[student.id] = {
-                        "student": (
-                            f"{student.first_name} "
-                            f"{student.last_name}"
-                        ),
+                        "student": (f"{student.first_name} " f"{student.last_name}"),
                         "className": (
-                            f"{division.division_name}-"
-                            f"{section.section_name}"
+                            f"{division.division_name}-" f"{section.section_name}"
                         ),
                         "percentages": [],
                     }
 
-                student_map[student.id]["percentages"].append(
-                    res.percentage or 0
-                )
+                student_map[student.id]["percentages"].append(res.percentage or 0)
 
             student_analytics = []
 
             for _, data in student_map.items():
 
                 avg_percentage = round(
-                    sum(data["percentages"]) /
-                    len(data["percentages"]),
+                    sum(data["percentages"]) / len(data["percentages"]),
                     2,
                 )
 
-                student_analytics.append({
-                    "student": data["student"],
-                    "className": data["className"],
-                    "percentage": avg_percentage,
-                })
+                student_analytics.append(
+                    {
+                        "student": data["student"],
+                        "className": data["className"],
+                        "percentage": avg_percentage,
+                    }
+                )
 
             # ================= TOP =================
             top_students = sorted(
@@ -1401,15 +1467,10 @@ class TeacherAnalyticsPDFAPI(MethodView):
             )[:5]
 
             # ================= WEAK =================
-            top_names = [
-                s["student"] for s in top_students
-            ]
+            top_names = [s["student"] for s in top_students]
 
             weak_students = sorted(
-                [
-                    s for s in student_analytics
-                    if s["student"] not in top_names
-                ],
+                [s for s in student_analytics if s["student"] not in top_names],
                 key=lambda x: x["percentage"],
             )[:5]
 
@@ -1417,24 +1478,16 @@ class TeacherAnalyticsPDFAPI(MethodView):
             insight = "Overall class performance is stable."
 
             if avg_marks >= 85:
-                insight = (
-                    "Excellent performance across assigned classes."
-                )
+                insight = "Excellent performance across assigned classes."
 
             elif avg_marks >= 70:
-                insight = (
-                    "Students are performing well with room for improvement."
-                )
+                insight = "Students are performing well with room for improvement."
 
             elif avg_marks >= 50:
-                insight = (
-                    "Average performance detected."
-                )
+                insight = "Average performance detected."
 
             else:
-                insight = (
-                    "Critical improvement required."
-                )
+                insight = "Critical improvement required."
 
             # ================= PDF =================
             buffer = BytesIO()
@@ -1478,19 +1531,14 @@ class TeacherAnalyticsPDFAPI(MethodView):
             )
 
             kpi_table.setStyle(
-                TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0),
-                     colors.HexColor("#4F46E5")),
-
-                    ("TEXTCOLOR", (0, 0), (-1, 0),
-                     colors.white),
-
-                    ("GRID", (0, 0), (-1, -1),
-                     0.5, colors.black),
-
-                    ("FONTNAME", (0, 0), (-1, 0),
-                     "Helvetica-Bold"),
-                ])
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4F46E5")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ]
+                )
             )
 
             elements.append(kpi_table)
@@ -1509,25 +1557,24 @@ class TeacherAnalyticsPDFAPI(MethodView):
 
             for student in top_students:
 
-                top_data.append([
-                    student["student"],
-                    student["className"],
-                    f"{student['percentage']}%",
-                ])
+                top_data.append(
+                    [
+                        student["student"],
+                        student["className"],
+                        f"{student['percentage']}%",
+                    ]
+                )
 
             top_table = Table(top_data)
 
             top_table.setStyle(
-                TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0),
-                     colors.green),
-
-                    ("TEXTCOLOR", (0, 0), (-1, 0),
-                     colors.white),
-
-                    ("GRID", (0, 0), (-1, -1),
-                     0.5, colors.black),
-                ])
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.green),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ]
+                )
             )
 
             elements.append(top_table)
@@ -1546,25 +1593,24 @@ class TeacherAnalyticsPDFAPI(MethodView):
 
             for student in weak_students:
 
-                weak_data.append([
-                    student["student"],
-                    student["className"],
-                    f"{student['percentage']}%",
-                ])
+                weak_data.append(
+                    [
+                        student["student"],
+                        student["className"],
+                        f"{student['percentage']}%",
+                    ]
+                )
 
             weak_table = Table(weak_data)
 
             weak_table.setStyle(
-                TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0),
-                     colors.red),
-
-                    ("TEXTCOLOR", (0, 0), (-1, 0),
-                     colors.white),
-
-                    ("GRID", (0, 0), (-1, -1),
-                     0.5, colors.black),
-                ])
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.red),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+                    ]
+                )
             )
 
             elements.append(weak_table)
@@ -1594,6 +1640,2086 @@ class TeacherAnalyticsPDFAPI(MethodView):
         except Exception as e:
             logger.exception(e)
 
-            return jsonify({
-                "error": "Failed to generate analytics PDF"
-            }), 500
+            return jsonify({"error": "Failed to generate analytics PDF"}), 500
+
+
+# ============================================================
+# ADMIN EXAM & RESULT CONTROL CENTER APIs
+# Supports admin dashboard JSX:
+# - KPI cards
+# - class progress cards
+# - detailed subject status
+# - verify all data
+# - bulk edit marks
+# - publish now / schedule publish
+# - export all reports PDF
+# ============================================================
+
+PASS_MARK_PERCENTAGE = 35
+
+
+def _safe_float(value, default=0.0):
+    try:
+        if value is None or value == "":
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _parse_int(value, default=None):
+    try:
+        if value is None or value == "" or value == "all":
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _parse_datetime(value):
+    if not value:
+        return None
+    try:
+        # accepts "2026-06-27T10:30:00" and "2026-06-27 10:30:00"
+        return datetime.fromisoformat(
+            str(value).replace("Z", "+00:00").replace(" ", "T")
+        )
+    except Exception:
+        return None
+
+
+def _grade_from_percentage(percentage):
+    percentage = _safe_float(percentage)
+    if percentage >= 90:
+        return "A+"
+    if percentage >= 80:
+        return "A"
+    if percentage >= 70:
+        return "B+"
+    if percentage >= 60:
+        return "B"
+    if percentage >= 50:
+        return "C"
+    if percentage >= PASS_MARK_PERCENTAGE:
+        return "Pass"
+    return "Fail"
+
+
+def _class_label(division, section, batch=None):
+    division_name = getattr(division, "division_name", None) or ""
+    section_name = getattr(section, "section_name", None) or ""
+    batch_name = getattr(batch, "batch_name", None) or ""
+    label = f"{division_name}-{section_name}".strip("-")
+    return label or batch_name or "Class"
+
+
+def _student_name(student):
+    return (
+        " ".join(
+            [
+                str(getattr(student, "first_name", "") or "").strip(),
+                str(getattr(student, "middle_name", "") or "").strip(),
+                str(getattr(student, "last_name", "") or "").strip(),
+            ]
+        )
+        .replace("  ", " ")
+        .strip()
+        or f"Student #{student.id}"
+    )
+
+
+def _result_out_of(result):
+    return (
+        _safe_float(result.internal_out_of)
+        + _safe_float(result.external_out_of)
+        + _safe_float(result.oral_out_of)
+        + _safe_float(result.practical_out_of)
+    )
+
+
+def _recalculate_result(result):
+    total = (
+        _safe_float(result.internal_marks)
+        + _safe_float(result.external_marks)
+        + _safe_float(result.oral_marks)
+        + _safe_float(result.practical_marks)
+    )
+    out_of = _result_out_of(result)
+    percentage = round((total / out_of) * 100, 2) if out_of > 0 else 0
+    result.total_marks = total
+    result.percentage = percentage
+    result.grade = _grade_from_percentage(percentage)
+    return result
+
+
+def _current_students_for_class(academic_class_id):
+    return (
+        db.session.query(StudentAcademicRecord, Student)
+        .join(Student, Student.id == StudentAcademicRecord.student_id)
+        .filter(
+            StudentAcademicRecord.academic_class_id == academic_class_id,
+            StudentAcademicRecord.is_current == True,
+        )
+        .order_by(StudentAcademicRecord.roll_number.asc(), Student.first_name.asc())
+        .all()
+    )
+
+
+def _exam_subject_ids(exam_id):
+    ids = [
+        row[0]
+        for row in db.session.query(ExamSubject.subject_id)
+        .filter(ExamSubject.exam_id == exam_id)
+        .all()
+    ]
+    if ids:
+        return ids
+    ids = [
+        row[0]
+        for row in db.session.query(ExamResult.subject_id)
+        .filter(ExamResult.exam_id == exam_id)
+        .distinct()
+        .all()
+    ]
+    if ids:
+        return ids
+    return [row[0] for row in db.session.query(Subject.id).all()]
+
+
+def _exam_progress(exam):
+    students = _current_students_for_class(exam.academic_class_id)
+    student_count = len(students)
+    subject_ids = _exam_subject_ids(exam.id)
+    subject_count = len(subject_ids)
+    expected = student_count * subject_count
+
+    submitted_statuses = ["Submitted", "Verified", "Published"]
+    marked = (
+        ExamResult.query.filter(
+            ExamResult.exam_id == exam.id,
+            ExamResult.subject_id.in_(subject_ids) if subject_ids else True,
+            ExamResult.status.in_(submitted_statuses),
+        ).count()
+        if expected
+        else 0
+    )
+
+    percentage = round((marked / expected) * 100, 2) if expected else 0
+    pending = max(expected - marked, 0)
+
+    if getattr(exam, "is_published", False):
+        state = "Published"
+    elif getattr(exam, "is_verified", False):
+        state = "Ready to Publish"
+    elif pending == 0 and expected > 0:
+        state = "Ready to Verify"
+    else:
+        state = f"{pending} Pending"
+
+    return {
+        "student_count": student_count,
+        "subject_count": subject_count,
+        "expected": expected,
+        "marked": marked,
+        "pending": pending,
+        "percentage": percentage,
+        "state": state,
+    }
+
+
+class AdminExamTermAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            academic_year = request.args.get("academic_year")
+            class_id = _parse_int(request.args.get("academic_class_id"))
+            exam_name = request.args.get("exam_name")
+
+            query = (
+                db.session.query(Exam, AcademicClass, Division, Section, Batch)
+                .join(AcademicClass, AcademicClass.id == Exam.academic_class_id)
+                .join(Division, Division.id == AcademicClass.division_id)
+                .join(Section, Section.id == AcademicClass.section_id)
+                .join(Batch, Batch.id == AcademicClass.batch_id)
+            )
+
+            if academic_year and academic_year != "all":
+                query = query.filter(Exam.academic_year == academic_year)
+            if class_id:
+                query = query.filter(Exam.academic_class_id == class_id)
+            if exam_name and exam_name != "all":
+                query = query.filter(Exam.exam_name == exam_name)
+
+            exams = query.order_by(
+                Exam.academic_year.desc(), Exam.exam_name.asc()
+            ).all()
+            return (
+                jsonify(
+                    [
+                        {
+                            "id": exam.id,
+                            "academic_class_id": exam.academic_class_id,
+                            "class_name": _class_label(division, section, batch),
+                            "academic_year": exam.academic_year,
+                            "exam_name": exam.exam_name,
+                            "exam_type": exam.exam_type,
+                            "start_date": (
+                                exam.start_date.isoformat() if exam.start_date else None
+                            ),
+                            "end_date": (
+                                exam.end_date.isoformat() if exam.end_date else None
+                            ),
+                            "is_verified": bool(getattr(exam, "is_verified", False)),
+                            "is_published": bool(exam.is_published),
+                            "marks_entry_enabled": bool(
+                                getattr(exam, "marks_entry_enabled", False)
+                            ),
+                            "publish_at": (
+                                exam.publish_at.isoformat()
+                                if getattr(exam, "publish_at", None)
+                                else None
+                            ),
+                            "progress": _exam_progress(exam),
+                        }
+                        for exam, academic, division, section, batch in exams
+                    ]
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load exam terms"}), 500
+
+    @login_required
+    def post(self):
+        try:
+            data = request.get_json(silent=True) or {}
+            academic_year = data.get("academic_year")
+            exam_name = data.get("exam_name")
+            academic_class_ids = data.get("academic_class_ids") or []
+            subject_ids = data.get("subject_ids") or []
+            exam_type = data.get("exam_type")
+            start_date = data.get("start_date")
+            end_date = data.get("end_date")
+
+            if not academic_year or not exam_name:
+                return (
+                    jsonify({"error": "academic_year and exam_name are required"}),
+                    400,
+                )
+
+            if not isinstance(academic_class_ids, list) or not academic_class_ids:
+                return (
+                    jsonify({"error": "academic_class_ids must be a non-empty list"}),
+                    400,
+                )
+
+            created = []
+            for class_id in academic_class_ids:
+                exam = Exam.query.filter_by(
+                    academic_class_id=int(class_id),
+                    academic_year=academic_year,
+                    exam_name=exam_name,
+                ).first()
+
+                if not exam:
+                    exam = Exam(
+                        academic_class_id=int(class_id),
+                        academic_year=academic_year,
+                        exam_name=exam_name,
+                        exam_type=exam_type,
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
+                    db.session.add(exam)
+                    db.session.flush()
+
+                for subject_id in subject_ids:
+                    existing = ExamSubject.query.filter_by(
+                        exam_id=exam.id, subject_id=int(subject_id)
+                    ).first()
+                    if not existing:
+                        db.session.add(
+                            ExamSubject(exam_id=exam.id, subject_id=int(subject_id))
+                        )
+
+                created.append(exam.id)
+
+            db.session.commit()
+            return (
+                jsonify(
+                    {"message": "Exam term saved successfully", "exam_ids": created}
+                ),
+                201,
+            )
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Database error while saving exam term"}), 500
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to save exam term"}), 500
+
+
+class AdminExamDashboardAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            academic_year = request.args.get("academic_year")
+            exam_name = request.args.get("exam_name")
+
+            exam_query = Exam.query
+            if academic_year and academic_year != "all":
+                exam_query = exam_query.filter(Exam.academic_year == academic_year)
+            if exam_name and exam_name != "all":
+                exam_query = exam_query.filter(Exam.exam_name == exam_name)
+
+            exams = exam_query.order_by(
+                Exam.academic_year.desc(), Exam.exam_name.asc()
+            ).all()
+            exam_ids = [e.id for e in exams]
+
+            class_cards = []
+            for exam in exams:
+                academic = AcademicClass.query.get(exam.academic_class_id)
+                if not academic:
+                    continue
+                division = Division.query.get(academic.division_id)
+                section = Section.query.get(academic.section_id)
+                batch = Batch.query.get(academic.batch_id)
+                progress = _exam_progress(exam)
+                class_cards.append(
+                    {
+                        "exam_id": exam.id,
+                        "academic_class_id": academic.id,
+                        "class_name": _class_label(division, section, batch),
+                        "academic_session": exam.academic_year,
+                        "exam_name": exam.exam_name,
+                        "status": progress["state"],
+                        "marks_submitted_percentage": progress["percentage"],
+                        "marked": progress["marked"],
+                        "expected": progress["expected"],
+                        "student_count": progress["student_count"],
+                        "subject_count": progress["subject_count"],
+                        "is_verified": bool(getattr(exam, "is_verified", False)),
+                        "is_published": bool(exam.is_published),
+                        "publish_at": (
+                            exam.publish_at.isoformat()
+                            if getattr(exam, "publish_at", None)
+                            else None
+                        ),
+                    }
+                )
+
+            result_rows = []
+            if exam_ids:
+                result_rows = (
+                    db.session.query(ExamResult, Student, Subject)
+                    .join(Student, Student.id == ExamResult.student_id)
+                    .join(Subject, Subject.id == ExamResult.subject_id)
+                    .filter(ExamResult.exam_id.in_(exam_ids))
+                    .all()
+                )
+
+            student_totals = {}
+            subject_totals = {}
+            for result, student, subject in result_rows:
+                sid = student.id
+                student_totals.setdefault(
+                    sid, {"student": student, "total": 0, "out_of": 0}
+                )
+                student_totals[sid]["total"] += _safe_float(result.total_marks)
+                student_totals[sid]["out_of"] += _result_out_of(result)
+
+                subject_totals.setdefault(subject.subject_name, [])
+                subject_totals[subject.subject_name].append(
+                    _safe_float(result.percentage)
+                )
+
+            topper = None
+            at_risk = 0
+            for row in student_totals.values():
+                percent = (
+                    round((row["total"] / row["out_of"]) * 100, 2)
+                    if row["out_of"]
+                    else 0
+                )
+                if percent < PASS_MARK_PERCENTAGE:
+                    at_risk += 1
+                if not topper or percent > topper["percentage"]:
+                    topper = {
+                        "student_name": _student_name(row["student"]),
+                        "percentage": percent,
+                    }
+
+            subject_avgs = [
+                {"subject": subject, "average": round(sum(values) / len(values), 2)}
+                for subject, values in subject_totals.items()
+                if values
+            ]
+            high_subject = (
+                max(subject_avgs, key=lambda x: x["average"]) if subject_avgs else None
+            )
+            low_subject = (
+                min(subject_avgs, key=lambda x: x["average"]) if subject_avgs else None
+            )
+
+            return (
+                jsonify(
+                    {
+                        "stats": {
+                            "topper": topper,
+                            "at_risk_students": at_risk,
+                            "subject_average_high": high_subject,
+                            "subject_average_low": low_subject,
+                            "total_exams": len(exams),
+                            "total_results": len(result_rows),
+                        },
+                        "classes": class_cards,
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load admin exam dashboard"}), 500
+
+
+class AdminExamClassDetailsAPI(MethodView):
+    @login_required
+    def get(self, exam_id):
+        try:
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+
+            academic = AcademicClass.query.get(exam.academic_class_id)
+            division = Division.query.get(academic.division_id) if academic else None
+            section = Section.query.get(academic.section_id) if academic else None
+            batch = Batch.query.get(academic.batch_id) if academic else None
+
+            students = _current_students_for_class(exam.academic_class_id)
+            student_ids = [student.id for _, student in students]
+            total_students = len(student_ids)
+            subject_ids = _exam_subject_ids(exam.id)
+            subjects = (
+                Subject.query.filter(Subject.id.in_(subject_ids))
+                .order_by(Subject.subject_name.asc())
+                .all()
+                if subject_ids
+                else []
+            )
+
+            details = []
+            for subject in subjects:
+                results = ExamResult.query.filter(
+                    ExamResult.exam_id == exam.id,
+                    ExamResult.subject_id == subject.id,
+                    ExamResult.student_id.in_(student_ids) if student_ids else True,
+                ).all()
+
+                submitted = [
+                    r
+                    for r in results
+                    if r.status in ["Submitted", "Verified", "Published"]
+                ]
+                pending = max(total_students - len(submitted), 0)
+
+                teacher_name = None
+                try:
+                    from utils.teacherDetails import TeacherClass
+
+                    tc = TeacherClass.query.filter_by(
+                        academic_class_id=exam.academic_class_id,
+                        subject_id=subject.id,
+                    ).first()
+                    if tc:
+                        teacher = Teacher.query.get(tc.teacher_id)
+                        teacher_name = (
+                            " ".join(
+                                [
+                                    getattr(teacher, "first_name", "") or "",
+                                    getattr(teacher, "last_name", "") or "",
+                                ]
+                            ).strip()
+                            if teacher
+                            else None
+                        )
+                except Exception:
+                    teacher_name = None
+
+                if not teacher_name and results:
+                    teacher = (
+                        Teacher.query.get(results[0].created_by)
+                        if results[0].created_by
+                        else None
+                    )
+                    teacher_name = (
+                        " ".join(
+                            [
+                                getattr(teacher, "first_name", "") or "",
+                                getattr(teacher, "last_name", "") or "",
+                            ]
+                        ).strip()
+                        if teacher
+                        else None
+                    )
+
+                if pending == 0 and total_students > 0:
+                    status = (
+                        "Verified"
+                        if getattr(exam, "is_verified", False)
+                        else "Submitted"
+                    )
+                else:
+                    status = "Pending"
+
+                details.append(
+                    {
+                        "subject_id": subject.id,
+                        "subject": subject.subject_name,
+                        "teacher": teacher_name or "Not Assigned",
+                        "status": status,
+                        "pending_marks": pending,
+                        "submitted_marks": len(submitted),
+                        "total_students": total_students,
+                    }
+                )
+
+            return (
+                jsonify(
+                    {
+                        "exam": {
+                            "id": exam.id,
+                            "name": exam.exam_name,
+                            "academic_year": exam.academic_year,
+                            "class_name": _class_label(division, section, batch),
+                            "is_verified": bool(getattr(exam, "is_verified", False)),
+                            "is_published": bool(exam.is_published),
+                        },
+                        "subjects": details,
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load class details"}), 500
+
+
+class AdminExamVerifyAPI(MethodView):
+    @login_required
+    def post(self, exam_id):
+        try:
+            data = request.get_json(silent=True) or {}
+            admin_id = data.get("admin_id") or data.get("user_id")
+
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+
+            progress = _exam_progress(exam)
+            if progress["pending"] > 0:
+                return (
+                    jsonify(
+                        {
+                            "error": "Cannot verify. Some marks are still pending.",
+                            "pending": progress["pending"],
+                            "progress": progress,
+                        }
+                    ),
+                    400,
+                )
+
+            updated = ExamResult.query.filter(
+                ExamResult.exam_id == exam.id,
+                ExamResult.status.in_(["Submitted", "Draft"]),
+            ).update({"status": "Verified"}, synchronize_session=False)
+
+            exam.is_verified = True
+            exam.verified_at = datetime.utcnow()
+            exam.verified_by = _parse_int(admin_id)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "message": "Exam data verified successfully",
+                        "updated_results": updated,
+                        "progress": _exam_progress(exam),
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to verify exam data"}), 500
+
+
+class AdminExamPublishAPI(MethodView):
+    @login_required
+    def post(self, exam_id):
+        try:
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+
+            if not getattr(exam, "is_verified", False):
+                return (
+                    jsonify({"error": "Please verify exam data before publishing"}),
+                    400,
+                )
+
+            updated = ExamResult.query.filter(
+                ExamResult.exam_id == exam.id,
+                ExamResult.status.in_(["Verified", "Submitted"]),
+            ).update({"status": "Published"}, synchronize_session=False)
+
+            exam.is_published = True
+            exam.published_at = datetime.utcnow()
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "message": "Result published successfully",
+                        "updated_results": updated,
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to publish result"}), 500
+
+
+class AdminExamMarksEntryPermissionAPI(MethodView):
+    @login_required
+    def put(self, exam_id):
+        try:
+            data = request.get_json(silent=True) or {}
+
+            enabled = data.get("marks_entry_enabled")
+
+            if enabled is None:
+                return jsonify({"error": "marks_entry_enabled is required"}), 400
+
+            exam = Exam.query.get(exam_id)
+
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+
+            # Do not allow marks editing after final publishing
+            if exam.is_published:
+                return (
+                    jsonify(
+                        {
+                            "error": "Published exam results cannot be changed. Unpublish or create a correction workflow first."
+                        }
+                    ),
+                    400,
+                )
+
+            exam.marks_entry_enabled = bool(enabled)
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "message": (
+                            "Marks entry enabled for teachers"
+                            if exam.marks_entry_enabled
+                            else "Marks entry disabled for teachers"
+                        ),
+                        "exam_id": exam.id,
+                        "marks_entry_enabled": bool(exam.marks_entry_enabled),
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to update marks entry permission"}), 500
+
+
+class AdminExamSchedulePublishAPI(MethodView):
+    @login_required
+    def post(self, exam_id):
+        try:
+            data = request.get_json(silent=True) or {}
+            publish_at = _parse_datetime(data.get("publish_at"))
+
+            if not publish_at:
+                return jsonify({"error": "publish_at is required in ISO format"}), 400
+
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+
+            if not getattr(exam, "is_verified", False):
+                return (
+                    jsonify(
+                        {"error": "Please verify exam data before scheduling publish"}
+                    ),
+                    400,
+                )
+
+            exam.publish_at = publish_at
+            db.session.commit()
+            return (
+                jsonify(
+                    {
+                        "message": "Publish schedule saved successfully",
+                        "publish_at": (
+                            exam.publish_at.isoformat() if exam.publish_at else None
+                        ),
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to schedule publishing"}), 500
+
+
+class AdminExamBulkEditAPI(MethodView):
+    @login_required
+    def put(self):
+        try:
+            data = request.get_json(silent=True) or {}
+            updates = data.get("updates") or []
+            admin_id = data.get("admin_id") or data.get("user_id")
+
+            if not isinstance(updates, list) or not updates:
+                return jsonify({"error": "updates must be a non-empty list"}), 400
+
+            allowed = {
+                "internal_marks",
+                "external_marks",
+                "oral_marks",
+                "practical_marks",
+                "internal_out_of",
+                "external_out_of",
+                "oral_out_of",
+                "practical_out_of",
+                "remarks",
+                "status",
+            }
+
+            changed = 0
+            for item in updates:
+                result_id = _parse_int(item.get("result_id"))
+                fields = item.get("fields") or {}
+                result = ExamResult.query.get(result_id)
+                if not result:
+                    continue
+
+                old_total = result.total_marks
+                for key, value in fields.items():
+                    if key in allowed:
+                        setattr(
+                            result,
+                            key,
+                            (
+                                value
+                                if key in ["remarks", "status"]
+                                else _safe_float(value)
+                            ),
+                        )
+
+                _recalculate_result(result)
+                db.session.add(
+                    ExamResultAudit(
+                        result_id=result.id,
+                        updated_by=_parse_int(admin_id),
+                        old_total=old_total,
+                        new_total=result.total_marks,
+                        action="ADMIN_BULK_EDIT",
+                    )
+                )
+                changed += 1
+
+            db.session.commit()
+            return (
+                jsonify({"message": "Bulk edit completed", "updated_results": changed}),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to bulk edit marks"}), 500
+
+
+class AdminExamResultsAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            exam_id = _parse_int(request.args.get("exam_id"))
+            class_id = _parse_int(request.args.get("academic_class_id"))
+            subject_id = _parse_int(request.args.get("subject_id"))
+            status = request.args.get("status")
+            search = (request.args.get("search") or "").strip().lower()
+
+            query = (
+                db.session.query(
+                    ExamResult, Student, Exam, Subject, StudentAcademicRecord
+                )
+                .join(Student, Student.id == ExamResult.student_id)
+                .join(Exam, Exam.id == ExamResult.exam_id)
+                .join(Subject, Subject.id == ExamResult.subject_id)
+                .join(
+                    StudentAcademicRecord,
+                    StudentAcademicRecord.student_id == Student.id,
+                )
+                .filter(StudentAcademicRecord.is_current == True)
+            )
+
+            if exam_id:
+                query = query.filter(ExamResult.exam_id == exam_id)
+            if class_id:
+                query = query.filter(
+                    StudentAcademicRecord.academic_class_id == class_id
+                )
+            if subject_id:
+                query = query.filter(ExamResult.subject_id == subject_id)
+            if status and status != "all":
+                query = query.filter(ExamResult.status == status)
+
+            rows = query.order_by(StudentAcademicRecord.roll_number.asc()).all()
+            data = []
+            for result, student, exam, subject, record in rows:
+                name = _student_name(student)
+                if (
+                    search
+                    and search not in name.lower()
+                    and search not in str(record.roll_number or "").lower()
+                ):
+                    continue
+                data.append(
+                    {
+                        "result_id": result.id,
+                        "student_id": student.id,
+                        "student_name": name,
+                        "roll_no": record.roll_number,
+                        "exam_id": exam.id,
+                        "exam_name": exam.exam_name,
+                        "academic_year": exam.academic_year,
+                        "subject_id": subject.id,
+                        "subject": subject.subject_name,
+                        "internal_marks": result.internal_marks,
+                        "external_marks": result.external_marks,
+                        "oral_marks": result.oral_marks,
+                        "practical_marks": result.practical_marks,
+                        "internal_out_of": result.internal_out_of,
+                        "external_out_of": result.external_out_of,
+                        "oral_out_of": result.oral_out_of,
+                        "practical_out_of": result.practical_out_of,
+                        "total_marks": result.total_marks,
+                        "percentage": result.percentage,
+                        "grade": result.grade,
+                        "status": result.status,
+                        "remarks": result.remarks,
+                    }
+                )
+
+            return jsonify(data), 200
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load exam result rows"}), 500
+
+
+class AdminExamReportsPDFAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            academic_year = request.args.get("academic_year")
+            exam_name = request.args.get("exam_name")
+
+            # reuse dashboard logic manually to avoid HTTP call
+            exam_query = Exam.query
+            if academic_year and academic_year != "all":
+                exam_query = exam_query.filter(Exam.academic_year == academic_year)
+            if exam_name and exam_name != "all":
+                exam_query = exam_query.filter(Exam.exam_name == exam_name)
+            exams = exam_query.order_by(
+                Exam.academic_year.desc(), Exam.exam_name.asc()
+            ).all()
+
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=A4)
+            styles = getSampleStyleSheet()
+            elements = [
+                Paragraph("<b>Exam & Result Admin Report</b>", styles["Title"]),
+                Spacer(1, 12),
+            ]
+
+            rows = [
+                ["Exam", "Year", "Class", "Status", "Marked", "Expected", "Progress"]
+            ]
+            for exam in exams:
+                academic = AcademicClass.query.get(exam.academic_class_id)
+                division = (
+                    Division.query.get(academic.division_id) if academic else None
+                )
+                section = Section.query.get(academic.section_id) if academic else None
+                batch = Batch.query.get(academic.batch_id) if academic else None
+                progress = _exam_progress(exam)
+                rows.append(
+                    [
+                        exam.exam_name,
+                        exam.academic_year,
+                        _class_label(division, section, batch),
+                        progress["state"],
+                        progress["marked"],
+                        progress["expected"],
+                        f'{progress["percentage"]}%',
+                    ]
+                )
+
+            table = Table(rows, repeatRows=1)
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4F46E5")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                        ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+                        ("ALIGN", (4, 1), (-1, -1), "CENTER"),
+                    ]
+                )
+            )
+            elements.append(table)
+            doc.build(elements)
+            buffer.seek(0)
+
+            return send_file(
+                buffer,
+                as_attachment=True,
+                download_name="admin_exam_result_report.pdf",
+                mimetype="application/pdf",
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to export admin exam report"}), 500
+
+
+# ============================================================
+# PRODUCTION OVERRIDES - REAL WORLD ADMIN EXAM RESULT SYSTEM
+# These classes intentionally override the earlier admin classes above.
+# They keep your existing DB tables but return richer, frontend-ready data.
+# ============================================================
+
+EXAM_STATUS_FLOW = [
+    "Draft",
+    "Scheduled",
+    "Conducting",
+    "Marks Entry",
+    "Verification",
+    "Ready to Publish",
+    "Published",
+    "Archived",
+]
+
+
+def _parse_date_value(value):
+    if not value:
+        return None
+    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
+        return value
+    raw = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(raw[:10], fmt).date()
+        except Exception:
+            pass
+    return None
+
+
+def _teacher_name(teacher):
+    if not teacher:
+        return None
+    parts = [
+        getattr(teacher, "first_name", "") or "",
+        getattr(teacher, "middle_name", "") or "",
+        getattr(teacher, "last_name", "") or "",
+    ]
+    name = " ".join([p.strip() for p in parts if p and p.strip()]).strip()
+    return (
+        name
+        or getattr(teacher, "name", None)
+        or getattr(teacher, "email", None)
+        or f"Teacher #{teacher.id}"
+    )
+
+
+def _exam_status(exam, progress=None):
+    if getattr(exam, "is_published", False):
+        return "Published"
+    if getattr(exam, "is_verified", False):
+        return "Ready to Publish"
+    if progress and progress.get("expected", 0) > 0 and progress.get("pending", 0) == 0:
+        return "Verification"
+    if progress and progress.get("marked", 0) > 0:
+        return "Marks Entry"
+    today = datetime.utcnow().date()
+    if exam.start_date and exam.end_date and exam.start_date <= today <= exam.end_date:
+        return "Conducting"
+    if exam.start_date and exam.start_date > today:
+        return "Scheduled"
+    return "Draft"
+
+
+def _subject_config_map(exam_id):
+    rows = ExamSubject.query.filter_by(exam_id=exam_id).all()
+    return {r.subject_id: r for r in rows}
+
+
+def _get_subject_ids_from_payload(data):
+    subject_ids = data.get("subject_ids") or data.get("subjects") or []
+    normalized = []
+    for item in subject_ids:
+        if isinstance(item, dict):
+            sid = _parse_int(item.get("subject_id") or item.get("id"))
+        else:
+            sid = _parse_int(item)
+        if sid and sid not in normalized:
+            normalized.append(sid)
+    return normalized
+
+
+def _get_class_ids_from_payload(data):
+    class_ids = (
+        data.get("academic_class_ids")
+        or data.get("class_ids")
+        or data.get("classes")
+        or []
+    )
+    single = data.get("academic_class_id") or data.get("class_id")
+    if single and not class_ids:
+        class_ids = [single]
+    normalized = []
+    for item in class_ids:
+        if isinstance(item, dict):
+            cid = _parse_int(
+                item.get("academic_class_id") or item.get("class_id") or item.get("id")
+            )
+        else:
+            cid = _parse_int(item)
+        if cid and cid not in normalized:
+            normalized.append(cid)
+    return normalized
+
+
+def _class_lookup():
+    rows = (
+        db.session.query(AcademicClass, Division, Section, Batch)
+        .join(Division, Division.id == AcademicClass.division_id)
+        .join(Section, Section.id == AcademicClass.section_id)
+        .join(Batch, Batch.id == AcademicClass.batch_id)
+        .all()
+    )
+    return {
+        academic.id: {
+            "academic": academic,
+            "division": division,
+            "section": section,
+            "batch": batch,
+            "label": _class_label(division, section, batch),
+        }
+        for academic, division, section, batch in rows
+    }
+
+
+class AdminExamOptionsAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            batches = Batch.query.order_by(Batch.batch_name.desc()).all()
+            years = [b.batch_name for b in batches]
+            exam_names = [
+                r[0]
+                for r in db.session.query(Exam.exam_name)
+                .distinct()
+                .order_by(Exam.exam_name.asc())
+                .all()
+            ]
+            class_rows = (
+                db.session.query(AcademicClass, Division, Section, Batch)
+                .join(Division, Division.id == AcademicClass.division_id)
+                .join(Section, Section.id == AcademicClass.section_id)
+                .join(Batch, Batch.id == AcademicClass.batch_id)
+                .order_by(Division.division_name.asc(), Section.section_name.asc())
+                .all()
+            )
+            subjects = Subject.query.order_by(Subject.subject_name.asc()).all()
+            teachers = Teacher.query.order_by(Teacher.id.asc()).all()
+
+            return (
+                jsonify(
+                    {
+                        "years": years,
+                        "batches": [
+                            {
+                                "id": b.id,
+                                "batch_name": b.batch_name,
+                                "start_date": (
+                                    b.start_date.isoformat() if b.start_date else None
+                                ),
+                                "end_date": (
+                                    b.end_date.isoformat() if b.end_date else None
+                                ),
+                            }
+                            for b in batches
+                        ],
+                        "exams": exam_names,
+                        "statuses": EXAM_STATUS_FLOW,
+                        "classes": [
+                            {
+                                "id": academic.id,
+                                "academic_class_id": academic.id,
+                                "batch_id": academic.batch_id,
+                                "batch_name": batch.batch_name if batch else None,
+                                "division_id": academic.division_id,
+                                "division_name": (
+                                    division.division_name if division else None
+                                ),
+                                "section_id": academic.section_id,
+                                "section_name": (
+                                    section.section_name if section else None
+                                ),
+                                "display_name": _class_label(division, section, batch),
+                            }
+                            for academic, division, section, batch in class_rows
+                        ],
+                        "subjects": [
+                            {
+                                "id": s.id,
+                                "name": s.subject_name,
+                                "subject_name": s.subject_name,
+                            }
+                            for s in subjects
+                        ],
+                        "teachers": [
+                            {"id": t.id, "name": _teacher_name(t)} for t in teachers
+                        ],
+                        "exam_types": [
+                            "Unit Test",
+                            "Mid Term",
+                            "Quarterly",
+                            "Half Yearly",
+                            "Pre Board",
+                            "Annual",
+                        ],
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load exam options"}), 500
+
+
+class AdminExamTermAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            academic_year = request.args.get("academic_year")
+            class_id = _parse_int(
+                request.args.get("academic_class_id") or request.args.get("class_id")
+            )
+            exam_name = request.args.get("exam_name") or request.args.get("exam")
+            status = request.args.get("status")
+
+            query = (
+                db.session.query(Exam, AcademicClass, Division, Section, Batch)
+                .join(AcademicClass, AcademicClass.id == Exam.academic_class_id)
+                .join(Division, Division.id == AcademicClass.division_id)
+                .join(Section, Section.id == AcademicClass.section_id)
+                .join(Batch, Batch.id == AcademicClass.batch_id)
+            )
+            if academic_year and academic_year != "all":
+                query = query.filter(Exam.academic_year == academic_year)
+            if class_id:
+                query = query.filter(Exam.academic_class_id == class_id)
+            if exam_name and exam_name != "all":
+                query = query.filter(Exam.exam_name == exam_name)
+
+            payload = []
+            for exam, academic, division, section, batch in query.order_by(
+                Exam.academic_year.desc(), Exam.exam_name.asc()
+            ).all():
+                progress = _exam_progress(exam)
+                computed_status = _exam_status(exam, progress)
+                if status and status != "all" and computed_status != status:
+                    continue
+                payload.append(
+                    {
+                        "id": exam.id,
+                        "academic_class_id": exam.academic_class_id,
+                        "class_name": _class_label(division, section, batch),
+                        "academic_year": exam.academic_year,
+                        "exam_name": exam.exam_name,
+                        "exam_type": exam.exam_type,
+                        "status": computed_status,
+                        "start_date": (
+                            exam.start_date.isoformat() if exam.start_date else None
+                        ),
+                        "end_date": (
+                            exam.end_date.isoformat() if exam.end_date else None
+                        ),
+                        "is_verified": bool(getattr(exam, "is_verified", False)),
+                        "is_published": bool(exam.is_published),
+                        "marks_entry_enabled": bool(
+                            getattr(exam, "marks_entry_enabled", False)
+                        ),
+                        "publish_at": (
+                            exam.publish_at.isoformat()
+                            if getattr(exam, "publish_at", None)
+                            else None
+                        ),
+                        "published_at": (
+                            exam.published_at.isoformat()
+                            if getattr(exam, "published_at", None)
+                            else None
+                        ),
+                        "progress": progress,
+                    }
+                )
+            return jsonify(payload), 200
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load exam terms"}), 500
+
+    @login_required
+    def post(self):
+        try:
+            data = request.get_json(silent=True) or {}
+            academic_year = data.get("academic_year")
+            exam_name = data.get("exam_name") or data.get("name")
+            exam_type = data.get("exam_type") or data.get("type")
+            start_date = _parse_date_value(data.get("start_date"))
+            end_date = _parse_date_value(data.get("end_date"))
+            class_ids = _get_class_ids_from_payload(data)
+            subject_ids = _get_subject_ids_from_payload(data)
+
+            if not academic_year or not exam_name:
+                return (
+                    jsonify({"error": "academic_year and exam_name are required"}),
+                    400,
+                )
+            if not class_ids:
+                return jsonify({"error": "Select at least one class"}), 400
+            if start_date and end_date and start_date > end_date:
+                return jsonify({"error": "start_date cannot be after end_date"}), 400
+
+            created_or_updated = []
+            for class_id in class_ids:
+                if not AcademicClass.query.get(class_id):
+                    continue
+                exam = Exam.query.filter_by(
+                    academic_class_id=class_id,
+                    academic_year=academic_year,
+                    exam_name=exam_name,
+                ).first()
+                if not exam:
+                    exam = Exam(
+                        academic_class_id=class_id,
+                        academic_year=academic_year,
+                        exam_name=exam_name,
+                    )
+                    db.session.add(exam)
+                    db.session.flush()
+                exam.exam_type = exam_type
+                exam.start_date = start_date
+                exam.end_date = end_date
+
+                for subject_id in subject_ids:
+                    if not Subject.query.get(subject_id):
+                        continue
+                    existing = ExamSubject.query.filter_by(
+                        exam_id=exam.id, subject_id=subject_id
+                    ).first()
+                    if not existing:
+                        db.session.add(
+                            ExamSubject(exam_id=exam.id, subject_id=subject_id)
+                        )
+                created_or_updated.append(exam.id)
+
+            db.session.commit()
+            return (
+                jsonify(
+                    {
+                        "message": "Examination saved successfully",
+                        "exam_ids": created_or_updated,
+                    }
+                ),
+                201,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to save examination"}), 500
+
+
+class AdminExamDashboardAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            academic_year = request.args.get("academic_year")
+            exam_name = request.args.get("exam_name") or request.args.get("exam")
+            class_id = _parse_int(
+                request.args.get("academic_class_id") or request.args.get("class_id")
+            )
+            subject_id = _parse_int(request.args.get("subject_id"))
+            teacher_id = _parse_int(request.args.get("teacher_id"))
+            status_filter = request.args.get("status")
+            search = (request.args.get("search") or "").strip().lower()
+
+            exam_query = Exam.query
+            if academic_year and academic_year != "all":
+                exam_query = exam_query.filter(Exam.academic_year == academic_year)
+            if exam_name and exam_name != "all":
+                exam_query = exam_query.filter(Exam.exam_name == exam_name)
+            if class_id:
+                exam_query = exam_query.filter(Exam.academic_class_id == class_id)
+
+            exams = exam_query.order_by(
+                Exam.academic_year.desc(), Exam.exam_name.asc()
+            ).all()
+            exam_ids = [e.id for e in exams]
+            class_map = _class_lookup()
+            class_cards = []
+            pending_verification = 0
+            pending_marks_total = 0
+
+            for exam in exams:
+                progress = _exam_progress(exam)
+                computed_status = _exam_status(exam, progress)
+                if (
+                    status_filter
+                    and status_filter != "all"
+                    and computed_status != status_filter
+                ):
+                    continue
+                if computed_status == "Verification":
+                    pending_verification += 1
+                pending_marks_total += progress["pending"]
+                lookup = class_map.get(exam.academic_class_id, {})
+                label = lookup.get("label", f"Class #{exam.academic_class_id}")
+                if (
+                    search
+                    and search not in label.lower()
+                    and search not in exam.exam_name.lower()
+                ):
+                    continue
+                class_cards.append(
+                    {
+                        "exam_id": exam.id,
+                        "academic_class_id": exam.academic_class_id,
+                        "class_name": label,
+                        "academic_session": exam.academic_year,
+                        "exam_name": exam.exam_name,
+                        "exam_type": exam.exam_type,
+                        "status": computed_status,
+                        "marks_submitted_percentage": progress["percentage"],
+                        "marked": progress["marked"],
+                        "expected": progress["expected"],
+                        "pending": progress["pending"],
+                        "student_count": progress["student_count"],
+                        "subject_count": progress["subject_count"],
+                        "is_verified": bool(getattr(exam, "is_verified", False)),
+                        "is_verified": bool(getattr(exam, "is_verified", False)),
+                        "is_published": bool(exam.is_published),
+                        "marks_entry_enabled": bool(
+                            getattr(exam, "marks_entry_enabled", False)
+                        ),
+                        "publish_at": (
+                            exam.publish_at.isoformat()
+                            if getattr(exam, "publish_at", None)
+                            else None
+                        ),
+                    }
+                )
+
+            result_rows = []
+            if exam_ids:
+                result_query = (
+                    db.session.query(ExamResult, Student, Subject, Exam)
+                    .join(Student, Student.id == ExamResult.student_id)
+                    .join(Subject, Subject.id == ExamResult.subject_id)
+                    .join(Exam, Exam.id == ExamResult.exam_id)
+                    .filter(ExamResult.exam_id.in_(exam_ids))
+                )
+                if subject_id:
+                    result_query = result_query.filter(
+                        ExamResult.subject_id == subject_id
+                    )
+                if teacher_id:
+                    result_query = result_query.filter(
+                        ExamResult.created_by == teacher_id
+                    )
+                result_rows = result_query.all()
+
+            student_totals = {}
+            subject_totals = {}
+            published_classes = len([c for c in class_cards if c["is_published"]])
+            for result, student, subject, exam in result_rows:
+                sid = student.id
+                student_totals.setdefault(
+                    sid, {"student": student, "total": 0, "out_of": 0}
+                )
+                student_totals[sid]["total"] += _safe_float(result.total_marks)
+                student_totals[sid]["out_of"] += _result_out_of(result)
+                subject_totals.setdefault(subject.subject_name, [])
+                subject_totals[subject.subject_name].append(
+                    _safe_float(result.percentage)
+                )
+
+            student_percentages = []
+            topper = None
+            at_risk = 0
+            for row in student_totals.values():
+                percent = (
+                    round((row["total"] / row["out_of"]) * 100, 2)
+                    if row["out_of"]
+                    else 0
+                )
+                student_percentages.append(percent)
+                if percent < PASS_MARK_PERCENTAGE:
+                    at_risk += 1
+                if not topper or percent > topper["percentage"]:
+                    topper = {
+                        "student_name": _student_name(row["student"]),
+                        "percentage": percent,
+                    }
+
+            subject_avgs = [
+                {"subject": subject, "average": round(sum(values) / len(values), 2)}
+                for subject, values in subject_totals.items()
+                if values
+            ]
+            high_subject = (
+                max(subject_avgs, key=lambda x: x["average"]) if subject_avgs else None
+            )
+            low_subject = (
+                min(subject_avgs, key=lambda x: x["average"]) if subject_avgs else None
+            )
+            avg_score = (
+                round(sum(student_percentages) / len(student_percentages), 2)
+                if student_percentages
+                else 0
+            )
+            pass_percentage = (
+                round(
+                    (
+                        len(
+                            [
+                                p
+                                for p in student_percentages
+                                if p >= PASS_MARK_PERCENTAGE
+                            ]
+                        )
+                        / len(student_percentages)
+                    )
+                    * 100,
+                    2,
+                )
+                if student_percentages
+                else 0
+            )
+
+            return (
+                jsonify(
+                    {
+                        "stats": {
+                            "total_exams": len(exams),
+                            "classes_covered": len(class_cards),
+                            "students": len(student_totals),
+                            "results_published": published_classes,
+                            "pending_verification": pending_verification,
+                            "pending_marks": pending_marks_total,
+                            "pass_percentage": pass_percentage,
+                            "average_score": avg_score,
+                            "topper": topper,
+                            "at_risk_students": at_risk,
+                            "subject_average_high": high_subject,
+                            "subject_average_low": low_subject,
+                            "total_results": len(result_rows),
+                        },
+                        "classes": class_cards,
+                        "analytics": {
+                            "subject_averages": subject_avgs,
+                            "top_performing_class": max(
+                                class_cards,
+                                key=lambda c: c["marks_submitted_percentage"],
+                                default=None,
+                            ),
+                            "lowest_progress_class": min(
+                                class_cards,
+                                key=lambda c: c["marks_submitted_percentage"],
+                                default=None,
+                            ),
+                        },
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load admin exam dashboard"}), 500
+
+
+class AdminExamClassDetailsAPI(MethodView):
+    @login_required
+    def get(self, exam_id):
+        try:
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+
+            academic = AcademicClass.query.get(exam.academic_class_id)
+            division = Division.query.get(academic.division_id) if academic else None
+            section = Section.query.get(academic.section_id) if academic else None
+            batch = Batch.query.get(academic.batch_id) if academic else None
+            subject_filter = _parse_int(request.args.get("subject_id"))
+
+            students = _current_students_for_class(exam.academic_class_id)
+            student_ids = [student.id for _, student in students]
+            total_students = len(student_ids)
+            subject_ids = _exam_subject_ids(exam.id)
+            if subject_filter:
+                subject_ids = [subject_filter]
+            subjects = (
+                Subject.query.filter(Subject.id.in_(subject_ids))
+                .order_by(Subject.subject_name.asc())
+                .all()
+                if subject_ids
+                else []
+            )
+            configs = _subject_config_map(exam.id)
+
+            subject_status = []
+            student_rows = []
+            for subject in subjects:
+                results = ExamResult.query.filter(
+                    ExamResult.exam_id == exam.id,
+                    ExamResult.subject_id == subject.id,
+                    ExamResult.student_id.in_(student_ids) if student_ids else True,
+                ).all()
+                by_student = {r.student_id: r for r in results}
+                submitted = [
+                    r
+                    for r in results
+                    if r.status in ["Submitted", "Verified", "Published"]
+                ]
+                pending = max(total_students - len(submitted), 0)
+
+                teacher_name = None
+                try:
+                    from utils.teacherDetails import TeacherClass
+
+                    tc = TeacherClass.query.filter_by(
+                        academic_class_id=exam.academic_class_id, subject_id=subject.id
+                    ).first()
+                    teacher_name = (
+                        _teacher_name(Teacher.query.get(tc.teacher_id)) if tc else None
+                    )
+                except Exception:
+                    teacher_name = None
+                if not teacher_name and results:
+                    teacher_name = (
+                        _teacher_name(Teacher.query.get(results[0].created_by))
+                        if results[0].created_by
+                        else None
+                    )
+
+                status = (
+                    "Verified"
+                    if getattr(exam, "is_verified", False) and pending == 0
+                    else ("Submitted" if pending == 0 and total_students else "Pending")
+                )
+                cfg = configs.get(subject.id)
+                subject_status.append(
+                    {
+                        "subject_id": subject.id,
+                        "subject": subject.subject_name,
+                        "teacher": teacher_name or "Not Assigned",
+                        "status": status,
+                        "pending_marks": pending,
+                        "submitted_marks": len(submitted),
+                        "total_students": total_students,
+                        "max_marks": (
+                            _safe_float(getattr(cfg, "internal_max", 0))
+                            + _safe_float(getattr(cfg, "external_max", 0))
+                            + _safe_float(getattr(cfg, "oral_max", 0))
+                            + _safe_float(getattr(cfg, "practical_max", 0))
+                            if cfg
+                            else None
+                        ),
+                        "passing_marks": (
+                            _safe_float(
+                                getattr(cfg, "passing_marks", PASS_MARK_PERCENTAGE)
+                            )
+                            if cfg
+                            else PASS_MARK_PERCENTAGE
+                        ),
+                    }
+                )
+
+                if subject_filter:
+                    for record, student in students:
+                        result = by_student.get(student.id)
+                        student_rows.append(
+                            {
+                                "result_id": result.id if result else None,
+                                "student_id": student.id,
+                                "roll_no": record.roll_number,
+                                "student_name": _student_name(student),
+                                "subject_id": subject.id,
+                                "subject": subject.subject_name,
+                                "internal_marks": (
+                                    result.internal_marks if result else 0
+                                ),
+                                "external_marks": (
+                                    result.external_marks if result else 0
+                                ),
+                                "oral_marks": result.oral_marks if result else 0,
+                                "practical_marks": (
+                                    result.practical_marks if result else 0
+                                ),
+                                "total_marks": result.total_marks if result else 0,
+                                "percentage": result.percentage if result else 0,
+                                "grade": result.grade if result else None,
+                                "status": result.status if result else "Pending",
+                                "remarks": result.remarks if result else "",
+                                "result": (
+                                    "PASS"
+                                    if result
+                                    and _safe_float(result.percentage)
+                                    >= PASS_MARK_PERCENTAGE
+                                    else "FAIL" if result else "PENDING"
+                                ),
+                            }
+                        )
+
+            return (
+                jsonify(
+                    {
+                        "exam": {
+                            "id": exam.id,
+                            "name": exam.exam_name,
+                            "academic_year": exam.academic_year,
+                            "class_name": _class_label(division, section, batch),
+                            "status": _exam_status(exam, _exam_progress(exam)),
+                            "is_verified": bool(getattr(exam, "is_verified", False)),
+                            "is_published": bool(exam.is_published),
+                        },
+                        "subjects": subject_status,
+                        "students": student_rows,
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load class details"}), 500
+
+
+class AdminExamVerifyAPI(MethodView):
+    @login_required
+    def post(self, exam_id):
+        try:
+            data = request.get_json(silent=True) or {}
+            admin_id = data.get("admin_id") or data.get("user_id")
+            force = bool(data.get("force", False))
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+            progress = _exam_progress(exam)
+            if progress["pending"] > 0 and not force:
+                return (
+                    jsonify(
+                        {
+                            "error": "Cannot verify. Some marks are still pending.",
+                            "pending": progress["pending"],
+                            "progress": progress,
+                        }
+                    ),
+                    400,
+                )
+            updated = ExamResult.query.filter(
+                ExamResult.exam_id == exam.id,
+                ExamResult.status.in_(["Submitted", "Draft"]),
+            ).update({"status": "Verified"}, synchronize_session=False)
+            exam.is_verified = True
+            exam.verified_at = datetime.utcnow()
+            exam.verified_by = _parse_int(admin_id)
+            db.session.commit()
+            return (
+                jsonify(
+                    {
+                        "message": "Exam data verified successfully",
+                        "updated_results": updated,
+                        "progress": _exam_progress(exam),
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to verify exam data"}), 500
+
+
+class AdminExamPublishAPI(MethodView):
+    @login_required
+    def post(self, exam_id):
+        try:
+            data = request.get_json(silent=True) or {}
+            force = bool(data.get("force", False))
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+            if not getattr(exam, "is_verified", False) and not force:
+                return (
+                    jsonify({"error": "Please verify exam data before publishing"}),
+                    400,
+                )
+            updated = ExamResult.query.filter(
+                ExamResult.exam_id == exam.id,
+                ExamResult.status.in_(["Verified", "Submitted"]),
+            ).update({"status": "Published"}, synchronize_session=False)
+            exam.is_verified = True
+            exam.is_published = True
+            exam.published_at = datetime.utcnow()
+            db.session.commit()
+            return (
+                jsonify(
+                    {
+                        "message": "Result published successfully",
+                        "updated_results": updated,
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to publish result"}), 500
+
+
+class AdminExamSchedulePublishAPI(MethodView):
+    @login_required
+    def post(self, exam_id):
+        try:
+            data = request.get_json(silent=True) or {}
+            publish_at = _parse_datetime(
+                data.get("publish_at") or data.get("release_at")
+            )
+            if not publish_at:
+                release_date = data.get("release_date") or data.get("date")
+                release_time = data.get("release_time") or data.get("time") or "00:00"
+                publish_at = (
+                    _parse_datetime(f"{release_date}T{release_time}:00")
+                    if release_date
+                    else None
+                )
+            if not publish_at:
+                return (
+                    jsonify(
+                        {"error": "publish_at or release_date/release_time is required"}
+                    ),
+                    400,
+                )
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+            if not getattr(exam, "is_verified", False) and not data.get("force"):
+                return (
+                    jsonify(
+                        {"error": "Please verify exam data before scheduling publish"}
+                    ),
+                    400,
+                )
+            exam.publish_at = (
+                publish_at.replace(tzinfo=None)
+                if getattr(publish_at, "tzinfo", None)
+                else publish_at
+            )
+            db.session.commit()
+            return (
+                jsonify(
+                    {
+                        "message": "Publish schedule saved successfully",
+                        "publish_at": (
+                            exam.publish_at.isoformat() if exam.publish_at else None
+                        ),
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Failed to schedule publishing"}), 500
+
+
+class AdminExamResultsAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            exam_id = _parse_int(request.args.get("exam_id"))
+            class_id = _parse_int(
+                request.args.get("academic_class_id") or request.args.get("class_id")
+            )
+            subject_id = _parse_int(request.args.get("subject_id"))
+            status = request.args.get("status")
+            search = (request.args.get("search") or "").strip().lower()
+            query = (
+                db.session.query(
+                    ExamResult,
+                    Student,
+                    Exam,
+                    Subject,
+                    StudentAcademicRecord,
+                    AcademicClass,
+                    Division,
+                    Section,
+                )
+                .join(Student, Student.id == ExamResult.student_id)
+                .join(Exam, Exam.id == ExamResult.exam_id)
+                .join(Subject, Subject.id == ExamResult.subject_id)
+                .join(
+                    StudentAcademicRecord,
+                    StudentAcademicRecord.student_id == Student.id,
+                )
+                .join(
+                    AcademicClass,
+                    AcademicClass.id == StudentAcademicRecord.academic_class_id,
+                )
+                .join(Division, Division.id == AcademicClass.division_id)
+                .join(Section, Section.id == AcademicClass.section_id)
+                .filter(StudentAcademicRecord.is_current == True)
+            )
+            if exam_id:
+                query = query.filter(ExamResult.exam_id == exam_id)
+            if class_id:
+                query = query.filter(
+                    StudentAcademicRecord.academic_class_id == class_id
+                )
+            if subject_id:
+                query = query.filter(ExamResult.subject_id == subject_id)
+            if status and status != "all":
+                query = query.filter(ExamResult.status == status)
+            rows = query.order_by(
+                Division.division_name.asc(),
+                Section.section_name.asc(),
+                StudentAcademicRecord.roll_number.asc(),
+            ).all()
+            data = []
+            for (
+                result,
+                student,
+                exam,
+                subject,
+                record,
+                academic,
+                division,
+                section,
+            ) in rows:
+                name = _student_name(student)
+                class_name = _class_label(division, section)
+                if (
+                    search
+                    and search not in name.lower()
+                    and search not in str(record.roll_number or "").lower()
+                    and search not in class_name.lower()
+                ):
+                    continue
+                out_of = _result_out_of(result)
+                data.append(
+                    {
+                        "result_id": result.id,
+                        "student_id": student.id,
+                        "student_name": name,
+                        "roll_no": record.roll_number,
+                        "academic_class_id": academic.id,
+                        "class_name": class_name,
+                        "exam_id": exam.id,
+                        "exam_name": exam.exam_name,
+                        "academic_year": exam.academic_year,
+                        "subject_id": subject.id,
+                        "subject": subject.subject_name,
+                        "internal_marks": result.internal_marks,
+                        "external_marks": result.external_marks,
+                        "oral_marks": result.oral_marks,
+                        "practical_marks": result.practical_marks,
+                        "internal_out_of": result.internal_out_of,
+                        "external_out_of": result.external_out_of,
+                        "oral_out_of": result.oral_out_of,
+                        "practical_out_of": result.practical_out_of,
+                        "total_marks": result.total_marks,
+                        "total_out_of": out_of,
+                        "percentage": result.percentage,
+                        "grade": result.grade,
+                        "status": result.status,
+                        "remarks": result.remarks,
+                        "final_result": (
+                            "PASS"
+                            if _safe_float(result.percentage) >= PASS_MARK_PERCENTAGE
+                            else "FAIL"
+                        ),
+                    }
+                )
+            return jsonify(data), 200
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to load exam result rows"}), 500
+
+
+class AdminExamReportCardsPDFAPI(MethodView):
+    @login_required
+    def get(self):
+        try:
+            exam_id = _parse_int(request.args.get("exam_id"))
+            class_id = _parse_int(
+                request.args.get("academic_class_id") or request.args.get("class_id")
+            )
+            if not exam_id:
+                return jsonify({"error": "exam_id is required"}), 400
+            exam = Exam.query.get(exam_id)
+            if not exam:
+                return jsonify({"error": "Exam not found"}), 404
+            if class_id and class_id != exam.academic_class_id:
+                return jsonify({"error": "Exam does not belong to selected class"}), 400
+
+            academic = AcademicClass.query.get(exam.academic_class_id)
+            division = Division.query.get(academic.division_id) if academic else None
+            section = Section.query.get(academic.section_id) if academic else None
+            batch = Batch.query.get(academic.batch_id) if academic else None
+            class_name = _class_label(division, section, batch)
+            students = _current_students_for_class(exam.academic_class_id)
+            subject_ids = _exam_subject_ids(exam.id)
+            subjects = (
+                Subject.query.filter(Subject.id.in_(subject_ids))
+                .order_by(Subject.subject_name.asc())
+                .all()
+                if subject_ids
+                else []
+            )
+
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                rightMargin=24,
+                leftMargin=24,
+                topMargin=24,
+                bottomMargin=24,
+            )
+            styles = getSampleStyleSheet()
+            elements = []
+            for idx, (record, student) in enumerate(students):
+                if idx:
+                    elements.append(Spacer(1, 24))
+                elements.append(Paragraph("<b>SCHOOL RESULT CARD</b>", styles["Title"]))
+                elements.append(
+                    Paragraph(
+                        f"<b>{exam.exam_name} - {exam.academic_year}</b>",
+                        styles["Heading3"],
+                    )
+                )
+                elements.append(Spacer(1, 8))
+                elements.append(
+                    Table(
+                        [
+                            [
+                                "Student",
+                                _student_name(student),
+                                "Roll No",
+                                record.roll_number or "N/A",
+                            ],
+                            ["Class", class_name, "Result", ""],
+                        ],
+                        colWidths=[70, 190, 70, 130],
+                    )
+                )
+                marks_rows = [["Subject", "Obtained", "Out Of", "%", "Grade", "Result"]]
+                total_obtained = 0
+                total_out = 0
+                for subject in subjects:
+                    result = ExamResult.query.filter_by(
+                        student_id=student.id, exam_id=exam.id, subject_id=subject.id
+                    ).first()
+                    obtained = _safe_float(result.total_marks) if result else 0
+                    out_of = _result_out_of(result) if result else 0
+                    percent = round((obtained / out_of) * 100, 2) if out_of else 0
+                    total_obtained += obtained
+                    total_out += out_of
+                    marks_rows.append(
+                        [
+                            subject.subject_name,
+                            obtained,
+                            out_of,
+                            f"{percent}%",
+                            result.grade if result else "-",
+                            "PASS" if percent >= PASS_MARK_PERCENTAGE else "FAIL",
+                        ]
+                    )
+                final_percentage = (
+                    round((total_obtained / total_out) * 100, 2) if total_out else 0
+                )
+                final_result = (
+                    "PASS" if final_percentage >= PASS_MARK_PERCENTAGE else "FAIL"
+                )
+                marks_rows.append(
+                    [
+                        "TOTAL",
+                        total_obtained,
+                        total_out,
+                        f"{final_percentage}%",
+                        _grade_from_percentage(final_percentage),
+                        final_result,
+                    ]
+                )
+                table = Table(marks_rows, repeatRows=1)
+                table.setStyle(
+                    TableStyle(
+                        [
+                            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4F46E5")),
+                            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+                            ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+                            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                        ]
+                    )
+                )
+                elements.append(Spacer(1, 10))
+                elements.append(table)
+                elements.append(Spacer(1, 16))
+                elements.append(
+                    Paragraph(
+                        "Class Teacher Signature ____________________ &nbsp;&nbsp;&nbsp; Principal Signature ____________________",
+                        styles["Normal"],
+                    )
+                )
+            doc.build(elements)
+            buffer.seek(0)
+            safe_exam = re.sub(r"[^a-zA-Z0-9]+", "_", exam.exam_name).strip("_")
+            return send_file(
+                buffer,
+                as_attachment=True,
+                download_name=f"{safe_exam}_{class_name}_report_cards.pdf",
+                mimetype="application/pdf",
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"error": "Failed to generate report cards"}), 500

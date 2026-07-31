@@ -745,8 +745,6 @@ function downloadCSV() {
 }
 
 // =================== Attendance Section (Admin Dashboard) ======================
-// ======================= ATTENDANCE MANAGEMENT =======================
-
 // ======================= DEMO DATA =======================
 
 const studentData = [
@@ -1573,149 +1571,155 @@ function previewStaffImg(event) {
     reader.readAsDataURL(event.target.files[0]);
 }
 
-// ========== ROLE & PERMISSION CORE ENGINE ==========
-
-const modules = ["Students", "Teachers", "Attendance", "Exams", "Fees", "Library", "HR", "Reports"];
-
-const roles = [
-    { name: "Super Admin", permissions: { "Reports": { view: true, create: true, edit: true, delete: true } } },
-    { name: "Teacher", permissions: { "Attendance": { view: true, create: true, edit: true, delete: false } } },
-    { name: "Accountant", permissions: { "Fees": { view: true, create: true, edit: true, delete: false } } }
-];
-
-const users = [
-    { id: 1, name: "Rahul Sharma", role: "Teacher", type: "teaching", customPermissions: {} },
-    { id: 2, name: "Aisha Khan", role: "Accountant", type: "nonTeaching", customPermissions: {} },
-    { id: 3, name: "Priya Desai", role: "Teacher", type: "teaching", customPermissions: {} }
-];
-
-let selectedRoleIndex = null;
-let currentSelectedUser = null;
-
-// --- ROLE LOGIC ---
-
-function loadRoles() {
-    const container = document.getElementById("roleList");
-    container.innerHTML = roles.map((role, index) => `
-        <div onclick="selectRole(${index})" 
-             class="group p-4 rounded-xl cursor-pointer border transition-all duration-200 ${selectedRoleIndex === index ? 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200 shadow-lg' : 'bg-white border-slate-100 hover:border-indigo-300 hover:bg-indigo-50'}">
-            <div class="flex justify-between items-center">
-                <span class="font-bold ${selectedRoleIndex === index ? 'text-white' : 'text-slate-700'}">${role.name}</span>
-                <span class="text-xs opacity-40 group-hover:opacity-100 transition-opacity">➔</span>
-            </div>
-        </div>
-    `).join("");
-}
-
-function selectRole(index) {
-    selectedRoleIndex = index;
-    document.getElementById("selectedRoleTitle").innerText = roles[index].name;
-    loadRoles();
-    renderRoleTable();
-}
-
-function renderRoleTable() {
-    const table = document.getElementById("permissionTable");
-    const role = roles[selectedRoleIndex];
-    table.innerHTML = modules.map(mod => `
-        <tr class="hover:bg-slate-50/80 transition">
-            <td class="p-4 font-bold text-slate-700">${mod}</td>
-            ${["view", "create", "edit", "delete"].map(act => `
-                <td class="p-4 text-center">
-                    <input type="checkbox" class="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                           ${role.permissions[mod]?.[act] ? 'checked' : ''} 
-                           onchange="updateRoleKey('${mod}', '${act}', this.checked)">
-                </td>
-            `).join("")}
-        </tr>
-    `).join("");
-}
-
-function updateRoleKey(mod, act, val) {
-    if (!roles[selectedRoleIndex].permissions[mod]) roles[selectedRoleIndex].permissions[mod] = {};
-    roles[selectedRoleIndex].permissions[mod][act] = val;
-}
-
-// --- USER OVERRIDE LOGIC ---
-
-function filterUsers() {
-    const type = document.getElementById("staffTypeFilter").value;
-    const select = document.getElementById("userSelect");
-    const filtered = type ? users.filter(u => u.type === type) : users;
-
-    select.innerHTML = '<option value="">Choose User...</option>' +
-        filtered.map(u => `<option value="${u.id}">${u.name} (${u.role})</option>`).join("");
-}
-
-function selectUser(userId) {
-    currentSelectedUser = users.find(u => u.id == userId);
-    const panel = document.getElementById("userOverridePanel");
-
-    if (!currentSelectedUser) { panel.classList.add("hidden"); return; }
-
-    panel.classList.remove("hidden");
-    document.getElementById("userName").innerText = currentSelectedUser.name;
-    document.getElementById("userInitial").innerText = currentSelectedUser.name.charAt(0);
-    document.getElementById("userBaseRole").innerText = `Base Role: ${currentSelectedUser.role}`;
-
-    renderUserTable();
-}
-
-function renderUserTable() {
-    const table = document.getElementById("userPermissionTable");
-    const baseRole = roles.find(r => r.name === currentSelectedUser.role);
-
-    table.innerHTML = modules.map(mod => {
-        return `<tr>
-            <td class="p-3 font-semibold text-slate-600">${mod}</td>
-            ${["view", "create", "edit", "delete"].map(act => {
-            const roleVal = baseRole?.permissions[mod]?.[act] || false;
-            const customVal = currentSelectedUser.customPermissions[mod]?.[act];
-
-            // Final value: Custom if defined, otherwise Role
-            const finalVal = (customVal !== undefined) ? customVal : roleVal;
-            const isOverridden = customVal !== undefined;
-
-            return `
-                <td class="p-3 text-center ${isOverridden ? 'bg-amber-50/50' : ''}">
-                    <input type="checkbox" class="w-4 h-4 rounded text-emerald-600" 
-                           ${finalVal ? 'checked' : ''} 
-                           onchange="updateUserOverride('${mod}', '${act}', this.checked)">
-                    ${isOverridden ? '<div class="text-[8px] text-amber-600 font-black uppercase leading-none mt-1">Manual</div>' : ''}
-                </td>`;
-        }).join("")}
-        </tr>`;
-    }).join("");
-}
-
-function updateUserOverride(mod, act, val) {
-    if (!currentSelectedUser.customPermissions[mod]) currentSelectedUser.customPermissions[mod] = {};
-    currentSelectedUser.customPermissions[mod][act] = val;
-    renderUserTable(); // Refresh to show "Manual" badge
-}
-
-function savePermissions() { alert("System Roles updated successfully!"); }
-function saveUserPermissions() { alert("Individual user overrides saved!"); }
-
-// Initialize
-loadRoles();
-filterUsers();
-
-
 // =========== EXAM and RESULT ===============
-// Demo Logic
-function toggleDetails(className) {
-    const detailSec = document.getElementById('classDetails');
-    const nameDisplay = document.getElementById('selectedClassName');
-    detailSec.classList.remove('hidden');
-    nameDisplay.innerText = className.replace('grade', 'Grade ').replace('A', '-A').replace('B', '-B');
-    detailSec.scrollIntoView({ behavior: 'smooth' });
+function openExamModal() {
+    document.getElementById("examModal").classList.remove("hidden");
+    document.getElementById("examModal").classList.add("flex");
 }
 
-function hideDetails() {
-    document.getElementById('classDetails').classList.add('hidden');
+function closeExamModal() {
+    document.getElementById("examModal").classList.add("hidden");
+    document.getElementById("examModal").classList.remove("flex");
 }
 
+function saveExam(event) {
+    event.preventDefault();
+
+    const payload = {
+        exam_name: document.getElementById("examName").value,
+        academic_year: document.getElementById("examAcademicYear").value,
+        exam_type: document.getElementById("examType").value,
+        status: document.getElementById("examStatus").value,
+        start_date: document.getElementById("examStartDate").value,
+        end_date: document.getElementById("examEndDate").value,
+        description: document.getElementById("examDescription").value
+    };
+
+    console.log("Create exam payload:", payload);
+    alert("Examination saved successfully.");
+    closeExamModal();
+}
+
+function applyExamFilters() {
+    const filters = {
+        academic_year: document.getElementById("examAcademicYearFilter").value,
+        exam: document.getElementById("examFilter").value,
+        class: document.getElementById("examClassFilter").value,
+        subject: document.getElementById("examSubjectFilter").value,
+        teacher: document.getElementById("examTeacherFilter").value,
+        status: document.getElementById("examStatusFilter").value,
+        search: document.getElementById("examStudentSearch").value
+    };
+
+    console.log("Applied filters:", filters);
+    alert("Filters applied.");
+}
+
+function resetExamFilters() {
+    [
+        "examAcademicYearFilter",
+        "examFilter",
+        "examClassFilter",
+        "examSubjectFilter",
+        "examTeacherFilter",
+        "examStatusFilter",
+        "examStudentSearch"
+    ].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+}
+
+function viewClassExamDetails(className) {
+    document.getElementById("selectedExamClassName").innerText = className;
+    document.getElementById("classExamDetailsPanel").classList.remove("hidden");
+    document.getElementById("classExamDetailsPanel").scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
+}
+
+function hideClassExamDetails() {
+    document.getElementById("classExamDetailsPanel").classList.add("hidden");
+}
+
+function refreshExamDashboard() {
+    alert("Dashboard refreshed.");
+}
+
+function exportExamReports() {
+    alert("Exporting all exam reports...");
+}
+
+function publishClassResult(className) {
+    if (!confirm(`Publish result for ${className}?`)) return;
+    alert(`Result published for ${className}.`);
+}
+
+function notifyPendingTeachers(className) {
+    alert(`Pending teachers notified for ${className}.`);
+}
+
+function notifyTeacher(teacherName) {
+    alert(`Reminder sent to ${teacherName}.`);
+}
+
+function openMarksEntry(subjectName) {
+    alert(`Opening marks entry for ${subjectName}.`);
+}
+
+function scheduleResultPublishing() {
+    const payload = {
+        academic_year: document.getElementById("publishAcademicYear").value,
+        exam: document.getElementById("publishExam").value,
+        class: document.getElementById("publishClass").value,
+        release_date: document.getElementById("publishDate").value,
+        release_time: document.getElementById("publishTime").value,
+        notify_parents: document.getElementById("notifyParents").checked,
+        generate_pdf: document.getElementById("generatePDF").checked
+    };
+
+    console.log("Publishing schedule:", payload);
+    alert("Result publishing schedule saved.");
+}
+
+function publishNow() {
+    if (!confirm("Publish verified results now?")) return;
+    alert("Results published successfully.");
+}
+
+function saveMarks() {
+    alert("Marks saved successfully.");
+}
+
+function verifyMarks() {
+    if (!confirm("Verify and lock selected marks?")) return;
+    alert("Marks verified and locked.");
+}
+
+function bulkImportMarks() {
+    alert("Bulk import marks feature opened.");
+}
+
+function notifyParent(studentName) {
+    alert(`Parent notified for ${studentName}.`);
+}
+
+function scheduleRemedialClass() {
+    alert("Remedial class scheduled.");
+}
+
+function assignMentor() {
+    alert("Mentor assigned.");
+}
+
+function downloadReport(type) {
+    alert(`Downloading ${type} report...`);
+}
+
+function generateReportCards() {
+    alert("Generating PDF report cards...");
+}
 
 // ============== FEES MANAGEMENT LOGIC =====================
 
