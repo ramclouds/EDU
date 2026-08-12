@@ -1700,9 +1700,7 @@ class RBACUserListAPI(MethodView):
     decorators = [super_admin_required]
 
     def get(self):
-        requested_user_type = normalize_user_type(
-            request.args.get("user_type", "all")
-        )
+        requested_user_type = normalize_user_type(request.args.get("user_type", "all"))
 
         if not requested_user_type:
             return jsonify({"error": "Invalid user type"}), 400
@@ -1763,27 +1761,18 @@ class RBACUserListAPI(MethodView):
                 if searchable_columns:
                     query = query.filter(or_(*searchable_columns))
 
-            if (
-                normalized_status in {"active", "inactive"}
-                and hasattr(model, "status")
-            ):
-                query = query.filter(
-                    model.status == normalized_status.capitalize()
-                )
+            if normalized_status in {"active", "inactive"} and hasattr(model, "status"):
+                query = query.filter(model.status == normalized_status.capitalize())
 
             if role_id:
-                assigned_user_ids = db.session.query(
-                    RBACUserRole.user_id
-                ).filter(
+                assigned_user_ids = db.session.query(RBACUserRole.user_id).filter(
                     RBACUserRole.user_type == user_type,
                     RBACUserRole.role_id == role_id,
                 )
                 query = query.filter(model.id.in_(assigned_user_ids))
 
             users = (
-                query.order_by(
-                    getattr(model, "first_name", model.id).asc()
-                )
+                query.order_by(getattr(model, "first_name", model.id).asc())
                 .limit(500)
                 .all()
             )

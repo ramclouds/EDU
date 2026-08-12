@@ -105,6 +105,30 @@ CREATE TABLE IF NOT EXISTS `admins` (
   KEY `idx_admin_admin_id` (`admin_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- admin_book_issues
+CREATE TABLE IF NOT EXISTS `admin_book_issues` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `admin_id` int NOT NULL,
+  `book_id` int NOT NULL,
+  `issue_date` date NOT NULL,
+  `due_date` date NOT NULL,
+  `return_date` date DEFAULT NULL,
+  `fine_per_day` decimal(5,2) NOT NULL,
+  `fine_amount` decimal(10,2) NOT NULL,
+  `status` enum('Issued','Returned','Overdue') NOT NULL,
+  `remarks` varchar(500) DEFAULT NULL,
+  `issued_by` varchar(50) DEFAULT NULL,
+  `returned_by` varchar(50) DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_admin_book_issues_book_id` (`book_id`),
+  KEY `ix_admin_book_issues_status` (`status`),
+  KEY `ix_admin_book_issues_admin_id` (`admin_id`),
+  CONSTRAINT `admin_book_issues_ibfk_1` FOREIGN KEY (`admin_id`) REFERENCES `admins` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `admin_book_issues_ibfk_2` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- announcements
 CREATE TABLE IF NOT EXISTS `announcements` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -643,19 +667,123 @@ CREATE TABLE IF NOT EXISTS `hostel_fees` (
   CONSTRAINT `hostel_fees_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- library_fine_payments
+CREATE TABLE IF NOT EXISTS `library_fine_payments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `book_issue_id` int DEFAULT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` varchar(30) NOT NULL,
+  `reference_no` varchar(100) DEFAULT NULL,
+  `remarks` varchar(500) DEFAULT NULL,
+  `status` enum('Collected','Waived','Refunded') NOT NULL,
+  `collected_by` varchar(50) DEFAULT NULL,
+  `collected_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_library_fine_payments_student_id` (`student_id`),
+  KEY `ix_library_fine_payments_status` (`status`),
+  KEY `ix_library_fine_payments_book_issue_id` (`book_issue_id`),
+  CONSTRAINT `library_fine_payments_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`),
+  CONSTRAINT `library_fine_payments_ibfk_2` FOREIGN KEY (`book_issue_id`) REFERENCES `book_issues` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- non_teaching_staff
+CREATE TABLE IF NOT EXISTS `non_teaching_staff` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `staff_id` varchar(50) NOT NULL,
+  `user_id` varchar(50) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `profile_image` varchar(255) DEFAULT NULL,
+  `gender` enum('Male','Female','Other') DEFAULT NULL,
+  `date_of_birth` date DEFAULT NULL,
+  `blood_group` enum('A+','A-','B+','B-','AB+','AB-','O+','O-') DEFAULT NULL,
+  `email` varchar(120) NOT NULL,
+  `mobile` varchar(15) DEFAULT NULL,
+  `alternate_mobile` varchar(15) DEFAULT NULL,
+  `username` varchar(50) NOT NULL,
+  `address` text,
+  `city` varchar(100) DEFAULT NULL,
+  `state` varchar(100) DEFAULT NULL,
+  `country` varchar(100) NOT NULL,
+  `pincode` varchar(10) DEFAULT NULL,
+  `department` varchar(100) NOT NULL,
+  `designation` varchar(100) NOT NULL,
+  `staff_type` enum('Clerk','Accountant','Librarian','Lab Assistant','Receptionist','Office Assistant','Peon','Security','Driver','Cleaner','Maintenance','Nurse','Counsellor','Other') NOT NULL,
+  `qualification` varchar(150) DEFAULT NULL,
+  `specialization` varchar(100) DEFAULT NULL,
+  `experience_years` int NOT NULL,
+  `joining_date` date DEFAULT NULL,
+  `employment_type` enum('Full Time','Part Time','Contract','Temporary') NOT NULL,
+  `shift` varchar(50) DEFAULT NULL,
+  `salary` float DEFAULT NULL,
+  `medical_condition` text,
+  `emergency_name` varchar(100) DEFAULT NULL,
+  `emergency_relation` varchar(50) DEFAULT NULL,
+  `emergency_phone` varchar(15) DEFAULT NULL,
+  `role` enum('staff') NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `auth_token` varchar(255) DEFAULT NULL,
+  `status` enum('Active','Inactive','Suspended') NOT NULL,
+  `last_login` datetime DEFAULT NULL,
+  `is_deleted` tinyint(1) NOT NULL,
+  `created_by` varchar(50) DEFAULT NULL,
+  `updated_by` varchar(50) DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ix_non_teaching_staff_user_id` (`user_id`),
+  UNIQUE KEY `ix_non_teaching_staff_staff_id` (`staff_id`),
+  UNIQUE KEY `ix_non_teaching_staff_email` (`email`),
+  UNIQUE KEY `ix_non_teaching_staff_username` (`username`),
+  UNIQUE KEY `ix_non_teaching_staff_mobile` (`mobile`),
+  KEY `idx_non_teaching_staff_deleted` (`is_deleted`),
+  KEY `ix_non_teaching_staff_department` (`department`),
+  KEY `idx_non_teaching_staff_department_status` (`department`,`status`),
+  KEY `ix_non_teaching_staff_staff_type` (`staff_type`),
+  KEY `ix_non_teaching_staff_status` (`status`),
+  KEY `ix_non_teaching_staff_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- notifications
 CREATE TABLE IF NOT EXISTS `notifications` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `user_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
   `role` varchar(50) NOT NULL,
-  `title` varchar(255) DEFAULT NULL,
-  `message` text,
+  `recipient_name` varchar(255) DEFAULT NULL,
+  `recipient_code` varchar(100) DEFAULT NULL,
+  `recipient_email` varchar(255) DEFAULT NULL,
+  `recipient_mobile` varchar(30) DEFAULT NULL,
+  `title` varchar(255) NOT NULL,
+  `message` text NOT NULL,
   `type` varchar(50) DEFAULT NULL,
+  `channel` varchar(30) NOT NULL,
+  `delivery_status` varchar(30) NOT NULL,
+  `failure_reason` varchar(500) DEFAULT NULL,
+  `retry_count` int NOT NULL,
+  `scheduled_at` datetime DEFAULT NULL,
+  `sent_at` datetime DEFAULT NULL,
+  `book_issue_id` int DEFAULT NULL,
+  `book_id` int DEFAULT NULL,
   `student_id` int DEFAULT NULL,
+  `teacher_id` int DEFAULT NULL,
+  `staff_id` int DEFAULT NULL,
   `leave_id` int DEFAULT NULL,
-  `is_read` tinyint(1) DEFAULT NULL,
-  `created_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `created_by` varchar(100) DEFAULT NULL,
+  `is_read` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL,
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_notifications_user_id` (`user_id`),
+  KEY `ix_notifications_book_id` (`book_id`),
+  KEY `ix_notifications_created_at` (`created_at`),
+  KEY `ix_notifications_delivery_status` (`delivery_status`),
+  KEY `ix_notifications_type` (`type`),
+  KEY `ix_notifications_book_issue_id` (`book_issue_id`),
+  KEY `ix_notifications_is_read` (`is_read`),
+  KEY `ix_notifications_role` (`role`),
+  KEY `ix_notifications_channel` (`channel`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- rbac_audit_logs
@@ -706,8 +834,8 @@ CREATE TABLE IF NOT EXISTS `rbac_roles` (
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `ix_rbac_roles_code` (`code`),
-  KEY `ix_rbac_roles_user_type` (`user_type`),
-  KEY `ix_rbac_roles_is_active` (`is_active`)
+  KEY `ix_rbac_roles_is_active` (`is_active`),
+  KEY `ix_rbac_roles_user_type` (`user_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- rbac_role_permissions
@@ -721,8 +849,8 @@ CREATE TABLE IF NOT EXISTS `rbac_role_permissions` (
   `can_delete` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_rbac_role_module` (`role_id`,`module_id`),
-  KEY `ix_rbac_role_permissions_role_id` (`role_id`),
   KEY `ix_rbac_role_permissions_module_id` (`module_id`),
+  KEY `ix_rbac_role_permissions_role_id` (`role_id`),
   CONSTRAINT `rbac_role_permissions_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `rbac_roles` (`id`) ON DELETE CASCADE,
   CONSTRAINT `rbac_role_permissions_ibfk_2` FOREIGN KEY (`module_id`) REFERENCES `rbac_modules` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -745,11 +873,11 @@ CREATE TABLE IF NOT EXISTS `rbac_user_permission_overrides` (
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_rbac_user_module_override` (`user_type`,`user_id`,`module_id`),
-  KEY `ix_rbac_user_permission_overrides_user_id` (`user_id`),
-  KEY `ix_rbac_user_permission_overrides_is_temporary` (`is_temporary`),
-  KEY `ix_rbac_user_permission_overrides_module_id` (`module_id`),
   KEY `ix_rbac_user_permission_overrides_user_type` (`user_type`),
+  KEY `ix_rbac_user_permission_overrides_module_id` (`module_id`),
+  KEY `ix_rbac_user_permission_overrides_is_temporary` (`is_temporary`),
   KEY `ix_rbac_user_permission_overrides_expires_at` (`expires_at`),
+  KEY `ix_rbac_user_permission_overrides_user_id` (`user_id`),
   CONSTRAINT `rbac_user_permission_overrides_ibfk_1` FOREIGN KEY (`module_id`) REFERENCES `rbac_modules` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -765,8 +893,8 @@ CREATE TABLE IF NOT EXISTS `rbac_user_roles` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_rbac_user_role` (`user_type`,`user_id`),
   KEY `ix_rbac_user_roles_role_id` (`role_id`),
-  KEY `ix_rbac_user_roles_user_type` (`user_type`),
   KEY `ix_rbac_user_roles_user_id` (`user_id`),
+  KEY `ix_rbac_user_roles_user_type` (`user_type`),
   CONSTRAINT `rbac_user_roles_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `rbac_roles` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -862,6 +990,46 @@ CREATE TABLE IF NOT EXISTS `staff` (
   KEY `ix_staff_is_deleted` (`is_deleted`),
   KEY `ix_staff_role` (`role`),
   KEY `ix_staff_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- staff_book_issues
+CREATE TABLE IF NOT EXISTS `staff_book_issues` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `staff_id` int NOT NULL,
+  `book_id` int NOT NULL,
+  `issue_date` date NOT NULL,
+  `due_date` date NOT NULL,
+  `return_date` date DEFAULT NULL,
+  `fine_per_day` decimal(5,2) NOT NULL,
+  `fine_amount` decimal(10,2) NOT NULL,
+  `status` enum('Issued','Returned','Overdue') NOT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_staff_book_issues_staff_id` (`staff_id`),
+  KEY `ix_staff_book_issues_book_id` (`book_id`),
+  KEY `ix_staff_book_issues_status` (`status`),
+  CONSTRAINT `staff_book_issues_ibfk_1` FOREIGN KEY (`staff_id`) REFERENCES `non_teaching_staff` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `staff_book_issues_ibfk_2` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- staff_library_fine_payments
+CREATE TABLE IF NOT EXISTS `staff_library_fine_payments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `staff_id` int NOT NULL,
+  `book_issue_id` int DEFAULT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` varchar(30) NOT NULL,
+  `reference_no` varchar(100) DEFAULT NULL,
+  `remarks` varchar(500) DEFAULT NULL,
+  `status` enum('Collected','Waived','Refunded') NOT NULL,
+  `collected_by` varchar(50) DEFAULT NULL,
+  `collected_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_staff_library_fine_payments_book_issue_id` (`book_issue_id`),
+  KEY `ix_staff_library_fine_payments_status` (`status`),
+  KEY `ix_staff_library_fine_payments_staff_id` (`staff_id`),
+  CONSTRAINT `staff_library_fine_payments_ibfk_1` FOREIGN KEY (`staff_id`) REFERENCES `non_teaching_staff` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `staff_library_fine_payments_ibfk_2` FOREIGN KEY (`book_issue_id`) REFERENCES `staff_book_issues` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- students
@@ -1012,6 +1180,26 @@ CREATE TABLE IF NOT EXISTS `teacher_attendance` (
   CONSTRAINT `teacher_attendance_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- teacher_book_issues
+CREATE TABLE IF NOT EXISTS `teacher_book_issues` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `teacher_id` int NOT NULL,
+  `book_id` int NOT NULL,
+  `issue_date` date NOT NULL,
+  `due_date` date NOT NULL,
+  `return_date` date DEFAULT NULL,
+  `fine_per_day` decimal(5,2) NOT NULL,
+  `fine_amount` decimal(10,2) NOT NULL,
+  `status` enum('Issued','Returned','Overdue') NOT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_teacher_book_issues_status` (`status`),
+  KEY `ix_teacher_book_issues_teacher_id` (`teacher_id`),
+  KEY `ix_teacher_book_issues_book_id` (`book_id`),
+  CONSTRAINT `teacher_book_issues_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `teacher_book_issues_ibfk_2` FOREIGN KEY (`book_id`) REFERENCES `books` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- teacher_classes
 CREATE TABLE IF NOT EXISTS `teacher_classes` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -1057,6 +1245,26 @@ CREATE TABLE IF NOT EXISTS `teacher_leave_balance` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `teacher_id` (`teacher_id`),
   CONSTRAINT `teacher_leave_balance_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- teacher_library_fine_payments
+CREATE TABLE IF NOT EXISTS `teacher_library_fine_payments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `teacher_id` int NOT NULL,
+  `book_issue_id` int DEFAULT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` varchar(30) NOT NULL,
+  `reference_no` varchar(100) DEFAULT NULL,
+  `remarks` varchar(500) DEFAULT NULL,
+  `status` enum('Collected','Waived','Refunded') NOT NULL,
+  `collected_by` varchar(50) DEFAULT NULL,
+  `collected_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_teacher_library_fine_payments_status` (`status`),
+  KEY `ix_teacher_library_fine_payments_teacher_id` (`teacher_id`),
+  KEY `ix_teacher_library_fine_payments_book_issue_id` (`book_issue_id`),
+  CONSTRAINT `teacher_library_fine_payments_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `teacher_library_fine_payments_ibfk_2` FOREIGN KEY (`book_issue_id`) REFERENCES `teacher_book_issues` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- timetable
@@ -1106,4 +1314,3 @@ CREATE TABLE IF NOT EXISTS `wardens` (
   `email` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
