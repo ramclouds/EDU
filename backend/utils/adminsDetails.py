@@ -879,3 +879,4 @@ class ChangeAdminPassword(MethodView):
             )
 
             return jsonify({"error": "Something went wrong"}), 500
+        

@@ -1,0 +1,4341 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Dashboard | Hostel Admin</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
+
+</head>
+
+<body class="bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-gray-100">
+
+    <div class="flex">
+
+        <!-- MOBILE OVERLAY -->
+        <div id="mobileOverlay" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[50] md:hidden"></div>
+
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="fixed top-0 left-0 h-screen w-64
+    bg-white/95 dark:bg-slate-900
+    backdrop-blur-xl border-r shadow-2xl z-[60]
+    flex flex-col
+    transform -translate-x-full md:translate-x-0
+    transition-transform duration-300
+    text-gray-800 dark:text-gray-100">
+
+            <!-- LOGO -->
+            <div class="px-6 py-5 border-b flex items-center gap-2">
+                <i class="bi bi-mortarboard text-purple-600 text-xl"></i>
+                <span class="app-name font-bold text-lg text-purple-600"></span>
+            </div>
+
+            <!-- SCROLLABLE AREA -->
+            <div class="relative flex-1 overflow-hidden">
+
+                <!-- TOP FADE -->
+                <div class="pointer-events-none absolute top-0 left-0 w-full h-6 
+        bg-gradient-to-b from-white dark:from-slate-900 to-transparent z-10"></div>
+
+                <!-- ========================= HOSTEL ADMIN SIDEBAR NAV ========================= -->
+                <nav class="h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-4 space-y-2 text-sm">
+
+                    <!-- MAIN -->
+                    <p class="text-xs text-gray-400 px-2 mt-2">MAIN</p>
+
+                    <button data-section="dashboard"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 font-semibold shadow">
+                        <i class="bi bi-grid"></i> Dashboard
+                    </button>
+
+                    <!-- HOSTEL MANAGEMENT -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">HOSTEL MANAGEMENT</p>
+
+                    <button data-section="rooms"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-door-open"></i> Rooms
+                    </button>
+
+                    <button data-section="room-allotment"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-house-check"></i> Room Allotment
+                    </button>
+
+                    <button data-section="beds"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-layout-sidebar-inset"></i> Bed Management
+                    </button>
+
+                    <button data-section="floors"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-building"></i> Floors & Blocks
+                    </button>
+
+                    <!-- RESIDENTS -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">HOSTEL RESIDENTS</p>
+
+                    <button data-section="students"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-mortarboard"></i> Students
+                    </button>
+
+                    <button data-section="staff"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-people"></i> Hostel Staff
+                    </button>
+
+                    <button data-section="visitors"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-person-lines-fill"></i> Visitors
+                    </button>
+
+                    <!-- ATTENDANCE -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">ATTENDANCE & ENTRY</p>
+
+                    <button data-section="attendance"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-calendar-check"></i> Attendance
+                    </button>
+
+                    <button data-section="checkin-checkout"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-box-arrow-in-right"></i> Check In / Out
+                    </button>
+
+                    <button data-section="leave-requests"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-journal-check"></i> Leave Requests
+                    </button>
+
+                    <!-- FEES -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">HOSTEL FEES</p>
+
+                    <button data-section="fees"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-cash-coin"></i> Fee Management
+                    </button>
+
+                    <button data-section="payments"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-credit-card"></i> Payments
+                    </button>
+
+                    <button data-section="dues"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-exclamation-circle"></i> Pending Dues
+                    </button>
+
+                    <!-- MESS MANAGEMENT -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">MESS MANAGEMENT</p>
+
+                    <button data-section="mess-menu"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-cup-hot"></i> Mess Menu
+                    </button>
+
+                    <button data-section="meal-attendance"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-clipboard-check"></i> Meal Attendance
+                    </button>
+
+                    <!-- COMPLAINTS -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">COMPLAINTS & SUPPORT</p>
+
+                    <button data-section="complaints"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-tools"></i> Complaints
+                    </button>
+
+                    <button data-section="maintenance"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-wrench-adjustable"></i> Maintenance
+                    </button>
+
+                    <!-- REPORTS -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">REPORTS</p>
+
+                    <button data-section="reports"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-bar-chart-line"></i> Reports & Analytics
+                    </button>
+
+                    <!-- COMMUNICATION -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">COMMUNICATION</p>
+
+                    <button data-section="announcements"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-megaphone"></i> Announcements
+                    </button>
+
+                    <button data-section="notifications"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-bell"></i> Notifications
+                    </button>
+
+                    <!-- SYSTEM -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">SYSTEM</p>
+
+                    <button data-section="settings"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-gear"></i> Settings
+                    </button>
+
+                    <button data-section="activity-logs"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-shield-check"></i> Activity Logs
+                    </button>
+
+                </nav>
+                <!-- BOTTOM FADE -->
+                <div class="pointer-events-none absolute bottom-0 left-0 w-full h-6 
+        bg-gradient-to-t from-white dark:from-slate-900 to-transparent z-10"></div>
+            </div>
+
+            <!-- FOOTER -->
+            <div class="p-4 border-t text-xs text-gray-400">
+                <span class="app-name"></span> © 2026
+            </div>
+
+        </aside>
+
+        <!-- MAIN -->
+        <main
+            class="flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8 md:ml-64 maincolor transition-all duration-300 dark:bg-slate-900 text-gray-800 dark:text-gray-100">
+
+            <!-- HEADER -->
+            <div class="sticky top-0 z-40 px-4 sm:px-6 py-3 
+    bg-gradient-to-r from-white/70 via-white/60 to-white/70 
+    dark:from-slate-800/80 dark:via-slate-800/70 dark:to-slate-800/80
+    backdrop-blur-2xl border border-white/40 dark:border-slate-700
+    shadow-[0_10px_40px_rgba(0,0,0,0.08)]
+    rounded-2xl transition-all duration-300 flex items-center justify-between gap-4">
+
+                <!-- MOBILE LOGO -->
+                <div class="flex items-center gap-2 md:hidden">
+                    <i class="bi bi-mortarboard text-indigo-600 text-lg"></i>
+                </div>
+
+                <!-- DESKTOP SEARCH -->
+                <div class="hidden md:flex w-1/2 relative group px-4">
+                    <i
+                        class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+                    <input type="text" id="desktopSearch" class="w-full pl-10 pr-4 py-2.5 rounded-full
+            bg-white/70 dark:bg-slate-700/70
+            backdrop-blur-md border border-gray-200 dark:border-slate-600
+            text-gray-800 dark:text-white
+            focus:bg-white dark:focus:bg-slate-700
+            transition-all duration-300
+            outline-none focus:ring-2 focus:ring-indigo-500
+            shadow-sm hover:shadow-md" placeholder="Search anything here...">
+                </div>
+
+                <!-- RIGHT ICONS -->
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <!-- <button id="darkToggleBtn" class="transition">
+                        <span id="darkIcon">🌙</span>
+                    </button> -->
+                    <!-- MOBILE MENU -->
+                    <button id="mobileSidebarBtn" class="md:hidden bg-white/70 dark:bg-slate-700/70 
+            backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
+            transition p-2.5 rounded-full shadow-md hover:scale-105">
+                        <i class="bi bi-list text-lg text-gray-700 dark:text-gray-200"></i>
+                    </button>
+
+                    <!-- MOBILE SEARCH -->
+                    <button id="mobileSearchBtn" class="md:hidden bg-white/70 dark:bg-slate-700/70 
+            backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
+            transition p-2.5 rounded-full shadow-md hover:scale-105">
+                        <i class="bi bi-search text-lg text-gray-700 dark:text-gray-200"></i>
+                    </button>
+
+                    <!-- NOTIFICATIONS -->
+                    <div class="relative">
+                        <div id="notificationBtn" class="relative cursor-pointer bg-white/70 dark:bg-slate-700/70
+                backdrop-blur-md hover:bg-white dark:hover:bg-slate-600
+                transition p-2.5 rounded-full shadow-md hover:scale-105">
+                            <i class="bi bi-bell text-lg text-gray-700 dark:text-gray-200"></i>
+
+                            <span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 
+                  text-[10px] flex items-center justify-center 
+                  bg-gradient-to-r from-red-500 to-pink-500 
+                  text-white rounded-full animate-pulse shadow">3</span>
+                        </div>
+
+                        <!-- NOTIFICATION MENU -->
+                        <div id="notificationMenu" class="hidden fixed top-20 left-1/2 -translate-x-1/2 
+                w-[92vw] max-w-md 
+                bg-white/95 dark:bg-slate-800/95
+                backdrop-blur-2xl 
+                rounded-2xl shadow-2xl 
+                border border-white/40 dark:border-slate-700
+                z-[70] overflow-hidden">
+
+                            <div
+                                class="p-4 border-b dark:border-slate-700 font-semibold flex justify-between items-center">
+                                Notifications
+                                <button id="closeNotifications"
+                                    class="text-xs text-gray-500 hover:text-red-500">✕</button>
+                            </div>
+
+                            <div class="max-h-06 overflow-y-auto p-4 text-sm space-y-3">
+
+                                <div class="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
+                                    <p class="font-medium text-gray-800 dark:text-gray-200">📢 New Exam Schedule
+                                        Released</p>
+                                    <p class="text-xs text-gray-500">2 hours ago</p>
+                                </div>
+
+                                <div class="p-3 bg-green-50 dark:bg-green-900/30 rounded-xl">
+                                    <p class="font-medium text-gray-800 dark:text-gray-200">✅ Attendance Updated</p>
+                                    <p class="text-xs text-gray-500">Today</p>
+                                </div>
+
+                            </div>
+
+                            <div onclick="openSection('notice')" class="p-3 text-center text-sm text-indigo-600 
+                    hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer font-medium">
+                                View All Notices →
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PROFILE -->
+                    <div class="relative">
+                        <button id="profileBtn" class="flex items-center gap-2 
+                bg-gradient-to-r from-white/70 to-white/60 
+                dark:from-slate-700 dark:to-slate-600
+                backdrop-blur-md px-2 py-1.5 rounded-full 
+                transition shadow-md hover:scale-105">
+
+                            <img src="https://i.pravatar.cc/100"
+                                class="rounded-full w-9 h-9 border-2 border-white dark:border-slate-500 shadow" />
+
+                            <span class="font-medium hidden sm:inline text-sm text-gray-700 dark:text-gray-200">
+                                Hostel Admin Name
+                            </span>
+                        </button>
+
+                        <div id="profileMenu" class="hidden absolute right-0 mt-4 w-56 
+                bg-white/95 dark:bg-slate-800/95
+                backdrop-blur-2xl rounded-2xl shadow-2xl 
+                border border-white/40 dark:border-slate-700 z-50">
+
+                            <div class="px-4 py-4 border-b dark:border-slate-700">
+                                <p class="font-semibold text-gray-800 dark:text-gray-200">Hostel Admin Name</p>
+                            </div>
+
+                            <ul class="py-2 text-sm">
+
+                                <li onclick="openSection('profile')"
+                                    class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer">
+                                    <i class="fa-solid fa-user text-gray-500"></i>
+                                    My Profile
+                                </li>
+
+                                <li id="openPasswordModal"
+                                    class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer">
+                                    <i class="fa-solid fa-lock text-gray-500"></i>
+                                    Password Change
+                                </li>
+
+                                <li onclick="openSection('settings')"
+                                    class="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer">
+                                    <i class="fa-solid fa-gear text-gray-500"></i>
+                                    Settings
+                                </li>
+
+                            </ul>
+                            <div class="border-t dark:border-slate-700">
+                                <button id="logoutBtn"
+                                    class="w-full px-4 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30">
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- MOBILE SEARCH -->
+            <div id="mobileSearch" class="hidden md:hidden px-4 mt-4">
+                <input type="text" class="w-full px-5 py-3 rounded-full 
+        bg-white dark:bg-slate-700 
+        text-gray-800 dark:text-white
+        shadow-md outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Search anything here...">
+            </div>
+
+            <!-- =========================== HOSTEL DASHBOARD SECTION =========================== -->
+            <section id="dashboardSection" class="section p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div>
+                    <h2 class="text-xl sm:text-2xl font-semibold">
+                        Welcome Back, Hostel Admin 👋
+                    </h2>
+                    <p class="text-gray-500 text-sm">
+                        Here’s your hostel overview for today
+                    </p>
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Total Rooms</p>
+                        <h3 class="text-lg font-semibold">120</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Occupied Rooms</p>
+                        <h3 class="text-blue-600 text-lg font-semibold">96</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Hostel Students</p>
+                        <h3 class="text-indigo-600 text-lg font-semibold">380</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-xl shadow">
+                        <p class="text-gray-500 text-xs">Monthly Revenue</p>
+                        <h3 class="text-green-600 text-lg font-semibold">₹2,45,000</h3>
+                    </div>
+
+                </div>
+
+                <!-- QUICK ACTIONS -->
+                <div class="bg-white p-4 rounded-xl shadow">
+                    <h3 class="text-sm font-semibold mb-3">Quick Actions</h3>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm">
+                            Add Student
+                        </button>
+
+                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">
+                            Allocate Room
+                        </button>
+
+                        <button class="bg-yellow-500 text-white px-4 py-2 rounded-lg text-sm">
+                            Add Room
+                        </button>
+
+                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
+                            Collect Fees
+                        </button>
+
+                    </div>
+                </div>
+
+                <!-- CHARTS -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <!-- OCCUPANCY TREND -->
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="text-sm font-semibold mb-3">Occupancy Trend</h3>
+
+                        <div class="h-48 flex items-center justify-center text-gray-400 text-sm">
+                            Occupancy Chart Placeholder
+                        </div>
+                    </div>
+
+                    <!-- REVENUE TREND -->
+                    <div class="bg-white p-5 rounded-xl shadow">
+                        <h3 class="text-sm font-semibold mb-3">Fee Collection Trend</h3>
+
+                        <div class="h-48 flex items-center justify-center text-gray-400 text-sm">
+                            Revenue Chart Placeholder
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RECENT ACTIVITY -->
+                <div class="bg-white rounded-xl shadow p-4">
+                    <h3 class="text-sm font-semibold mb-3">Recent Activity</h3>
+
+                    <div class="space-y-3 text-sm">
+
+                        <div class="flex justify-between">
+                            <span>Rahul Sharma checked into Room 204</span>
+                            <span class="text-gray-400">5 min ago</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span>Priya Patil paid hostel fees (₹12,000)</span>
+                            <span class="text-gray-400">20 min ago</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span>Maintenance request submitted for Room 108</span>
+                            <span class="text-gray-400">45 min ago</span>
+                        </div>
+
+                        <div class="flex justify-between">
+                            <span>New student added: Ayesha Khan</span>
+                            <span class="text-gray-400">1 hr ago</span>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- PENDING DUES ALERT -->
+                <div class="bg-red-50 border border-red-200 p-4 rounded-xl">
+                    <h3 class="text-sm font-semibold text-red-600 mb-2">
+                        ⚠ Pending Hostel Fee Alerts
+                    </h3>
+
+                    <ul class="text-sm text-red-700 space-y-1">
+                        <li>Rahul Verma - ₹5,000 pending</li>
+                        <li>Kavita Joshi - ₹8,500 pending</li>
+                        <li>Arjun Patil - ₹3,200 pending</li>
+                    </ul>
+                </div>
+
+                <!-- ROOM STATUS -->
+                <div class="bg-white rounded-xl shadow p-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold">Room Status Overview</h3>
+
+                        <button class="text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-lg">
+                            View All
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+
+                        <div class="bg-green-50 p-4 rounded-xl">
+                            <h4 class="text-lg font-bold text-green-600">96</h4>
+                            <p class="text-xs text-gray-500 mt-1">Occupied</p>
+                        </div>
+
+                        <div class="bg-blue-50 p-4 rounded-xl">
+                            <h4 class="text-lg font-bold text-blue-600">18</h4>
+                            <p class="text-xs text-gray-500 mt-1">Available</p>
+                        </div>
+
+                        <div class="bg-yellow-50 p-4 rounded-xl">
+                            <h4 class="text-lg font-bold text-yellow-600">4</h4>
+                            <p class="text-xs text-gray-500 mt-1">Under Cleaning</p>
+                        </div>
+
+                        <div class="bg-red-50 p-4 rounded-xl">
+                            <h4 class="text-lg font-bold text-red-600">2</h4>
+                            <p class="text-xs text-gray-500 mt-1">Maintenance</p>
+                        </div>
+
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- =========================== ROOMS SECTION =========================== -->
+            <section id="roomsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Room Management
+                        </h2>
+                        <p class="text-gray-500 text-sm">
+                            Manage hostel rooms, occupancy, and availability
+                        </p>
+                    </div>
+
+                    <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                        <i class="bi bi-plus-circle mr-2"></i>
+                        Add New Room
+                    </button>
+                </div>
+
+                <!-- ROOM SUMMARY -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Total Rooms</p>
+                        <h3 class="text-2xl font-bold mt-1">120</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Occupied Rooms</p>
+                        <h3 class="text-2xl font-bold text-blue-600 mt-1">96</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Available Rooms</p>
+                        <h3 class="text-2xl font-bold text-green-600 mt-1">18</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Maintenance Rooms</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-1">6</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full lg:w-80">
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search room number..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                        </div>
+
+                        <!-- FILTERS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Floors</option>
+                                <option>1st Floor</option>
+                                <option>2nd Floor</option>
+                                <option>3rd Floor</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Status</option>
+                                <option>Occupied</option>
+                                <option>Available</option>
+                                <option>Maintenance</option>
+                                <option>Cleaning</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Types</option>
+                                <option>Single Sharing</option>
+                                <option>Double Sharing</option>
+                                <option>Triple Sharing</option>
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- ROOMS TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+                        <h3 class="font-semibold text-sm">
+                            All Hostel Rooms
+                        </h3>
+
+                        <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg">
+                            Export
+                        </button>
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Room No</th>
+                                    <th class="text-left px-6 py-4 font-medium">Floor</th>
+                                    <th class="text-left px-6 py-4 font-medium">Type</th>
+                                    <th class="text-left px-6 py-4 font-medium">Capacity</th>
+                                    <th class="text-left px-6 py-4 font-medium">Occupied</th>
+                                    <th class="text-left px-6 py-4 font-medium">Status</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4 font-medium">
+                                        Room 101
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        1st Floor
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Double Sharing
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        2 Beds
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        2/2
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Occupied
+                                        </span>
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4 font-medium">
+                                        Room 102
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        1st Floor
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Triple Sharing
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        3 Beds
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        1/3
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Available
+                                        </span>
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4 font-medium">
+                                        Room 203
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        2nd Floor
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Single Sharing
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        1 Bed
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        0/1
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Cleaning
+                                        </span>
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- =========================== ROOM ALLOTMENT SECTION =========================== -->
+            <section id="room-allotmentSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Room Allotment
+                        </h2>
+
+                        <p class="text-gray-500 text-sm">
+                            Allocate hostel rooms and manage student assignments
+                        </p>
+                    </div>
+
+                    <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                        <i class="bi bi-plus-circle mr-2"></i>
+                        New Allotment
+                    </button>
+
+                </div>
+
+                <!-- SUMMARY CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Total Allotments</p>
+                        <h3 class="text-2xl font-bold mt-1">380</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Active Students</p>
+                        <h3 class="text-2xl font-bold text-blue-600 mt-1">352</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Vacant Beds</p>
+                        <h3 class="text-2xl font-bold text-green-600 mt-1">28</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Pending Requests</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-1">12</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full lg:w-80">
+
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search student or room..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                        </div>
+
+                        <!-- FILTER OPTIONS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Floors</option>
+                                <option>1st Floor</option>
+                                <option>2nd Floor</option>
+                                <option>3rd Floor</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Room Types</option>
+                                <option>Single Sharing</option>
+                                <option>Double Sharing</option>
+                                <option>Triple Sharing</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Status</option>
+                                <option>Active</option>
+                                <option>Pending</option>
+                                <option>Transferred</option>
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- ALLOTMENT TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+
+                        <h3 class="font-semibold text-sm">
+                            Student Room Allotments
+                        </h3>
+
+                        <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg">
+                            Export
+                        </button>
+
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Student</th>
+                                    <th class="text-left px-6 py-4 font-medium">Room No</th>
+                                    <th class="text-left px-6 py-4 font-medium">Floor</th>
+                                    <th class="text-left px-6 py-4 font-medium">Bed</th>
+                                    <th class="text-left px-6 py-4 font-medium">Check-In Date</th>
+                                    <th class="text-left px-6 py-4 font-medium">Status</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div>
+                                            <h4 class="font-medium">Rahul Sharma</h4>
+                                            <p class="text-xs text-gray-500">
+                                                STU1024
+                                            </p>
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        101
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        1st Floor
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Bed A
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        12 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Active
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-orange-600 hover:text-orange-800">
+                                                <i class="bi bi-arrow-left-right"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div>
+                                            <h4 class="font-medium">Ayesha Khan</h4>
+                                            <p class="text-xs text-gray-500">
+                                                STU1087
+                                            </p>
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        203
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        2nd Floor
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Bed B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        10 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Pending
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-orange-600 hover:text-orange-800">
+                                                <i class="bi bi-arrow-left-right"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div>
+                                            <h4 class="font-medium">Priya Patil</h4>
+                                            <p class="text-xs text-gray-500">
+                                                STU1120
+                                            </p>
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        305
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        3rd Floor
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Bed C
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        08 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Transferred
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-orange-600 hover:text-orange-800">
+                                                <i class="bi bi-arrow-left-right"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- =========================== BED MANAGEMENT SECTION =========================== -->
+            <section id="bedsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Bed Management
+                        </h2>
+
+                        <p class="text-gray-500 text-sm">
+                            Manage hostel beds, occupancy, and allocations
+                        </p>
+                    </div>
+
+                    <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                        <i class="bi bi-plus-circle mr-2"></i>
+                        Add New Bed
+                    </button>
+
+                </div>
+
+                <!-- SUMMARY CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Total Beds</p>
+                        <h3 class="text-2xl font-bold mt-1">420</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Occupied Beds</p>
+                        <h3 class="text-2xl font-bold text-blue-600 mt-1">352</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Available Beds</p>
+                        <h3 class="text-2xl font-bold text-green-600 mt-1">58</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Maintenance Beds</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-1">10</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full lg:w-80">
+
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search room or bed..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                        </div>
+
+                        <!-- FILTER OPTIONS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Floors</option>
+                                <option>1st Floor</option>
+                                <option>2nd Floor</option>
+                                <option>3rd Floor</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Rooms</option>
+                                <option>Room 101</option>
+                                <option>Room 102</option>
+                                <option>Room 201</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+                                <option>All Status</option>
+                                <option>Occupied</option>
+                                <option>Available</option>
+                                <option>Maintenance</option>
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- BED TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+
+                        <h3 class="font-semibold text-sm">
+                            Hostel Bed List
+                        </h3>
+
+                        <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg">
+                            Export
+                        </button>
+
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Bed ID</th>
+                                    <th class="text-left px-6 py-4 font-medium">Room No</th>
+                                    <th class="text-left px-6 py-4 font-medium">Floor</th>
+                                    <th class="text-left px-6 py-4 font-medium">Student</th>
+                                    <th class="text-left px-6 py-4 font-medium">Type</th>
+                                    <th class="text-left px-6 py-4 font-medium">Status</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4 font-medium">
+                                        BED-101A
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Room 101
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        1st Floor
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div>
+                                            <h4 class="font-medium">Rahul Sharma</h4>
+                                            <p class="text-xs text-gray-500">
+                                                STU1024
+                                            </p>
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Double Sharing
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Occupied
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4 font-medium">
+                                        BED-102B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Room 102
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        1st Floor
+                                    </td>
+
+                                    <td class="px-6 py-4 text-gray-400">
+                                        Not Assigned
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Triple Sharing
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Available
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4 font-medium">
+                                        BED-203C
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Room 203
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        2nd Floor
+                                    </td>
+
+                                    <td class="px-6 py-4 text-gray-400">
+                                        Under Maintenance
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Single Sharing
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Maintenance
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =========================== FLOORS & BLOCKS SECTION =========================== -->
+            <!-- ===========================================================
+ HOSTEL STRUCTURE MANAGEMENT
+ Replace Old Floors & Blocks Section
+=========================================================== -->
+
+            <section id="floorsSection" class="section hidden p-6 space-y-6">
+
+                <!-- Header -->
+
+                <div class="flex flex-col lg:flex-row justify-between gap-4">
+
+                    <div>
+
+                        <h2 class="text-3xl font-bold">
+                            Hostel Structure Management
+                        </h2>
+
+                        <p class="text-gray-500 mt-1">
+                            Build your hostel hierarchy from Block → Floor → Room → Beds
+                        </p>
+
+                    </div>
+
+                    <div class="flex gap-3">
+
+                        <button class="bg-indigo-600 text-white px-5 py-3 rounded-xl hover:bg-indigo-700">
+
+                            <i class="bi bi-building-add me-2"></i>
+                            Add Block
+
+                        </button>
+
+                        <button class="bg-green-600 text-white px-5 py-3 rounded-xl">
+
+                            <i class="bi bi-download me-2"></i>
+                            Export Structure
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Statistics -->
+
+                <div class="grid lg:grid-cols-6 md:grid-cols-3 grid-cols-2 gap-5">
+
+                    <div class="bg-white rounded-2xl shadow p-5">
+
+                        <p class="text-gray-500 text-sm">Blocks</p>
+
+                        <h3 class="text-3xl font-bold mt-2">4</h3>
+
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow p-5">
+
+                        <p class="text-gray-500 text-sm">Floors</p>
+
+                        <h3 class="text-3xl font-bold text-blue-600 mt-2">12</h3>
+
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow p-5">
+
+                        <p class="text-gray-500 text-sm">Rooms</p>
+
+                        <h3 class="text-3xl font-bold text-purple-600 mt-2">120</h3>
+
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow p-5">
+
+                        <p class="text-gray-500 text-sm">Beds</p>
+
+                        <h3 class="text-3xl font-bold text-green-600 mt-2">360</h3>
+
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow p-5">
+
+                        <p class="text-gray-500 text-sm">Occupied</p>
+
+                        <h3 class="text-3xl font-bold text-red-500 mt-2">314</h3>
+
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow p-5">
+
+                        <p class="text-gray-500 text-sm">Available</p>
+
+                        <h3 class="text-3xl font-bold text-orange-500 mt-2">46</h3>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Structure -->
+
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+
+                    <div class="flex justify-between items-center mb-6">
+
+                        <h3 class="text-xl font-semibold">
+
+                            Hostel Structure
+
+                        </h3>
+
+                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-xl">
+
+                            + New Block
+
+                        </button>
+
+                    </div>
+
+
+                    <!-- Block Card -->
+
+                    <div class="border rounded-2xl mb-6 overflow-hidden">
+
+                        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 flex justify-between">
+
+                            <div>
+
+                                <h3 class="text-xl font-semibold">
+
+                                    Building A
+
+                                </h3>
+
+                                <p class="text-indigo-100">
+
+                                    Boys Hostel
+
+                                </p>
+
+                            </div>
+
+                            <div class="space-x-2">
+
+                                <button class="bg-white/20 px-4 py-2 rounded-lg">
+
+                                    Edit
+
+                                </button>
+
+                                <button class="bg-red-500 px-4 py-2 rounded-lg">
+
+                                    Delete
+
+                                </button>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- Floors -->
+
+                        <div class="p-6 space-y-6">
+
+
+                            <!-- Floor -->
+
+                            <div class="border rounded-xl">
+
+                                <div class="bg-slate-100 p-4 flex justify-between items-center">
+
+                                    <div>
+
+                                        <h4 class="font-semibold">
+
+                                            1st Floor
+
+                                        </h4>
+
+                                        <small>
+
+                                            Rooms : 5
+
+                                        </small>
+
+                                    </div>
+
+                                    <button class="bg-green-600 text-white px-3 py-2 rounded-lg">
+
+                                        + Room
+
+                                    </button>
+
+                                </div>
+
+
+                                <!-- Rooms -->
+
+                                <div class="grid lg:grid-cols-5 md:grid-cols-3 gap-4 p-5">
+
+
+                                    <!-- Room -->
+
+                                    <div class="border rounded-xl p-4 hover:shadow-lg transition">
+
+                                        <div class="flex justify-between items-center mb-3">
+
+                                            <h5 class="font-bold">
+
+                                                A-101
+
+                                            </h5>
+
+                                            <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">
+
+                                                Available
+
+                                            </span>
+
+                                        </div>
+
+                                        <div class="space-y-2 text-sm">
+
+                                            <p>
+
+                                                Capacity :
+                                                <strong>3 Beds</strong>
+
+                                            </p>
+
+                                            <p>
+
+                                                Occupied :
+                                                <strong>2</strong>
+
+                                            </p>
+
+                                            <p>
+
+                                                Available :
+                                                <strong>1</strong>
+
+                                            </p>
+
+                                        </div>
+
+                                        <hr class="my-3">
+
+                                        <div class="space-y-2">
+
+                                            <div class="flex justify-between bg-gray-50 rounded p-2">
+
+                                                <span>
+
+                                                    Bed A
+
+                                                </span>
+
+                                                <span class="text-green-600 font-medium">
+
+                                                    Rahul
+
+                                                </span>
+
+                                            </div>
+
+                                            <div class="flex justify-between bg-gray-50 rounded p-2">
+
+                                                <span>
+
+                                                    Bed B
+
+                                                </span>
+
+                                                <span class="text-green-600 font-medium">
+
+                                                    Amit
+
+                                                </span>
+
+                                            </div>
+
+                                            <div class="flex justify-between bg-gray-50 rounded p-2">
+
+                                                <span>
+
+                                                    Bed C
+
+                                                </span>
+
+                                                <span class="text-orange-500">
+
+                                                    Empty
+
+                                                </span>
+
+                                            </div>
+
+                                        </div>
+
+                                        <button class="mt-4 w-full bg-indigo-600 text-white py-2 rounded-lg">
+
+                                            View Room
+
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+            <!-- =========================== STUDENTS SECTION =========================== -->
+            <section id="studentsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Hostel Students
+                        </h2>
+
+                        <p class="text-gray-500 text-sm">
+                            Manage hostel student records, room details, and stay information
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        <button
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-person-plus mr-2"></i>
+                            Add Student
+                        </button>
+
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-download mr-2"></i>
+                            Export
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Total Students</p>
+                        <h3 class="text-2xl font-bold mt-1">380</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Boys Hostel</p>
+                        <h3 class="text-2xl font-bold text-blue-600 mt-1">210</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Girls Hostel</p>
+                        <h3 class="text-2xl font-bold text-pink-600 mt-1">170</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Pending Fees</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-1">28</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full xl:w-80">
+
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search student name, ID, room..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                        </div>
+
+                        <!-- FILTERS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Blocks</option>
+                                <option>Block A</option>
+                                <option>Block B</option>
+                                <option>Block C</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Floors</option>
+                                <option>1st Floor</option>
+                                <option>2nd Floor</option>
+                                <option>3rd Floor</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Status</option>
+                                <option>Active</option>
+                                <option>Pending Fees</option>
+                                <option>Checked Out</option>
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- STUDENTS TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+
+                        <h3 class="font-semibold text-sm">
+                            Hostel Student Records
+                        </h3>
+
+                        <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg">
+                            View All
+                        </button>
+
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Student</th>
+                                    <th class="text-left px-6 py-4 font-medium">Course</th>
+                                    <th class="text-left px-6 py-4 font-medium">Room</th>
+                                    <th class="text-left px-6 py-4 font-medium">Block</th>
+                                    <th class="text-left px-6 py-4 font-medium">Check-In</th>
+                                    <th class="text-left px-6 py-4 font-medium">Fees</th>
+                                    <th class="text-left px-6 py-4 font-medium">Status</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-semibold">
+                                                RS
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Rahul Sharma
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1024
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        B.Tech CSE
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        101
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block A
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        12 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Paid
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Active
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-semibold">
+                                                AK
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Ayesha Khan
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1087
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        MBA
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        203
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        10 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Pending
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Fee Due
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-semibold">
+                                                PP
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Priya Patil
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1120
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        BBA
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        305
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        08 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Paid
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Checked Out
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- =========================== HOSTEL STAFF SECTION =========================== -->
+            <section id="staffSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Hostel Staff Management
+                        </h2>
+
+                        <p class="text-gray-500 text-sm">
+                            Manage wardens, security staff, cleaners, and hostel employees
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        <button
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-person-plus mr-2"></i>
+                            Add Staff
+                        </button>
+
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-download mr-2"></i>
+                            Export
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Total Staff</p>
+                        <h3 class="text-2xl font-bold mt-1">42</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Wardens</p>
+                        <h3 class="text-2xl font-bold text-indigo-600 mt-1">6</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Security Staff</p>
+                        <h3 class="text-2xl font-bold text-blue-600 mt-1">18</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Support Staff</p>
+                        <h3 class="text-2xl font-bold text-green-600 mt-1">18</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full xl:w-80">
+
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search staff name or ID..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                        </div>
+
+                        <!-- FILTERS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Roles</option>
+                                <option>Warden</option>
+                                <option>Security Guard</option>
+                                <option>Cleaner</option>
+                                <option>Cook</option>
+                                <option>Maintenance</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Blocks</option>
+                                <option>Block A</option>
+                                <option>Block B</option>
+                                <option>Block C</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Status</option>
+                                <option>Active</option>
+                                <option>On Leave</option>
+                                <option>Inactive</option>
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- STAFF TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+
+                        <h3 class="font-semibold text-sm">
+                            Hostel Staff Records
+                        </h3>
+
+                        <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg">
+                            View All
+                        </button>
+
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Staff</th>
+                                    <th class="text-left px-6 py-4 font-medium">Role</th>
+                                    <th class="text-left px-6 py-4 font-medium">Assigned Block</th>
+                                    <th class="text-left px-6 py-4 font-medium">Shift</th>
+                                    <th class="text-left px-6 py-4 font-medium">Contact</th>
+                                    <th class="text-left px-6 py-4 font-medium">Status</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-semibold">
+                                                VK
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Vijay Kulkarni
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STF1001
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Chief Warden
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block A
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Morning
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        +91 9876543210
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Active
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-semibold">
+                                                RS
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Rakesh Singh
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STF1008
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Security Guard
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Night
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        +91 9123456780
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            On Leave
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-semibold">
+                                                SP
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Sunita Patil
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STF1015
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Cleaner
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block C
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Evening
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        +91 9988776655
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Active
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- =========================== VISITORS SECTION =========================== -->
+            <section id="visitorsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Visitors Management
+                        </h2>
+
+                        <p class="text-gray-500 text-sm">
+                            Track hostel visitors, entry approvals, and visitor history
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        <button
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-person-plus mr-2"></i>
+                            Add Visitor
+                        </button>
+
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-download mr-2"></i>
+                            Export
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Today's Visitors</p>
+                        <h3 class="text-2xl font-bold mt-1">48</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Inside Hostel</p>
+                        <h3 class="text-2xl font-bold text-blue-600 mt-1">12</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Approved Visits</p>
+                        <h3 class="text-2xl font-bold text-green-600 mt-1">40</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Pending Requests</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-1">8</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full xl:w-80">
+
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search visitor or student..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                        </div>
+
+                        <!-- FILTERS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Blocks</option>
+                                <option>Block A</option>
+                                <option>Block B</option>
+                                <option>Block C</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Visit Types</option>
+                                <option>Parent</option>
+                                <option>Guardian</option>
+                                <option>Friend</option>
+                                <option>Relative</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Status</option>
+                                <option>Approved</option>
+                                <option>Pending</option>
+                                <option>Rejected</option>
+                                <option>Checked Out</option>
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- VISITORS TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+
+                        <h3 class="font-semibold text-sm">
+                            Visitor Entry Records
+                        </h3>
+
+                        <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg">
+                            View All
+                        </button>
+
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Visitor</th>
+                                    <th class="text-left px-6 py-4 font-medium">Student</th>
+                                    <th class="text-left px-6 py-4 font-medium">Relation</th>
+                                    <th class="text-left px-6 py-4 font-medium">Block / Room</th>
+                                    <th class="text-left px-6 py-4 font-medium">Check-In</th>
+                                    <th class="text-left px-6 py-4 font-medium">Check-Out</th>
+                                    <th class="text-left px-6 py-4 font-medium">Status</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-semibold">
+                                                AS
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Anil Sharma
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    VIS1001
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div>
+                                            <h4 class="font-medium">
+                                                Rahul Sharma
+                                            </h4>
+
+                                            <p class="text-xs text-gray-500">
+                                                STU1024
+                                            </p>
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Father
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block A / 101
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        10:30 AM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        --
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Inside Hostel
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-semibold">
+                                                PK
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Pooja Khan
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    VIS1002
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div>
+                                            <h4 class="font-medium">
+                                                Ayesha Khan
+                                            </h4>
+
+                                            <p class="text-xs text-gray-500">
+                                                STU1087
+                                            </p>
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Sister
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B / 203
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        09:15 AM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        11:00 AM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Checked Out
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center font-semibold">
+                                                RM
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Ravi More
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    VIS1003
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div>
+                                            <h4 class="font-medium">
+                                                Priya Patil
+                                            </h4>
+
+                                            <p class="text-xs text-gray-500">
+                                                STU1120
+                                            </p>
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Friend
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B / 305
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        01:00 PM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        --
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Pending Approval
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- =========================== ATTENDANCE SECTION =========================== -->
+            <section id="attendanceSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Hostel Attendance
+                        </h2>
+
+                        <p class="text-gray-500 text-sm">
+                            Track daily student attendance, hostel presence, and absentees
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        <button
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-check2-square mr-2"></i>
+                            Mark Attendance
+                        </button>
+
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-download mr-2"></i>
+                            Export Report
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Total Students</p>
+                        <h3 class="text-2xl font-bold mt-1">380</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Present Today</p>
+                        <h3 class="text-2xl font-bold text-green-600 mt-1">342</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Absent Today</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-1">24</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">On Leave</p>
+                        <h3 class="text-2xl font-bold text-yellow-600 mt-1">14</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full xl:w-80">
+
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search student or room..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                        </div>
+
+                        <!-- FILTER OPTIONS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <input type="date"
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Blocks</option>
+                                <option>Block A</option>
+                                <option>Block B</option>
+                                <option>Block C</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Status</option>
+                                <option>Present</option>
+                                <option>Absent</option>
+                                <option>On Leave</option>
+                                <option>Late Entry</option>
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- ATTENDANCE TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+
+                        <h3 class="font-semibold text-sm">
+                            Daily Attendance Records
+                        </h3>
+
+                        <div class="flex gap-2">
+
+                            <button class="bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm">
+                                Present
+                            </button>
+
+                            <button class="bg-red-100 text-red-700 px-3 py-2 rounded-lg text-sm">
+                                Absent
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Student</th>
+                                    <th class="text-left px-6 py-4 font-medium">Room</th>
+                                    <th class="text-left px-6 py-4 font-medium">Block</th>
+                                    <th class="text-left px-6 py-4 font-medium">Check-In Time</th>
+                                    <th class="text-left px-6 py-4 font-medium">Attendance</th>
+                                    <th class="text-left px-6 py-4 font-medium">Remarks</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-semibold">
+                                                RS
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Rahul Sharma
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1024
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        101
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block A
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        08:10 AM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Present
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        On Time
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-semibold">
+                                                AK
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Ayesha Khan
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1087
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        203
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        --
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Absent
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        No Entry
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center font-semibold">
+                                                PP
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Priya Patil
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1120
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        305
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Approved Leave
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            On Leave
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Family Visit
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- =========================== CHECK-IN / CHECK-OUT SECTION =========================== -->
+            <section id="checkin-checkoutSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Check-In / Check-Out Management
+                        </h2>
+
+                        <p class="text-gray-500 text-sm">
+                            Monitor hostel entries, exits, late returns, and movement records
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        <button
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-box-arrow-in-right mr-2"></i>
+                            New Check-In
+                        </button>
+
+                        <button class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-box-arrow-right mr-2"></i>
+                            New Check-Out
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Inside Hostel</p>
+                        <h3 class="text-2xl font-bold text-green-600 mt-1">342</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Checked Out</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-1">26</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Late Entries</p>
+                        <h3 class="text-2xl font-bold text-yellow-600 mt-1">8</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Pending Approval</p>
+                        <h3 class="text-2xl font-bold text-indigo-600 mt-1">5</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full xl:w-80">
+
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search student, room, or ID..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                        </div>
+
+                        <!-- FILTERS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <input type="date"
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Blocks</option>
+                                <option>Block A</option>
+                                <option>Block B</option>
+                                <option>Block C</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Status</option>
+                                <option>Checked In</option>
+                                <option>Checked Out</option>
+                                <option>Late Entry</option>
+                                <option>Pending</option>
+                            </select>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- CHECK-IN / OUT TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+
+                        <h3 class="font-semibold text-sm">
+                            Student Movement Records
+                        </h3>
+
+                        <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg">
+                            Export Logs
+                        </button>
+
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Student</th>
+                                    <th class="text-left px-6 py-4 font-medium">Room</th>
+                                    <th class="text-left px-6 py-4 font-medium">Block</th>
+                                    <th class="text-left px-6 py-4 font-medium">Check-Out</th>
+                                    <th class="text-left px-6 py-4 font-medium">Expected Return</th>
+                                    <th class="text-left px-6 py-4 font-medium">Check-In</th>
+                                    <th class="text-left px-6 py-4 font-medium">Status</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-semibold">
+                                                RS
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Rahul Sharma
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1024
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        101
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block A
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        09:00 AM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        06:00 PM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        05:40 PM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Returned
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-semibold">
+                                                AK
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Ayesha Khan
+                                                </h4>
+                                                <p class="text-xs text-gray-500">
+                                                    STU1087
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        203
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        11:30 AM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        08:00 PM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        --
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Outside Hostel
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-box-arrow-in-right"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center font-semibold">
+                                                PP
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Priya Patil
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1120
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        305
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Block B
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        04:00 PM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        07:00 PM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        09:15 PM
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Late Entry
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-exclamation-circle"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- LATE ENTRY ALERT -->
+                <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+
+                    <div class="flex items-start gap-3">
+
+                        <div
+                            class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+
+                        <div>
+
+                            <h3 class="font-semibold text-yellow-800">
+                                Late Entry Alert
+                            </h3>
+
+                            <p class="text-sm text-yellow-700 mt-1">
+                                8 students entered the hostel after the allowed timing today.
+                                Review and approve late entries if required.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =========================== LEAVE REQUEST SECTION =========================== -->
+            <section id="leave-requestsSection" class="section hidden p-4 sm:p-6 space-y-6">
+
+                <!-- HEADER -->
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-semibold">
+                            Leave Request Management
+                        </h2>
+
+                        <p class="text-gray-500 text-sm">
+                            Manage student leave applications, approvals, and return tracking
+                        </p>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        <button
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-plus-circle mr-2"></i>
+                            New Leave Request
+                        </button>
+
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm shadow">
+                            <i class="bi bi-download mr-2"></i>
+                            Export Reports
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI CARDS -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Total Requests</p>
+                        <h3 class="text-2xl font-bold mt-1">124</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Pending Approval</p>
+                        <h3 class="text-2xl font-bold text-yellow-600 mt-1">12</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Approved</p>
+                        <h3 class="text-2xl font-bold text-green-600 mt-1">98</h3>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl shadow">
+                        <p class="text-xs text-gray-500">Rejected</p>
+                        <h3 class="text-2xl font-bold text-red-600 mt-1">14</h3>
+                    </div>
+
+                </div>
+
+                <!-- FILTERS -->
+                <div class="bg-white rounded-2xl shadow p-4">
+
+                    <div class="flex flex-col xl:flex-row gap-4 xl:items-center xl:justify-between">
+
+                        <!-- SEARCH -->
+                        <div class="relative w-full xl:w-80">
+
+                            <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+
+                            <input type="text" placeholder="Search student or leave ID..."
+                                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                        </div>
+
+                        <!-- FILTERS -->
+                        <div class="flex flex-wrap gap-3">
+
+                            <input type="date"
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Blocks</option>
+                                <option>Block A</option>
+                                <option>Block B</option>
+                                <option>Block C</option>
+                            </select>
+
+                            <select
+                                class="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+                                <option>All Status</option>
+                                <option>Pending</option>
+                                <option>Approved</option>
+                                <option>Rejected</option>
+                                <option>Returned</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LEAVE REQUEST TABLE -->
+                <div class="bg-white rounded-2xl shadow overflow-hidden">
+
+                    <!-- TABLE HEADER -->
+                    <div class="flex items-center justify-between p-4 border-b">
+
+                        <h3 class="font-semibold text-sm">
+                            Leave Applications
+                        </h3>
+
+                        <button class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg">
+                            View All
+                        </button>
+
+                    </div>
+
+                    <!-- TABLE -->
+                    <div class="overflow-x-auto">
+
+                        <table class="w-full text-sm">
+
+                            <thead class="bg-gray-50 text-gray-600">
+
+                                <tr>
+                                    <th class="text-left px-6 py-4 font-medium">Student</th>
+                                    <th class="text-left px-6 py-4 font-medium">Room</th>
+                                    <th class="text-left px-6 py-4 font-medium">Leave Type</th>
+                                    <th class="text-left px-6 py-4 font-medium">From</th>
+                                    <th class="text-left px-6 py-4 font-medium">To</th>
+                                    <th class="text-left px-6 py-4 font-medium">Reason</th>
+                                    <th class="text-left px-6 py-4 font-medium">Status</th>
+                                    <th class="text-left px-6 py-4 font-medium">Actions</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody class="divide-y">
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-semibold">
+                                                RS
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Rahul Sharma
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1024
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        A-101
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Weekend Leave
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        15 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        17 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Family Function
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Approved
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-semibold">
+                                                AK
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Ayesha Khan
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1087
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        B-203
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Medical Leave
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        16 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        20 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Health Checkup
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Pending
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <!-- ROW -->
+                                <tr class="hover:bg-gray-50 transition">
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3">
+
+                                            <div
+                                                class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center font-semibold">
+                                                PP
+                                            </div>
+
+                                            <div>
+                                                <h4 class="font-medium">
+                                                    Priya Patil
+                                                </h4>
+
+                                                <p class="text-xs text-gray-500">
+                                                    STU1120
+                                                </p>
+                                            </div>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td class="px-6 py-4 font-medium">
+                                        B-305
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Emergency Leave
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        14 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        15 May 2026
+                                    </td>
+
+                                    <td class="px-6 py-4">
+                                        Family Emergency
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <span
+                                            class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                                            Rejected
+                                        </span>
+
+                                    </td>
+
+                                    <td class="px-6 py-4">
+
+                                        <div class="flex items-center gap-3 text-lg">
+
+                                            <button class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button class="text-green-600 hover:text-green-800">
+                                                <i class="bi bi-check-circle"></i>
+                                            </button>
+                                            <button class="text-red-600 hover:text-red-800">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PENDING ALERT -->
+                <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+
+                    <div class="flex items-start gap-3">
+
+                        <div
+                            class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+
+                        <div>
+
+                            <h3 class="font-semibold text-yellow-800">
+                                Pending Leave Requests
+                            </h3>
+
+                            <p class="text-sm text-yellow-700 mt-1">
+                                12 leave requests are waiting for approval.
+                                Review pending applications to avoid delays.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+            <!-- ============================= LIBRARY ADMIN PROFILE SECTION ============================= -->
+            <section id="profileSection"
+                class="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
+
+                <!-- HEADER -->
+                <div
+                    class="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-xl overflow-hidden">
+
+                    <div class="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
+
+                    <div class="relative flex flex-col sm:flex-row items-center gap-6">
+
+                        <img src="https://i.pravatar.cc/120?img=12"
+                            class="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
+
+                        <div class="text-center sm:text-left flex-1">
+                            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">
+                                Salman Pinjari
+                            </h2>
+
+                            <p class="text-sm opacity-90 mt-1">
+                                Library Admin • School Library System
+                            </p>
+
+                            <div class="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
+                                <span class="px-3 py-1 text-xs bg-white/20 rounded-full">LIB-ADMIN-001</span>
+                                <span class="px-3 py-1 text-xs bg-white/20 rounded-full">Full Library Access</span>
+
+                                <span class="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
+                                    Active
+                                </span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- GRID -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+
+                    <!-- PERSONAL -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">👤 Personal Info</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>DOB: <span class="font-medium">1995-05-10</span></p>
+                            <p>Gender: <span class="font-medium">Male</span></p>
+                            <p>Phone: <span class="font-medium">9876543210</span></p>
+                            <p>Email: <span class="font-medium">library@school.com</span></p>
+                        </div>
+                    </div>
+
+                    <!-- ROLE -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">📚 Role & Access</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Role: <span class="font-medium">Library Admin</span></p>
+                            <p>Permissions: <span class="font-medium">Books, Members, Fines</span></p>
+                            <p>Access Level: <span class="text-green-600 font-medium">Full Control</span></p>
+                        </div>
+                    </div>
+
+                    <!-- LIBRARY INFO -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">🏫 Library Info</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Library Name: <span class="font-medium">ABC School Library</span></p>
+                            <p>Code: <span class="font-medium">LIB-102</span></p>
+                            <p>Total Books: <span class="font-medium">1250+</span></p>
+                            <p>Sections: <span class="font-medium">Science, Arts, Tech</span></p>
+                        </div>
+                    </div>
+
+                    <!-- SYSTEM CONTROL -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">⚙️ System Control</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Members Managed: <span class="font-medium">540+</span></p>
+                            <p>Active Issues: <span class="font-medium">320</span></p>
+                            <p>Modules Enabled: <span class="font-medium">All Library</span></p>
+                        </div>
+                    </div>
+
+                    <!-- FINANCE -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">💰 Fine Control</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Fine Access: <span class="text-green-600 font-medium">Full</span></p>
+                            <p>Waive Authority: <span class="font-medium">Yes</span></p>
+                            <p>Total Collection: <span class="font-medium">₹4,350</span></p>
+                        </div>
+                    </div>
+
+                    <!-- SECURITY -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">🔐 Security</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Last Login: <span class="font-medium">Today</span></p>
+                            <p>2FA: <span class="text-green-600 font-medium">Enabled</span></p>
+                            <p>Login Alerts: <span class="font-medium">Active</span></p>
+                        </div>
+                    </div>
+
+                    <!-- ACTIVITY -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">📊 Activity</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Logins (30d): <span class="font-medium">60</span></p>
+                            <p>Books Issued: <span class="font-medium">320+</span></p>
+                            <p>Last Action: <span class="font-medium">Issued Book</span></p>
+                        </div>
+                    </div>
+
+                    <!-- ADDRESS -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">📍 Address</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Aurangabad, Maharashtra</p>
+                            <p>Pincode: 431001</p>
+                        </div>
+                    </div>
+
+                    <!-- SUPPORT -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">📞 Support Contact</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Name: <span class="font-medium">Library Assistant</span></p>
+                            <p>Phone: <span class="font-medium">9876501234</span></p>
+                            <p>Email: <span class="font-medium">support@library.com</span></p>
+                        </div>
+                    </div>
+
+                    <!-- ACCOUNT -->
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
+                        <h4 class="font-semibold mb-3">🖥️ Account</h4>
+                        <div class="space-y-2 text-sm">
+                            <p>Username: <span class="font-medium">lib_admin001</span></p>
+                            <p>Status: <span class="text-green-600 font-medium">Active</span></p>
+                            <p>Created On: <span class="font-medium">2022</span></p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ACTION BAR -->
+                <div class="sticky bottom-4 flex justify-center sm:justify-end gap-3">
+
+                    <button
+                        class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium shadow-lg hover:opacity-90">
+                        Edit Profile
+                    </button>
+
+                </div>
+
+            </section>
+            <!-- PASSWORD MODAL -->
+            <div id="passwordModal"
+                class="hidden fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-50 p-4">
+
+                <!-- MODAL CARD -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-5 sm:p-6 w-full max-w-md">
+
+                    <!-- TITLE -->
+                    <h2 class="text-lg sm:text-xl font-semibold mb-4 dark:text-white">
+                        Change Password
+                    </h2>
+
+                    <!-- INPUTS -->
+                    <div class="flex flex-col gap-3">
+
+                        <input id="currentPass" type="password" placeholder="Current Password"
+                            class="px-4 py-2 border rounded-lg text-sm 
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+                        <input id="newPass" type="password" placeholder="New Password"
+                            class="px-4 py-2 border rounded-lg text-sm 
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+                        <input id="confirmPass" type="password" placeholder="Confirm Password"
+                            class="px-4 py-2 border rounded-lg text-sm 
+                bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+                        <!-- TOGGLE -->
+                        <div id="togglePassword"
+                            class="flex items-center gap-2 cursor-pointer text-gray-500 dark:text-gray-300 text-sm hover:text-gray-700 dark:hover:text-white transition">
+
+                            <i class="bi bi-eye-fill"></i>
+                            <span>Show Passwords</span>
+                        </div>
+
+                    </div>
+
+                    <!-- BUTTONS -->
+                    <div class="flex flex-col sm:flex-row justify-end gap-3 mt-5">
+
+                        <button id="closePasswordModal" type="button"
+                            class="w-full sm:w-auto px-4 py-2 rounded-lg bg-gray-200 dark:bg-slate-700 dark:text-white hover:bg-gray-300 dark:hover:bg-slate-600 transition">
+                            Cancel
+                        </button>
+
+                        <button id="savePasswordBtn" type="button"
+                            class="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition">
+                            Save Password
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+            <!-- ============================= PROFILE SECTION END ============================= -->
+
+            <script src="./js-scripts/main.js"></script>
+            <!-- NOTIFICATION CONTAINER -->
+            <!-- <div id="notificationContainer" class="fixed top-5 right-5 space-y-3 z-[9999]"></div> -->
+        </main>
+
+    </div>
+</body>
+
+</html>

@@ -399,6 +399,25 @@ class Login(MethodView):
             user.auth_token = token
             db.session.commit()
 
+            # Load effective RBAC access without changing the existing
+            # custom token, dashboard, role, or authentication behaviour.
+            rbac_access = None
+            try:
+                from utils.rolePermissionManagement import build_user_access
+
+                if isinstance(user, Admin):
+                    rbac_user_type = "admin"
+                elif isinstance(user, Teacher):
+                    rbac_user_type = "teacher"
+                elif isinstance(user, Student):
+                    rbac_user_type = "student"
+                else:
+                    rbac_user_type = str(getattr(user, "role", "") or "").lower()
+
+                rbac_access = build_user_access(rbac_user_type, user.id)
+            except Exception:
+                logger.exception("Unable to load RBAC access during login")
+
             # Auto dashboard based on role and admin type
             if user.role == "student":
                 dashboard = "/student-dashboard"
@@ -436,6 +455,7 @@ class Login(MethodView):
                         "token": token,
                         "role": user.role,
                         "dashboard": dashboard,
+                        "rbac": rbac_access,
                         "user": {
                             "id": user.id,
                             "role": user.role,

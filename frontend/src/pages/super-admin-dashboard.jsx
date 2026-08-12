@@ -19,6 +19,7 @@ import { useMyClasses } from "../controllers/MyClasses/useMyClass";
 import { useTeacherManagement } from "../controllers/MyClasses/useTeachersManagement";
 import { useSubjectManagements } from "../controllers/Subjects/useSubjectManagements";
 import { useExamResultManagement } from "../controllers/ExamResult/useExamResultManagement";
+import { useRolePermissionManagement } from "../controllers/Auth/useRolePermissionManagement";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -364,6 +365,97 @@ function AdminDashboard() {
     updateAttendanceStatus,
     markAllAttendance,
   } = useAttendanceManagement({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
+  // ============== Role and Permission Hook ==============
+  const {
+    rbacActions,
+    rbacUserTypes,
+
+    rbacModules,
+    rbacRoles,
+    rbacUsers,
+    rbacStats,
+
+    rbacSelectedRole,
+    rbacSelectedRoleId,
+
+    rbacSelectedUser,
+    rbacSelectedUserKey,
+    rbacSelectedUserAccess,
+
+    rbacRoleOptions,
+
+    rbacRoleForm,
+    rbacRolePermissionForm,
+    rbacUserOverrideForm,
+    rbacUserFilters,
+    rbacTemporaryAccessForm,
+
+    rbacRoleModalOpen,
+    rbacDeleteRoleModalOpen,
+    rbacUserAccessModalOpen,
+
+    rbacLoading,
+    rbacRolesLoading,
+    rbacUsersLoading,
+    rbacUserAccessLoading,
+    rbacSavingRole,
+    rbacSavingPermissions,
+    rbacSavingUserAccess,
+    rbacDeletingRole,
+
+    rbacHasUnsavedRolePermissionChanges,
+    rbacHasUnsavedOverrideChanges,
+
+    loadRbacRolePermissionBootstrap,
+    refreshRbacRolePermissionManagement,
+
+    loadRbacRoles,
+    loadRbacUsers,
+    loadRbacUserAccess,
+
+    selectRbacRole,
+
+    openRbacCreateRoleModal,
+    openRbacEditRoleModal,
+    closeRbacRoleModal,
+
+    updateRbacRoleForm,
+    saveRbacRole,
+
+    openRbacDeleteRoleModal,
+    closeRbacDeleteRoleModal,
+    deleteRbacRole,
+
+    toggleRbacRolePermission,
+    setAllRbacRolePermissions,
+    setRbacRoleModulePermissions,
+    saveRbacRolePermissions,
+
+    updateRbacUserFilter,
+    resetRbacUserFilters,
+
+    selectRbacUser,
+    closeRbacUserAccessModal,
+
+    assignRbacRoleToUser,
+
+    setRbacUserPermissionOverride,
+    cycleRbacUserPermissionOverride,
+    saveRbacUserOverrides,
+    resetRbacUserOverrides,
+
+    updateRbacTemporaryAccessForm,
+
+    getRbacEffectivePermission,
+    getRbacInheritedPermission,
+    getRbacOverrideValue,
+    getRbacOverrideLabel,
+  } = useRolePermissionManagement({
     activeSection,
     fetchWithAuth,
     showToast,
@@ -1029,6 +1121,1451 @@ function AdminDashboard() {
         {activeSection === "dashboard" && (
           <section>
             <h1>hello Super Admin</h1>
+          </section>
+        )}
+
+        {activeSection === "roles" && (
+          <section className="space-y-6">
+            {/* =====================================================
+        SECTION HEADER
+    ====================================================== */}
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+                  <i className="fas fa-user-shield text-xl" />
+                </div>
+
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900">
+                    Roles & Permissions
+                  </h1>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Manage roles, user permissions and temporary access.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={refreshRbacRolePermissionManagement}
+                  disabled={rbacLoading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <i
+                    className={`fas fa-sync-alt ${
+                      rbacLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openRbacCreateRoleModal("admin")}
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                >
+                  <i className="fas fa-plus" />
+                  Add New Role
+                </button>
+              </div>
+            </div>
+
+            {/* =====================================================
+        LOADING
+    ====================================================== */}
+            {rbacLoading ? (
+              <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="text-center">
+                  <i className="fas fa-spinner animate-spin text-4xl text-indigo-600" />
+
+                  <p className="mt-3 text-sm font-medium text-slate-500">
+                    Loading roles and permissions...
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* =================================================
+            CARD 1: ROLES AND PERMISSIONS
+        ================================================== */}
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-200 p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-900">
+                          Role Permission Management
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          Select a default or custom role to manage its
+                          permissions.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                          {rbacStats.total_roles || rbacRoles.length} Roles
+                        </span>
+
+                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                          {rbacStats.active_roles || 0} Active
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5">
+                    {/* =============================================
+                ROLE CARDS
+            ============================================== */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {/* ADD ROLE CARD */}
+                      <button
+                        type="button"
+                        onClick={() => openRbacCreateRoleModal("admin")}
+                        className="group min-h-[160px] rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/50 p-5 text-left transition hover:border-indigo-500 hover:bg-indigo-50"
+                      >
+                        <div className="flex h-full flex-col items-center justify-center text-center">
+                          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+                            <i className="fas fa-plus" />
+                          </div>
+
+                          <p className="font-bold text-indigo-700">
+                            Add New Role
+                          </p>
+
+                          <p className="mt-1 text-xs text-indigo-500">
+                            Create a custom role with module permissions.
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* ROLE LIST */}
+                      {rbacRoles.map((role) => {
+                        const isSelected =
+                          String(rbacSelectedRoleId) === String(role.id);
+
+                        return (
+                          <button
+                            key={role.id}
+                            type="button"
+                            onClick={() => selectRbacRole(role)}
+                            className={`min-h-[160px] rounded-2xl border p-5 text-left transition ${
+                              isSelected
+                                ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
+                                : "border-slate-200 bg-white hover:border-indigo-300 hover:shadow-md"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div
+                                className={`flex h-11 w-11 items-center justify-center rounded-xl ${
+                                  isSelected
+                                    ? "bg-indigo-600 text-white"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                <i className="fas fa-users-cog" />
+                              </div>
+
+                              <div className="flex flex-col items-end gap-1">
+                                {role.is_system && (
+                                  <span className="rounded-full bg-violet-100 px-2 py-1 text-[10px] font-bold uppercase text-violet-700">
+                                    Default
+                                  </span>
+                                )}
+
+                                <span
+                                  className={`rounded-full px-2 py-1 text-[10px] font-bold ${
+                                    role.is_active !== false
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : "bg-rose-100 text-rose-700"
+                                  }`}
+                                >
+                                  {role.is_active !== false
+                                    ? "Active"
+                                    : "Inactive"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <h3 className="mt-4 truncate font-bold text-slate-900">
+                              {role.name}
+                            </h3>
+
+                            <p className="mt-1 line-clamp-2 min-h-[32px] text-xs text-slate-500">
+                              {role.description ||
+                                "Role permission configuration"}
+                            </p>
+
+                            <div className="mt-3 flex items-center justify-between">
+                              <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase text-slate-600">
+                                {role.user_type || "admin"}
+                              </span>
+
+                              <i
+                                className={`fas fa-chevron-right text-xs ${
+                                  isSelected
+                                    ? "text-indigo-600"
+                                    : "text-slate-400"
+                                }`}
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* =============================================
+                SELECTED ROLE PERMISSION MATRIX
+            ============================================== */}
+                    {rbacSelectedRole ? (
+                      <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+                        <div className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 p-5 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-lg font-bold text-slate-900">
+                                {rbacSelectedRole.name}
+                              </h3>
+
+                              {rbacSelectedRole.is_system && (
+                                <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                                  Default Role
+                                </span>
+                              )}
+
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                  rbacSelectedRole.is_active !== false
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-rose-100 text-rose-700"
+                                }`}
+                              >
+                                {rbacSelectedRole.is_active !== false
+                                  ? "Active"
+                                  : "Inactive"}
+                              </span>
+                            </div>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                              Edit module permissions and save your changes.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAllRbacRolePermissions(true)}
+                              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                            >
+                              <i className="fas fa-check-double mr-1.5" />
+                              Allow All
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setAllRbacRolePermissions(false)}
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                            >
+                              <i className="fas fa-times mr-1.5" />
+                              Clear All
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openRbacEditRoleModal(rbacSelectedRole)
+                              }
+                              disabled={rbacSelectedRole.is_system}
+                              className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <i className="fas fa-edit" />
+                              Edit Role
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openRbacDeleteRoleModal(rbacSelectedRole)
+                              }
+                              disabled={rbacSelectedRole.is_system}
+                              className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <i className="fas fa-trash" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[760px]">
+                            <thead className="bg-white">
+                              <tr className="border-b border-slate-200">
+                                <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Module
+                                </th>
+
+                                {rbacActions.map((action) => (
+                                  <th
+                                    key={action}
+                                    className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500"
+                                  >
+                                    {action}
+                                  </th>
+                                ))}
+
+                                <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Full Access
+                                </th>
+                              </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-slate-100">
+                              {rbacModules.map((module) => {
+                                const moduleCode =
+                                  module.code ||
+                                  module.module_code ||
+                                  module.slug;
+
+                                const permissions =
+                                  rbacRolePermissionForm?.[moduleCode] || {};
+
+                                const hasFullAccess = rbacActions.every(
+                                  (action) => Boolean(permissions[action]),
+                                );
+
+                                return (
+                                  <tr
+                                    key={moduleCode}
+                                    className="transition hover:bg-slate-50"
+                                  >
+                                    <td className="px-5 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                                          <i
+                                            className={
+                                              module.icon || "fas fa-cube"
+                                            }
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <p className="font-semibold text-slate-800">
+                                            {module.name ||
+                                              module.module_name ||
+                                              moduleCode}
+                                          </p>
+
+                                          <p className="text-xs text-slate-500">
+                                            {moduleCode}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {rbacActions.map((action) => {
+                                      const checked = Boolean(
+                                        permissions[action],
+                                      );
+
+                                      return (
+                                        <td
+                                          key={`${moduleCode}-${action}`}
+                                          className="px-4 py-4 text-center"
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              toggleRbacRolePermission(
+                                                moduleCode,
+                                                action,
+                                                !checked,
+                                              )
+                                            }
+                                            title={`${checked ? "Remove" : "Allow"} ${action} permission`}
+                                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                                              checked
+                                                ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                                                : "border-slate-300 bg-white text-slate-400 hover:border-indigo-400 hover:text-indigo-600"
+                                            }`}
+                                          >
+                                            <i className="fas fa-check text-xs" />
+                                          </button>
+                                        </td>
+                                      );
+                                    })}
+
+                                    <td className="px-4 py-4 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setRbacRoleModulePermissions(
+                                            moduleCode,
+                                            !hasFullAccess,
+                                          )
+                                        }
+                                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                                          hasFullAccess
+                                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                        }`}
+                                      >
+                                        {hasFullAccess ? "Enabled" : "Enable"}
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+
+                              {rbacModules.length === 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={rbacActions.length + 2}
+                                    className="px-5 py-12 text-center text-sm text-slate-500"
+                                  >
+                                    No permission modules are available.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p
+                              className={`text-sm ${
+                                rbacHasUnsavedRolePermissionChanges
+                                  ? "font-semibold text-amber-700"
+                                  : "text-slate-500"
+                              }`}
+                            >
+                              {rbacHasUnsavedRolePermissionChanges
+                                ? "You have unsaved permission changes."
+                                : "All permission changes are saved."}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={saveRbacRolePermissions}
+                            disabled={
+                              rbacSavingPermissions ||
+                              !rbacHasUnsavedRolePermissionChanges
+                            }
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {rbacSavingPermissions ? (
+                              <>
+                                <i className="fas fa-spinner animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <i className="fas fa-save" />
+                                Save Changes
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+                          <i className="fas fa-user-tag text-xl" />
+                        </div>
+
+                        <p className="mt-3 font-semibold text-slate-700">
+                          Select a role
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          Select one of the roles above to manage permissions.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* =================================================
+            CARD 2: USER ROLE ASSIGNMENT
+        ================================================== */}
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-200 p-5">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-900">
+                          User Role Assignment
+                        </h2>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          Filter users and select a user to assign roles,
+                          permissions or temporary access.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-full bg-indigo-50 px-3 py-1.5 font-semibold text-indigo-700">
+                          {rbacStats.total_users || rbacUsers.length} Users
+                        </span>
+
+                        <span className="rounded-full bg-amber-50 px-3 py-1.5 font-semibold text-amber-700">
+                          {rbacStats.users_with_overrides || 0} Custom Access
+                        </span>
+
+                        <span className="rounded-full bg-rose-50 px-3 py-1.5 font-semibold text-rose-700">
+                          {rbacStats.temporary_access_users || 0} Temporary
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* FILTERS */}
+                    <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[220px_minmax(260px,1fr)_190px_160px_auto_auto]">
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                          User Type
+                        </label>
+
+                        <select
+                          name="user_type"
+                          value={rbacUserFilters.user_type}
+                          onChange={updateRbacUserFilter}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        >
+                          {rbacUserTypes.map((type) => (
+                            <option key={type.value} value={type.value}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                          Search User
+                        </label>
+
+                        <div className="relative">
+                          <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+
+                          <input
+                            type="text"
+                            name="search"
+                            value={rbacUserFilters.search}
+                            onChange={updateRbacUserFilter}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                loadRbacUsers(rbacUserFilters);
+                              }
+                            }}
+                            placeholder="Name, email, username or ID..."
+                            className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                          Role
+                        </label>
+
+                        <select
+                          name="role_id"
+                          value={rbacUserFilters.role_id}
+                          onChange={updateRbacUserFilter}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        >
+                          <option value="">All Roles</option>
+
+                          {rbacRoles.map((role) => (
+                            <option key={role.id} value={role.id}>
+                              {role.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                          Status
+                        </label>
+
+                        <select
+                          name="status"
+                          value={rbacUserFilters.status}
+                          onChange={updateRbacUserFilter}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        >
+                          <option value="">All Status</option>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="temporary">Temporary Access</option>
+                          <option value="override">Custom Permission</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => loadRbacUsers(rbacUserFilters)}
+                        disabled={rbacUsersLoading}
+                        className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {rbacUsersLoading ? (
+                          <i className="fas fa-spinner animate-spin" />
+                        ) : (
+                          <i className="fas fa-filter" />
+                        )}
+                        Apply
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const resetFilters = resetRbacUserFilters();
+                          loadRbacUsers(resetFilters, {
+                            clearSelectedUser: true,
+                          });
+                        }}
+                        className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <i className="fas fa-undo" />
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* USER LIST */}
+                  <div className="p-5">
+                    {rbacUsersLoading ? (
+                      <div className="flex min-h-[260px] items-center justify-center">
+                        <div className="text-center">
+                          <i className="fas fa-spinner animate-spin text-3xl text-indigo-600" />
+
+                          <p className="mt-3 text-sm text-slate-500">
+                            Loading users...
+                          </p>
+                        </div>
+                      </div>
+                    ) : rbacUsers.length === 0 ? (
+                      <div className="py-16 text-center">
+                        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                          <i className="fas fa-users" />
+                        </div>
+
+                        <p className="font-semibold text-slate-700">
+                          No users found
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          Change the user type or filter options.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {rbacUsers.map((user) => {
+                          const isSelected =
+                            rbacSelectedUserKey === user.user_key;
+
+                          return (
+                            <button
+                              key={user.user_key}
+                              type="button"
+                              onClick={() => selectRbacUser(user, true)}
+                              className={`rounded-xl border p-4 text-left transition ${
+                                isSelected
+                                  ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
+                                  : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/40 hover:shadow-sm"
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                {user.profile_image ? (
+                                  <img
+                                    src={user.profile_image}
+                                    alt={user.name}
+                                    className="h-12 w-12 shrink-0 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-100 font-bold text-indigo-700">
+                                    {user.name?.charAt(0)?.toUpperCase() ||
+                                      user.username?.charAt(0)?.toUpperCase() ||
+                                      "U"}
+                                  </div>
+                                )}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="truncate font-bold text-slate-900">
+                                        {user.name ||
+                                          user.username ||
+                                          `User ${user.id}`}
+                                      </p>
+
+                                      <p className="mt-1 truncate text-xs text-slate-500">
+                                        {user.email ||
+                                          user.username ||
+                                          `ID: ${user.id}`}
+                                      </p>
+                                    </div>
+
+                                    <i className="fas fa-chevron-right mt-1 text-xs text-slate-400" />
+                                  </div>
+
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-600">
+                                      {user.user_type}
+                                    </span>
+
+                                    <span className="rounded-md bg-indigo-100 px-2 py-1 text-[10px] font-bold text-indigo-700">
+                                      {user.role_name ||
+                                        user.role?.name ||
+                                        "No Role"}
+                                    </span>
+
+                                    {user.has_overrides && (
+                                      <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">
+                                        Custom Permission
+                                      </span>
+                                    )}
+
+                                    {user.is_temporary && (
+                                      <span className="rounded-md bg-rose-100 px-2 py-1 text-[10px] font-bold text-rose-700">
+                                        Temporary
+                                      </span>
+                                    )}
+
+                                    {user.status && (
+                                      <span
+                                        className={`rounded-md px-2 py-1 text-[10px] font-bold ${
+                                          String(user.status).toLowerCase() ===
+                                          "active"
+                                            ? "bg-emerald-100 text-emerald-700"
+                                            : "bg-slate-100 text-slate-600"
+                                        }`}
+                                      >
+                                        {user.status}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {user.is_temporary && user.expires_at && (
+                                    <p className="mt-2 text-[11px] font-medium text-rose-600">
+                                      <i className="fas fa-clock mr-1" />
+                                      Expires:{" "}
+                                      {new Date(
+                                        user.expires_at,
+                                      ).toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* =====================================================
+        USER ACCESS POPUP
+    ====================================================== */}
+            {rbacUserAccessModalOpen && rbacSelectedUser && (
+              <div
+                className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    closeRbacUserAccessModal();
+                  }
+                }}
+              >
+                <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                  {/* POPUP HEADER */}
+                  <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-6 sm:py-5">
+                    <div className="flex min-w-0 items-center gap-4">
+                      {rbacSelectedUser.profile_image ? (
+                        <img
+                          src={rbacSelectedUser.profile_image}
+                          alt={rbacSelectedUser.name}
+                          className="h-12 w-12 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-600 font-bold text-white">
+                          {rbacSelectedUser.name?.charAt(0)?.toUpperCase() ||
+                            rbacSelectedUser.username
+                              ?.charAt(0)
+                              ?.toUpperCase() ||
+                            "U"}
+                        </div>
+                      )}
+
+                      <div className="min-w-0">
+                        <h3 className="truncate text-lg font-bold text-slate-900">
+                          {rbacSelectedUser.name || rbacSelectedUser.username}
+                        </h3>
+
+                        <p className="truncate text-sm text-slate-500">
+                          {rbacSelectedUser.email ||
+                            rbacSelectedUser.username ||
+                            `User ID: ${rbacSelectedUser.id}`}
+                        </p>
+
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                            {rbacSelectedUser.user_type}
+                          </span>
+
+                          <span className="rounded bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                            {rbacSelectedUser.role_name ||
+                              rbacSelectedUserAccess?.role?.name ||
+                              "No Role"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closeRbacUserAccessModal}
+                      disabled={rbacSavingUserAccess}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <i className="fas fa-times" />
+                    </button>
+                  </div>
+
+                  {rbacUserAccessLoading ? (
+                    <div className="flex min-h-[500px] items-center justify-center">
+                      <div className="text-center">
+                        <i className="fas fa-spinner animate-spin text-4xl text-indigo-600" />
+
+                        <p className="mt-3 text-sm text-slate-500">
+                          Loading user access...
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="overflow-y-auto p-5 sm:p-6">
+                      {/* ===========================================
+                  ROLE AND TEMPORARY ACCESS
+              ============================================ */}
+                      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                        {/* ASSIGN ROLE */}
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="mb-4 flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+                              <i className="fas fa-user-tag" />
+                            </div>
+
+                            <div>
+                              <h4 className="font-bold text-slate-900">
+                                Assigned Role
+                              </h4>
+
+                              <p className="text-xs text-slate-500">
+                                Select the main role for this user.
+                              </p>
+                            </div>
+                          </div>
+
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Role
+                          </label>
+
+                          <select
+                            value={
+                              rbacSelectedUserAccess?.role?.id ||
+                              rbacSelectedUser.role_id ||
+                              ""
+                            }
+                            onChange={(event) =>
+                              assignRbacRoleToUser(event.target.value)
+                            }
+                            disabled={rbacSavingUserAccess}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <option value="">No Role Assigned</option>
+
+                            {rbacRoleOptions.map((role) => (
+                              <option key={role.id} value={role.id}>
+                                {role.name}
+                              </option>
+                            ))}
+                          </select>
+
+                          <p className="mt-2 text-xs text-slate-500">
+                            Role permissions are inherited automatically.
+                            Individual permissions below can override them.
+                          </p>
+                        </div>
+
+                        {/* TEMPORARY ACCESS */}
+                        <div
+                          className={`rounded-xl border p-4 ${
+                            rbacTemporaryAccessForm.is_temporary
+                              ? "border-amber-300 bg-amber-50"
+                              : "border-slate-200 bg-slate-50"
+                          }`}
+                        >
+                          <label className="flex cursor-pointer items-start justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                              <div
+                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                                  rbacTemporaryAccessForm.is_temporary
+                                    ? "bg-amber-200 text-amber-800"
+                                    : "bg-slate-200 text-slate-600"
+                                }`}
+                              >
+                                <i className="fas fa-clock" />
+                              </div>
+
+                              <div>
+                                <p
+                                  className={`font-bold ${
+                                    rbacTemporaryAccessForm.is_temporary
+                                      ? "text-amber-900"
+                                      : "text-slate-900"
+                                  }`}
+                                >
+                                  Temporary Permission
+                                </p>
+
+                                <p
+                                  className={`mt-1 text-xs ${
+                                    rbacTemporaryAccessForm.is_temporary
+                                      ? "text-amber-700"
+                                      : "text-slate-500"
+                                  }`}
+                                >
+                                  Automatically revoke custom permissions after
+                                  the selected date and time.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="relative mt-1 shrink-0">
+                              <input
+                                type="checkbox"
+                                name="is_temporary"
+                                checked={Boolean(
+                                  rbacTemporaryAccessForm.is_temporary,
+                                )}
+                                onChange={updateRbacTemporaryAccessForm}
+                                className="peer sr-only"
+                              />
+
+                              <div className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-amber-600" />
+
+                              <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+                            </div>
+                          </label>
+
+                          {rbacTemporaryAccessForm.is_temporary && (
+                            <div className="mt-4 space-y-4 border-t border-amber-200 pt-4">
+                              <div>
+                                <label className="mb-1.5 block text-xs font-bold text-amber-900">
+                                  Access Expiry Date & Time
+                                  <span className="ml-1 text-rose-600">*</span>
+                                </label>
+
+                                <input
+                                  type="datetime-local"
+                                  name="expires_at"
+                                  value={rbacTemporaryAccessForm.expires_at}
+                                  onChange={updateRbacTemporaryAccessForm}
+                                  className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1.5 block text-xs font-bold text-amber-900">
+                                  Reason
+                                </label>
+
+                                <textarea
+                                  name="reason"
+                                  rows={3}
+                                  value={rbacTemporaryAccessForm.reason}
+                                  onChange={updateRbacTemporaryAccessForm}
+                                  placeholder="Example: Temporary exam result verification access"
+                                  className="w-full resize-none rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                                />
+                              </div>
+
+                              <div className="rounded-lg border border-amber-200 bg-white/70 p-3">
+                                <p className="text-xs font-medium text-amber-800">
+                                  <i className="fas fa-info-circle mr-1.5" />
+                                  After expiry, the user will continue using
+                                  only the assigned role permissions.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ===========================================
+                  PERMISSION OVERRIDES
+              ============================================ */}
+                      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
+                        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <h4 className="font-bold text-slate-900">
+                              Individual Permission Overrides
+                            </h4>
+
+                            <p className="mt-1 text-xs text-slate-500">
+                              Click each permission to cycle between Role, Allow
+                              and Deny.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold">
+                            <span className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-indigo-700">
+                              Role = Inherited
+                            </span>
+
+                            <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-700">
+                              Allow = Granted
+                            </span>
+
+                            <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-700">
+                              Deny = Blocked
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[850px]">
+                            <thead className="bg-white">
+                              <tr className="border-b border-slate-200">
+                                <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Module
+                                </th>
+
+                                {rbacActions.map((action) => (
+                                  <th
+                                    key={`popup-${action}`}
+                                    className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500"
+                                  >
+                                    {action}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-slate-100">
+                              {rbacModules.map((module) => {
+                                const moduleCode =
+                                  module.code ||
+                                  module.module_code ||
+                                  module.slug;
+
+                                return (
+                                  <tr
+                                    key={`popup-${moduleCode}`}
+                                    className="transition hover:bg-slate-50"
+                                  >
+                                    <td className="px-5 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                                          <i
+                                            className={
+                                              module.icon || "fas fa-cube"
+                                            }
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <p className="font-semibold text-slate-800">
+                                            {module.name ||
+                                              module.module_name ||
+                                              moduleCode}
+                                          </p>
+
+                                          <p className="text-xs text-slate-500">
+                                            {moduleCode}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    {rbacActions.map((action) => {
+                                      const overrideValue =
+                                        getRbacOverrideValue(
+                                          moduleCode,
+                                          action,
+                                        );
+
+                                      const inheritedPermission =
+                                        getRbacInheritedPermission(
+                                          moduleCode,
+                                          action,
+                                        );
+
+                                      const effectivePermission =
+                                        getRbacEffectivePermission(
+                                          moduleCode,
+                                          action,
+                                        );
+
+                                      return (
+                                        <td
+                                          key={`${moduleCode}-${action}-popup`}
+                                          className="px-4 py-4 text-center"
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              cycleRbacUserPermissionOverride(
+                                                moduleCode,
+                                                action,
+                                              )
+                                            }
+                                            className={`min-w-[92px] rounded-lg border px-3 py-2 text-xs font-bold transition ${
+                                              overrideValue === true
+                                                ? "border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                                : overrideValue === false
+                                                  ? "border-rose-300 bg-rose-100 text-rose-700 hover:bg-rose-200"
+                                                  : inheritedPermission
+                                                    ? "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                                                    : "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                            }`}
+                                          >
+                                            {getRbacOverrideLabel(
+                                              moduleCode,
+                                              action,
+                                            )}
+                                          </button>
+
+                                          <p
+                                            className={`mt-1 text-[10px] font-medium ${
+                                              effectivePermission
+                                                ? "text-emerald-600"
+                                                : "text-rose-500"
+                                            }`}
+                                          >
+                                            Effective:{" "}
+                                            {effectivePermission
+                                              ? "Allowed"
+                                              : "Denied"}
+                                          </p>
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              })}
+
+                              {rbacModules.length === 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={rbacActions.length + 1}
+                                    className="px-5 py-12 text-center text-sm text-slate-500"
+                                  >
+                                    No permission modules are available.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* POPUP FOOTER */}
+                  <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <button
+                      type="button"
+                      onClick={resetRbacUserOverrides}
+                      disabled={rbacSavingUserAccess || rbacUserAccessLoading}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <i className="fas fa-undo" />
+                      Reset to Role Permissions
+                    </button>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={closeRbacUserAccessModal}
+                        disabled={rbacSavingUserAccess}
+                        className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={saveRbacUserOverrides}
+                        disabled={
+                          rbacSavingUserAccess ||
+                          rbacUserAccessLoading ||
+                          (rbacTemporaryAccessForm.is_temporary &&
+                            !rbacTemporaryAccessForm.expires_at)
+                        }
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {rbacSavingUserAccess ? (
+                          <>
+                            <i className="fas fa-spinner animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-save" />
+                            Apply Role & Permissions
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* =====================================================
+        CREATE / EDIT ROLE MODAL
+    ====================================================== */}
+            {rbacRoleModalOpen && (
+              <div
+                className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    closeRbacRoleModal();
+                  }
+                }}
+              >
+                <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">
+                        {rbacRoleForm.id ? "Edit Role" : "Add New Role"}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        {rbacRoleForm.id
+                          ? "Update role information."
+                          : "Create a role and configure permissions after saving."}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closeRbacRoleModal}
+                      disabled={rbacSavingRole}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <i className="fas fa-times" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 p-6">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                        Role Name
+                        <span className="ml-1 text-rose-500">*</span>
+                      </label>
+
+                      <input
+                        type="text"
+                        name="name"
+                        value={rbacRoleForm.name}
+                        onChange={updateRbacRoleForm}
+                        placeholder="Example: Hostel Administrator"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                        Role Code
+                        <span className="ml-1 text-rose-500">*</span>
+                      </label>
+
+                      <input
+                        type="text"
+                        name="code"
+                        value={rbacRoleForm.code}
+                        onChange={updateRbacRoleForm}
+                        placeholder="Example: hostel_administrator"
+                        disabled={Boolean(rbacRoleForm.id)}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                      />
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        Use lowercase letters and underscores. The code cannot
+                        be changed after creation.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                        User Type
+                      </label>
+
+                      <select
+                        name="user_type"
+                        value={rbacRoleForm.user_type}
+                        onChange={updateRbacRoleForm}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                      >
+                        {rbacUserTypes.map((type) => (
+                          <option key={type.value} value={type.value}>
+                            {type.label}
+                          </option>
+                        ))}
+
+                        <option value="all">All User Types</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                        Description
+                      </label>
+
+                      <textarea
+                        name="description"
+                        rows={4}
+                        value={rbacRoleForm.description}
+                        onChange={updateRbacRoleForm}
+                        placeholder="Describe the role responsibilities..."
+                        className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+
+                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div>
+                        <p className="font-semibold text-slate-800">
+                          Active Role
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Inactive roles cannot be assigned to new users.
+                        </p>
+                      </div>
+
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          name="is_active"
+                          checked={Boolean(rbacRoleForm.is_active)}
+                          onChange={updateRbacRoleForm}
+                          className="peer sr-only"
+                        />
+
+                        <div className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-indigo-600" />
+
+                        <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+                    <button
+                      type="button"
+                      onClick={closeRbacRoleModal}
+                      disabled={rbacSavingRole}
+                      className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={saveRbacRole}
+                      disabled={
+                        rbacSavingRole ||
+                        !rbacRoleForm.name.trim() ||
+                        !rbacRoleForm.code.trim()
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {rbacSavingRole ? (
+                        <>
+                          <i className="fas fa-spinner animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-save" />
+                          {rbacRoleForm.id ? "Update Role" : "Create Role"}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* =====================================================
+        DELETE ROLE CONFIRMATION
+    ====================================================== */}
+            {rbacDeleteRoleModalOpen && rbacSelectedRole && (
+              <div
+                className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    closeRbacDeleteRoleModal();
+                  }
+                }}
+              >
+                <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+                  <div className="p-6 text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                      <i className="fas fa-trash-alt text-2xl" />
+                    </div>
+
+                    <h3 className="mt-4 text-lg font-bold text-slate-900">
+                      Delete Role?
+                    </h3>
+
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      Are you sure you want to delete{" "}
+                      <span className="font-bold text-slate-800">
+                        {rbacSelectedRole.name}
+                      </span>
+                      ? Users assigned to this role may lose access.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+                    <button
+                      type="button"
+                      onClick={closeRbacDeleteRoleModal}
+                      disabled={rbacDeletingRole}
+                      className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={deleteRbacRole}
+                      disabled={rbacDeletingRole}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {rbacDeletingRole ? (
+                        <>
+                          <i className="fas fa-spinner animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-trash" />
+                          Delete Role
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
 

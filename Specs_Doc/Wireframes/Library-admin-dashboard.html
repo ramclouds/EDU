@@ -59,18 +59,8 @@
                         <i class="bi bi-grid"></i> Dashboard
                     </button>
 
-                    <!-- BOOK MANAGEMENT -->
-                    <p class="text-xs text-gray-400 px-2 mt-4">BOOK MANAGEMENT</p>
-
-                    <button data-section="books"
-                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
-                        <i class="bi bi-book"></i> All Books
-                    </button>
-
-                    <button data-section="add-book"
-                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
-                        <i class="bi bi-plus-circle"></i> Add Book
-                    </button>
+                    <!-- CATALOG SETUP -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">CATALOG SETUP</p>
 
                     <button data-section="categories"
                         class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
@@ -82,20 +72,17 @@
                         <i class="bi bi-person"></i> Authors
                     </button>
 
-                    <!-- ISSUE / RETURN -->
-                    <p class="text-xs text-gray-400 px-2 mt-4">CIRCULATION</p>
-
-                    <button data-section="issue-books"
+                    <button data-section="add-book"
                         class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
-                        <i class="bi bi-arrow-up-right-circle"></i> Issue Book
+                        <i class="bi bi-plus-circle"></i> Add Book
                     </button>
 
-                    <button data-section="return-books"
+                    <button data-section="books"
                         class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
-                        <i class="bi bi-arrow-down-left-circle"></i> Return Book
+                        <i class="bi bi-book"></i> All Books
                     </button>
 
-                    <!-- USERS -->
+                    <!-- LIBRARY USERS -->
                     <p class="text-xs text-gray-400 px-2 mt-4">LIBRARY USERS</p>
 
                     <button data-section="students"
@@ -113,7 +100,20 @@
                         <i class="bi bi-people"></i> All Members
                     </button>
 
-                    <!-- FINES -->
+                    <!-- CIRCULATION -->
+                    <p class="text-xs text-gray-400 px-2 mt-4">CIRCULATION</p>
+
+                    <button data-section="issue-books"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-arrow-up-right-circle"></i> Issue Book
+                    </button>
+
+                    <button data-section="return-books"
+                        class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
+                        <i class="bi bi-arrow-down-left-circle"></i> Return Book
+                    </button>
+
+                    <!-- FINES & PAYMENTS -->
                     <p class="text-xs text-gray-400 px-2 mt-4">FINES & PAYMENTS</p>
 
                     <button data-section="fines"
@@ -127,15 +127,12 @@
                     </button>
 
                     <!-- REPORTS -->
-                    <p class="text-xs text-gray-400 px-2 mt-4">REPORTS</p>
+                    <p class="text-xs text-gray-400 px-2 mt-4">REPORTS & COMMUNICATION</p>
 
                     <button data-section="reports"
                         class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
                         <i class="bi bi-bar-chart"></i> Reports & Analytics
                     </button>
-
-                    <!-- NOTIFICATIONS -->
-                    <p class="text-xs text-gray-400 px-2 mt-4">COMMUNICATION</p>
 
                     <button data-section="notifications"
                         class="menu-btn flex w-full items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100">
@@ -263,7 +260,7 @@
 
                             </div>
 
-                            <div onclick="openSection('notice')" class="p-3 text-center text-sm text-indigo-600 
+                            <div onclick="openSection('notifications')" class="p-3 text-center text-sm text-indigo-600 
                     hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer font-medium">
                                 View All Notices →
                             </div>
@@ -380,19 +377,23 @@
 
                     <div class="flex flex-wrap gap-3">
 
-                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm">
+                        <button type="button" onclick="openSection('issue-books')"
+                            class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm">
                             Issue Book
                         </button>
 
-                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">
+                        <button type="button" onclick="openSection('return-books')"
+                            class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">
                             Return Book
                         </button>
 
-                        <button class="bg-yellow-500 text-white px-4 py-2 rounded-lg text-sm">
+                        <button type="button" onclick="openSection('add-book')"
+                            class="bg-yellow-500 text-white px-4 py-2 rounded-lg text-sm">
                             Add Book
                         </button>
 
-                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
+                        <button type="button" onclick="openSection('members')"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
                             Add Member
                         </button>
 
@@ -479,7 +480,8 @@
                         </div>
 
                         <!-- BUTTON -->
-                        <button class="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow">
+                        <button type="button" onclick="openSection('add-book')"
+                            class="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow">
                             + Add Book
                         </button>
 
@@ -1067,7 +1069,8 @@
                     <!-- ACTIONS -->
                     <div class="sm:col-span-2 flex flex-wrap justify-end gap-3">
 
-                        <button class="bg-green-600 text-white px-5 py-2 rounded-lg text-sm">
+                        <button type="button" onclick="returnBook()"
+                            class="bg-green-600 text-white px-5 py-2 rounded-lg text-sm">
                             Return Book
                         </button>
 
@@ -2542,165 +2545,57 @@
                 </div>
 
             </section>
-            <section id="logsSection" class="section hidden p-4 sm:p-6 space-y-6">
+            <!-- ============================= SETTINGS SECTION ============================= -->
+            <section id="settingsSection" class="section hidden p-4 sm:p-6 space-y-6">
 
-                <!-- HEADER -->
-                <!-- HEADER -->
                 <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
+                    <h2 class="text-lg sm:text-xl font-semibold">Library Settings</h2>
+                    <p class="text-xs sm:text-sm opacity-90">
+                        Configure circulation, fines and library rules
+                    </p>
+                </div>
 
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="bg-white rounded-xl shadow p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
 
-                        <!-- TEXT -->
-                        <div>
-                            <h2 class="text-lg sm:text-xl font-semibold">Activity & Logs</h2>
-                            <p class="text-xs sm:text-sm opacity-90">
-                                Track all system activities and user actions
-                            </p>
-                        </div>
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">
+                            Default Issue Duration
+                        </label>
+                        <input id="defaultIssueDays" type="number" value="14" min="1"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">
+                            Fine Per Late Day
+                        </label>
+                        <input id="finePerDay" type="number" value="5" min="0"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">
+                            Maximum Books Per Student
+                        </label>
+                        <input id="studentBookLimit" type="number" value="3" min="1"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-medium text-gray-600">
+                            Maximum Books Per Teacher
+                        </label>
+                        <input id="teacherBookLimit" type="number" value="5" min="1"
+                            class="mt-1 w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+
+                    <div class="sm:col-span-2 flex justify-end">
+                        <button type="button" class="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                            Save Settings
+                        </button>
                     </div>
 
                 </div>
-
-                <!-- FILTERS -->
-                <div class="bg-white p-4 rounded-xl shadow flex flex-col sm:flex-row gap-3">
-
-                    <!-- SEARCH -->
-                    <input type="text" placeholder="Search user, action..."
-                        class="w-full border rounded-lg px-3 py-2 text-sm" />
-
-                    <!-- USER TYPE -->
-                    <select class="border rounded-lg px-3 py-2 text-sm">
-                        <option>All Users</option>
-                        <option>Admin</option>
-                        <option>Teacher</option>
-                        <option>Student</option>
-                    </select>
-
-                    <!-- ACTION TYPE -->
-                    <select class="border rounded-lg px-3 py-2 text-sm">
-                        <option>All Actions</option>
-                        <option>Login</option>
-                        <option>Logout</option>
-                        <option>Issue Book</option>
-                        <option>Return Book</option>
-                        <option>Fine Payment</option>
-                        <option>Add Book</option>
-                        <option>Delete Book</option>
-                    </select>
-
-                    <!-- DATE -->
-                    <input type="date" class="border rounded-lg px-3 py-2 text-sm" />
-
-                </div>
-
-                <!-- SUMMARY CARDS -->
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <p class="text-xs text-gray-500">Total Activities</p>
-                        <h3 class="text-lg font-semibold">1,250</h3>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <p class="text-xs text-gray-500">Logins Today</p>
-                        <h3 class="text-green-600 text-lg font-semibold">85</h3>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <p class="text-xs text-gray-500">Books Issued</p>
-                        <h3 class="text-blue-600 text-lg font-semibold">320</h3>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-xl shadow">
-                        <p class="text-xs text-gray-500">Errors</p>
-                        <h3 class="text-red-600 text-lg font-semibold">5</h3>
-                    </div>
-
-                </div>
-
-                <!-- ACTIVITY TABLE -->
-                <div class="bg-white rounded-xl shadow overflow-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-100 text-gray-600">
-                            <tr>
-                                <th class="p-3 text-left">Time</th>
-                                <th class="p-3 text-left">User</th>
-                                <th class="p-3 text-left">Role</th>
-                                <th class="p-3 text-left">Action</th>
-                                <th class="p-3 text-left">Details</th>
-                                <th class="p-3 text-left">Status</th>
-                                <th class="p-3 text-left">IP</th>
-                            </tr>
-                        </thead>
-
-                        <tbody class="divide-y">
-
-                            <!-- ROW -->
-                            <tr>
-                                <td class="p-3">10:15 AM</td>
-                                <td class="p-3">Salman (Admin)</td>
-                                <td class="p-3">Admin</td>
-                                <td class="p-3 font-medium">Add Book</td>
-                                <td class="p-3">Added "Physics Fundamentals"</td>
-                                <td class="p-3">
-                                    <span class="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">Success</span>
-                                </td>
-                                <td class="p-3">192.168.1.1</td>
-                            </tr>
-
-                            <tr>
-                                <td class="p-3">10:20 AM</td>
-                                <td class="p-3">Rahul Verma</td>
-                                <td class="p-3">Student</td>
-                                <td class="p-3 font-medium">Issue Book</td>
-                                <td class="p-3">Issued "Math Vol 1"</td>
-                                <td class="p-3">
-                                    <span class="bg-green-100 text-green-600 px-2 py-1 text-xs rounded">Success</span>
-                                </td>
-                                <td class="p-3">192.168.1.5</td>
-                            </tr>
-
-                            <tr>
-                                <td class="p-3">10:30 AM</td>
-                                <td class="p-3">Priya Patil</td>
-                                <td class="p-3">Teacher</td>
-                                <td class="p-3 font-medium">Return Book</td>
-                                <td class="p-3">Returned "Chemistry Guide"</td>
-                                <td class="p-3">
-                                    <span class="bg-yellow-100 text-yellow-600 px-2 py-1 text-xs rounded">Pending
-                                        Fine</span>
-                                </td>
-                                <td class="p-3">192.168.1.8</td>
-                            </tr>
-
-                            <tr>
-                                <td class="p-3">11:00 AM</td>
-                                <td class="p-3">System</td>
-                                <td class="p-3">System</td>
-                                <td class="p-3 font-medium">Auto Fine</td>
-                                <td class="p-3">Generated ₹50 fine</td>
-                                <td class="p-3">
-                                    <span class="bg-blue-100 text-blue-600 px-2 py-1 text-xs rounded">Auto</span>
-                                </td>
-                                <td class="p-3">—</td>
-                            </tr>
-
-                            <tr>
-                                <td class="p-3">11:30 AM</td>
-                                <td class="p-3">Admin</td>
-                                <td class="p-3">Admin</td>
-                                <td class="p-3 font-medium">Delete Book</td>
-                                <td class="p-3">Deleted "Old History Book"</td>
-                                <td class="p-3">
-                                    <span class="bg-red-100 text-red-600 px-2 py-1 text-xs rounded">Critical</span>
-                                </td>
-                                <td class="p-3">192.168.1.1</td>
-                            </tr>
-
-                        </tbody>
-                    </table>
-                </div>
-
             </section>
             <!-- ============================= SETTINGS END ============================= -->
             <!-- ============================= LIBRARY ADMIN PROFILE SECTION ============================= -->

@@ -59,6 +59,52 @@ export function useLogin() {
         localStorage.removeItem("admin_type");
       }
 
+      // ================= RBAC ACCESS SYNC =================
+      // Keep the existing login and redirect logic unchanged.
+      // RBAC failure must never block a valid login.
+      try {
+        let rbacAccess = data.rbac || null;
+
+        if (!rbacAccess && data.token) {
+          const rbacResponse = await fetch(
+            `${BASE_URL}/rbac/my-access`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${data.token}`,
+              },
+            }
+          );
+
+          if (rbacResponse.ok) {
+            rbacAccess = await rbacResponse.json();
+          }
+        }
+
+        if (rbacAccess) {
+          localStorage.setItem(
+            "rbac_access",
+            JSON.stringify(rbacAccess)
+          );
+          localStorage.setItem(
+            "effective_permissions",
+            JSON.stringify(
+              rbacAccess.effective_permissions || {}
+            )
+          );
+        } else {
+          localStorage.removeItem("rbac_access");
+          localStorage.removeItem("effective_permissions");
+        }
+      } catch (rbacError) {
+        console.warn(
+          "RBAC access could not be loaded:",
+          rbacError
+        );
+        localStorage.removeItem("rbac_access");
+        localStorage.removeItem("effective_permissions");
+      }
+
       console.log("LOGIN SUCCESS", data);
 
       // Prefer backend-provided dashboard
