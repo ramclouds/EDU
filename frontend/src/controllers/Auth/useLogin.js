@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { BASE_URL } from "../../config/appConfig";
+import {
+  clearStoredDashboardAccess,
+  storeDashboardAccess,
+} from "./useDashboardAccess";
 
 export function useLogin() {
   const [identifier, setIdentifier] = useState("");
@@ -10,6 +14,11 @@ export function useLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
+  // Shown as an inline banner on the login page instead of (or in
+  // addition to) the blocking alert, so the "no dashboard access"
+  // message stays visible and readable rather than flashing by.
+  const [loginNotice, setLoginNotice] = useState(null);
+
   // ================= LOGIN =================
   const login = async () => {
     if (!identifier || !password) {
@@ -18,6 +27,7 @@ export function useLogin() {
     }
 
     setLoading(true);
+    setLoginNotice(null);
 
     try {
       const response = await fetch(
@@ -37,7 +47,21 @@ export function useLogin() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Login failed");
+        // The backend blocks login (and issues no token) whenever the
+        // account's own dashboard has not been granted to it, e.g. a
+        // Library Admin whose "library" dashboard access was revoked
+        // or was never assigned by a Super Admin.
+        if (data.error_code === "DASHBOARD_ACCESS_DENIED") {
+          setLoginNotice({
+            type: "error",
+            message:
+              data.error ||
+              "Your account does not have access to any dashboard yet. Please contact a Super Administrator.",
+          });
+        } else {
+          alert(data.error || "Login failed");
+        }
+
         return;
       }
 
@@ -57,6 +81,15 @@ export function useLogin() {
         );
       } else {
         localStorage.removeItem("admin_type");
+      }
+
+      // ================= DASHBOARD ACCESS =================
+      // List of dashboards this user may open, each flagged with
+      // can_view / can_write. Drives the sidebar nav and route guards.
+      if (Array.isArray(data.dashboard_access)) {
+        storeDashboardAccess(data.dashboard_access);
+      } else {
+        clearStoredDashboardAccess();
       }
 
       // ================= RBAC ACCESS SYNC =================
@@ -258,6 +291,9 @@ export function useLogin() {
 
     showForgotModal,
     setShowForgotModal,
+
+    loginNotice,
+    setLoginNotice,
 
     login,
 

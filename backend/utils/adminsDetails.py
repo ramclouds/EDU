@@ -163,9 +163,70 @@ def get_expected_dashboard_permission(admin_type):
 
 
 # ACCESS RESOLVER
+def _rbac_dashboard_rights(admin, config):
+    """
+    Ask the real RBAC system (Role & Permission Management) whether this
+    admin currently has view/write access to their own dashboard.
+    Returns None if RBAC lookup isn't available, so callers can fall
+    back to the legacy CSV-based fields.
+    """
+
+    if not config:
+        return None
+
+    try:
+        from utils.rolePermissionManagement import (
+            get_dashboard_entry_for_admin_type,
+            get_user_dashboard_access,
+        )
+
+        entry = get_dashboard_entry_for_admin_type(admin.admin_type)
+
+        if not entry:
+            return None
+
+        return get_user_dashboard_access(admin, entry)
+    except Exception:
+        logger.exception("Unable to resolve RBAC dashboard access for admin")
+        return None
+
+
+def _rbac_all_dashboard_access(admin):
+    """
+    Every dashboard (key/label/route/can_view/can_write) this admin
+    currently has *view* access to via RBAC - not just the one dashboard
+    tied to their admin_type.
+
+    BUG FIX: a Super Admin can grant an admin extra dashboards beyond
+    their own via Role & Permission Management (e.g. a Library Admin
+    who is *also* given Hostel Dashboard access). resolve_admin_access()
+    used to only ever resolve the admin's own home dashboard, so that
+    second grant never showed up in the admin's profile/table and the
+    corresponding sidebar link never appeared on their own dashboard.
+
+    Returns None if RBAC lookup isn't available (caller falls back to
+    legacy behavior for that admin).
+    """
+
+    try:
+        from utils.rolePermissionManagement import list_dashboard_access_for_user
+
+        return list_dashboard_access_for_user(admin)
+    except Exception:
+        logger.exception("Unable to resolve full RBAC dashboard list for admin")
+        return None
+
+
 def resolve_admin_access(admin):
     """
     Build dashboard access and CRUD rights for an admin.
+
+    This is now a thin wrapper: the source of truth for "can this admin
+    open this dashboard, and can they edit or only view it" is the RBAC
+    Role & Permission Management system (see rolePermissionManagement.py
+    / DASHBOARD_REGISTRY). Legacy `permissions` / `modules_enabled` /
+    `access_level` columns on the Admin row are only used as a fallback
+    when no RBAC role/module mapping exists yet for that admin_type.
 
     permissions:
         Contains dashboard permission only.
@@ -186,6 +247,7 @@ def resolve_admin_access(admin):
             "permissions": [DASHBOARD_PERMISSIONS["Super Admin"]],
             "modules": ["*"],
             "allowed_modules": ["*"],
+            "dashboard_access": (_rbac_all_dashboard_access(admin) or []),
             "rights": SUPER_ADMIN_RIGHTS,
             "can_read": True,
             "can_write": True,
@@ -225,6 +287,38 @@ def resolve_admin_access(admin):
             ):
                 allowed_modules.append(module)
 
+        rbac_rights = _rbac_dashboard_rights(admin, config)
+
+        if rbac_rights is not None:
+            can_read = rbac_rights["can_view"]
+            can_write_flag = rbac_rights["can_write"]
+            rights = ["read"] + (["write", "edit", "delete"] if can_write_flag else [])
+            # A dashboard the admin has no view access to should not be
+            # reported as "assigned" - keeps nav/redirect logic honest.
+            if not can_read:
+                dashboard_permissions = []
+                allowed_modules = []
+        else:
+            can_read = "read" in stored_rights
+            can_write_flag = "write" in stored_rights
+            rights = stored_rights
+
+        # BUG FIX: merge in every OTHER dashboard RBAC says this admin
+        # can view (e.g. Super Admin additionally granted this Library
+        # Admin access to the Hostel Dashboard too). Without this, only
+        # the admin's own home dashboard ever showed up here, no matter
+        # what extra access was granted in Role & Permission Management.
+        rbac_all_access = _rbac_all_dashboard_access(admin)
+
+        dashboard_access_detail = rbac_all_access or []
+
+        for entry in dashboard_access_detail:
+            if entry["key"] not in dashboard_permissions:
+                dashboard_permissions.append(entry["key"])
+
+            if entry["key"] not in allowed_modules:
+                allowed_modules.append(entry["key"])
+
         return {
             "dashboard_type": config["dashboard_type"],
             "dashboard_route": config["dashboard_route"],
@@ -232,11 +326,12 @@ def resolve_admin_access(admin):
             "permissions": dashboard_permissions,
             "modules": allowed_modules,
             "allowed_modules": allowed_modules,
-            "rights": stored_rights,
-            "can_read": "read" in stored_rights,
-            "can_write": "write" in stored_rights,
-            "can_edit": "edit" in stored_rights,
-            "can_delete": "delete" in stored_rights,
+            "dashboard_access": dashboard_access_detail,
+            "rights": rights,
+            "can_read": can_read,
+            "can_write": can_write_flag,
+            "can_edit": can_write_flag,
+            "can_delete": can_write_flag,
             "is_super_admin": False,
             "is_academic_admin": (admin_type == "Academic Admin"),
             "is_hr_admin": (admin_type == "HR Admin"),
@@ -268,6 +363,7 @@ def resolve_admin_access(admin):
         "permissions": fallback_permissions,
         "modules": fallback_permissions,
         "allowed_modules": fallback_permissions,
+        "dashboard_access": [],
         "rights": stored_rights,
         "can_read": "read" in stored_rights,
         "can_write": "write" in stored_rights,
@@ -358,6 +454,7 @@ def admin_to_dict(admin):
         "dashboard_permissions": access["dashboard_permissions"],
         "allowed_modules": access["allowed_modules"],
         "modules": access["modules"],
+        "dashboard_access": access["dashboard_access"],
         "rights": access["rights"],
         # Resolved rights
         "can_read": access["can_read"],
@@ -846,11 +943,8 @@ class ChangeAdminPassword(MethodView):
             )
 
             admin.password = hashed_password.decode("utf-8")
-
             admin.last_password_change = datetime.utcnow()
-
             admin.updated_at = datetime.utcnow()
-
             db.session.commit()
 
             return jsonify({"message": ("Password updated successfully")}), 200

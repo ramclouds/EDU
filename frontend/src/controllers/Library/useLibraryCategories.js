@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const emptyCategoryForm = {
     id: null,
@@ -46,6 +47,8 @@ export function useLibraryCategories({
     fetchWithAuth,
     showToast,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const [categories, setCategories] = useState([]);
     const [categoryStats, setCategoryStats] =
         useState(emptyStats);
@@ -291,6 +294,14 @@ export function useLibraryCategories({
                 return;
             }
 
+            if (!canWriteLibrary) {
+                showToast?.(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             setCategorySaving(true);
 
             try {
@@ -351,6 +362,7 @@ export function useLibraryCategories({
         },
         [
             categoryForm,
+            canWriteLibrary,
             fetchWithAuth,
             loadCategories,
             showToast,
@@ -360,6 +372,14 @@ export function useLibraryCategories({
 
     const toggleCategoryStatus = useCallback(
         async (category) => {
+            if (!canWriteLibrary) {
+                showToast?.(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             const nextStatus =
                 category.status === "Active"
                     ? "Inactive"
@@ -407,10 +427,18 @@ export function useLibraryCategories({
                 setCategoryStatusLoadingId(null);
             }
         },
-        [fetchWithAuth, loadCategories, showToast],
+        [canWriteLibrary, fetchWithAuth, loadCategories, showToast],
     );
 
     const requestDeleteCategory = useCallback((category) => {
+        if (!canWriteLibrary) {
+            showToast?.(
+                "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                "error"
+            );
+            return;
+        }
+
         setCategoryDeleteModal({
             open: true,
             category,
@@ -420,7 +448,7 @@ export function useLibraryCategories({
             requiresForce:
                 Number(category.total_books || 0) > 0,
         });
-    }, []);
+    }, [canWriteLibrary, showToast]);
 
     const closeDeleteCategoryModal = useCallback(() => {
         if (categoryDeleting) {
@@ -440,6 +468,14 @@ export function useLibraryCategories({
             const category = categoryDeleteModal.category;
 
             if (!category) {
+                return;
+            }
+
+            if (!canWriteLibrary) {
+                showToast?.(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
                 return;
             }
 
@@ -515,6 +551,7 @@ export function useLibraryCategories({
             categories.length,
             categoryDeleteModal.category,
             categoryPagination.page,
+            canWriteLibrary,
             fetchWithAuth,
             loadCategories,
             showToast,
@@ -564,5 +601,7 @@ export function useLibraryCategories({
         requestDeleteCategory,
         closeDeleteCategoryModal,
         deleteCategory,
+
+        canWriteLibrary,
     };
 }

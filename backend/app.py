@@ -207,6 +207,8 @@ from utils.rolePermissionManagement import (
     RBACUserOverrideAPI,
     RBACUserRoleAPI,
     seed_rbac_defaults,
+    MyDashboardAccessAPI,
+    MyRBACAccessAPI,
 )
 
 
@@ -313,6 +315,11 @@ def create_app():
         "/api/rbac/my-access",
         view_func=MyRBACAccessAPI.as_view("my_rbac_access_api"),
         methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/my-dashboards",
+        view_func=MyDashboardAccessAPI.as_view("my_dashboard_access"),
     )
 
     # STUDENT

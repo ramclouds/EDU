@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const INITIAL_FILTERS = {
     search: "",
@@ -37,6 +38,8 @@ export function useLibraryMembers({
     showToast,
     setActiveSection,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const fetchRef = useRef(fetchWithAuth);
     const toastRef = useRef(showToast);
     const requestRunningRef = useRef(false);
@@ -456,6 +459,14 @@ export function useLibraryMembers({
     const issueBookToMember =
         useCallback(
             (member) => {
+                if (!canWriteLibrary) {
+                    notify(
+                        "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                        "error"
+                    );
+                    return;
+                }
+
                 localStorage.setItem(
                     "libraryIssueMember",
                     JSON.stringify({
@@ -475,11 +486,19 @@ export function useLibraryMembers({
                     "issued-books"
                 );
             },
-            [setActiveSection]
+            [canWriteLibrary, notify, setActiveSection]
         );
 
     const payMemberFine = useCallback(
         (member) => {
+            if (!canWriteLibrary) {
+                notify(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             if (
                 member.member_type !== "staff"
             ) {
@@ -509,7 +528,7 @@ export function useLibraryMembers({
                 "info"
             );
         },
-        [notify]
+        [canWriteLibrary, notify]
     );
 
     const exportMembersCSV =
@@ -654,5 +673,7 @@ export function useLibraryMembers({
         issueBookToMember,
         payMemberFine,
         exportMembersCSV,
+
+        canWriteLibrary,
     };
 }

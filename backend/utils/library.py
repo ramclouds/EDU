@@ -5794,6 +5794,68 @@ class LibraryMembersAPI(MethodView):
                         )
                     )
 
+                    # BUG FIX: this used to hardcode active/returned/overdue
+                    # book counts and pending_fine to 0 for every admin,
+                    # regardless of their actual AdminBookIssue records -
+                    # that's why an admin with a real, overdue-fined issue
+                    # (e.g. LIB-ADM-000001) still showed ₹0.00 / 0 / 0 here.
+                    # Mirrors the Non-Teaching Staff block below, using
+                    # AdminBookIssue instead of StaffBookIssue. Admins have
+                    # no dedicated fine-payment ledger (get_fine_payment_model
+                    # returns None for "admin"), so nothing is ever recorded
+                    # as paid/waived - pending_fine is simply the full
+                    # calculated fine across their issues, same as what the
+                    # generic circulation/returns views already compute via
+                    # get_issue_paid_fine()/get_issue_waived_fine().
+                    admin_issues = (
+                        AdminBookIssue.query.filter(
+                            AdminBookIssue.admin_id == admin.id
+                        )
+                        .order_by(AdminBookIssue.id.desc())
+                        .all()
+                    )
+
+                    admin_active_issues = [
+                        issue
+                        for issue in admin_issues
+                        if not issue.return_date
+                    ]
+
+                    admin_returned_issues = [
+                        issue
+                        for issue in admin_issues
+                        if issue.return_date
+                    ]
+
+                    admin_overdue_issues = [
+                        issue
+                        for issue in admin_active_issues
+                        if date.today() > issue.due_date
+                    ]
+
+                    admin_pending_fine = Decimal("0")
+
+                    for issue in admin_issues:
+                        effective_date = issue.return_date or date.today()
+
+                        overdue_days = max(
+                            (effective_date - issue.due_date).days,
+                            0,
+                        )
+
+                        admin_pending_fine += Decimal(
+                            str(issue.fine_per_day or DUE_RUPEES)
+                        ) * Decimal(overdue_days)
+
+                    if admin_overdue_issues:
+                        admin_library_status = "Blocked"
+
+                    elif admin_pending_fine > 0:
+                        admin_library_status = "Fine Pending"
+
+                    else:
+                        admin_library_status = admin.status
+
                     members.append(
                         {
                             "id": admin.id,
@@ -5812,11 +5874,11 @@ class LibraryMembersAPI(MethodView):
                                 admin.department or "Administration"
                             ),
                             "status": admin.status,
-                            "library_status": (admin.status),
-                            "active_books": 0,
-                            "returned_books": 0,
-                            "overdue_books": 0,
-                            "pending_fine": 0.0,
+                            "library_status": (admin_library_status),
+                            "active_books": len(admin_active_issues),
+                            "returned_books": len(admin_returned_issues),
+                            "overdue_books": len(admin_overdue_issues),
+                            "pending_fine": float(admin_pending_fine),
                             "collected_fine": 0.0,
                             "profile": (admin.to_dict()),
                         }
@@ -6364,6 +6426,52 @@ class LibraryMemberDetailsAPI(MethodView):
 
             admin_data = admin.to_dict()
 
+            # BUG FIX: this branch used to return hardcoded zero stats and
+            # empty issue lists for every admin, so opening "View" on an
+            # admin from the All Members list showed nothing even when
+            # real issues existed (e.g. LIB-ADM-000001). Reuses the same
+            # generic circulation serializers the Transactions/Circulation
+            # views already use for admins, so the numbers match exactly.
+            admin_issues = (
+                AdminBookIssue.query.filter(
+                    AdminBookIssue.admin_id == admin.id
+                )
+                .order_by(AdminBookIssue.id.desc())
+                .all()
+            )
+
+            admin_issue_rows = [
+                serialize_return_record("admin", issue)
+                if issue.return_date
+                else serialize_circulation_issue("admin", issue)
+                for issue in admin_issues
+            ]
+
+            admin_active_issues = [
+                row for row in admin_issue_rows if not row["return_date"]
+            ]
+
+            admin_return_history = [
+                row for row in admin_issue_rows if row["return_date"]
+            ]
+
+            # Admins have no dedicated fine-payment ledger (unlike
+            # students/teachers/staff), so nothing is ever recorded as
+            # paid or waived - pending_fine is the full calculated fine
+            # across all of this admin's issues.
+            admin_pending_fine = sum(
+                float(
+                    row.get("pending_fine", row.get("fine_amount", 0)) or 0
+                )
+                for row in admin_issue_rows
+            )
+
+            admin_overdue_books = sum(
+                1
+                for row in admin_active_issues
+                if row["status"] == "Overdue"
+            )
+
             admin_data.update(
                 {
                     "name": " ".join(
@@ -6379,7 +6487,15 @@ class LibraryMemberDetailsAPI(MethodView):
                     "member_code": (admin.admin_id),
                     "member_type": "admin",
                     "role_label": ("Administrator"),
-                    "library_status": (admin.status),
+                    "library_status": (
+                        "Blocked"
+                        if admin_overdue_books > 0
+                        else (
+                            "Fine Pending"
+                            if admin_pending_fine > 0
+                            else admin.status
+                        )
+                    ),
                 }
             )
 
@@ -6389,16 +6505,16 @@ class LibraryMemberDetailsAPI(MethodView):
                         "success": True,
                         "member": admin_data,
                         "summary": {
-                            "active_books": 0,
-                            "returned_books": 0,
-                            "overdue_books": 0,
-                            "total_transactions": 0,
-                            "pending_fine": 0,
+                            "active_books": len(admin_active_issues),
+                            "returned_books": len(admin_return_history),
+                            "overdue_books": (admin_overdue_books),
+                            "total_transactions": len(admin_issue_rows),
+                            "pending_fine": (admin_pending_fine),
                             "collected_fine": 0,
                             "waived_fine": 0,
                         },
-                        "active_issues": [],
-                        "return_history": [],
+                        "active_issues": (admin_active_issues),
+                        "return_history": (admin_return_history),
                         "fine_payments": [],
                     }
                 ),

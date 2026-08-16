@@ -402,16 +402,18 @@ class Login(MethodView):
             if user.status != "Active":
                 return jsonify({"error": "Account inactive"}), 403
 
-            # Generate token
-            token = str(uuid.uuid4())
-            user.auth_token = token
-            db.session.commit()
-
             # Load effective RBAC access without changing the existing
             # custom token, dashboard, role, or authentication behaviour.
             rbac_access = None
+            dashboard_entry = None
+            dashboard_rights = {"can_view": True, "can_write": True}
+
             try:
-                from utils.rolePermissionManagement import build_user_access
+                from utils.rolePermissionManagement import (
+                    build_user_access,
+                    get_home_dashboard_for_user,
+                    get_user_dashboard_access,
+                )
 
                 if isinstance(user, Admin):
                     rbac_user_type = "admin"
@@ -427,11 +429,51 @@ class Login(MethodView):
 
                 else:
                     rbac_user_type = str(getattr(user, "role", "") or "").lower()
+
+                rbac_access = build_user_access(rbac_user_type, user.id)
+
+                # The dashboard a user with this role/admin_type is meant
+                # to land on, and whether they actually have access to it.
+                dashboard_entry = get_home_dashboard_for_user(user)
+                dashboard_rights = get_user_dashboard_access(user, dashboard_entry)
+
             except Exception:
                 logger.exception("Unable to load RBAC access during login")
 
+            # ================= DASHBOARD ACCESS GATE =================
+            # If the account's own dashboard has not been granted to it
+            # (e.g. a Library Admin whose "library" module access was
+            # revoked, or never assigned), stop the login here and tell
+            # the user clearly instead of dropping them on a page they
+            # can't use.
+            if isinstance(user, Admin) and dashboard_entry is not None:
+                if not dashboard_rights.get("can_view"):
+                    return (
+                        jsonify(
+                            {
+                                "error": (
+                                    "Your account does not have access to the "
+                                    f"{dashboard_entry['label']}. Please contact "
+                                    "a Super Administrator to request access."
+                                ),
+                                "error_code": "DASHBOARD_ACCESS_DENIED",
+                                "dashboard": dashboard_entry["route"],
+                            }
+                        ),
+                        403,
+                    )
+
+            # Generate token only after the dashboard-access check passes,
+            # so a denied login never receives a usable session token.
+            token = str(uuid.uuid4())
+            user.auth_token = token
+            db.session.commit()
+
             # Auto dashboard based on role and admin type
-            if user.role == "student":
+            if dashboard_entry is not None:
+                dashboard = dashboard_entry["route"]
+
+            elif user.role == "student":
                 dashboard = "/student-dashboard"
 
             elif user.role == "teacher":
@@ -457,12 +499,22 @@ class Login(MethodView):
 
             elif user.role == "admin":
                 dashboard = "/admin-dashboard"
-                
+
             elif user.role == "staff":
                 dashboard = "/staff-dashboard"
 
             else:
                 dashboard = "/"
+
+            try:
+                from utils.rolePermissionManagement import (
+                    list_dashboard_access_for_user,
+                )
+
+                dashboard_access = list_dashboard_access_for_user(user)
+            except Exception:
+                logger.exception("Unable to load dashboard access during login")
+                dashboard_access = []
 
             return (
                 jsonify(
@@ -471,6 +523,7 @@ class Login(MethodView):
                         "role": user.role,
                         "dashboard": dashboard,
                         "rbac": rbac_access,
+                        "dashboard_access": dashboard_access,
                         "user": {
                             "id": user.id,
                             "role": user.role,

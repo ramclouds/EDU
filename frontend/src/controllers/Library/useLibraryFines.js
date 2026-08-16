@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const EMPTY_FILTERS = {
   search: "",
@@ -48,6 +49,8 @@ export function useLibraryFines({
   fetchWithAuth,
   showToast,
 }) {
+  const { canWriteLibrary } = useLibraryPermission();
+
   const fetchRef = useRef(fetchWithAuth);
   const toastRef = useRef(showToast);
   const listRunningRef = useRef(false);
@@ -181,8 +184,8 @@ export function useLibraryFines({
       if (!response.ok) {
         const error = new Error(
           data.error ||
-            data.message ||
-            `Request failed (${response.status})`
+          data.message ||
+          `Request failed (${response.status})`
         );
 
         error.data = data;
@@ -286,7 +289,7 @@ export function useLibraryFines({
         if (!silent) {
           notify(
             error.message ||
-              "Failed to load fines",
+            "Failed to load fines",
             "error"
           );
         }
@@ -352,7 +355,7 @@ export function useLibraryFines({
         if (
           page < 1 ||
           page >
-            finePagination.pages
+          finePagination.pages
         ) {
           return;
         }
@@ -401,7 +404,7 @@ export function useLibraryFines({
         } catch (error) {
           notify(
             error.message ||
-              "Failed to load fine details",
+            "Failed to load fine details",
             "error"
           );
 
@@ -453,7 +456,7 @@ export function useLibraryFines({
         const pendingAmount =
           Number(
             fine.pending_amount ||
-              0
+            0
           );
 
         setSelectedFine(fine);
@@ -464,8 +467,8 @@ export function useLibraryFines({
           amount:
             pendingAmount > 0
               ? String(
-                  pendingAmount
-                )
+                pendingAmount
+              )
               : "",
           payment_method:
             action === "waive"
@@ -548,7 +551,7 @@ export function useLibraryFines({
           amount >
           Number(
             selectedFine.pending_amount ||
-              0
+            0
           )
         ) {
           errors.amount =
@@ -557,7 +560,7 @@ export function useLibraryFines({
 
         if (
           fineActionForm.action ===
-            "collect" &&
+          "collect" &&
           !fineActionForm
             .payment_method
         ) {
@@ -567,7 +570,7 @@ export function useLibraryFines({
 
         if (
           fineActionForm.action ===
-            "waive" &&
+          "waive" &&
           !fineActionForm.remarks.trim()
         ) {
           errors.remarks =
@@ -582,6 +585,14 @@ export function useLibraryFines({
             errors
           );
 
+          return;
+        }
+
+        if (!canWriteLibrary) {
+          notify(
+            "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+            "error"
+          );
           return;
         }
 
@@ -616,7 +627,7 @@ export function useLibraryFines({
 
           notify(
             data.message ||
-              "Fine updated successfully",
+            "Fine updated successfully",
             "success"
           );
 
@@ -650,7 +661,7 @@ export function useLibraryFines({
 
           notify(
             error.message ||
-              "Failed to update fine",
+            "Failed to update fine",
             "error"
           );
         } finally {
@@ -660,6 +671,7 @@ export function useLibraryFines({
         }
       },
       [
+        canWriteLibrary,
         fineActionForm,
         fineActionSaving,
         fineDetailsOpen,
@@ -772,7 +784,7 @@ export function useLibraryFines({
       } catch (error) {
         notify(
           error.message ||
-            "Failed to export report",
+          "Failed to export report",
           "error"
         );
       } finally {
@@ -851,5 +863,7 @@ export function useLibraryFines({
     saveFineAction,
 
     exportFineReport,
+
+    canWriteLibrary,
   };
 }

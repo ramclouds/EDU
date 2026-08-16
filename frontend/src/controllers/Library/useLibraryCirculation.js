@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const todayISO = () =>
     new Date().toISOString().slice(0, 10);
@@ -66,6 +67,8 @@ export function useLibraryCirculation({
     fetchWithAuth,
     showToast,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const fetchRef = useRef(fetchWithAuth);
     const toastRef = useRef(showToast);
 
@@ -592,6 +595,14 @@ export function useLibraryCirculation({
                 return;
             }
 
+            if (!canWriteLibrary) {
+                notify(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             setIssueSaving(true);
             setIssueFormErrors({});
 
@@ -668,6 +679,7 @@ export function useLibraryCirculation({
             }
         },
         [
+            canWriteLibrary,
             circulationFilters,
             circulationPagination.per_page,
             issueForm,
@@ -927,6 +939,14 @@ export function useLibraryCirculation({
                     return;
                 }
 
+                if (!canWriteLibrary) {
+                    notify(
+                        "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                        "error"
+                    );
+                    return;
+                }
+
                 const issueKey =
                     `${issue.member_type}-${issue.id}`;
 
@@ -993,6 +1013,7 @@ export function useLibraryCirculation({
                 }
             },
             [
+                canWriteLibrary,
                 circulationFilters,
                 circulationPagination.page,
                 circulationPagination.per_page,
@@ -1196,5 +1217,7 @@ export function useLibraryCirculation({
         setMemberDropdownOpen,
         circulationExporting,
         exportCirculationReport,
+
+        canWriteLibrary,
     };
 }

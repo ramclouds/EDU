@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const todayISO = () =>
     new Date().toISOString().slice(0, 10);
@@ -52,6 +53,8 @@ export function useLibraryReturns({
     fetchWithAuth,
     showToast,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const fetchRef = useRef(fetchWithAuth);
     const toastRef = useRef(showToast);
 
@@ -605,6 +608,14 @@ export function useLibraryReturns({
                     return;
                 }
 
+                if (!canWriteLibrary) {
+                    notify(
+                        "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                        "error"
+                    );
+                    return;
+                }
+
                 setReturnSaving(true);
                 setReturnFormErrors({});
 
@@ -682,6 +693,7 @@ export function useLibraryReturns({
             },
             [
                 calculatedReturnInfo.fineAmount,
+                canWriteLibrary,
                 loadReturnOptions,
                 loadReturnRecords,
                 notify,
@@ -959,5 +971,7 @@ export function useLibraryReturns({
 
         openReturnDetails,
         closeReturnDetails,
+
+        canWriteLibrary,
     };
 }

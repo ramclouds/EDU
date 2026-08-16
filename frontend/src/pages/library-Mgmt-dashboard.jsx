@@ -5,6 +5,7 @@ import "../css/dashboard.css";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/adminDashboard";
 import { useAdminProfile } from "../controllers/Profiles/useAdminProfile";
+import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import { useLibraryCategories } from "../controllers/Library/useLibraryCategories";
 import { useLibraryAuthors } from "../controllers/Library/useLibraryAuthors";
 import { useLibraryStudents } from "../controllers/Library/useAddLibraryStudents";
@@ -18,6 +19,7 @@ import { useLibraryTransactions } from "../controllers/Library/useLibraryTransac
 import { useLibraryReports } from "../controllers/Library/useLibraryReports";
 import { useLibraryDashboard } from "../controllers/Library/useLibraryDashboard";
 import { useLibraryNotifications } from "../controllers/Library/useLibraryNotifications";
+import { useLibraryPermission } from "../controllers/Library/useLibraryPermission";
 
 const BookDetailItem = ({ label, value }) => {
   const displayValue =
@@ -72,6 +74,13 @@ function AdminDashboard() {
   );
   // const [noticeTab, setNoticeTab] = useState("announcements");
   const [search, setSearch] = useState("");
+
+  const { canWriteLibrary, libraryAccessLevel } = useLibraryPermission();
+  const { dashboards: accessibleDashboards } = useDashboardAccess();
+
+  const otherAccessibleDashboards = (accessibleDashboards || []).filter(
+    (dashboard) => dashboard.key !== "library-admin-dashboard",
+  );
 
   // ================= DASHBOARD HOOK =================
   const {
@@ -821,6 +830,55 @@ function AdminDashboard() {
               })}
             </div>
           ))}
+
+          {/* OTHER DASHBOARDS THIS ADMIN HAS BEEN GRANTED ACCESS TO */}
+          {otherAccessibleDashboards.length > 0 && (
+            <div>
+              {sidebarExpanded && (
+                <p className="text-xs text-gray-400 px-2 mt-4">
+                  OTHER DASHBOARDS
+                </p>
+              )}
+
+              {otherAccessibleDashboards.map((dashboard) => (
+                <button
+                  key={dashboard.key}
+                  type="button"
+                  title={!sidebarExpanded ? dashboard.label : ""}
+                  onClick={() => {
+                    navigate(dashboard.route);
+                    closeSidebarOnMobile();
+                  }}
+                  className={`relative flex w-full items-center rounded-xl py-3
+              transition-all duration-300 ease-in-out
+              ${
+                sidebarExpanded
+                  ? "gap-3 px-4 justify-start"
+                  : "justify-center px-0"
+              }
+              text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white`}
+                >
+                  <i className="bi bi-grid-3x3-gap-fill text-base shrink-0" />
+
+                  <span
+                    className={`whitespace-nowrap truncate overflow-hidden
+                transition-all duration-300 ease-in-out
+                ${
+                  sidebarExpanded
+                    ? "opacity-100 max-w-[190px]"
+                    : "opacity-0 max-w-0"
+                }`}
+                  >
+                    {dashboard.label}
+                  </span>
+
+                  {sidebarExpanded && (
+                    <i className="bi bi-box-arrow-up-right ml-auto shrink-0 text-xs opacity-60" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </nav>
 
         {/* FOOTER */}
@@ -869,6 +927,23 @@ function AdminDashboard() {
               >
                 {toast.message}
               </div>
+            </div>
+          )}
+
+          {/* READ-ONLY ACCESS BANNER */}
+          {!canWriteLibrary && (
+            <div
+              role="status"
+              className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+            >
+              <i className="bi bi-eye text-lg" />
+              <span>
+                <strong className="font-semibold">Read-only access.</strong> You
+                can view, filter and download data on this dashboard, but
+                adding, editing, issuing, returning or deleting records is
+                turned off. Ask your Super Admin for Full Access if you need to
+                make changes.
+              </span>
             </div>
           )}
 

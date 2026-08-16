@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const EMPTY_FILTERS = {
     search: "",
@@ -44,6 +45,8 @@ export function useLibraryTeachers({
     showToast,
     setActiveSection,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const fetchRef = useRef(fetchWithAuth);
     const toastRef = useRef(showToast);
     const requestRunningRef = useRef(false);
@@ -467,6 +470,14 @@ export function useLibraryTeachers({
     const issueBookToTeacher =
         useCallback(
             (teacher) => {
+                if (!canWriteLibrary) {
+                    notify(
+                        "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                        "error"
+                    );
+                    return;
+                }
+
                 localStorage.setItem(
                     "libraryIssueMember",
                     JSON.stringify({
@@ -485,7 +496,7 @@ export function useLibraryTeachers({
                     "issued-books"
                 );
             },
-            [setActiveSection]
+            [canWriteLibrary, notify, setActiveSection]
         );
 
     const openTeacherFineModal =
@@ -565,6 +576,14 @@ export function useLibraryTeachers({
                     return;
                 }
 
+                if (!canWriteLibrary) {
+                    notify(
+                        "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                        "error"
+                    );
+                    return;
+                }
+
                 setTeacherFineSaving(true);
 
                 try {
@@ -634,6 +653,7 @@ export function useLibraryTeachers({
                 }
             },
             [
+                canWriteLibrary,
                 closeTeacherFineModal,
                 loadLibraryTeachers,
                 loadTeacherLibraryDetails,
@@ -790,5 +810,7 @@ export function useLibraryTeachers({
         saveTeacherFine,
 
         exportLibraryTeachersCSV,
+
+        canWriteLibrary,
     };
 }

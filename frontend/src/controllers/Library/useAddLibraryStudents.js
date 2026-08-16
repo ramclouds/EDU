@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const INITIAL_FILTERS = {
     search: "",
@@ -44,6 +45,8 @@ export function useLibraryStudents({
     showToast,
     setActiveSection,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const fetchRef = useRef(fetchWithAuth);
     const toastRef = useRef(showToast);
 
@@ -605,6 +608,14 @@ export function useLibraryStudents({
                 return;
             }
 
+            if (!canWriteLibrary) {
+                notify(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             setFineSaving(true);
             setFineFormErrors({});
 
@@ -700,6 +711,7 @@ export function useLibraryStudents({
             }
         },
         [
+            canWriteLibrary,
             closeFineModal,
             fineForm,
             fineSaving,
@@ -927,5 +939,7 @@ export function useLibraryStudents({
         saveFinePayment,
 
         issueBookToStudent,
+
+        canWriteLibrary,
     };
 }

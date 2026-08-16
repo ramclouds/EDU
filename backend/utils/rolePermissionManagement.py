@@ -19,10 +19,7 @@ from utils.auth_middleware import get_current_user, login_required
 logger = logging.getLogger(__name__)
 
 
-# =========================================================
 # CONFIGURATION
-# =========================================================
-
 VALID_USER_TYPES = {"admin", "teacher", "student", "staff", "all"}
 VALID_ACTIONS = ("view", "create", "edit", "delete")
 
@@ -251,11 +248,201 @@ DEFAULT_ROLES = [
 ]
 
 
-# =========================================================
+# =====================================================================
+# DASHBOARD REGISTRY
+#
+# Single source of truth for "which dashboard page maps to which RBAC
+# module". Access to an entire dashboard page is gated by the "view"
+# permission on `module_code`; the ability to perform actions inside
+# that page ("write" access) is gated by having create/edit/delete on
+# the same module. This gives page-level (not section-level) access
+# control, exactly like a light on/off switch per dashboard.
+#
+# To add a new dashboard in the future: add one entry here (and, if it
+# needs its own RBAC module, add a matching entry to DEFAULT_MODULES
+# above / create an RBACModule row) - nothing else needs to change.
+# =====================================================================
+DASHBOARD_REGISTRY = [
+    {
+        "key": "super-admin-dashboard",
+        "label": "Super Admin Dashboard",
+        "route": "/super-admin-dashboard",
+        "module_code": None,
+        "owner_admin_type": "Super Admin",
+        "super_admin_only": True,
+    },
+    {
+        "key": "library-admin-dashboard",
+        "label": "Library Dashboard",
+        "route": "/library-admin-dashboard",
+        "module_code": "library",
+        "owner_admin_type": "Library Admin",
+    },
+    {
+        "key": "accounts-admin-dashboard",
+        "label": "Accounts Dashboard",
+        "route": "/accounts-admin-dashboard",
+        "module_code": "accounts",
+        "owner_admin_type": "Accounts Admin",
+    },
+    {
+        "key": "hostel-admin-dashboard",
+        "label": "Hostel Dashboard",
+        "route": "/hostel-admin-dashboard",
+        "module_code": "hostel",
+        "owner_admin_type": "Hostel Admin",
+    },
+    {
+        "key": "hr-admin-dashboard",
+        "label": "HR Dashboard",
+        "route": "/hr-admin-dashboard",
+        "module_code": "hr",
+        "owner_admin_type": "HR Admin",
+    },
+    {
+        "key": "teacher-dashboard",
+        "label": "Teacher Dashboard",
+        "route": "/teacher-dashboard",
+        "module_code": None,
+        "restricted_user_type": "teacher",
+    },
+    {
+        "key": "student-dashboard",
+        "label": "Student Dashboard",
+        "route": "/student-dashboard",
+        "module_code": None,
+        "restricted_user_type": "student",
+    },
+]
+
+DASHBOARD_BY_KEY = {entry["key"]: entry for entry in DASHBOARD_REGISTRY}
+DASHBOARD_BY_ADMIN_TYPE = {
+    entry["owner_admin_type"]: entry
+    for entry in DASHBOARD_REGISTRY
+    if entry.get("owner_admin_type")
+}
+
+
+def get_dashboard_entry_for_admin_type(admin_type):
+    """Return the dashboard registry entry owned by a given admin_type."""
+
+    return DASHBOARD_BY_ADMIN_TYPE.get(str(admin_type or "").strip())
+
+
+def _dashboard_rights_from_actions(action_map):
+    action_map = action_map or {}
+
+    can_view = bool(action_map.get("view"))
+    can_write = bool(
+        action_map.get("create") or action_map.get("edit") or action_map.get("delete")
+    )
+
+    return {"can_view": can_view, "can_write": can_write}
+
+
+def get_user_dashboard_access(user, dashboard_entry):
+    """
+    Resolve {can_view, can_write} for one dashboard entry for a given
+    logged-in user (Admin / Teacher / Student / Staff instance).
+    """
+
+    if not dashboard_entry:
+        return {"can_view": False, "can_write": False}
+
+    restricted_user_type = dashboard_entry.get("restricted_user_type")
+
+    if restricted_user_type == "student":
+        allowed = isinstance(user, Student)
+        return {"can_view": allowed, "can_write": allowed}
+
+    if restricted_user_type == "teacher":
+        allowed = isinstance(user, Teacher)
+        return {"can_view": allowed, "can_write": allowed}
+
+    # From here on, only admins/staff are ever eligible.
+    if not isinstance(user, Admin) and not (
+        Staff is not None and isinstance(user, Staff)
+    ):
+        return {"can_view": False, "can_write": False}
+
+    if dashboard_entry.get("super_admin_only"):
+        allowed = is_super_admin_user(user)
+        return {"can_view": allowed, "can_write": allowed}
+
+    if is_super_admin_user(user):
+        return {"can_view": True, "can_write": True}
+
+    module_code = dashboard_entry.get("module_code")
+
+    if not module_code:
+        return {"can_view": False, "can_write": False}
+
+    if isinstance(user, Admin):
+        user_type = "admin"
+    else:
+        user_type = "staff"
+
+    access = build_user_access(user_type, getattr(user, "id", None))
+
+    if not access:
+        return {"can_view": False, "can_write": False}
+
+    return _dashboard_rights_from_actions(
+        access["effective_permissions"].get(module_code)
+    )
+
+
+def list_dashboard_access_for_user(user):
+    """
+    Return every dashboard the user may see, each with can_view /
+    can_write flags - used to drive the login redirect, ProtectedRoute
+    guard and the sidebar navigation on the frontend.
+    """
+
+    results = []
+
+    for entry in DASHBOARD_REGISTRY:
+        rights = get_user_dashboard_access(user, entry)
+
+        if not rights["can_view"]:
+            continue
+
+        results.append(
+            {
+                "key": entry["key"],
+                "label": entry["label"],
+                "route": entry["route"],
+                "can_view": rights["can_view"],
+                "can_write": rights["can_write"],
+            }
+        )
+
+    return results
+
+
+def get_home_dashboard_for_user(user):
+    """
+    Resolve the dashboard a user should land on right after login,
+    based on their role/admin_type - independent of whether they
+    actually have access to it (callers must still check access).
+    """
+
+    if isinstance(user, Student):
+        return DASHBOARD_BY_KEY["student-dashboard"]
+
+    if isinstance(user, Teacher):
+        return DASHBOARD_BY_KEY["teacher-dashboard"]
+
+    if isinstance(user, Admin):
+        if is_super_admin_user(user):
+            return DASHBOARD_BY_KEY["super-admin-dashboard"]
+
+        return get_dashboard_entry_for_admin_type(getattr(user, "admin_type", None))
+
+    return None
+
+
 # DATABASE MODELS
-# =========================================================
-
-
 class RBACModule(db.Model):
     __tablename__ = "rbac_modules"
 
@@ -560,9 +747,7 @@ class RBACUserPermissionOverride(db.Model):
     )
 
     access_reason = db.Column(db.String(500), nullable=True)
-
     updated_by = db.Column(db.String(100))
-
     created_at = db.Column(
         db.DateTime,
         nullable=False,
@@ -625,11 +810,7 @@ class RBACAuditLog(db.Model):
     )
 
 
-# =========================================================
 # VALIDATION AND NORMALIZATION
-# =========================================================
-
-
 def normalize_code(value):
     value = str(value or "").strip().lower()
     value = re.sub(r"[^a-z0-9_-]+", "-", value)
@@ -797,11 +978,7 @@ def write_audit_log(
     db.session.add(log)
 
 
-# =========================================================
 # USER HELPERS
-# =========================================================
-
-
 def get_user_model(user_type):
     mapping = {
         "admin": Admin,
@@ -893,11 +1070,7 @@ def serialize_basic_user(user_type, user):
     }
 
 
-# =========================================================
 # PERMISSION SERIALIZATION
-# =========================================================
-
-
 def empty_action_map(default=False):
     return {
         "view": default,
@@ -1036,11 +1209,7 @@ def build_user_access(user_type, user_id):
     }
 
 
-# =========================================================
 # RUNTIME PERMISSION CHECK
-# =========================================================
-
-
 def user_has_permission(
     user,
     module_code,
@@ -1109,11 +1278,7 @@ def permission_required(module_code, action="view"):
     return decorator
 
 
-# =========================================================
 # DATABASE SEED
-# =========================================================
-
-
 def seed_rbac_defaults():
     """
     Run once after db.create_all() or through a Flask CLI command.
@@ -1198,105 +1363,132 @@ def seed_rbac_defaults():
         return False
 
 
-# =========================================================
 # BOOTSTRAP API
-# =========================================================
-
-
 class RBACBootstrapAPI(MethodView):
     decorators = [super_admin_required]
 
     def get(self):
-        # Self-heal older/production databases where RBAC tables exist but
-        # default module rows were never inserted. This is safe to repeat.
-        if RBACModule.query.count() == 0:
-            seeded = seed_rbac_defaults()
-            if not seeded:
-                return (
-                    jsonify(
-                        {
-                            "error": "RBAC default modules could not be initialized",
-                            "modules": [],
-                            "roles": [],
-                        }
-                    ),
-                    500,
+        try:
+            # Self-heal older/production databases where RBAC tables exist but
+            # default module rows were never inserted. This is safe to repeat.
+            if RBACModule.query.count() == 0:
+                seeded = seed_rbac_defaults()
+                if not seeded:
+                    return (
+                        jsonify(
+                            {
+                                "error": "RBAC default modules could not be initialized",
+                                "modules": [],
+                                "roles": [],
+                            }
+                        ),
+                        500,
+                    )
+
+            modules = (
+                RBACModule.query.filter_by(is_active=True)
+                .order_by(
+                    RBACModule.sort_order.asc(),
+                    RBACModule.name.asc(),
                 )
-
-        modules = (
-            RBACModule.query.filter_by(is_active=True)
-            .order_by(
-                RBACModule.sort_order.asc(),
-                RBACModule.name.asc(),
+                .all()
             )
-            .all()
-        )
 
-        roles = RBACRole.query.order_by(
-            RBACRole.is_system.desc(),
-            RBACRole.name.asc(),
-        ).all()
+            roles = RBACRole.query.order_by(
+                RBACRole.is_system.desc(),
+                RBACRole.name.asc(),
+            ).all()
 
-        total_users = (
-            Admin.query.filter_by(is_deleted=False).count()
-            + Teacher.query.count()
-            + Student.query.count()
-            + (Staff.query.count() if Staff is not None else 0)
-        )
-
-        now = datetime.utcnow()
-
-        active_override_filter = or_(
-            RBACUserPermissionOverride.is_temporary.is_(False),
-            RBACUserPermissionOverride.expires_at > now,
-        )
-
-        users_with_overrides = (
-            RBACUserPermissionOverride.query.filter(active_override_filter)
-            .with_entities(
-                RBACUserPermissionOverride.user_type,
-                RBACUserPermissionOverride.user_id,
+            total_users = (
+                Admin.query.filter_by(is_deleted=False).count()
+                + Teacher.query.count()
+                + Student.query.count()
+                + (Staff.query.count() if Staff is not None else 0)
             )
-            .distinct()
-            .count()
-        )
 
-        temporary_access_users = (
-            RBACUserPermissionOverride.query.filter(
-                RBACUserPermissionOverride.is_temporary.is_(True),
+            now = datetime.utcnow()
+
+            active_override_filter = or_(
+                RBACUserPermissionOverride.is_temporary.is_(False),
                 RBACUserPermissionOverride.expires_at > now,
             )
-            .with_entities(
-                RBACUserPermissionOverride.user_type,
-                RBACUserPermissionOverride.user_id,
+
+            users_with_overrides = (
+                RBACUserPermissionOverride.query.filter(active_override_filter)
+                .with_entities(
+                    RBACUserPermissionOverride.user_type,
+                    RBACUserPermissionOverride.user_id,
+                )
+                .distinct()
+                .count()
             )
-            .distinct()
-            .count()
-        )
 
-        return (
-            jsonify(
-                {
-                    "modules": [module.to_dict() for module in modules],
-                    "roles": [serialize_role(role) for role in roles],
-                    "stats": {
-                        "total_roles": len(roles),
-                        "active_roles": sum(1 for role in roles if role.is_active),
-                        "total_users": total_users,
-                        "users_with_overrides": users_with_overrides,
-                        "temporary_access_users": temporary_access_users,
-                    },
-                }
-            ),
-            200,
-        )
+            temporary_access_users = (
+                RBACUserPermissionOverride.query.filter(
+                    RBACUserPermissionOverride.is_temporary.is_(True),
+                    RBACUserPermissionOverride.expires_at > now,
+                )
+                .with_entities(
+                    RBACUserPermissionOverride.user_type,
+                    RBACUserPermissionOverride.user_id,
+                )
+                .distinct()
+                .count()
+            )
+
+            return (
+                jsonify(
+                    {
+                        "modules": [module.to_dict() for module in modules],
+                        "roles": [serialize_role(role) for role in roles],
+                        "stats": {
+                            "total_roles": len(roles),
+                            "active_roles": sum(1 for role in roles if role.is_active),
+                            "total_users": total_users,
+                            "users_with_overrides": users_with_overrides,
+                            "temporary_access_users": temporary_access_users,
+                        },
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError:
+            db.session.rollback()
+            logger.exception(
+                "RBAC bootstrap failed - RBAC tables may not exist yet. "
+                "Run db.create_all()/migrations, then seed_rbac_defaults()."
+            )
+            return (
+                jsonify(
+                    {
+                        "error": (
+                            "RBAC tables are not set up correctly. Please run "
+                            "database migrations and seed RBAC defaults."
+                        ),
+                        "modules": [],
+                        "roles": [],
+                    }
+                ),
+                500,
+            )
+
+        except Exception:
+            db.session.rollback()
+            logger.exception("Unexpected error loading RBAC bootstrap data")
+            return (
+                jsonify(
+                    {
+                        "error": "Failed to load role and permission data",
+                        "modules": [],
+                        "roles": [],
+                    }
+                ),
+                500,
+            )
 
 
-# =========================================================
 # ROLE CRUD API
-# =========================================================
-
-
 class RBACRoleListAPI(MethodView):
     decorators = [super_admin_required]
 
@@ -1531,9 +1723,7 @@ class RBACRoleDetailAPI(MethodView):
         assigned_users = len(assignments)
 
         try:
-            # A custom role owns only RBAC assignment rows. Removing those
-            # rows does not delete application users or their accounts. This
-            # makes Delete Role complete and prevents a permanent 409 loop.
+
             for assignment in assignments:
                 db.session.delete(assignment)
 
@@ -1568,11 +1758,7 @@ class RBACRoleDetailAPI(MethodView):
             return jsonify({"error": "Database error"}), 500
 
 
-# =========================================================
 # ROLE PERMISSION API
-# =========================================================
-
-
 class RBACRolePermissionAPI(MethodView):
     decorators = [super_admin_required]
 
@@ -1594,9 +1780,7 @@ class RBACRolePermissionAPI(MethodView):
             )
 
         modules = RBACModule.query.filter_by(is_active=True).all()
-
         module_lookup = {module.code: module for module in modules}
-
         unknown_modules = set(permissions.keys()) - set(module_lookup.keys())
 
         if unknown_modules:
@@ -1691,11 +1875,7 @@ class RBACRolePermissionAPI(MethodView):
             return jsonify({"error": "Database error"}), 500
 
 
-# =========================================================
 # USER LIST API
-# =========================================================
-
-
 class RBACUserListAPI(MethodView):
     decorators = [super_admin_required]
 
@@ -1818,11 +1998,7 @@ class RBACUserListAPI(MethodView):
         )
 
 
-# =========================================================
 # USER ACCESS API
-# =========================================================
-
-
 class RBACUserAccessAPI(MethodView):
     decorators = [super_admin_required]
 
@@ -2143,11 +2319,7 @@ class RBACUserOverrideAPI(MethodView):
             return jsonify({"error": "Database error"}), 500
 
 
-# =========================================================
 # CURRENT USER ACCESS API
-# =========================================================
-
-
 class MyRBACAccessAPI(MethodView):
     decorators = [login_required]
 
@@ -2191,3 +2363,26 @@ class MyRBACAccessAPI(MethodView):
             return jsonify({"error": "Access not configured"}), 404
 
         return jsonify(access), 200
+
+
+# CURRENT USER DASHBOARD ACCESS API
+class MyDashboardAccessAPI(MethodView):
+
+    decorators = [login_required]
+
+    def get(self):
+        current_user = get_current_user()
+
+        home = get_home_dashboard_for_user(current_user)
+
+        return (
+            jsonify(
+                {
+                    "dashboards": list_dashboard_access_for_user(current_user),
+                    "home_dashboard": home["key"] if home else None,
+                    "home_route": home["route"] if home else None,
+                    "is_super_admin": is_super_admin_user(current_user),
+                }
+            ),
+            200,
+        )

@@ -8,6 +8,7 @@ import {
 import {
     BASE_URL,
 } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const EMPTY_FILTERS = {
     search: "",
@@ -63,6 +64,8 @@ export function useLibraryNotifications({
     fetchWithAuth,
     showToast,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const fetchRef =
         useRef(fetchWithAuth);
 
@@ -538,6 +541,14 @@ export function useLibraryNotifications({
                     return;
                 }
 
+                if (!canWriteLibrary) {
+                    notify(
+                        "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                        "error"
+                    );
+                    return;
+                }
+
                 setNotificationSaving(
                     true
                 );
@@ -671,6 +682,7 @@ export function useLibraryNotifications({
                 }
             },
             [
+                canWriteLibrary,
                 libraryNotificationFilters,
                 libraryNotificationPagination
                     .per_page,
@@ -717,6 +729,14 @@ export function useLibraryNotifications({
                 if (
                     !notification?.id
                 ) {
+                    return;
+                }
+
+                if (!canWriteLibrary) {
+                    notify(
+                        "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                        "error"
+                    );
                     return;
                 }
 
@@ -769,6 +789,7 @@ export function useLibraryNotifications({
                 }
             },
             [
+                canWriteLibrary,
                 libraryNotificationFilters,
                 libraryNotificationPagination
                     .page,
@@ -848,5 +869,7 @@ export function useLibraryNotifications({
         closeNotificationDetails,
 
         retryNotification,
+
+        canWriteLibrary,
     };
 }
