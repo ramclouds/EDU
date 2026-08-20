@@ -380,6 +380,19 @@ CREATE TABLE IF NOT EXISTS `batches` (
   UNIQUE KEY `batch_name` (`batch_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- beds
+CREATE TABLE IF NOT EXISTS `beds` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `room_id` int NOT NULL,
+  `bed_number` varchar(10) NOT NULL,
+  `bed_type` enum('Standard','Premium') DEFAULT NULL,
+  `status` enum('Vacant','Occupied','Maintenance','Reserved') NOT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_bed_room_number` (`room_id`,`bed_number`),
+  CONSTRAINT `beds_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- books
 CREATE TABLE IF NOT EXISTS `books` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -580,98 +593,53 @@ CREATE TABLE IF NOT EXISTS `exam_subjects` (
 CREATE TABLE IF NOT EXISTS `hostels` (
   `id` int NOT NULL AUTO_INCREMENT,
   `hostel_name` varchar(100) NOT NULL,
-  `description` text,
-  `is_active` tinyint(1) NOT NULL,
-  `created_at` datetime NOT NULL,
-  `updated_at` datetime NOT NULL,
+  `hostel_type` enum('Boys','Girls','Co-ed') DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL,
+  `created_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `ix_hostels_hostel_name` (`hostel_name`),
-  KEY `ix_hostels_is_active` (`is_active`)
+  UNIQUE KEY `hostel_name` (`hostel_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- hostel_allocations
 CREATE TABLE IF NOT EXISTS `hostel_allocations` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `student_id` int NOT NULL,
-  `room_id` int NOT NULL,
-  `bed_id` int DEFAULT NULL,
-  `bed_number` varchar(20) NOT NULL,
-  `check_in_date` date NOT NULL,
+  `student_id` int DEFAULT NULL,
+  `bed_id` int NOT NULL,
+  `check_in_date` date DEFAULT NULL,
   `check_out_date` date DEFAULT NULL,
-  `status` enum('Pending','Active','Transferred','Checked Out') NOT NULL,
-  `remarks` text,
   `is_active` tinyint(1) DEFAULT NULL,
-  `created_by` int DEFAULT NULL,
-  `updated_by` int DEFAULT NULL,
-  `created_at` datetime NOT NULL,
-  `updated_at` datetime NOT NULL,
+  `created_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `ix_hostel_allocations_status` (`status`),
-  KEY `ix_hostel_allocation_active_student` (`student_id`,`is_active`,`status`),
-  KEY `ix_hostel_allocations_is_active` (`is_active`),
-  KEY `ix_hostel_allocation_active_bed` (`bed_id`,`is_active`,`status`),
-  KEY `ix_hostel_allocations_room_id` (`room_id`),
-  KEY `ix_hostel_allocations_student_id` (`student_id`),
-  KEY `ix_hostel_allocations_bed_id` (`bed_id`),
+  KEY `student_id` (`student_id`),
+  KEY `bed_id` (`bed_id`),
   CONSTRAINT `hostel_allocations_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `hostel_allocations_ibfk_2` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `hostel_allocations_ibfk_3` FOREIGN KEY (`bed_id`) REFERENCES `hostel_beds` (`id`) ON DELETE RESTRICT,
-  CONSTRAINT `ck_allocation_dates` CHECK (((`check_out_date` is null) or (`check_out_date` >= `check_in_date`)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- hostel_beds
-CREATE TABLE IF NOT EXISTS `hostel_beds` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `room_id` int NOT NULL,
-  `bed_code` varchar(50) NOT NULL,
-  `bed_number` varchar(20) NOT NULL,
-  `status` enum('Available','Occupied','Maintenance') NOT NULL,
-  `description` text,
-  `is_active` tinyint(1) DEFAULT NULL,
-  `created_by` int DEFAULT NULL,
-  `updated_by` int DEFAULT NULL,
-  `created_at` datetime NOT NULL,
-  `updated_at` datetime NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_room_bed_number` (`room_id`,`bed_number`),
-  UNIQUE KEY `ix_hostel_beds_bed_code` (`bed_code`),
-  KEY `ix_hostel_beds_status` (`status`),
-  KEY `ix_hostel_beds_room_id` (`room_id`),
-  KEY `ix_hostel_beds_is_active` (`is_active`),
-  CONSTRAINT `hostel_beds_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE
+  CONSTRAINT `hostel_allocations_ibfk_2` FOREIGN KEY (`bed_id`) REFERENCES `beds` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- hostel_blocks
 CREATE TABLE IF NOT EXISTS `hostel_blocks` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `hostel_id` int DEFAULT NULL,
-  `block_name` varchar(50) NOT NULL,
-  `block_type` enum('Boys','Girls','Staff','Common') NOT NULL,
-  `status` enum('Active','Maintenance','Inactive') NOT NULL,
-  `description` text,
-  `is_active` tinyint(1) NOT NULL,
-  `created_by` int DEFAULT NULL,
-  `updated_by` int DEFAULT NULL,
-  `created_at` datetime NOT NULL,
-  `updated_at` datetime NOT NULL,
+  `hostel_id` int NOT NULL,
+  `block_name` varchar(10) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL,
+  `created_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_hostel_block_name` (`hostel_id`,`block_name`),
-  KEY `ix_hostel_blocks_hostel_id` (`hostel_id`),
-  KEY `ix_hostel_blocks_is_active` (`is_active`),
-  KEY `ix_hostel_blocks_status` (`status`),
+  UNIQUE KEY `uq_block_hostel_name` (`hostel_id`,`block_name`),
   CONSTRAINT `hostel_blocks_ibfk_1` FOREIGN KEY (`hostel_id`) REFERENCES `hostels` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- hostel_complaints
 CREATE TABLE IF NOT EXISTS `hostel_complaints` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `student_id` int NOT NULL,
+  `student_id` int DEFAULT NULL,
   `room_id` int DEFAULT NULL,
-  `issue` text NOT NULL,
-  `status` enum('Pending','In Progress','Resolved') NOT NULL,
+  `issue` text,
+  `status` enum('Pending','In Progress','Resolved') DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `ix_hostel_complaints_student_id` (`student_id`),
-  KEY `ix_hostel_complaints_room_id` (`room_id`),
+  KEY `student_id` (`student_id`),
+  KEY `room_id` (`room_id`),
   CONSTRAINT `hostel_complaints_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
   CONSTRAINT `hostel_complaints_ibfk_2` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -679,12 +647,64 @@ CREATE TABLE IF NOT EXISTS `hostel_complaints` (
 -- hostel_fees
 CREATE TABLE IF NOT EXISTS `hostel_fees` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `student_id` int NOT NULL,
+  `student_id` int DEFAULT NULL,
   `amount` decimal(10,2) DEFAULT NULL,
-  `status` enum('Pending','Paid','Overdue') NOT NULL,
+  `status` enum('Pending','Paid','Overdue') DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `ix_hostel_fees_student_id` (`student_id`),
+  KEY `student_id` (`student_id`),
   CONSTRAINT `hostel_fees_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_floors
+CREATE TABLE IF NOT EXISTS `hostel_floors` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `block_id` int NOT NULL,
+  `floor_number` int NOT NULL,
+  `floor_name` varchar(50) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_floor_block_number` (`block_id`,`floor_number`),
+  CONSTRAINT `hostel_floors_ibfk_1` FOREIGN KEY (`block_id`) REFERENCES `hostel_blocks` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_staff
+CREATE TABLE IF NOT EXISTS `hostel_staff` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `staff_code` varchar(20) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `last_name` varchar(100) DEFAULT NULL,
+  `role` enum('Warden','Security Guard','Cleaner','Cook','Maintenance','Other') NOT NULL,
+  `block_id` int DEFAULT NULL,
+  `shift` enum('Morning','Evening','Night') DEFAULT NULL,
+  `mobile` varchar(15) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `status` enum('Active','On Leave','Inactive') NOT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `staff_code` (`staff_code`),
+  KEY `block_id` (`block_id`),
+  CONSTRAINT `hostel_staff_ibfk_1` FOREIGN KEY (`block_id`) REFERENCES `hostel_blocks` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_visitors
+CREATE TABLE IF NOT EXISTS `hostel_visitors` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `visitor_code` varchar(20) NOT NULL,
+  `visitor_name` varchar(150) NOT NULL,
+  `visitor_mobile` varchar(15) DEFAULT NULL,
+  `student_id` int NOT NULL,
+  `relation` enum('Parent','Guardian','Friend','Relative','Other') NOT NULL,
+  `purpose` varchar(255) DEFAULT NULL,
+  `status` enum('Pending','Approved','Rejected','Checked Out') NOT NULL,
+  `check_in_time` datetime DEFAULT NULL,
+  `check_out_time` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `visitor_code` (`visitor_code`),
+  KEY `student_id` (`student_id`),
+  CONSTRAINT `hostel_visitors_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- library_fine_payments
@@ -921,38 +941,26 @@ CREATE TABLE IF NOT EXISTS `rbac_user_roles` (
 -- rooms
 CREATE TABLE IF NOT EXISTS `rooms` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `block_id` int DEFAULT NULL,
-  `room_number` varchar(20) NOT NULL,
-  `floor` int NOT NULL,
-  `room_type` enum('Single','Double','Triple','Dorm') NOT NULL,
-  `capacity` int NOT NULL,
-  `status` enum('Available','Occupied','Maintenance','Cleaning') NOT NULL,
-  `monthly_fee` decimal(10,2) DEFAULT NULL,
-  `description` text,
-  `is_active` tinyint(1) DEFAULT NULL,
-  `created_by` int DEFAULT NULL,
-  `updated_by` int DEFAULT NULL,
-  `created_at` datetime NOT NULL,
-  `updated_at` datetime NOT NULL,
+  `floor_id` int NOT NULL,
+  `room_number` varchar(10) NOT NULL,
+  `room_type` enum('Single','Double','Triple','Dorm') DEFAULT NULL,
+  `status` enum('Active','Maintenance','Inactive') NOT NULL,
+  `monthly_rent` decimal(10,2) DEFAULT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_block_room_number` (`block_id`,`room_number`),
-  KEY `ix_rooms_is_active` (`is_active`),
-  KEY `ix_rooms_block_id` (`block_id`),
-  KEY `ix_rooms_status` (`status`),
-  KEY `ix_rooms_room_number` (`room_number`),
-  CONSTRAINT `rooms_ibfk_1` FOREIGN KEY (`block_id`) REFERENCES `hostel_blocks` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `ck_room_capacity_positive` CHECK ((`capacity` > 0)),
-  CONSTRAINT `ck_room_floor_nonnegative` CHECK ((`floor` >= 0))
+  UNIQUE KEY `uq_room_floor_number` (`floor_id`,`room_number`),
+  CONSTRAINT `rooms_ibfk_1` FOREIGN KEY (`floor_id`) REFERENCES `hostel_floors` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- room_wardens
 CREATE TABLE IF NOT EXISTS `room_wardens` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `room_id` int NOT NULL,
-  `warden_id` int NOT NULL,
+  `room_id` int DEFAULT NULL,
+  `warden_id` int DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `ix_room_wardens_warden_id` (`warden_id`),
-  KEY `ix_room_wardens_room_id` (`room_id`),
+  KEY `room_id` (`room_id`),
+  KEY `warden_id` (`warden_id`),
   CONSTRAINT `room_wardens_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE CASCADE,
   CONSTRAINT `room_wardens_ibfk_2` FOREIGN KEY (`warden_id`) REFERENCES `wardens` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

@@ -21,14 +21,6 @@ import HRAdminDashboard from "./pages/hr-Mgmt-dashboard";
 // living in your project (it sits next to useLogin.js in this patch).
 import { useDashboardAccess } from "./controllers/Auth/useDashboardAccess";
 
-/* =========================
-   FULL-SCREEN LOADER
-   Shown only the first time the dashboard-access list is being
-   fetched (e.g. right after a hard page refresh), so a legitimately
-   permitted admin never gets bounced to "/" before we know their
-   permissions.
-========================= */
-
 function AccessCheckLoader() {
   return (
     <div className="flex h-screen w-screen items-center justify-center text-sm text-gray-400">
