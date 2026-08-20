@@ -1,277 +1,960 @@
-import { useEffect, useState, useRef } from "react";
-import { BASE_URL } from "../config/appConfig";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-export function useStudentDashboard(activeSection, setActiveSection) {
+import {
+  BASE_URL,
+} from "../config/appConfig";
 
-  // ================= LOADING =================
-  const [loading, setLoading] = useState(true);
-  const [noticeLoading, setNoticeLoading] = useState(false);
+export function useStudentDashboard(
+  activeSection,
+  setActiveSection,
+) {
+  // =========================================================
+  // REFS
+  // =========================================================
+  const toastTimerRef =
+    useRef(null);
 
-  // ================= NOTIFICATIONS =================
-  const [notifications, setNotifications] = useState([]);
-  const [notificationUnread, setNotificationUnread] = useState(0);
-  const [notificationLoading, setNotificationLoading] = useState(false);
+  const notificationRunningRef =
+    useRef(false);
 
-  // ================= NOTICES =================
-  const [announcements, setNotices] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [noticeStats, setNoticeStats] = useState({
+  // =========================================================
+  // LOADING
+  // =========================================================
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    noticeLoading,
+    setNoticeLoading,
+  ] = useState(false);
+
+  // =========================================================
+  // NOTIFICATIONS
+  // =========================================================
+  const [
+    notifications,
+    setNotifications,
+  ] = useState([]);
+
+  const [
+    notificationUnread,
+    setNotificationUnread,
+  ] = useState(0);
+
+  const [
+    notificationLoading,
+    setNotificationLoading,
+  ] = useState(false);
+
+  // =========================================================
+  // ANNOUNCEMENTS
+  // =========================================================
+  const [
+    announcements,
+    setNotices,
+  ] = useState([]);
+
+  const [
+    unreadCount,
+    setUnreadCount,
+  ] = useState(0);
+
+  const [
+    noticeStats,
+    setNoticeStats,
+  ] = useState({
     total: 0,
     important: 0,
     thisWeek: 0,
   });
 
-  // ================= LIBRARY =================
-  const [libraryData, setLibraryData] = useState([]);
-  const [librarySummary, setLibrarySummary] = useState({
-    total_books: 0,
-    overdue: 0,
-    fine_due: 0,
-  });
-
-  // ================= TOAST =================
-  const [toast, setToast] = useState({
+  // =========================================================
+  // TOAST
+  // =========================================================
+  const [
+    toast,
+    setToast,
+  ] = useState({
     show: false,
     message: "",
     type: "success",
   });
 
-  const showToast = (message, type = "success") => {
-    setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast({ show: false, message: "", type });
-    }, 3000);
-  };
+  const showToast =
+    useCallback(
+      (
+        message,
+        type = "success",
+      ) => {
+        if (
+          toastTimerRef.current
+        ) {
+          clearTimeout(
+            toastTimerRef.current,
+          );
+        }
 
-  // ================= AUTH =================
-  const getAuth = () => {
-    try {
-      return {
-        user: JSON.parse(localStorage.getItem("user")),
-        token: localStorage.getItem("token"),
-      };
-    } catch {
-      return { user: null, token: null };
-    }
-  };
+        setToast({
+          show: true,
+          message,
+          type,
+        });
 
-  const logoutUser = () => {
-    localStorage.clear();
-    window.location.href = "/";
-  };
-
-  const fetchWithAuth = async (url, options = {}) => {
-    const { token } = getAuth();
-
-    const res = await fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: `Bearer ${token}`,
+        toastTimerRef.current =
+          setTimeout(() => {
+            setToast({
+              show: false,
+              message: "",
+              type,
+            });
+          }, 3000);
       },
-    });
+      [],
+    );
 
-    if (res.status === 401) {
-      logoutUser();
-      throw new Error("Unauthorized");
-    }
-
-    return res;
-  };
-
-  // ================= AUTH CHECK =================
-  useEffect(() => {
-    const { user, token } = getAuth();
-    if (!user || !token) logoutUser();
-  }, []);
-
-  // ================= DASHBOARD PREFETCH =================
-  useEffect(() => {
-    const { user } = getAuth();
-    if (!user) return;
-
-    const fetchDashboardData = async () => {
+  // =========================================================
+  // AUTH
+  // =========================================================
+  const getAuth =
+    useCallback(() => {
       try {
-        setLoading(true);
+        const rawUser =
+          localStorage.getItem(
+            "user",
+          );
 
-        const [noticeRes, libraryRes] = await Promise.all([
-          fetchWithAuth(
-            `${BASE_URL}/announcements/student/${user.id}?page=1&limit=5`
-          ),
-          fetchWithAuth(`${BASE_URL}/library/${user.id}`),
-        ]);
+        return {
+          user: rawUser
+            ? JSON.parse(rawUser)
+            : null,
 
-        const noticeData = await noticeRes.json();
-        const libraryDataRes = await libraryRes.json();
-
-        const notices = noticeData.data || [];
-        setNotices(notices);
-        setUnreadCount(notices.filter(n => !n.is_read).length);
-
-        setLibraryData(libraryDataRes.books || []);
-        setLibrarySummary(libraryDataRes.summary || {});
-
-      } catch (err) {
-        console.error("Dashboard Fetch Error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
-
-  // ================= LIBRARY (ON TAB CHANGE) =================
-  useEffect(() => {
-    if (activeSection !== "library") return;
-
-    const { user } = getAuth();
-    if (!user) return;
-
-    const fetchLibrary = async () => {
-      try {
-        setLoading(true);
-
-        const res = await fetchWithAuth(
-          `${BASE_URL}/library/${user.id}`
+          token:
+            localStorage.getItem(
+              "token",
+            ),
+        };
+      } catch (error) {
+        console.error(
+          "Failed to parse auth:",
+          error,
         );
 
-        const data = await res.json();
-
-        setLibraryData(data.books || []);
-        setLibrarySummary(data.summary || {});
-      } catch (err) {
-        console.error(err);
-        showToast("Failed to load library data", "error");
-      } finally {
-        setLoading(false);
+        return {
+          user: null,
+          token: null,
+        };
       }
-    };
+    }, []);
 
-    fetchLibrary();
-  }, [activeSection]);
+  const logoutUser =
+    useCallback(() => {
+      localStorage.clear();
 
-  // ================= NOTIFICATIONS =================
-  const fetchNotifications = async () => {
-    try {
-      setNotificationLoading(true);
+      window.location.href = "/";
+    }, []);
 
-      const res = await fetchWithAuth(`${BASE_URL}/notifications`);
-      const data = await res.json();
+  // =========================================================
+  // AUTHENTICATED FETCH
+  // =========================================================
+  const fetchWithAuth =
+    useCallback(
+      async (
+        url,
+        options = {},
+      ) => {
+        const { token } =
+          getAuth();
 
-      const sorted = (data || []).sort((a, b) =>
-        a.is_read === b.is_read ? 0 : a.is_read ? 1 : -1
-      );
+        if (!token) {
+          logoutUser();
 
-      setNotifications(sorted);
-      setNotificationUnread(sorted.filter(n => !n.is_read).length);
+          throw new Error(
+            "Authentication token missing",
+          );
+        }
 
-    } catch (err) {
-      console.error("Notification fetch error:", err);
-    } finally {
-      setNotificationLoading(false);
-    }
-  };
+        const headers = {
+          ...(options.headers ||
+            {}),
 
+          Authorization:
+            `Bearer ${token}`,
+        };
+
+        /*
+         * Do not force Content-Type for FormData.
+         * Browser needs to generate multipart boundary.
+         */
+        if (
+          options.body &&
+          !(options.body
+            instanceof FormData) &&
+          !headers[
+          "Content-Type"
+          ]
+        ) {
+          headers[
+            "Content-Type"
+          ] = "application/json";
+        }
+
+        const response =
+          await fetch(
+            url,
+            {
+              ...options,
+              headers,
+            },
+          );
+
+        if (
+          response.status ===
+          401
+        ) {
+          logoutUser();
+
+          throw new Error(
+            "Unauthorized",
+          );
+        }
+
+        return response;
+      },
+      [
+        getAuth,
+        logoutUser,
+      ],
+    );
+
+  // =========================================================
+  // AUTH CHECK
+  // =========================================================
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000);
-    return () => clearInterval(interval);
-  }, []);
+    const {
+      user,
+      token,
+    } = getAuth();
 
-  const markNotificationRead = async (id) => {
-    try {
-      await fetchWithAuth(`${BASE_URL}/notifications/read/${id}`, {
-        method: "POST",
-      });
-
-      setNotifications(prev =>
-        prev.map(n =>
-          n.id === id ? { ...n, is_read: true } : n
-        )
-      );
-
-      setNotificationUnread(prev => Math.max(prev - 1, 0));
-    } catch (err) {
-      console.error(err);
+    if (!user || !token) {
+      logoutUser();
     }
-  };
+  }, [
+    getAuth,
+    logoutUser,
+  ]);
 
-  // ================= NOTICE =================
-  const markNoticeAsRead = async (noticeId) => {
-    const { user } = getAuth();
+  // =========================================================
+  // LOAD ANNOUNCEMENTS
+  // =========================================================
+  const fetchAnnouncements =
+    useCallback(
+      async ({
+        silent = false,
+      } = {}) => {
+        const { user } =
+          getAuth();
 
-    try {
-      await fetchWithAuth(
-        `${BASE_URL}/announcements/read/${noticeId}/${user.id}`,
-        { method: "POST" }
-      );
+        if (!user?.id) {
+          return;
+        }
 
-      setNotices(prev =>
-        prev.map(n =>
-          n.id === noticeId ? { ...n, is_read: true } : n
-        )
-      );
+        if (!silent) {
+          setNoticeLoading(
+            true,
+          );
+        }
 
-      setUnreadCount(prev => Math.max(prev - 1, 0));
-    } catch (err) {
-      console.error(err);
+        try {
+          const response =
+            await fetchWithAuth(
+              `${BASE_URL}/announcements/student/${user.id}?page=1&limit=20`,
+            );
+
+          let data = {};
+
+          try {
+            data =
+              await response.json();
+          } catch {
+            data = {};
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              data.error ||
+              data.message ||
+              "Unable to load announcements",
+            );
+          }
+
+          const notices =
+            Array.isArray(
+              data.data,
+            )
+              ? data.data
+              : Array.isArray(data)
+                ? data
+                : [];
+
+          setNotices(notices);
+
+          setUnreadCount(
+            notices.filter(
+              (notice) =>
+                !notice.is_read,
+            ).length,
+          );
+        } catch (error) {
+          console.error(
+            "Announcement fetch error:",
+            error,
+          );
+
+          if (!silent) {
+            showToast(
+              error.message ||
+              "Failed to load announcements",
+              "error",
+            );
+          }
+        } finally {
+          if (!silent) {
+            setNoticeLoading(
+              false,
+            );
+          }
+        }
+      },
+      [
+        fetchWithAuth,
+        getAuth,
+        showToast,
+      ],
+    );
+
+  // =========================================================
+  // DASHBOARD INITIAL DATA
+  //
+  // IMPORTANT:
+  // Library fetching is intentionally NOT here anymore.
+  // useStudentLibrary owns library data.
+  // =========================================================
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDashboard =
+      async () => {
+        try {
+          setLoading(true);
+
+          await fetchAnnouncements({
+            silent: true,
+          });
+        } catch (error) {
+          console.error(
+            "Dashboard fetch error:",
+            error,
+          );
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      };
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    fetchAnnouncements,
+  ]);
+
+  // =========================================================
+  // ANNOUNCEMENTS TAB
+  // =========================================================
+  useEffect(() => {
+    if (
+      activeSection !==
+      "announcements"
+    ) {
+      return;
     }
-  };
 
-  // ================= COMBINED =================
-  const combinedNotifications = [
-    ...(notifications || []).map(n => ({
-      ...n,
-      source: "leave",
-      time: n.created_at,
-    })),
-    ...(announcements || []).map(n => ({
-      ...n,
-      source: "notice",
-      time: n.date,
-    })),
-  ];
+    fetchAnnouncements({
+      silent: true,
+    });
+  }, [
+    activeSection,
+    fetchAnnouncements,
+  ]);
 
-  const sortedNotifications = [...combinedNotifications].sort((a, b) => {
-    if (a.is_read !== b.is_read) return a.is_read ? 1 : -1;
-    return new Date(b.time) - new Date(a.time);
-  });
+  // =========================================================
+  // NOTIFICATIONS
+  // =========================================================
+  const fetchNotifications =
+    useCallback(
+      async ({
+        silent = true,
+      } = {}) => {
+        if (
+          notificationRunningRef
+            .current
+        ) {
+          return;
+        }
+
+        notificationRunningRef.current =
+          true;
+
+        if (!silent) {
+          setNotificationLoading(
+            true,
+          );
+        }
+
+        try {
+          const response =
+            await fetchWithAuth(
+              `${BASE_URL}/notifications`,
+            );
+
+          let data = [];
+
+          try {
+            data =
+              await response.json();
+          } catch {
+            data = [];
+          }
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+              data?.message ||
+              "Failed to load notifications",
+            );
+          }
+
+          const rows =
+            Array.isArray(data)
+              ? data
+              : Array.isArray(
+                data.notifications,
+              )
+                ? data.notifications
+                : [];
+
+          const sorted = [
+            ...rows,
+          ].sort(
+            (a, b) => {
+              if (
+                Boolean(
+                  a.is_read,
+                ) !==
+                Boolean(
+                  b.is_read,
+                )
+              ) {
+                return a.is_read
+                  ? 1
+                  : -1;
+              }
+
+              const timeA =
+                new Date(
+                  a.created_at ||
+                  0,
+                ).getTime();
+
+              const timeB =
+                new Date(
+                  b.created_at ||
+                  0,
+                ).getTime();
+
+              return (
+                timeB -
+                timeA
+              );
+            },
+          );
+
+          setNotifications(
+            sorted,
+          );
+
+          setNotificationUnread(
+            sorted.filter(
+              (notification) =>
+                !notification.is_read,
+            ).length,
+          );
+        } catch (error) {
+          console.error(
+            "Notification fetch error:",
+            error,
+          );
+        } finally {
+          notificationRunningRef.current =
+            false;
+
+          if (!silent) {
+            setNotificationLoading(
+              false,
+            );
+          }
+        }
+      },
+      [fetchWithAuth],
+    );
+
+  // Initial notification load + polling.
+  useEffect(() => {
+    fetchNotifications({
+      silent: false,
+    });
+
+    const interval =
+      setInterval(() => {
+        fetchNotifications({
+          silent: true,
+        });
+      }, 15000);
+
+    return () => {
+      clearInterval(
+        interval,
+      );
+    };
+  }, [
+    fetchNotifications,
+  ]);
+
+  // =========================================================
+  // MARK NOTIFICATION READ
+  // =========================================================
+  const markNotificationRead =
+    useCallback(
+      async (id) => {
+        if (!id) {
+          return;
+        }
+
+        try {
+          const response =
+            await fetchWithAuth(
+              `${BASE_URL}/notifications/read/${id}`,
+              {
+                method: "POST",
+              },
+            );
+
+          if (!response.ok) {
+            let data = {};
+
+            try {
+              data =
+                await response.json();
+            } catch {
+              data = {};
+            }
+
+            throw new Error(
+              data.error ||
+              data.message ||
+              "Unable to mark notification as read",
+            );
+          }
+
+          setNotifications(
+            (previous) =>
+              previous.map(
+                (notification) =>
+                  notification.id ===
+                    id
+                    ? {
+                      ...notification,
+                      is_read:
+                        true,
+                    }
+                    : notification,
+              ),
+          );
+
+          setNotificationUnread(
+            (previous) =>
+              Math.max(
+                previous - 1,
+                0,
+              ),
+          );
+        } catch (error) {
+          console.error(
+            "Mark notification error:",
+            error,
+          );
+        }
+      },
+      [fetchWithAuth],
+    );
+
+  // =========================================================
+  // MARK ANNOUNCEMENT READ
+  // =========================================================
+  const markNoticeAsRead =
+    useCallback(
+      async (
+        noticeId,
+      ) => {
+        const { user } =
+          getAuth();
+
+        if (
+          !noticeId ||
+          !user?.id
+        ) {
+          return;
+        }
+
+        try {
+          const response =
+            await fetchWithAuth(
+              `${BASE_URL}/announcements/read/${noticeId}/${user.id}`,
+              {
+                method: "POST",
+              },
+            );
+
+          if (!response.ok) {
+            let data = {};
+
+            try {
+              data =
+                await response.json();
+            } catch {
+              data = {};
+            }
+
+            throw new Error(
+              data.error ||
+              data.message ||
+              "Unable to mark announcement as read",
+            );
+          }
+
+          setNotices(
+            (previous) =>
+              previous.map(
+                (notice) =>
+                  notice.id ===
+                    noticeId
+                    ? {
+                      ...notice,
+                      is_read:
+                        true,
+                    }
+                    : notice,
+              ),
+          );
+
+          setUnreadCount(
+            (previous) =>
+              Math.max(
+                previous - 1,
+                0,
+              ),
+          );
+        } catch (error) {
+          console.error(
+            "Mark announcement error:",
+            error,
+          );
+        }
+      },
+      [
+        fetchWithAuth,
+        getAuth,
+      ],
+    );
+
+  // =========================================================
+  // COMBINED NOTIFICATION CENTER
+  // =========================================================
+  const combinedNotifications =
+    useMemo(
+      () => [
+        ...(notifications ||
+          []).map(
+            (notification) => ({
+              ...notification,
+
+              source:
+                "notification",
+
+              time:
+                notification.created_at,
+
+              title:
+                notification.title ||
+                "Notification",
+
+              message:
+                notification.message ||
+                "",
+            }),
+          ),
+
+        ...(announcements ||
+          []).map(
+            (announcement) => ({
+              ...announcement,
+
+              source:
+                "notice",
+
+              time:
+                announcement.date ||
+                announcement.created_at,
+
+              title:
+                announcement.title ||
+                "Announcement",
+
+              message:
+                announcement.description ||
+                announcement.message ||
+                "",
+            }),
+          ),
+      ],
+      [
+        announcements,
+        notifications,
+      ],
+    );
+
+  const sortedNotifications =
+    useMemo(
+      () =>
+        [
+          ...combinedNotifications,
+        ].sort(
+          (a, b) => {
+            if (
+              Boolean(
+                a.is_read,
+              ) !==
+              Boolean(
+                b.is_read,
+              )
+            ) {
+              return a.is_read
+                ? 1
+                : -1;
+            }
+
+            return (
+              new Date(
+                b.time || 0,
+              ).getTime() -
+              new Date(
+                a.time || 0,
+              ).getTime()
+            );
+          },
+        ),
+      [
+        combinedNotifications,
+      ],
+    );
 
   const totalUnread =
-    (notifications?.filter(n => !n.is_read).length || 0) +
-    (announcements?.filter(n => !n.is_read).length || 0);
+    useMemo(
+      () =>
+        (notifications?.filter(
+          (notification) =>
+            !notification.is_read,
+        ).length || 0) +
+        (announcements?.filter(
+          (announcement) =>
+            !announcement.is_read,
+        ).length || 0),
+      [
+        announcements,
+        notifications,
+      ],
+    );
 
-  const handleNotificationClick = async (n) => {
-    if (n.source === "notice") {
-      await markNoticeAsRead(n.id);
-      setActiveSection("announcements");
-    } else {
-      await markNotificationRead(n.id);
-      setActiveSection("leaves");
-    }
-  };
+  // =========================================================
+  // NOTIFICATION CLICK
+  // =========================================================
+  const handleNotificationClick =
+    useCallback(
+      async (item) => {
+        if (!item) {
+          return;
+        }
 
-  // ================= NOTICE STATS =================
+        if (
+          item.source ===
+          "notice"
+        ) {
+          if (!item.is_read) {
+            await markNoticeAsRead(
+              item.id,
+            );
+          }
+
+          setActiveSection(
+            "announcements",
+          );
+
+          return;
+        }
+
+        if (!item.is_read) {
+          await markNotificationRead(
+            item.id,
+          );
+        }
+
+        /*
+         * Library notifications should open Library.
+         */
+        if (
+          [
+            "overdue",
+            "fine",
+            "return_reminder",
+          ].includes(
+            String(
+              item.type || "",
+            ).toLowerCase(),
+          )
+        ) {
+          setActiveSection(
+            "library",
+          );
+
+          return;
+        }
+
+        /*
+         * Generic notifications are shown in
+         * Announcements / Notifications center.
+         */
+        setActiveSection(
+          "announcements",
+        );
+      },
+      [
+        markNoticeAsRead,
+        markNotificationRead,
+        setActiveSection,
+      ],
+    );
+
+  // =========================================================
+  // NOTICE STATS
+  // =========================================================
   useEffect(() => {
-    if (activeSection !== "announcements") return;
+    if (
+      activeSection !==
+      "announcements"
+    ) {
+      return;
+    }
 
-    const total = announcements.length;
+    const total =
+      announcements.length;
 
-    const important = announcements.filter(
-      n => n.priority === "High"
-    ).length;
+    const important =
+      announcements.filter(
+        (notice) =>
+          notice.priority ===
+          "High",
+      ).length;
 
-    const thisWeek = announcements.filter(n => {
-      const d = new Date(n.date);
-      const diff = (new Date() - d) / (1000 * 60 * 60 * 24);
-      return diff <= 7;
-    }).length;
+    const now =
+      new Date();
 
-    setNoticeStats({ total, important, thisWeek });
-  }, [activeSection, announcements]);
+    const thisWeek =
+      announcements.filter(
+        (notice) => {
+          if (!notice.date) {
+            return false;
+          }
 
-  // ================= RETURN =================
+          const noticeDate =
+            new Date(
+              notice.date,
+            );
+
+          if (
+            Number.isNaN(
+              noticeDate.getTime(),
+            )
+          ) {
+            return false;
+          }
+
+          const difference =
+            (now.getTime() -
+              noticeDate.getTime()) /
+            (
+              1000 *
+              60 *
+              60 *
+              24
+            );
+
+          return (
+            difference >= 0 &&
+            difference <= 7
+          );
+        },
+      ).length;
+
+    setNoticeStats({
+      total,
+      important,
+      thisWeek,
+    });
+  }, [
+    activeSection,
+    announcements,
+  ]);
+
+  // =========================================================
+  // CLEANUP
+  // =========================================================
+  useEffect(
+    () => () => {
+      if (
+        toastTimerRef.current
+      ) {
+        clearTimeout(
+          toastTimerRef.current,
+        );
+      }
+    },
+    [],
+  );
+
+  // =========================================================
+  // RETURN
+  // =========================================================
   return {
     loading,
     noticeLoading,
@@ -280,9 +963,6 @@ export function useStudentDashboard(activeSection, setActiveSection) {
     unreadCount,
     noticeStats,
 
-    libraryData,
-    librarySummary,
-
     notifications,
     notificationUnread,
     notificationLoading,
@@ -290,12 +970,17 @@ export function useStudentDashboard(activeSection, setActiveSection) {
     combinedNotifications,
     sortedNotifications,
     totalUnread,
+
     handleNotificationClick,
 
     markNotificationRead,
     markNoticeAsRead,
 
+    fetchAnnouncements,
+    fetchNotifications,
+
     toast,
+
     fetchWithAuth,
     showToast,
   };

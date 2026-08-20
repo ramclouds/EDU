@@ -51,6 +51,9 @@ from utils.Notifications import (
     MarkAllNotificationsReadAPI,
     DeleteNotificationAPI,
     UnreadNotificationCountAPI,
+    LibraryNotificationsAPI,
+    LibraryNotificationRetryAPI,
+    LibraryNotificationDetailsAPI,
     ActivityLogsAPI,
 )
 
@@ -140,6 +143,7 @@ from utils.announcement import (
 
 from utils.library import (
     StudentLibraryAPI,
+    StudentLibraryDashboardAPI,
     LibraryCategoryListAPI,
     LibraryCategoryDetailAPI,
     LibraryCategoryStatusAPI,
@@ -152,6 +156,25 @@ from utils.library import (
     LibraryBookOptionsAPI,
     LibraryBookDetailAPI,
     LibraryBookStatusAPI,
+    LibraryStudentsAPI,
+    LibraryStudentFinePaymentAPI,
+    LibraryTeachersAPI,
+    LibraryTeacherDetailsAPI,
+    LibraryTeacherFinePaymentAPI,
+    LibraryMembersAPI,
+    LibraryMemberDetailsAPI,
+    LibraryCirculationOptionsAPI,
+    LibraryCirculationAPI,
+    LibraryCirculationReturnAPI,
+    LibraryReturnOptionsAPI,
+    LibraryReturnBookAPI,
+    LibraryReturnedBooksAPI,
+    LibraryFinesAPI,
+    LibraryFineActionAPI,
+    LibraryFineDetailsAPI,
+    LibraryTransactionsAPI,
+    LibraryReportsAPI,
+    LibraryDashboardAPI,
 )
 
 from utils.teacherMyClasses import TeacherMyClasses, MyClasses
@@ -184,6 +207,8 @@ from utils.rolePermissionManagement import (
     RBACUserOverrideAPI,
     RBACUserRoleAPI,
     seed_rbac_defaults,
+    MyDashboardAccessAPI,
+    MyRBACAccessAPI,
 )
 
 
@@ -290,6 +315,11 @@ def create_app():
         "/api/rbac/my-access",
         view_func=MyRBACAccessAPI.as_view("my_rbac_access_api"),
         methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/rbac/my-dashboards",
+        view_func=MyDashboardAccessAPI.as_view("my_dashboard_access"),
     )
 
     # STUDENT
@@ -511,6 +541,26 @@ def create_app():
         "/api/notifications/unread-count",
         view_func=UnreadNotificationCountAPI.as_view("unread_count"),
         methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/notifications",
+        view_func=LibraryNotificationsAPI.as_view("library_notifications_api"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/notifications/<int:notification_id>",
+        view_func=LibraryNotificationDetailsAPI.as_view(
+            "library_notification_details_api"
+        ),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/notifications/<int:notification_id>/retry",
+        view_func=LibraryNotificationRetryAPI.as_view("library_notification_retry_api"),
+        methods=["POST"],
     )
 
     app.add_url_rule(
@@ -951,7 +1001,6 @@ def create_app():
         methods=["GET", "OPTIONS"],
     )
 
-    # NEW ROUTES ADDED BELOW
     app.add_url_rule(
         "/api/admin/library/books/<int:book_id>",
         view_func=LibraryBookDetailAPI.as_view("library_book_detail_api"),
@@ -962,6 +1011,136 @@ def create_app():
         "/api/admin/library/books/<int:book_id>/status",
         view_func=LibraryBookStatusAPI.as_view("library_book_status_api"),
         methods=["PATCH", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/students",
+        view_func=LibraryStudentsAPI.as_view("library_students_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/students/<int:student_id>",
+        view_func=StudentLibraryAPI.as_view("library_student_details_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/student/library/dashboard",
+        view_func=StudentLibraryDashboardAPI.as_view("student_library_dashboard_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/students/<int:student_id>/fine-payments",
+        view_func=LibraryStudentFinePaymentAPI.as_view(
+            "library_student_fine_payment_api"
+        ),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/teachers",
+        view_func=LibraryTeachersAPI.as_view("library_teachers_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/teachers/<int:teacher_id>",
+        view_func=LibraryTeacherDetailsAPI.as_view("library_teacher_details_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/teachers/<int:teacher_id>/fine-payments",
+        view_func=LibraryTeacherFinePaymentAPI.as_view("library_teacher_fine_api"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/members",
+        view_func=LibraryMembersAPI.as_view("library_members_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/members/<string:member_type>/<int:member_id>",
+        view_func=LibraryMemberDetailsAPI.as_view("library_member_details_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/circulation/options",
+        view_func=LibraryCirculationOptionsAPI.as_view(
+            "library_circulation_options_api"
+        ),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/circulation",
+        view_func=LibraryCirculationAPI.as_view("library_circulation_api"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/circulation/<string:member_type>/<int:issue_id>/return",
+        view_func=LibraryCirculationReturnAPI.as_view("library_circulation_return_api"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/returns/options",
+        view_func=LibraryReturnOptionsAPI.as_view("library_return_options_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/returns/<string:member_type>/<int:issue_id>",
+        view_func=LibraryReturnBookAPI.as_view("library_return_book_api"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/returns",
+        view_func=LibraryReturnedBooksAPI.as_view("library_returned_books_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/fines",
+        view_func=LibraryFinesAPI.as_view("library_fines_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/fines/<string:member_type>/<int:issue_id>/action",
+        view_func=LibraryFineActionAPI.as_view("library_fine_action_api"),
+        methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/transactions",
+        view_func=LibraryTransactionsAPI.as_view("library_transactions_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/fines/<string:member_type>/<int:issue_id>",
+        view_func=LibraryFineDetailsAPI.as_view("library_fine_details_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/reports",
+        view_func=LibraryReportsAPI.as_view("library_reports_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/library/dashboard",
+        view_func=LibraryDashboardAPI.as_view("library_dashboard_api"),
+        methods=["GET"],
     )
 
     # Hostels
@@ -976,62 +1155,6 @@ def create_app():
         view_func=CreateHostelComplaint.as_view("student_hostel_complaint"),
         methods=["POST"],
     )
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/rooms",
-    #     view_func=AdminRoomsAPI.as_view("admin_hostel_rooms"),
-    #     methods=["GET", "POST"],
-    # )
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/rooms/<int:room_id>",
-    #     view_func=AdminRoomDetailAPI.as_view("admin_hostel_room_detail"),
-    #     methods=["GET", "PUT", "DELETE"],
-    # )
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/room-allotments",
-    #     view_func=AdminRoomAllotmentsAPI.as_view("admin_hostel_room_allotments"),
-    #     methods=["GET", "POST"],
-    # )
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/room-allotments/<int:allocation_id>",
-    #     view_func=AdminRoomAllotmentDetailAPI.as_view(
-    #         "admin_hostel_room_allotment_detail"
-    #     ),
-    #     methods=["GET", "PUT", "DELETE"],
-    # )
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/room-allotments/<int:allocation_id>/transfer",
-    #     view_func=AdminRoomTransferAPI.as_view("admin_hostel_room_allotment_transfer"),
-    #     methods=["POST"],
-    # )
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/beds",
-    #     view_func=AdminHostelBedsAPI.as_view("admin_hostel_beds"),
-    #     methods=["GET", "POST"],
-    # )
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/beds/<int:bed_id>",
-    #     view_func=AdminHostelBedDetailAPI.as_view("admin_hostel_bed_detail"),
-    #     methods=["GET", "PUT", "DELETE"],
-    # )
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/blocks",
-    #     view_func=AdminHostelBlocksAPI.as_view("admin_hostel_blocks"),
-    #     methods=["GET", "POST"],
-    # )   
-
-    # app.add_url_rule(
-    #     "/api/admin/hostel/blocks/<int:block_id>",
-    #     view_func=AdminHostelBlockDetailAPI.as_view("admin_hostel_block_detail"),
-    #     methods=["PUT", "DELETE"],
-    # )
 
     # MY CLASSES
     app.add_url_rule(

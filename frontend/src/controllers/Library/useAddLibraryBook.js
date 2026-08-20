@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const EMPTY_BOOK_FORM = {
     title: "",
@@ -58,6 +59,8 @@ export function useAddLibraryBook({
     showToast,
     setActiveSection,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const [bookForm, setBookForm] = useState({
         ...EMPTY_BOOK_FORM,
     });
@@ -507,6 +510,14 @@ export function useAddLibraryBook({
                 return;
             }
 
+            if (!canWriteLibrary) {
+                notify(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             const title = String(bookForm.title || "").trim();
             const authorId = Number(bookForm.author_id);
             const categoryId = Number(bookForm.category_id);
@@ -610,6 +621,7 @@ export function useAddLibraryBook({
             bookPagination.page,
             bookPagination.per_page,
             bookSaving,
+            canWriteLibrary,
             editingBookId,
             loadBooks,
             loadRecentBooks,
@@ -720,6 +732,14 @@ export function useAddLibraryBook({
                 return;
             }
 
+            if (!canWriteLibrary) {
+                notify(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             const confirmed = window.confirm(
                 `Are you sure you want to delete "${book.title}"?`
             );
@@ -773,6 +793,7 @@ export function useAddLibraryBook({
             bookPagination.page,
             bookPagination.per_page,
             bookRows.length,
+            canWriteLibrary,
             closeBookDetails,
             loadBooks,
             loadRecentBooks,
@@ -901,6 +922,8 @@ export function useAddLibraryBook({
         closeBookDetails,
         openEditBook,
         deleteBook,
+
+        canWriteLibrary,
     };
 }
 

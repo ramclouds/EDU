@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
+import { useLibraryPermission } from "./useLibraryPermission";
 
 const emptyAuthorForm = {
     id: null,
@@ -46,6 +47,8 @@ export function useLibraryAuthors({
     fetchWithAuth,
     showToast,
 }) {
+    const { canWriteLibrary } = useLibraryPermission();
+
     const [authors, setAuthors] = useState([]);
     const [authorCountries, setAuthorCountries] =
         useState([]);
@@ -319,6 +322,14 @@ export function useLibraryAuthors({
                 return;
             }
 
+            if (!canWriteLibrary) {
+                showToast?.(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             if (typeof fetchWithAuth !== "function") {
                 showToast?.(
                     "Authentication request function is unavailable",
@@ -398,6 +409,7 @@ export function useLibraryAuthors({
         },
         [
             authorForm,
+            canWriteLibrary,
             fetchWithAuth,
             loadAuthors,
             showToast,
@@ -407,6 +419,14 @@ export function useLibraryAuthors({
 
     const toggleAuthorStatus = useCallback(
         async (author) => {
+            if (!canWriteLibrary) {
+                showToast?.(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             const nextStatus =
                 author.status === "Active"
                     ? "Inactive"
@@ -458,6 +478,7 @@ export function useLibraryAuthors({
             }
         },
         [
+            canWriteLibrary,
             fetchWithAuth,
             loadAuthors,
             showToast,
@@ -466,6 +487,14 @@ export function useLibraryAuthors({
 
     const requestDeleteAuthor = useCallback(
         (author) => {
+            if (!canWriteLibrary) {
+                showToast?.(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
+                return;
+            }
+
             setAuthorDeleteModal({
                 open: true,
                 author,
@@ -478,7 +507,7 @@ export function useLibraryAuthors({
                     ) > 0,
             });
         },
-        []
+        [canWriteLibrary, showToast]
     );
 
     const closeDeleteAuthorModal = useCallback(() => {
@@ -499,6 +528,14 @@ export function useLibraryAuthors({
             const author = authorDeleteModal.author;
 
             if (!author) {
+                return;
+            }
+
+            if (!canWriteLibrary) {
+                showToast?.(
+                    "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.",
+                    "error"
+                );
                 return;
             }
 
@@ -582,6 +619,7 @@ export function useLibraryAuthors({
             authorDeleteModal.author,
             authors.length,
             authorPagination.page,
+            canWriteLibrary,
             fetchWithAuth,
             loadAuthors,
             showToast,
@@ -645,5 +683,7 @@ export function useLibraryAuthors({
         requestDeleteAuthor,
         closeDeleteAuthorModal,
         deleteAuthor,
+
+        canWriteLibrary,
     };
 }

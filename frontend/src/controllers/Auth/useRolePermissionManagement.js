@@ -42,6 +42,96 @@ export const RBAC_USER_TYPES = [
   },
 ];
 
+export const DASHBOARD_PAGES = [
+  {
+    key: "library-admin-dashboard",
+    moduleCode: "library",
+    label: "Library Dashboard",
+    description: "Library catalogue, issues, returns and fines.",
+    icon: "fas fa-book",
+  },
+  {
+    key: "accounts-admin-dashboard",
+    moduleCode: "accounts",
+    label: "Accounts Dashboard",
+    description: "Fee collection, ledgers and financial reports.",
+    icon: "fas fa-file-invoice-dollar",
+  },
+  {
+    key: "hostel-admin-dashboard",
+    moduleCode: "hostel",
+    label: "Hostel Dashboard",
+    description: "Room allocation, occupancy and hostel records.",
+    icon: "fas fa-building",
+  },
+  {
+    key: "hr-admin-dashboard",
+    moduleCode: "hr",
+    label: "HR Dashboard",
+    description: "Staff records, payroll and HR administration.",
+    icon: "fas fa-users-cog",
+  },
+];
+
+export const DASHBOARD_ACCESS_LEVELS = [
+  {
+    value: "none",
+    label: "No Access",
+    description: "Page is hidden and blocked.",
+  },
+  {
+    value: "read",
+    label: "Read Only",
+    description: "View, filter and download only.",
+  },
+  {
+    value: "write",
+    label: "Full Access",
+    description: "View, filter, download and CRUD.",
+  },
+];
+
+/** {view, create, edit, delete} -> "none" | "read" | "write" */
+export const dashboardAccessLevelFromActions = (actions = {}) => {
+  if (!actions || !actions.view) {
+    return "none";
+  }
+
+  if (actions.create || actions.edit || actions.delete) {
+    return "write";
+  }
+
+  return "read";
+};
+
+/** "none" | "read" | "write" -> {view, create, edit, delete} */
+export const dashboardActionsFromAccessLevel = (level) => {
+  if (level === "write") {
+    return {
+      view: true,
+      create: true,
+      edit: true,
+      delete: true,
+    };
+  }
+
+  if (level === "read") {
+    return {
+      view: true,
+      create: false,
+      edit: false,
+      delete: false,
+    };
+  }
+
+  return {
+    view: false,
+    create: false,
+    edit: false,
+    delete: false,
+  };
+};
+
 const EMPTY_ROLE_FORM = {
   id: null,
   name: "",
@@ -1653,6 +1743,46 @@ export function useRolePermissionManagement({
       [],
     );
 
+  /* =======================================================
+     DASHBOARD-PAGE PERMISSIONS (ROLE LEVEL)
+     ---------------------------------------------------------
+     Thin view over rbacRolePermissionForm that speaks in terms
+     of whole dashboard pages (Read / Write / No Access) instead
+     of individual view/create/edit/delete checkboxes per
+     module. Saving still goes through the existing
+     saveRbacRolePermissions()/RBACRolePermissionAPI flow, so no
+     backend changes are required to support this view.
+  ======================================================= */
+
+  const rbacDashboardPermissionForm =
+    useMemo(
+      () =>
+        DASHBOARD_PAGES.map((page) => ({
+          ...page,
+          access: dashboardAccessLevelFromActions(
+            rbacRolePermissionForm?.[page.moduleCode],
+          ),
+        })),
+      [rbacRolePermissionForm],
+    );
+
+  const setRbacDashboardAccess =
+    useCallback(
+      (moduleCode, level) => {
+        if (!moduleCode) {
+          return;
+        }
+
+        setRbacRolePermissionForm(
+          (previousPermissions) => ({
+            ...previousPermissions,
+            [moduleCode]: dashboardActionsFromAccessLevel(level),
+          }),
+        );
+      },
+      [],
+    );
+
   const saveRbacRolePermissions =
     useCallback(async () => {
       if (!rbacSelectedRoleId) {
@@ -2608,6 +2738,95 @@ export function useRolePermissionManagement({
     );
 
   /* =======================================================
+     DASHBOARD-PAGE PERMISSIONS (PER-USER OVERRIDE)
+     ---------------------------------------------------------
+     Same idea as rbacDashboardPermissionForm, but for one
+     individual user's overrides on top of their role - e.g.
+     "give this one Accounts Admin temporary access to the
+     Hostel dashboard". "Inherit" clears the override so the
+     user simply follows their role again.
+  ======================================================= */
+
+  const rbacDashboardOverrideForm =
+    useMemo(
+      () =>
+        DASHBOARD_PAGES.map((page) => {
+          const overrideActions =
+            rbacUserOverrideForm?.[page.moduleCode] || {};
+
+          const hasOverride =
+            Object.keys(overrideActions).length > 0;
+
+          const inheritedLevel = dashboardAccessLevelFromActions(
+            rbacSelectedUserAccess?.role_permissions?.[page.moduleCode],
+          );
+
+          const overrideLevel = hasOverride
+            ? dashboardAccessLevelFromActions({
+              view:
+                overrideActions.view ??
+                rbacSelectedUserAccess?.role_permissions?.[page.moduleCode]
+                  ?.view,
+              create:
+                overrideActions.create ??
+                rbacSelectedUserAccess?.role_permissions?.[page.moduleCode]
+                  ?.create,
+              edit:
+                overrideActions.edit ??
+                rbacSelectedUserAccess?.role_permissions?.[page.moduleCode]
+                  ?.edit,
+              delete:
+                overrideActions.delete ??
+                rbacSelectedUserAccess?.role_permissions?.[page.moduleCode]
+                  ?.delete,
+            })
+            : inheritedLevel;
+
+          return {
+            ...page,
+            hasOverride,
+            inheritedLevel,
+            effectiveLevel: dashboardAccessLevelFromActions(
+              rbacSelectedUserAccess?.effective_permissions?.[
+              page.moduleCode
+              ],
+            ),
+            overrideLevel,
+          };
+        }),
+      [
+        rbacUserOverrideForm,
+        rbacSelectedUserAccess,
+      ],
+    );
+
+  const setRbacUserDashboardOverride =
+    useCallback(
+      (moduleCode, level) => {
+        if (!moduleCode) {
+          return;
+        }
+
+        if (level === "inherit") {
+          setRbacUserOverrideForm((previousOverrides) => {
+            const nextOverrides = { ...previousOverrides };
+            delete nextOverrides[moduleCode];
+            return nextOverrides;
+          });
+          return;
+        }
+
+        const actions = dashboardActionsFromAccessLevel(level);
+
+        setRbacUserOverrideForm((previousOverrides) => ({
+          ...previousOverrides,
+          [moduleCode]: { ...actions },
+        }));
+      },
+      [],
+    );
+
+  /* =======================================================
      SAVE USER PERMISSION OVERRIDES
   ======================================================= */
 
@@ -3340,6 +3559,15 @@ export function useRolePermissionManagement({
     setAllRbacRolePermissions,
     setRbacRoleModulePermissions,
     saveRbacRolePermissions,
+
+    /* Dashboard-page permissions (configurable page registry) */
+
+    dashboardPages: DASHBOARD_PAGES,
+    dashboardAccessLevels: DASHBOARD_ACCESS_LEVELS,
+    rbacDashboardPermissionForm,
+    setRbacDashboardAccess,
+    rbacDashboardOverrideForm,
+    setRbacUserDashboardOverride,
 
     /* User filters */
 

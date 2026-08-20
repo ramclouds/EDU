@@ -10,6 +10,7 @@ import { useStudentTimeTable } from "../controllers/TimeTable/useStudentTimeTabl
 import { useStudentAttendance } from "../controllers/Attendance/useStudentAttendance";
 import { useStudentExams } from "../controllers/ExamResult/useStudentExams";
 import { useStudentHostel } from "../controllers/Hostel/useStudentHostel";
+import { useStudentLibrary } from "../controllers/Library/useStudentLibrary";
 
 function StudentDashboard() {
   const [noticeTab, setNoticeTab] = useState("announcements");
@@ -50,8 +51,6 @@ function StudentDashboard() {
     announcements,
     noticeStats,
     unreadCount,
-    libraryData,
-    librarySummary,
 
     // 🔔 Notices
     markNoticeAsRead,
@@ -161,6 +160,44 @@ function StudentDashboard() {
     setComplaintText,
     handleRaiseComplaint,
   } = useStudentHostel(fetchWithAuth, activeSection, showToast);
+
+  // ================= STUDENT LIBRARY =================
+  const {
+    studentLibraryLoading,
+
+    studentLibrarySummary,
+    libraryProfile,
+
+    currentBooks,
+    borrowingHistory,
+    fineRecords,
+    paymentHistory,
+    libraryNotifications,
+
+    libraryActiveTab,
+    setLibraryActiveTab,
+
+    librarySearch,
+    setLibrarySearch,
+
+    libraryStatusFilter,
+    setLibraryStatusFilter,
+
+    filteredCurrentBooks,
+    filteredHistory,
+
+    selectedLibraryRecord,
+    libraryRecordModalOpen,
+
+    refreshStudentLibrary,
+
+    openLibraryRecord,
+    closeLibraryRecord,
+  } = useStudentLibrary({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
 
   // 🎴 Dashboard Card Animation
   useEffect(() => {
@@ -779,21 +816,46 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
                   {!visibleCards.includes("libraryCard") ? (
                     <CardLoader />
-                  ) : libraryData.length === 0 ? (
+                  ) : studentLibraryLoading ? (
+                    <div className="flex justify-center py-5">
+                      <div className="h-6 w-6 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
+                    </div>
+                  ) : currentBooks.length === 0 ? (
                     <p className="text-sm text-gray-500 fade-in">
-                      No books issued
+                      No books currently issued
                     </p>
                   ) : (
                     <div className="fade-in space-y-2">
-                      {libraryData.slice(0, 2).map((b, i) => (
-                        <div key={i} className="p-3 border rounded-xl">
-                          <p className="font-medium text-sm truncate">
-                            📘 {b.title}
+                      {currentBooks.slice(0, 2).map((book) => (
+                        <button
+                          type="button"
+                          key={book.id}
+                          onClick={() => {
+                            setActiveSection("library");
+                            openLibraryRecord(book);
+                          }}
+                          className="w-full rounded-xl border p-3 text-left hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-700"
+                        >
+                          <p className="truncate text-sm font-medium">
+                            📘 {book.book_title || book.title}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            Issued: {b.issue_date}
+
+                          <p className="mt-1 text-xs text-gray-500">
+                            Due: {book.due_date || "—"}
                           </p>
-                        </div>
+
+                          <p
+                            className={`mt-1 text-xs font-medium ${
+                              book.status === "Overdue"
+                                ? "text-red-600"
+                                : book.status === "Due Soon"
+                                  ? "text-amber-600"
+                                  : "text-green-600"
+                            }`}
+                          >
+                            {book.status || "Issued"}
+                          </p>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -1925,266 +1987,972 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         )}
         {/* ===================== HOSTEL SECTION END ========================*/}
 
-        {/* ===================== LIBRARY SECTION START ========================*/}
+        {/* ===================== STUDENT LIBRARY ======================== */}
         {activeSection === "library" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
-            {hostelLoading && (
-              <div className="flex justify-center py-10">
-                <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+          <section className="section active space-y-6 p-4 sm:p-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold sm:text-xl">
+                    My Library
+                  </h2>
+
+                  <p className="mt-1 text-xs text-blue-100 sm:text-sm">
+                    Track your books, returns, fines and complete borrowing
+                    history
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={refreshStudentLibrary}
+                  disabled={studentLibraryLoading}
+                  className="self-start rounded-lg bg-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/25 disabled:opacity-50"
+                >
+                  <i
+                    className={`bi bi-arrow-clockwise mr-2 ${
+                      studentLibraryLoading ? "inline-block animate-spin" : ""
+                    }`}
+                  ></i>
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* LIBRARY MEMBER CARD */}
+            {libraryProfile && (
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-xl text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                      <i className="bi bi-person-badge"></i>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Library Member
+                      </p>
+
+                      <h3 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                        {libraryProfile.name ||
+                          `${student?.first_name || ""} ${student?.last_name || ""}`}
+                      </h3>
+
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {libraryProfile.student_code ||
+                          student?.student_id ||
+                          "—"}
+
+                        {libraryProfile.class_name
+                          ? ` • ${libraryProfile.class_name}`
+                          : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-slate-700">
+                      <p className="text-[10px] uppercase text-gray-500 dark:text-gray-400">
+                        Member Status
+                      </p>
+
+                      <p
+                        className={`mt-1 text-sm font-semibold ${
+                          libraryProfile.status === "Blocked"
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {libraryProfile.status || "Active"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-slate-700">
+                      <p className="text-[10px] uppercase text-gray-500 dark:text-gray-400">
+                        Borrow Limit
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                        {libraryProfile.borrow_limit ?? "—"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-slate-700">
+                      <p className="text-[10px] uppercase text-gray-500 dark:text-gray-400">
+                        Current Books
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                        {studentLibrarySummary.currently_issued || 0}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-slate-700">
+                      <p className="text-[10px] uppercase text-gray-500 dark:text-gray-400">
+                        Remaining Limit
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-indigo-600">
+                        {libraryProfile.remaining_limit ?? "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* HEADER */}
-            <div
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-5 sm:p-6 rounded-2xl shadow-md 
-      flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-            >
-              <div>
-                <h3 className="text-lg sm:text-xl font-semibold">📚 Library</h3>
-                <p className="text-xs sm:text-sm opacity-90">
-                  Manage your issued books and track due dates
-                </p>
-              </div>
-            </div>
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+              {[
+                [
+                  "Currently Issued",
+                  studentLibrarySummary.currently_issued,
+                  "bi-book",
+                  "bg-blue-100 text-blue-700",
+                ],
 
-            {/* STATS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Total Books
-                </p>
-                <h4 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  {librarySummary.total_books || 0}
-                </h4>
-              </div>
+                [
+                  "Due Soon",
+                  studentLibrarySummary.due_soon,
+                  "bi-clock",
+                  "bg-amber-100 text-amber-700",
+                ],
 
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Overdue
-                </p>
-                <h4 className="text-lg sm:text-xl font-semibold text-red-500 dark:text-red-400">
-                  {librarySummary.overdue || 0}
-                </h4>
-              </div>
+                [
+                  "Overdue",
+                  studentLibrarySummary.overdue,
+                  "bi-exclamation-triangle",
+                  "bg-red-100 text-red-700",
+                ],
 
-              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Fine Due
-                </p>
-                <h4 className="text-lg sm:text-xl font-semibold text-red-500 dark:text-red-400">
-                  ₹{librarySummary.fine_due || 0}
-                </h4>
-              </div>
-            </div>
+                [
+                  "Books Returned",
+                  studentLibrarySummary.returned,
+                  "bi-check2-circle",
+                  "bg-green-100 text-green-700",
+                ],
 
-            {/* TABLE + MOBILE */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm">
-              {/* HEADER */}
-              <div className="p-4 sm:p-5 border-b border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                {/* TITLE */}
-                <h4 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100">
-                  Issued Books
-                </h4>
+                [
+                  "Fine Pending",
+                  `₹${Number(studentLibrarySummary.fine_pending || 0).toFixed(
+                    2,
+                  )}`,
+                  "bi-currency-rupee",
+                  "bg-red-100 text-red-700",
+                ],
 
-                {/* SEARCH */}
-                <input
-                  type="text"
-                  placeholder="Search books..."
-                  value={search || ""}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full sm:w-64 px-4 py-2 rounded-xl text-sm 
-    bg-gray-100 dark:bg-slate-700 
-    text-gray-900 dark:text-white 
-    placeholder-gray-500 dark:placeholder-gray-400
-    border border-gray-200 dark:border-slate-600
-    focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                />
-              </div>
+                [
+                  "Fine Paid",
+                  `₹${Number(studentLibrarySummary.fine_paid || 0).toFixed(2)}`,
+                  "bi-cash-stack",
+                  "bg-emerald-100 text-emerald-700",
+                ],
+              ].map(([label, value, icon, iconClass]) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {label}
+                      </p>
 
-              {/* DESKTOP TABLE */}
-              <div className="hidden md:block overflow-x-auto">
-                {loading ? (
-                  <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                    Loading library...
+                      <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
+                        {value ?? 0}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}
+                    >
+                      <i className={`bi ${icon}`}></i>
+                    </span>
                   </div>
-                ) : (
-                  <table className="w-full text-sm min-w-[700px]">
-                    <thead className="bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-300">
-                      <tr>
-                        <th className="py-3 px-4 text-left">Book</th>
-                        <th className="text-left px-2">Issue</th>
-                        <th className="text-left px-2">Due</th>
-                        <th className="text-left px-2">Days Left</th>
-                        <th className="text-left px-2">Fine (₹)</th>
-                        <th className="text-left px-2">Status</th>
-                      </tr>
-                    </thead>
+                </div>
+              ))}
+            </div>
 
-                    <tbody className="divide-y dark:divide-slate-700">
-                      {libraryData
-                        .filter((book) =>
-                          book.title
-                            ?.toLowerCase()
-                            .includes((search || "").toLowerCase()),
-                        )
-                        .map((book) => (
-                          <tr
+            {/* OVERDUE WARNING */}
+            {studentLibrarySummary.overdue > 0 && (
+              <div className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-500/10 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <i className="bi bi-exclamation-triangle-fill mt-0.5 text-red-600"></i>
+
+                  <div>
+                    <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                      You have overdue library books
+                    </p>
+
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                      Please return overdue books to avoid additional fines.
+                    </p>
+                  </div>
+                </div>
+
+                <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">
+                  {studentLibrarySummary.overdue} Overdue
+                </span>
+              </div>
+            )}
+
+            {/* TABS */}
+            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="overflow-x-auto border-b border-gray-200 dark:border-slate-700">
+                <div className="flex min-w-max">
+                  {[
+                    ["issued", "Current Books", currentBooks.length, "bi-book"],
+
+                    [
+                      "history",
+                      "Borrowing History",
+                      borrowingHistory.length,
+                      "bi-clock-history",
+                    ],
+
+                    [
+                      "fines",
+                      "My Fines",
+                      fineRecords.length,
+                      "bi-currency-rupee",
+                    ],
+
+                    [
+                      "payments",
+                      "Payments",
+                      paymentHistory.length,
+                      "bi-receipt",
+                    ],
+
+                    [
+                      "notifications",
+                      "Library Alerts",
+                      libraryNotifications.length,
+                      "bi-bell",
+                    ],
+                  ].map(([key, label, count, icon]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setLibraryActiveTab(key)}
+                      className={`flex items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-medium transition ${
+                        libraryActiveTab === key
+                          ? "border-b-2 border-indigo-600 text-indigo-600"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"
+                      }`}
+                    >
+                      <i className={`bi ${icon}`}></i>
+
+                      {label}
+
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-600 dark:bg-slate-700 dark:text-gray-300">
+                        {count || 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* SEARCH / FILTER */}
+              {["issued", "history"].includes(libraryActiveTab) && (
+                <div className="flex flex-col gap-3 border-b p-4 sm:flex-row">
+                  <div className="relative flex-1">
+                    <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+
+                    <input
+                      type="search"
+                      value={librarySearch}
+                      onChange={(event) => setLibrarySearch(event.target.value)}
+                      placeholder="Search by book, author, ISBN..."
+                      className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+
+                  <select
+                    value={libraryStatusFilter}
+                    onChange={(event) =>
+                      setLibraryStatusFilter(event.target.value)
+                    }
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                  >
+                    <option value="">All Status</option>
+
+                    <option value="Issued">Issued</option>
+
+                    <option value="Due Soon">Due Soon</option>
+
+                    <option value="Overdue">Overdue</option>
+
+                    <option value="Returned">Returned</option>
+                  </select>
+                </div>
+              )}
+
+              {/* ================= CURRENT BOOKS ================= */}
+              {libraryActiveTab === "issued" && (
+                <div>
+                  {studentLibraryLoading ? (
+                    <div className="flex justify-center py-16">
+                      <div className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
+                    </div>
+                  ) : filteredCurrentBooks.length === 0 ? (
+                    <div className="py-16 text-center">
+                      <i className="bi bi-book text-4xl text-gray-300"></i>
+
+                      <p className="mt-3 text-sm font-medium text-gray-600 dark:text-gray-300">
+                        No currently issued books
+                      </p>
+
+                      <p className="mt-1 text-xs text-gray-400">
+                        Books issued to you will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* DESKTOP */}
+                      <div className="hidden overflow-x-auto md:block">
+                        <table className="min-w-[1050px] w-full text-sm">
+                          <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-slate-700 dark:text-gray-300">
+                            <tr>
+                              <th className="p-3 text-left">Book</th>
+
+                              <th className="p-3 text-left">Issue Date</th>
+
+                              <th className="p-3 text-left">Due Date</th>
+
+                              <th className="p-3 text-center">Days</th>
+
+                              <th className="p-3 text-right">Fine</th>
+
+                              <th className="p-3 text-center">Status</th>
+
+                              <th className="p-3 text-right">Action</th>
+                            </tr>
+                          </thead>
+
+                          <tbody className="divide-y dark:divide-slate-700">
+                            {filteredCurrentBooks.map((book) => {
+                              const statusClass =
+                                book.status === "Overdue"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                  : book.status === "Due Soon"
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                    : "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300";
+
+                              return (
+                                <tr
+                                  key={book.id}
+                                  className="hover:bg-gray-50 dark:hover:bg-slate-700/60"
+                                >
+                                  <td className="p-3">
+                                    <p className="font-semibold text-gray-900 dark:text-white">
+                                      {book.book_title}
+                                    </p>
+
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                      {book.book_code}
+
+                                      {book.author ? ` • ${book.author}` : ""}
+
+                                      {book.category
+                                        ? ` • ${book.category}`
+                                        : ""}
+                                    </p>
+                                  </td>
+
+                                  <td className="p-3 text-gray-700 dark:text-gray-300">
+                                    {book.issue_date}
+                                  </td>
+
+                                  <td className="p-3 font-medium text-gray-700 dark:text-gray-300">
+                                    {book.due_date}
+                                  </td>
+
+                                  <td className="p-3 text-center">
+                                    <span
+                                      className={
+                                        Number(book.overdue_days || 0) > 0
+                                          ? "font-bold text-red-600"
+                                          : Number(book.days_left || 0) <= 2
+                                            ? "font-semibold text-amber-600"
+                                            : "font-medium text-green-600"
+                                      }
+                                    >
+                                      {book.status === "Overdue"
+                                        ? `${book.overdue_days} late`
+                                        : `${book.days_left} left`}
+                                    </span>
+                                  </td>
+
+                                  <td className="p-3 text-right">
+                                    <span
+                                      className={
+                                        Number(book.pending_fine || 0) > 0
+                                          ? "font-bold text-red-600"
+                                          : "text-green-600"
+                                      }
+                                    >
+                                      ₹
+                                      {Number(book.pending_fine || 0).toFixed(
+                                        2,
+                                      )}
+                                    </span>
+                                  </td>
+
+                                  <td className="p-3 text-center">
+                                    <span
+                                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClass}`}
+                                    >
+                                      {book.status}
+                                    </span>
+                                  </td>
+
+                                  <td className="p-3 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => openLibraryRecord(book)}
+                                      className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-500/30 dark:text-indigo-300"
+                                    >
+                                      View
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* MOBILE */}
+                      <div className="space-y-3 p-4 md:hidden">
+                        {filteredCurrentBooks.map((book) => (
+                          <button
                             key={book.id}
-                            className={`transition ${
-                              book.status === "Overdue"
-                                ? "hover:bg-red-50 dark:hover:bg-red-900/20"
-                                : book.status === "Due Soon"
-                                  ? "hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
-                                  : "hover:bg-gray-50 dark:hover:bg-slate-700"
-                            }`}
+                            type="button"
+                            onClick={() => openLibraryRecord(book)}
+                            className="w-full rounded-xl border border-gray-100 bg-gray-50 p-4 text-left dark:border-slate-600 dark:bg-slate-700"
                           >
-                            <td className="py-3 px-4 text-gray-900 dark:text-gray-100">
-                              <p className="font-medium">{book.title}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {book.author} • {book.category}
-                              </p>
-                            </td>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                                  {book.book_title}
+                                </p>
 
-                            <td className="text-gray-800 dark:text-gray-200">
-                              {book.issue_date}
-                            </td>
+                                <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                                  {book.author || "Unknown Author"}
+                                </p>
+                              </div>
 
-                            <td className="text-gray-800 dark:text-gray-200">
-                              {book.due_date}
-                            </td>
-
-                            <td
-                              className={`font-medium ${
-                                book.days_left < 0
-                                  ? "text-red-600 dark:text-red-400"
-                                  : book.days_left <= 2
-                                    ? "text-yellow-600 dark:text-yellow-400"
-                                    : "text-green-600 dark:text-green-400"
-                              }`}
-                            >
-                              {book.days_left} Days
-                            </td>
-
-                            <td
-                              className={`font-medium ${
-                                book.fine > 0
-                                  ? "text-red-600 dark:text-red-400"
-                                  : "text-green-600 dark:text-green-400"
-                              }`}
-                            >
-                              ₹{book.fine}
-                            </td>
-
-                            <td>
                               <span
-                                className={`px-2 py-1 text-xs rounded-full ${
+                                className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-medium ${
                                   book.status === "Overdue"
-                                    ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300"
+                                    ? "bg-red-100 text-red-700"
                                     : book.status === "Due Soon"
-                                      ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/40 dark:text-yellow-300"
-                                      : "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-300"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-green-100 text-green-700"
                                 }`}
                               >
                                 {book.status}
                               </span>
-                            </td>
-                          </tr>
-                        ))}
+                            </div>
 
-                      {libraryData.length === 0 && (
+                            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <p className="text-gray-400">Issued</p>
+
+                                <p className="mt-1 font-medium text-gray-700 dark:text-gray-200">
+                                  {book.issue_date}
+                                </p>
+                              </div>
+
+                              <div>
+                                <p className="text-gray-400">Due</p>
+
+                                <p className="mt-1 font-medium text-gray-700 dark:text-gray-200">
+                                  {book.due_date}
+                                </p>
+                              </div>
+
+                              <div>
+                                <p className="text-gray-400">Remaining</p>
+
+                                <p className="mt-1 font-semibold">
+                                  {book.status === "Overdue"
+                                    ? `${book.overdue_days} days late`
+                                    : `${book.days_left} days`}
+                                </p>
+                              </div>
+
+                              <div>
+                                <p className="text-gray-400">Fine</p>
+
+                                <p
+                                  className={`mt-1 font-semibold ${
+                                    Number(book.pending_fine || 0) > 0
+                                      ? "text-red-600"
+                                      : "text-green-600"
+                                  }`}
+                                >
+                                  ₹{Number(book.pending_fine || 0).toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ================= HISTORY ================= */}
+              {libraryActiveTab === "history" && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[1000px] w-full text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-slate-700 dark:text-gray-300">
+                      <tr>
+                        <th className="p-3 text-left">Book</th>
+
+                        <th className="p-3 text-left">Issue Date</th>
+
+                        <th className="p-3 text-left">Due Date</th>
+
+                        <th className="p-3 text-left">Return Date</th>
+
+                        <th className="p-3 text-center">Late Days</th>
+
+                        <th className="p-3 text-right">Fine</th>
+
+                        <th className="p-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y dark:divide-slate-700">
+                      {filteredHistory.length === 0 ? (
                         <tr>
                           <td
-                            colSpan="6"
-                            className="text-center py-6 text-gray-400 dark:text-gray-500"
+                            colSpan="7"
+                            className="p-12 text-center text-gray-400"
                           >
-                            No books issued
+                            No borrowing history.
                           </td>
                         </tr>
+                      ) : (
+                        filteredHistory.map((record) => (
+                          <tr
+                            key={record.id}
+                            className="hover:bg-gray-50 dark:hover:bg-slate-700/60"
+                          >
+                            <td className="p-3">
+                              <button
+                                type="button"
+                                onClick={() => openLibraryRecord(record)}
+                                className="text-left"
+                              >
+                                <p className="font-semibold text-indigo-700 dark:text-indigo-300">
+                                  {record.book_title}
+                                </p>
+
+                                <p className="text-xs text-gray-500">
+                                  {record.author}
+                                </p>
+                              </button>
+                            </td>
+
+                            <td className="p-3">{record.issue_date}</td>
+
+                            <td className="p-3">{record.due_date}</td>
+
+                            <td className="p-3">{record.return_date || "—"}</td>
+
+                            <td className="p-3 text-center">
+                              {record.overdue_days || 0}
+                            </td>
+
+                            <td className="p-3 text-right">
+                              ₹{Number(record.fine_amount || 0).toFixed(2)}
+                            </td>
+
+                            <td className="p-3 text-center">
+                              <span
+                                className={`rounded-full px-2 py-1 text-xs ${
+                                  record.status === "Returned"
+                                    ? "bg-green-100 text-green-700"
+                                    : record.status === "Overdue"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-blue-100 text-blue-700"
+                                }`}
+                              >
+                                {record.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
                       )}
                     </tbody>
                   </table>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* 📱 MOBILE VIEW */}
-              <div className="md:hidden p-4 space-y-3">
-                {loading ? (
-                  <p className="text-center text-gray-500 dark:text-gray-400">
-                    Loading library...
-                  </p>
-                ) : libraryData.length > 0 ? (
-                  libraryData
-                    .filter((book) =>
-                      book.title
-                        ?.toLowerCase()
-                        .includes((search || "").toLowerCase()),
-                    )
-                    .map((book) => (
+              {/* ================= FINES ================= */}
+              {libraryActiveTab === "fines" && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[950px] w-full text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-slate-700 dark:text-gray-300">
+                      <tr>
+                        <th className="p-3 text-left">Fine ID</th>
+
+                        <th className="p-3 text-left">Book</th>
+
+                        <th className="p-3 text-center">Late Days</th>
+
+                        <th className="p-3 text-right">Fine</th>
+
+                        <th className="p-3 text-right">Paid</th>
+
+                        <th className="p-3 text-right">Waived</th>
+
+                        <th className="p-3 text-right">Pending</th>
+
+                        <th className="p-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y dark:divide-slate-700">
+                      {fineRecords.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="8"
+                            className="p-12 text-center text-gray-400"
+                          >
+                            No fine records. 🎉
+                          </td>
+                        </tr>
+                      ) : (
+                        fineRecords.map((fine) => (
+                          <tr key={fine.id}>
+                            <td className="p-3 font-medium">
+                              {fine.fine_code}
+                            </td>
+
+                            <td className="p-3">
+                              <p className="font-semibold text-gray-900 dark:text-white">
+                                {fine.book_title}
+                              </p>
+
+                              <p className="text-xs text-gray-500">
+                                {fine.book_code}
+                              </p>
+                            </td>
+
+                            <td className="p-3 text-center text-red-600">
+                              {fine.overdue_days}
+                            </td>
+
+                            <td className="p-3 text-right font-semibold">
+                              ₹{Number(fine.fine_amount || 0).toFixed(2)}
+                            </td>
+
+                            <td className="p-3 text-right text-green-600">
+                              ₹{Number(fine.collected_amount || 0).toFixed(2)}
+                            </td>
+
+                            <td className="p-3 text-right text-purple-600">
+                              ₹{Number(fine.waived_amount || 0).toFixed(2)}
+                            </td>
+
+                            <td className="p-3 text-right font-bold text-red-600">
+                              ₹{Number(fine.pending_amount || 0).toFixed(2)}
+                            </td>
+
+                            <td className="p-3 text-center">
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  fine.status === "Paid"
+                                    ? "bg-green-100 text-green-700"
+                                    : fine.status === "Waived"
+                                      ? "bg-purple-100 text-purple-700"
+                                      : "bg-amber-100 text-amber-700"
+                                }`}
+                              >
+                                {fine.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* ================= PAYMENTS ================= */}
+              {libraryActiveTab === "payments" && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[900px] w-full text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-slate-700 dark:text-gray-300">
+                      <tr>
+                        <th className="p-3 text-left">Transaction</th>
+
+                        <th className="p-3 text-left">Book</th>
+
+                        <th className="p-3 text-right">Amount</th>
+
+                        <th className="p-3 text-left">Method</th>
+
+                        <th className="p-3 text-left">Reference</th>
+
+                        <th className="p-3 text-left">Date</th>
+
+                        <th className="p-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y dark:divide-slate-700">
+                      {paymentHistory.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan="7"
+                            className="p-12 text-center text-gray-400"
+                          >
+                            No payment transactions.
+                          </td>
+                        </tr>
+                      ) : (
+                        paymentHistory.map((payment) => (
+                          <tr key={payment.id}>
+                            <td className="p-3 font-medium">
+                              {payment.transaction_code}
+                            </td>
+
+                            <td className="p-3">{payment.book_title}</td>
+
+                            <td className="p-3 text-right font-bold">
+                              ₹{Number(payment.amount || 0).toFixed(2)}
+                            </td>
+
+                            <td className="p-3">{payment.payment_method}</td>
+
+                            <td className="p-3">
+                              {payment.reference_no || "—"}
+                            </td>
+
+                            <td className="p-3">
+                              {payment.transaction_date
+                                ? new Date(
+                                    payment.transaction_date,
+                                  ).toLocaleString()
+                                : "—"}
+                            </td>
+
+                            <td className="p-3 text-center">
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs ${
+                                  payment.status === "Paid"
+                                    ? "bg-green-100 text-green-700"
+                                    : payment.status === "Waived"
+                                      ? "bg-purple-100 text-purple-700"
+                                      : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {payment.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* ================= LIBRARY NOTIFICATIONS ================= */}
+              {libraryActiveTab === "notifications" && (
+                <div className="divide-y dark:divide-slate-700">
+                  {libraryNotifications.length === 0 ? (
+                    <div className="py-16 text-center">
+                      <i className="bi bi-bell text-4xl text-gray-300"></i>
+
+                      <p className="mt-3 text-sm text-gray-500">
+                        No library notifications.
+                      </p>
+                    </div>
+                  ) : (
+                    libraryNotifications.map((notification) => (
                       <div
-                        key={book.id}
-                        className="bg-gray-50 dark:bg-slate-700 rounded-xl p-3 space-y-2"
+                        key={notification.id}
+                        className="flex gap-4 p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50"
                       >
-                        <div>
-                          <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                            {book.title}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {book.author} • {book.category}
-                          </p>
-                        </div>
-
-                        <div className="flex justify-between text-xs text-gray-700 dark:text-gray-300">
-                          <span>Issue: {book.issue_date}</span>
-                          <span>Due: {book.due_date}</span>
-                        </div>
-
-                        <div className="flex justify-between items-center text-xs">
-                          <span
-                            className={`font-medium ${
-                              book.days_left < 0
-                                ? "text-red-600 dark:text-red-400"
-                                : book.days_left <= 2
-                                  ? "text-yellow-600 dark:text-yellow-400"
-                                  : "text-green-600 dark:text-green-400"
-                            }`}
-                          >
-                            {book.days_left} Days
-                          </span>
-
-                          <span
-                            className={`font-medium ${
-                              book.fine > 0
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-green-600 dark:text-green-400"
-                            }`}
-                          >
-                            ₹{book.fine}
-                          </span>
-                        </div>
-
                         <span
-                          className={`inline-block px-2 py-1 text-[10px] rounded-full ${
-                            book.status === "Overdue"
-                              ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300"
-                              : book.status === "Due Soon"
-                                ? "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/40 dark:text-yellow-300"
-                                : "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-300"
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            notification.type === "overdue"
+                              ? "bg-red-100 text-red-700"
+                              : notification.type === "fine"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-blue-100 text-blue-700"
                           }`}
                         >
-                          {book.status}
+                          <i
+                            className={`bi ${
+                              notification.type === "overdue"
+                                ? "bi-exclamation-triangle"
+                                : notification.type === "fine"
+                                  ? "bi-currency-rupee"
+                                  : "bi-bell"
+                            }`}
+                          ></i>
                         </span>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              {notification.title}
+                            </p>
+
+                            <span className="text-xs text-gray-400">
+                              {notification.created_at
+                                ? new Date(
+                                    notification.created_at,
+                                  ).toLocaleString()
+                                : ""}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                            {notification.message}
+                          </p>
+                        </div>
                       </div>
                     ))
-                ) : (
-                  <p className="text-center text-gray-400 dark:text-gray-500">
-                    No books issued
-                  </p>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* BOOK DETAIL MODAL */}
+            {libraryRecordModalOpen && selectedLibraryRecord && (
+              <div
+                className="fixed inset-0 z-[160] flex items-center justify-center bg-black/50 p-4"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    closeLibraryRecord();
+                  }
+                }}
+              >
+                <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-slate-800">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4 dark:border-slate-700 dark:bg-slate-800">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Borrowing Details
+                      </h3>
+
+                      <p className="text-xs text-gray-500">
+                        {selectedLibraryRecord.issue_code}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closeLibraryRecord}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700"
+                    >
+                      <i className="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+
+                  <div className="space-y-5 p-5">
+                    <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 p-5 text-white">
+                      <p className="text-xs uppercase text-indigo-200">Book</p>
+
+                      <h3 className="mt-1 text-xl font-semibold">
+                        {selectedLibraryRecord.book_title}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-indigo-100">
+                        {selectedLibraryRecord.author || "Unknown Author"}
+
+                        {selectedLibraryRecord.category
+                          ? ` • ${selectedLibraryRecord.category}`
+                          : ""}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                      {[
+                        ["Book ID", selectedLibraryRecord.book_code],
+
+                        ["ISBN", selectedLibraryRecord.isbn],
+
+                        ["Issue Date", selectedLibraryRecord.issue_date],
+
+                        ["Due Date", selectedLibraryRecord.due_date],
+
+                        ["Return Date", selectedLibraryRecord.return_date],
+
+                        ["Status", selectedLibraryRecord.status],
+
+                        ["Days Left", selectedLibraryRecord.days_left],
+
+                        ["Late Days", selectedLibraryRecord.overdue_days],
+
+                        [
+                          "Fine",
+                          `₹${Number(
+                            selectedLibraryRecord.fine_amount ||
+                              selectedLibraryRecord.pending_fine ||
+                              0,
+                          ).toFixed(2)}`,
+                        ],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-slate-600 dark:bg-slate-700"
+                        >
+                          <p className="text-[10px] font-medium uppercase text-gray-500 dark:text-gray-400">
+                            {label}
+                          </p>
+
+                          <p className="mt-1 break-words text-sm font-semibold text-gray-800 dark:text-white">
+                            {value !== undefined &&
+                            value !== null &&
+                            value !== ""
+                              ? value
+                              : "—"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedLibraryRecord.status === "Overdue" && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-500/10">
+                        <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                          Return required
+                        </p>
+
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                          This book is overdue. Please return it to the library
+                          circulation desk.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end border-t pt-4 dark:border-slate-700">
+                      <button
+                        type="button"
+                        onClick={closeLibraryRecord}
+                        className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium dark:border-slate-600"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
-        {/* ===================== LIBRARY SECTION END ========================*/}
+        {/* ===================== STUDENT LIBRARY END ======================== */}
 
         {/* ===================== STUDENT LEAVE SECTION START ========================*/}
 

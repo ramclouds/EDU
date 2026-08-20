@@ -383,6 +383,14 @@ class Login(MethodView):
                 or Teacher.query.filter_by(username=identifier).first()
                 or Admin.query.filter_by(email=identifier).first()
                 or Admin.query.filter_by(username=identifier).first()
+                or NonTeachingStaff.query.filter_by(
+                    email=identifier,
+                    is_deleted=False,
+                ).first()
+                or NonTeachingStaff.query.filter_by(
+                    username=identifier,
+                    is_deleted=False,
+                ).first()
             )
 
             if not user:
@@ -394,32 +402,78 @@ class Login(MethodView):
             if user.status != "Active":
                 return jsonify({"error": "Account inactive"}), 403
 
-            # Generate token
-            token = str(uuid.uuid4())
-            user.auth_token = token
-            db.session.commit()
-
             # Load effective RBAC access without changing the existing
             # custom token, dashboard, role, or authentication behaviour.
             rbac_access = None
+            dashboard_entry = None
+            dashboard_rights = {"can_view": True, "can_write": True}
+
             try:
-                from utils.rolePermissionManagement import build_user_access
+                from utils.rolePermissionManagement import (
+                    build_user_access,
+                    get_home_dashboard_for_user,
+                    get_user_dashboard_access,
+                )
 
                 if isinstance(user, Admin):
                     rbac_user_type = "admin"
+
                 elif isinstance(user, Teacher):
                     rbac_user_type = "teacher"
+
                 elif isinstance(user, Student):
                     rbac_user_type = "student"
+
+                elif isinstance(user, NonTeachingStaff):
+                    rbac_user_type = "staff"
+
                 else:
                     rbac_user_type = str(getattr(user, "role", "") or "").lower()
 
                 rbac_access = build_user_access(rbac_user_type, user.id)
+
+                # The dashboard a user with this role/admin_type is meant
+                # to land on, and whether they actually have access to it.
+                dashboard_entry = get_home_dashboard_for_user(user)
+                dashboard_rights = get_user_dashboard_access(user, dashboard_entry)
+
             except Exception:
                 logger.exception("Unable to load RBAC access during login")
 
+            # ================= DASHBOARD ACCESS GATE =================
+            # If the account's own dashboard has not been granted to it
+            # (e.g. a Library Admin whose "library" module access was
+            # revoked, or never assigned), stop the login here and tell
+            # the user clearly instead of dropping them on a page they
+            # can't use.
+            if isinstance(user, Admin) and dashboard_entry is not None:
+                if not dashboard_rights.get("can_view"):
+                    return (
+                        jsonify(
+                            {
+                                "error": (
+                                    "Your account does not have access to the "
+                                    f"{dashboard_entry['label']}. Please contact "
+                                    "a Super Administrator to request access."
+                                ),
+                                "error_code": "DASHBOARD_ACCESS_DENIED",
+                                "dashboard": dashboard_entry["route"],
+                            }
+                        ),
+                        403,
+                    )
+
+            # Generate token only after the dashboard-access check passes,
+            # so a denied login never receives a usable session token.
+            token = str(uuid.uuid4())
+            user.auth_token = token
+            db.session.commit()
+
             # Auto dashboard based on role and admin type
-            if user.role == "student":
+            if dashboard_entry is not None:
+                dashboard = dashboard_entry["route"]
+
+            elif user.role == "student":
                 dashboard = "/student-dashboard"
 
             elif user.role == "teacher":
@@ -446,8 +500,21 @@ class Login(MethodView):
             elif user.role == "admin":
                 dashboard = "/admin-dashboard"
 
+            elif user.role == "staff":
+                dashboard = "/staff-dashboard"
+
             else:
                 dashboard = "/"
+
+            try:
+                from utils.rolePermissionManagement import (
+                    list_dashboard_access_for_user,
+                )
+
+                dashboard_access = list_dashboard_access_for_user(user)
+            except Exception:
+                logger.exception("Unable to load dashboard access during login")
+                dashboard_access = []
 
             return (
                 jsonify(
@@ -456,6 +523,7 @@ class Login(MethodView):
                         "role": user.role,
                         "dashboard": dashboard,
                         "rbac": rbac_access,
+                        "dashboard_access": dashboard_access,
                         "user": {
                             "id": user.id,
                             "role": user.role,
@@ -492,6 +560,376 @@ class Login(MethodView):
 
             traceback.print_exc()
             return jsonify({"error": str(e)}), 500
+
+
+# ==================================
+# NON-TEACHING STAFF MODEL
+# ==================================
+class NonTeachingStaff(db.Model):
+    __tablename__ = "non_teaching_staff"
+
+    # ================= PRIMARY =================
+    id = db.Column(
+        db.Integer,
+        primary_key=True,
+    )
+
+    staff_id = db.Column(
+        db.String(50),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    user_id = db.Column(
+        db.String(50),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    # ================= PERSONAL =================
+    first_name = db.Column(
+        db.String(100),
+        nullable=False,
+    )
+
+    middle_name = db.Column(
+        db.String(100),
+        nullable=True,
+    )
+
+    last_name = db.Column(
+        db.String(100),
+        nullable=False,
+    )
+
+    profile_image = db.Column(
+        db.String(255),
+        nullable=True,
+    )
+
+    gender = db.Column(
+        db.Enum(
+            "Male",
+            "Female",
+            "Other",
+            name="non_teaching_staff_gender_enum",
+        ),
+        nullable=True,
+    )
+
+    date_of_birth = db.Column(
+        db.Date,
+        nullable=True,
+    )
+
+    blood_group = db.Column(
+        db.Enum(
+            "A+",
+            "A-",
+            "B+",
+            "B-",
+            "AB+",
+            "AB-",
+            "O+",
+            "O-",
+            name="non_teaching_staff_blood_group_enum",
+        ),
+        nullable=True,
+    )
+
+    # ================= CONTACT =================
+    email = db.Column(
+        db.String(120),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    mobile = db.Column(
+        db.String(15),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
+    alternate_mobile = db.Column(
+        db.String(15),
+        nullable=True,
+    )
+
+    username = db.Column(
+        db.String(50),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    # ================= ADDRESS =================
+    address = db.Column(
+        db.Text,
+        nullable=True,
+    )
+
+    city = db.Column(
+        db.String(100),
+        nullable=True,
+    )
+
+    state = db.Column(
+        db.String(100),
+        nullable=True,
+    )
+
+    country = db.Column(
+        db.String(100),
+        nullable=False,
+        default="India",
+    )
+
+    pincode = db.Column(
+        db.String(10),
+        nullable=True,
+    )
+
+    # ================= EMPLOYMENT =================
+    department = db.Column(
+        db.String(100),
+        nullable=False,
+        index=True,
+    )
+
+    designation = db.Column(
+        db.String(100),
+        nullable=False,
+    )
+
+    staff_type = db.Column(
+        db.Enum(
+            "Clerk",
+            "Accountant",
+            "Librarian",
+            "Lab Assistant",
+            "Receptionist",
+            "Office Assistant",
+            "Peon",
+            "Security",
+            "Driver",
+            "Cleaner",
+            "Maintenance",
+            "Nurse",
+            "Counsellor",
+            "Other",
+            name="non_teaching_staff_type_enum",
+        ),
+        nullable=False,
+        default="Other",
+        index=True,
+    )
+
+    qualification = db.Column(
+        db.String(150),
+        nullable=True,
+    )
+
+    specialization = db.Column(
+        db.String(100),
+        nullable=True,
+    )
+
+    experience_years = db.Column(
+        db.Integer,
+        nullable=False,
+        default=0,
+    )
+
+    joining_date = db.Column(
+        db.Date,
+        nullable=True,
+    )
+
+    employment_type = db.Column(
+        db.Enum(
+            "Full Time",
+            "Part Time",
+            "Contract",
+            "Temporary",
+            name="non_teaching_staff_employment_enum",
+        ),
+        nullable=False,
+        default="Full Time",
+    )
+
+    shift = db.Column(
+        db.String(50),
+        nullable=True,
+    )
+
+    salary = db.Column(
+        db.Float,
+        nullable=True,
+    )
+
+    # ================= MEDICAL =================
+    medical_condition = db.Column(
+        db.Text,
+        nullable=True,
+    )
+
+    # ================= EMERGENCY =================
+    emergency_name = db.Column(
+        db.String(100),
+        nullable=True,
+    )
+
+    emergency_relation = db.Column(
+        db.String(50),
+        nullable=True,
+    )
+
+    emergency_phone = db.Column(
+        db.String(15),
+        nullable=True,
+    )
+
+    # ================= AUTH =================
+    role = db.Column(
+        db.Enum(
+            "staff",
+            name="non_teaching_staff_role_enum",
+        ),
+        nullable=False,
+        default="staff",
+    )
+
+    password = db.Column(
+        db.String(255),
+        nullable=False,
+    )
+
+    auth_token = db.Column(
+        db.String(255),
+        nullable=True,
+    )
+
+    status = db.Column(
+        db.Enum(
+            "Active",
+            "Inactive",
+            "Suspended",
+            name="non_teaching_staff_status_enum",
+        ),
+        nullable=False,
+        default="Active",
+        index=True,
+    )
+
+    last_login = db.Column(
+        db.DateTime,
+        nullable=True,
+    )
+
+    is_deleted = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+        index=True,
+    )
+
+    created_by = db.Column(
+        db.String(50),
+        nullable=True,
+    )
+
+    updated_by = db.Column(
+        db.String(50),
+        nullable=True,
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+    )
+
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    __table_args__ = (
+        db.Index(
+            "idx_non_teaching_staff_department_status",
+            "department",
+            "status",
+        ),
+        db.Index(
+            "idx_non_teaching_staff_deleted",
+            "is_deleted",
+        ),
+    )
+
+    def to_dict(self):
+        full_name = " ".join(
+            filter(
+                None,
+                [
+                    self.first_name,
+                    self.middle_name,
+                    self.last_name,
+                ],
+            )
+        )
+
+        return {
+            "id": self.id,
+            "staff_id": self.staff_id,
+            "user_id": self.user_id,
+            "name": full_name,
+            "first_name": self.first_name,
+            "middle_name": self.middle_name,
+            "last_name": self.last_name,
+            "profile_image": self.profile_image,
+            "gender": self.gender,
+            "date_of_birth": (
+                self.date_of_birth.isoformat() if self.date_of_birth else None
+            ),
+            "blood_group": self.blood_group,
+            "email": self.email,
+            "mobile": self.mobile,
+            "alternate_mobile": self.alternate_mobile,
+            "username": self.username,
+            "address": self.address,
+            "city": self.city,
+            "state": self.state,
+            "country": self.country,
+            "pincode": self.pincode,
+            "department": self.department,
+            "designation": self.designation,
+            "staff_type": self.staff_type,
+            "qualification": self.qualification,
+            "specialization": self.specialization,
+            "experience_years": self.experience_years,
+            "joining_date": (
+                self.joining_date.isoformat() if self.joining_date else None
+            ),
+            "employment_type": self.employment_type,
+            "shift": self.shift,
+            "salary": self.salary,
+            "medical_condition": self.medical_condition,
+            "emergency_name": self.emergency_name,
+            "emergency_relation": self.emergency_relation,
+            "emergency_phone": self.emergency_phone,
+            "role": self.role,
+            "status": self.status,
+            "last_login": (self.last_login.isoformat() if self.last_login else None),
+            "is_deleted": self.is_deleted,
+            "created_at": (self.created_at.isoformat() if self.created_at else None),
+            "updated_at": (self.updated_at.isoformat() if self.updated_at else None),
+        }
 
 
 # ===========================
@@ -534,6 +972,50 @@ def generate_admin_id():
     except Exception as e:
         logger.error(f"Admin ID generation failed: {e}")
         return f"ADM{int(datetime.utcnow().timestamp())}"
+
+
+def generate_staff_id():
+    try:
+        last_staff = NonTeachingStaff.query.order_by(NonTeachingStaff.id.desc()).first()
+
+        if not last_staff or not last_staff.staff_id:
+            return "NTS1001"
+
+        numeric_part = int(
+            last_staff.staff_id.replace(
+                "NTS",
+                "",
+            )
+        )
+
+        return f"NTS{numeric_part + 1}"
+
+    except Exception as error:
+        logger.error("Non-teaching staff ID " f"generation failed: {error}")
+
+        return f"NTS{int(datetime.utcnow().timestamp())}"
+
+
+def generate_staff_user_id():
+    try:
+        last_staff = NonTeachingStaff.query.order_by(NonTeachingStaff.id.desc()).first()
+
+        if not last_staff or not last_staff.user_id:
+            return "STFUSR1001"
+
+        numeric_part = int(
+            last_staff.user_id.replace(
+                "STFUSR",
+                "",
+            )
+        )
+
+        return f"STFUSR{numeric_part + 1}"
+
+    except Exception as error:
+        logger.error("Staff user ID generation failed: " f"{error}")
+
+        return "STFUSR" f"{int(datetime.utcnow().timestamp())}"
 
 
 # ===========================

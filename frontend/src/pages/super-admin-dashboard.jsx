@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
+import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import {
   APP_NAME,
   APP_YEAR,
@@ -26,6 +27,12 @@ function AdminDashboard() {
   const [noticeTab, setNoticeTab] = useState("announcements");
   const [activeSection, setActiveSection] = useState("dashboard");
   const [search, setSearch] = useState("");
+
+  // Which of the other admin dashboards this account may currently
+  // open - Super Admin normally sees all of them, but this stays
+  // driven by Role & Permission Management rather than assumed, so a
+  // future "restricted super admin" style role also works correctly.
+  const { canView: canViewDashboard } = useDashboardAccess();
 
   // ================= DASHBOARD HOOK =================
   const {
@@ -372,10 +379,8 @@ function AdminDashboard() {
 
   // ============== Role and Permission Hook ==============
   const {
-    rbacActions,
     rbacUserTypes,
 
-    rbacModules,
     rbacRoles,
     rbacUsers,
     rbacStats,
@@ -390,8 +395,6 @@ function AdminDashboard() {
     rbacRoleOptions,
 
     rbacRoleForm,
-    rbacRolePermissionForm,
-    rbacUserOverrideForm,
     rbacUserFilters,
     rbacTemporaryAccessForm,
 
@@ -431,10 +434,14 @@ function AdminDashboard() {
     closeRbacDeleteRoleModal,
     deleteRbacRole,
 
-    toggleRbacRolePermission,
-    setAllRbacRolePermissions,
-    setRbacRoleModulePermissions,
     saveRbacRolePermissions,
+
+    dashboardPages,
+    dashboardAccessLevels,
+    rbacDashboardPermissionForm,
+    setRbacDashboardAccess,
+    rbacDashboardOverrideForm,
+    setRbacUserDashboardOverride,
 
     updateRbacUserFilter,
     resetRbacUserFilters,
@@ -444,17 +451,10 @@ function AdminDashboard() {
 
     assignRbacRoleToUser,
 
-    setRbacUserPermissionOverride,
-    cycleRbacUserPermissionOverride,
     saveRbacUserOverrides,
     resetRbacUserOverrides,
 
     updateRbacTemporaryAccessForm,
-
-    getRbacEffectivePermission,
-    getRbacInheritedPermission,
-    getRbacOverrideValue,
-    getRbacOverrideLabel,
   } = useRolePermissionManagement({
     activeSection,
     fetchWithAuth,
@@ -668,86 +668,109 @@ function AdminDashboard() {
                 ["security", "bi-shield-check", "Security & Logs"],
               ],
             },
-          ].map((section) => (
-            <div key={section.title}>
-              {sidebarExpanded && (
-                <p className="text-xs text-gray-400 px-3 mt-4 transition-all duration-300">
-                  {section.title}
-                </p>
-              )}
+          ].map((section) => {
+            // key -> dashboardRegistry key, used to check real access
+            // before showing a cross-dashboard nav link. Add new
+            // cross-dashboard links to this map (and to the backend +
+            // frontend dashboardRegistry) - nothing else needs to change.
+            const DASHBOARD_LINK_TARGETS = {
+              "library-dashboard": "library-admin-dashboard",
+              "accounts-dashboard": "accounts-admin-dashboard",
+              "hostels-dashboard": "hostel-admin-dashboard",
+              "hr-dashboard": "hr-admin-dashboard",
+            };
 
-              {section.items.map(([key, icon, label]) => {
-                const isDashboardLink = [
-                  "library-dashboard",
-                  "accounts-dashboard",
-                  "hostels-dashboard",
-                  "hr-dashboard",
-                ].includes(key);
+            const visibleItems = section.items.filter(([key]) => {
+              const targetDashboardKey = DASHBOARD_LINK_TARGETS[key];
+              return (
+                !targetDashboardKey || canViewDashboard(targetDashboardKey)
+              );
+            });
 
-                const isActive = !isDashboardLink && activeSection === key;
+            if (visibleItems.length === 0) {
+              return null;
+            }
 
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    title={!sidebarExpanded ? label : ""}
-                    onClick={() => {
-                      if (key === "library-dashboard") {
-                        navigate("/library-admin-dashboard", {
-                          state: {
-                            from: "super-admin-dashboard",
-                            accessBy: "super_admin",
-                            activeSection: "dashboard",
-                          },
-                        });
+            return (
+              <div key={section.title}>
+                {sidebarExpanded && (
+                  <p className="text-xs text-gray-400 px-3 mt-4 transition-all duration-300">
+                    {section.title}
+                  </p>
+                )}
 
+                {visibleItems.map(([key, icon, label]) => {
+                  const isDashboardLink = [
+                    "library-dashboard",
+                    "accounts-dashboard",
+                    "hostels-dashboard",
+                    "hr-dashboard",
+                  ].includes(key);
+
+                  const isActive = !isDashboardLink && activeSection === key;
+
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      title={!sidebarExpanded ? label : ""}
+                      onClick={() => {
+                        if (key === "library-dashboard") {
+                          navigate("/library-admin-dashboard", {
+                            state: {
+                              from: "super-admin-dashboard",
+                              accessBy: "super_admin",
+                              activeSection: "dashboard",
+                            },
+                          });
+
+                          closeSidebarOnMobile();
+                          return;
+                        }
+
+                        if (key === "accounts-dashboard") {
+                          navigate("/accounts-admin-dashboard", {
+                            state: {
+                              from: "super-admin-dashboard",
+                              accessBy: "super_admin",
+                              activeSection: "dashboard",
+                            },
+                          });
+
+                          closeSidebarOnMobile();
+                          return;
+                        }
+
+                        if (key === "hostels-dashboard") {
+                          navigate("/hostel-admin-dashboard", {
+                            state: {
+                              from: "super-admin-dashboard",
+                              accessBy: "super_admin",
+                              activeSection: "dashboard",
+                            },
+                          });
+
+                          closeSidebarOnMobile();
+                          return;
+                        }
+
+                        if (key === "hr-dashboard") {
+                          navigate("/hr-admin-dashboard", {
+                            state: {
+                              from: "super-admin-dashboard",
+                              accessBy: "super_admin",
+                              activeSection: "dashboard",
+                            },
+                          });
+
+                          closeSidebarOnMobile();
+                          return;
+                        }
+
+                        setActiveSection(key);
                         closeSidebarOnMobile();
-                        return;
-                      }
-
-                      if (key === "accounts-dashboard") {
-                        navigate("/accounts-admin-dashboard", {
-                          state: {
-                            from: "super-admin-dashboard",
-                            accessBy: "super_admin",
-                            activeSection: "dashboard",
-                          },
-                        });
-
-                        closeSidebarOnMobile();
-                        return;
-                      }
-
-                      if (key === "hostels-dashboard") {
-                        navigate("/hostel-admin-dashboard", {
-                          state: {
-                            from: "super-admin-dashboard",
-                            accessBy: "super_admin",
-                            activeSection: "dashboard",
-                          },
-                        });
-
-                        closeSidebarOnMobile();
-                        return;
-                      }
-
-                      if (key === "hr-dashboard") {
-                        navigate("/hr-admin-dashboard", {
-                          state: {
-                            from: "super-admin-dashboard",
-                            accessBy: "super_admin",
-                            activeSection: "dashboard",
-                          },
-                        });
-
-                        closeSidebarOnMobile();
-                        return;
-                      }
-
-                      setActiveSection(key);
-                      closeSidebarOnMobile();
-                    }}
-                    className={`relative group flex w-full items-center
+                      }}
+                      className={`relative group flex w-full items-center
               ${
                 sidebarExpanded
                   ? "gap-3 px-4 justify-start"
@@ -759,29 +782,30 @@ function AdminDashboard() {
                   ? "bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-500/20 dark:to-indigo-500/20 text-purple-700 dark:text-purple-300 font-semibold shadow-sm"
                   : "text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white"
               }`}
-                  >
-                    {isActive && (
-                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-purple-600 rounded-r-full" />
-                    )}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-purple-600 rounded-r-full" />
+                      )}
 
-                    <i className={`bi ${icon} text-base shrink-0`} />
+                      <i className={`bi ${icon} text-base shrink-0`} />
 
-                    <span
-                      className={`whitespace-nowrap truncate overflow-hidden
+                      <span
+                        className={`whitespace-nowrap truncate overflow-hidden
                 transition-all duration-300 ease-in-out
                 ${
                   sidebarExpanded
                     ? "opacity-100 max-w-[180px]"
                     : "opacity-0 max-w-0"
                 }`}
-                    >
-                      {label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+                      >
+                        {label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </nav>
         {/* FOOTER */}
         <div
@@ -1349,27 +1373,45 @@ function AdminDashboard() {
                             </div>
 
                             <p className="mt-1 text-sm text-slate-500">
-                              Edit module permissions and save your changes.
+                              Grant Read or Full Access per dashboard page, then
+                              save. This controls whether the page is even
+                              visible to this role - not what happens inside it.
                             </p>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={() => setAllRbacRolePermissions(true)}
-                              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                              onClick={() =>
+                                dashboardPages.forEach((page) =>
+                                  setRbacDashboardAccess(
+                                    page.moduleCode,
+                                    "write",
+                                  ),
+                                )
+                              }
+                              disabled={rbacSelectedRole.code === "super-admin"}
+                              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <i className="fas fa-check-double mr-1.5" />
-                              Allow All
+                              Full Access - All Pages
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => setAllRbacRolePermissions(false)}
-                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                              onClick={() =>
+                                dashboardPages.forEach((page) =>
+                                  setRbacDashboardAccess(
+                                    page.moduleCode,
+                                    "none",
+                                  ),
+                                )
+                              }
+                              disabled={rbacSelectedRole.code === "super-admin"}
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <i className="fas fa-times mr-1.5" />
-                              Clear All
+                              Revoke All
                             </button>
 
                             <button
@@ -1398,139 +1440,108 @@ function AdminDashboard() {
                           </div>
                         </div>
 
-                        <div className="overflow-x-auto">
-                          <table className="w-full min-w-[760px]">
-                            <thead className="bg-white">
-                              <tr className="border-b border-slate-200">
-                                <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                                  Module
-                                </th>
-
-                                {rbacActions.map((action) => (
-                                  <th
-                                    key={action}
-                                    className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500"
-                                  >
-                                    {action}
+                        {rbacSelectedRole.code === "super-admin" ? (
+                          <div className="mx-5 mt-5 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+                            <i className="fas fa-shield-alt" />
+                            <span>
+                              This is the Super Admin role - it always has Full
+                              Access to every dashboard page and can't be
+                              restricted here.
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[640px]">
+                              <thead className="bg-white">
+                                <tr className="border-b border-slate-200">
+                                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                                    Dashboard Page
                                   </th>
-                                ))}
 
-                                <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
-                                  Full Access
-                                </th>
-                              </tr>
-                            </thead>
+                                  <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
+                                    Access Level
+                                  </th>
+                                </tr>
+                              </thead>
 
-                            <tbody className="divide-y divide-slate-100">
-                              {rbacModules.map((module) => {
-                                const moduleCode =
-                                  module.code ||
-                                  module.module_code ||
-                                  module.slug;
-
-                                const permissions =
-                                  rbacRolePermissionForm?.[moduleCode] || {};
-
-                                const hasFullAccess = rbacActions.every(
-                                  (action) => Boolean(permissions[action]),
-                                );
-
-                                return (
+                              <tbody className="divide-y divide-slate-100">
+                                {rbacDashboardPermissionForm.map((page) => (
                                   <tr
-                                    key={moduleCode}
+                                    key={page.moduleCode}
                                     className="transition hover:bg-slate-50"
                                   >
                                     <td className="px-5 py-4">
                                       <div className="flex items-center gap-3">
                                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                                          <i
-                                            className={
-                                              module.icon || "fas fa-cube"
-                                            }
-                                          />
+                                          <i className={page.icon} />
                                         </div>
 
                                         <div>
                                           <p className="font-semibold text-slate-800">
-                                            {module.name ||
-                                              module.module_name ||
-                                              moduleCode}
+                                            {page.label}
                                           </p>
 
                                           <p className="text-xs text-slate-500">
-                                            {moduleCode}
+                                            {page.description}
                                           </p>
                                         </div>
                                       </div>
                                     </td>
 
-                                    {rbacActions.map((action) => {
-                                      const checked = Boolean(
-                                        permissions[action],
-                                      );
+                                    <td className="px-4 py-4">
+                                      <div className="mx-auto flex w-fit rounded-lg border border-slate-200 bg-slate-50 p-1">
+                                        {dashboardAccessLevels.map(
+                                          (levelOption) => {
+                                            const active =
+                                              page.access === levelOption.value;
 
-                                      return (
-                                        <td
-                                          key={`${moduleCode}-${action}`}
-                                          className="px-4 py-4 text-center"
-                                        >
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              toggleRbacRolePermission(
-                                                moduleCode,
-                                                action,
-                                                !checked,
-                                              )
-                                            }
-                                            title={`${checked ? "Remove" : "Allow"} ${action} permission`}
-                                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg border transition ${
-                                              checked
-                                                ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                                                : "border-slate-300 bg-white text-slate-400 hover:border-indigo-400 hover:text-indigo-600"
-                                            }`}
-                                          >
-                                            <i className="fas fa-check text-xs" />
-                                          </button>
-                                        </td>
-                                      );
-                                    })}
-
-                                    <td className="px-4 py-4 text-center">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setRbacRoleModulePermissions(
-                                            moduleCode,
-                                            !hasFullAccess,
-                                          )
-                                        }
-                                        className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                                          hasFullAccess
-                                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                        }`}
-                                      >
-                                        {hasFullAccess ? "Enabled" : "Enable"}
-                                      </button>
+                                            return (
+                                              <button
+                                                key={levelOption.value}
+                                                type="button"
+                                                title={levelOption.description}
+                                                onClick={() =>
+                                                  setRbacDashboardAccess(
+                                                    page.moduleCode,
+                                                    levelOption.value,
+                                                  )
+                                                }
+                                                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                                                  active
+                                                    ? levelOption.value ===
+                                                      "write"
+                                                      ? "bg-emerald-600 text-white shadow-sm"
+                                                      : levelOption.value ===
+                                                          "read"
+                                                        ? "bg-indigo-600 text-white shadow-sm"
+                                                        : "bg-slate-500 text-white shadow-sm"
+                                                    : "text-slate-500 hover:text-slate-800"
+                                                }`}
+                                              >
+                                                {levelOption.label}
+                                              </button>
+                                            );
+                                          },
+                                        )}
+                                      </div>
                                     </td>
                                   </tr>
-                                );
-                              })}
+                                ))}
 
-                              {rbacModules.length === 0 && (
-                                <tr>
-                                  <td
-                                    colSpan={rbacActions.length + 2}
-                                    className="px-5 py-12 text-center text-sm text-slate-500"
-                                  >
-                                    No permission modules are available.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
+                                {rbacDashboardPermissionForm.length === 0 && (
+                                  <tr>
+                                    <td
+                                      colSpan={2}
+                                      className="px-5 py-12 text-center text-sm text-slate-500"
+                                    >
+                                      No dashboard pages are configured yet.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
 
                         <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between">
                           <div>
@@ -2114,159 +2125,157 @@ function AdminDashboard() {
                         <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <h4 className="font-bold text-slate-900">
-                              Individual Permission Overrides
+                              Individual Dashboard Access Overrides
                             </h4>
 
                             <p className="mt-1 text-xs text-slate-500">
-                              Click each permission to cycle between Role, Allow
-                              and Deny.
+                              Give this one user extra (or reduced) access to a
+                              dashboard page, without changing their whole role.
+                              Pick "Inherit" to go back to what their role
+                              allows.
                             </p>
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold">
                             <span className="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-indigo-700">
-                              Role = Inherited
+                              Inherit = From Role
+                            </span>
+
+                            <span className="rounded-md border border-slate-300 bg-slate-100 px-2 py-1 text-slate-600">
+                              No Access = Blocked
                             </span>
 
                             <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-700">
-                              Allow = Granted
-                            </span>
-
-                            <span className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-rose-700">
-                              Deny = Blocked
+                              Read / Write = Granted
                             </span>
                           </div>
                         </div>
 
                         <div className="overflow-x-auto">
-                          <table className="w-full min-w-[850px]">
+                          <table className="w-full min-w-[640px]">
                             <thead className="bg-white">
                               <tr className="border-b border-slate-200">
                                 <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                                  Module
+                                  Dashboard Page
                                 </th>
 
-                                {rbacActions.map((action) => (
-                                  <th
-                                    key={`popup-${action}`}
-                                    className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500"
-                                  >
-                                    {action}
-                                  </th>
-                                ))}
+                                <th className="px-4 py-4 text-center text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Access Level
+                                </th>
                               </tr>
                             </thead>
 
                             <tbody className="divide-y divide-slate-100">
-                              {rbacModules.map((module) => {
-                                const moduleCode =
-                                  module.code ||
-                                  module.module_code ||
-                                  module.slug;
-
-                                return (
-                                  <tr
-                                    key={`popup-${moduleCode}`}
-                                    className="transition hover:bg-slate-50"
-                                  >
-                                    <td className="px-5 py-4">
-                                      <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                                          <i
-                                            className={
-                                              module.icon || "fas fa-cube"
-                                            }
-                                          />
-                                        </div>
-
-                                        <div>
-                                          <p className="font-semibold text-slate-800">
-                                            {module.name ||
-                                              module.module_name ||
-                                              moduleCode}
-                                          </p>
-
-                                          <p className="text-xs text-slate-500">
-                                            {moduleCode}
-                                          </p>
-                                        </div>
+                              {rbacDashboardOverrideForm.map((page) => (
+                                <tr
+                                  key={`popup-${page.moduleCode}`}
+                                  className="transition hover:bg-slate-50"
+                                >
+                                  <td className="px-5 py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                                        <i className={page.icon} />
                                       </div>
-                                    </td>
 
-                                    {rbacActions.map((action) => {
-                                      const overrideValue =
-                                        getRbacOverrideValue(
-                                          moduleCode,
-                                          action,
-                                        );
+                                      <div>
+                                        <p className="font-semibold text-slate-800">
+                                          {page.label}
+                                        </p>
 
-                                      const inheritedPermission =
-                                        getRbacInheritedPermission(
-                                          moduleCode,
-                                          action,
-                                        );
+                                        <p className="text-xs text-slate-500">
+                                          Role grants:{" "}
+                                          {page.inheritedLevel === "none"
+                                            ? "No Access"
+                                            : page.inheritedLevel === "write"
+                                              ? "Full Access"
+                                              : "Read Only"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </td>
 
-                                      const effectivePermission =
-                                        getRbacEffectivePermission(
-                                          moduleCode,
-                                          action,
-                                        );
+                                  <td className="px-4 py-4">
+                                    <div className="mx-auto flex w-fit flex-wrap justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                                      <button
+                                        type="button"
+                                        title="Use whatever the user's role grants for this page"
+                                        onClick={() =>
+                                          setRbacUserDashboardOverride(
+                                            page.moduleCode,
+                                            "inherit",
+                                          )
+                                        }
+                                        className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                                          !page.hasOverride
+                                            ? "bg-indigo-600 text-white shadow-sm"
+                                            : "text-slate-500 hover:text-slate-800"
+                                        }`}
+                                      >
+                                        Inherit
+                                      </button>
 
-                                      return (
-                                        <td
-                                          key={`${moduleCode}-${action}-popup`}
-                                          className="px-4 py-4 text-center"
-                                        >
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              cycleRbacUserPermissionOverride(
-                                                moduleCode,
-                                                action,
-                                              )
-                                            }
-                                            className={`min-w-[92px] rounded-lg border px-3 py-2 text-xs font-bold transition ${
-                                              overrideValue === true
-                                                ? "border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                                                : overrideValue === false
-                                                  ? "border-rose-300 bg-rose-100 text-rose-700 hover:bg-rose-200"
-                                                  : inheritedPermission
-                                                    ? "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                                                    : "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                            }`}
-                                          >
-                                            {getRbacOverrideLabel(
-                                              moduleCode,
-                                              action,
-                                            )}
-                                          </button>
+                                      {dashboardAccessLevels.map(
+                                        (levelOption) => {
+                                          const active =
+                                            page.hasOverride &&
+                                            page.overrideLevel ===
+                                              levelOption.value;
 
-                                          <p
-                                            className={`mt-1 text-[10px] font-medium ${
-                                              effectivePermission
-                                                ? "text-emerald-600"
-                                                : "text-rose-500"
-                                            }`}
-                                          >
-                                            Effective:{" "}
-                                            {effectivePermission
-                                              ? "Allowed"
-                                              : "Denied"}
-                                          </p>
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                );
-                              })}
+                                          return (
+                                            <button
+                                              key={levelOption.value}
+                                              type="button"
+                                              title={levelOption.description}
+                                              onClick={() =>
+                                                setRbacUserDashboardOverride(
+                                                  page.moduleCode,
+                                                  levelOption.value,
+                                                )
+                                              }
+                                              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                                                active
+                                                  ? levelOption.value ===
+                                                    "write"
+                                                    ? "bg-emerald-600 text-white shadow-sm"
+                                                    : levelOption.value ===
+                                                        "read"
+                                                      ? "bg-indigo-600 text-white shadow-sm"
+                                                      : "bg-slate-500 text-white shadow-sm"
+                                                  : "text-slate-500 hover:text-slate-800"
+                                              }`}
+                                            >
+                                              {levelOption.label}
+                                            </button>
+                                          );
+                                        },
+                                      )}
+                                    </div>
 
-                              {rbacModules.length === 0 && (
+                                    <p
+                                      className={`mt-1.5 text-center text-[10px] font-medium ${
+                                        page.effectiveLevel !== "none"
+                                          ? "text-emerald-600"
+                                          : "text-rose-500"
+                                      }`}
+                                    >
+                                      Effective:{" "}
+                                      {page.effectiveLevel === "none"
+                                        ? "No Access"
+                                        : page.effectiveLevel === "write"
+                                          ? "Full Access"
+                                          : "Read Only"}
+                                    </p>
+                                  </td>
+                                </tr>
+                              ))}
+
+                              {rbacDashboardOverrideForm.length === 0 && (
                                 <tr>
                                   <td
-                                    colSpan={rbacActions.length + 1}
+                                    colSpan={2}
                                     className="px-5 py-12 text-center text-sm text-slate-500"
                                   >
-                                    No permission modules are available.
+                                    No dashboard pages are configured yet.
                                   </td>
                                 </tr>
                               )}

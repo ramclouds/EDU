@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -17,11 +17,31 @@ import HostelAdminDashboard from "./pages/hostels-Mgmt-dashboard";
 import HRAdminDashboard from "./pages/hr-Mgmt-dashboard";
 // import AcademicAdminDashboard from "./pages/admin/AcademicAdminDashboard";
 
+// Adjust this relative path to wherever useDashboardAccess.js ends up
+// living in your project (it sits next to useLogin.js in this patch).
+import { useDashboardAccess } from "./controllers/Auth/useDashboardAccess";
+
+/* =========================
+   FULL-SCREEN LOADER
+   Shown only the first time the dashboard-access list is being
+   fetched (e.g. right after a hard page refresh), so a legitimately
+   permitted admin never gets bounced to "/" before we know their
+   permissions.
+========================= */
+
+function AccessCheckLoader() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center text-sm text-gray-400">
+      Checking your access…
+    </div>
+  );
+}
+
 /* =========================
    PROTECTED ROUTE
 ========================= */
 
-function ProtectedRoute({ children, allowedRole, allowedAdminType }) {
+function ProtectedRoute({ children, allowedRole, dashboardKey }) {
   const token = localStorage.getItem("token");
 
   let savedUser = {};
@@ -35,8 +55,7 @@ function ProtectedRoute({ children, allowedRole, allowedAdminType }) {
   const userRole =
     localStorage.getItem("role") || savedUser.role || savedUser.user_type || "";
 
-  const adminType =
-    localStorage.getItem("admin_type") || savedUser.admin_type || "";
+  const { canView, loaded, loading } = useDashboardAccess();
 
   if (!token) {
     return <Navigate to="/" replace />;
@@ -46,19 +65,27 @@ function ProtectedRoute({ children, allowedRole, allowedAdminType }) {
     return <Navigate to="/" replace />;
   }
 
-  const isSuperAdmin =
-    userRole === "super_admin" || adminType === "Super Admin";
+  // Students and teachers always own their single dashboard - no RBAC
+  // lookup needed, and no admin can ever be routed here (allowedRole
+  // above already filters that out).
+  if (
+    dashboardKey === "student-dashboard" ||
+    dashboardKey === "teacher-dashboard"
+  ) {
+    return children;
+  }
 
-  if (allowedAdminType && adminType !== allowedAdminType && !isSuperAdmin) {
-    if (adminType === "Library Admin") {
-      return <Navigate to="/library-admin-dashboard" replace />;
-    }
+  // Every other dashboard (Super Admin, Library, Accounts, Hostel, HR,
+  // and any future one added to dashboardRegistry.js) is gated purely
+  // by whether Role & Permission Management has granted this account
+  // "view" access to it - configured per role or per user, and
+  // enforced here for every admin, including Super Admin.
+  if (!loaded && loading) {
+    return <AccessCheckLoader />;
+  }
 
-    if (adminType === "Hostel Admin") {
-      return <Navigate to="/hostel-admin-dashboard" replace />;
-    }
-
-    return <Navigate to="/" replace />;
+  if (dashboardKey && !canView(dashboardKey)) {
+    return <Navigate to="/" replace state={{ accessDenied: dashboardKey }} />;
   }
 
   return children;
@@ -81,7 +108,10 @@ export default function App() {
       <Route
         path="/student-dashboard"
         element={
-          <ProtectedRoute allowedRole="student">
+          <ProtectedRoute
+            allowedRole="student"
+            dashboardKey="student-dashboard"
+          >
             <StudentDashboard />
           </ProtectedRoute>
         }
@@ -92,7 +122,10 @@ export default function App() {
       <Route
         path="/teacher-dashboard"
         element={
-          <ProtectedRoute allowedRole="teacher">
+          <ProtectedRoute
+            allowedRole="teacher"
+            dashboardKey="teacher-dashboard"
+          >
             <TeacherDashboard />
           </ProtectedRoute>
         }
@@ -103,7 +136,10 @@ export default function App() {
       <Route
         path="/super-admin-dashboard"
         element={
-          <ProtectedRoute allowedRole="admin" allowedAdminType="Super Admin">
+          <ProtectedRoute
+            allowedRole="admin"
+            dashboardKey="super-admin-dashboard"
+          >
             <SuperMainAdminDashboard />
           </ProtectedRoute>
         }
@@ -114,7 +150,10 @@ export default function App() {
       <Route
         path="/library-admin-dashboard"
         element={
-          <ProtectedRoute allowedRole="admin" allowedAdminType="Library Admin">
+          <ProtectedRoute
+            allowedRole="admin"
+            dashboardKey="library-admin-dashboard"
+          >
             <LibraryAdminDashboard />
           </ProtectedRoute>
         }
@@ -125,7 +164,10 @@ export default function App() {
       <Route
         path="/accounts-admin-dashboard"
         element={
-          <ProtectedRoute allowedRole="admin" allowedAdminType="Accounts Admin">
+          <ProtectedRoute
+            allowedRole="admin"
+            dashboardKey="accounts-admin-dashboard"
+          >
             <AccountsAdminDashboard />
           </ProtectedRoute>
         }
@@ -136,7 +178,10 @@ export default function App() {
       <Route
         path="/hostel-admin-dashboard"
         element={
-          <ProtectedRoute allowedRole="admin" allowedAdminType="Hostel Admin">
+          <ProtectedRoute
+            allowedRole="admin"
+            dashboardKey="hostel-admin-dashboard"
+          >
             <HostelAdminDashboard />
           </ProtectedRoute>
         }
@@ -145,7 +190,7 @@ export default function App() {
       <Route
         path="/hr-admin-dashboard"
         element={
-          <ProtectedRoute allowedRole="admin" allowedAdminType="HR Admin">
+          <ProtectedRoute allowedRole="admin" dashboardKey="hr-admin-dashboard">
             <HRAdminDashboard />
           </ProtectedRoute>
         }

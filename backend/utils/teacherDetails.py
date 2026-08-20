@@ -59,7 +59,7 @@ class TeacherDetails(MethodView):
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
 
-            # ✅ Fetch assigned classes
+            #  Fetch assigned classes
             classes = TeacherClass.query.filter_by(teacher_id=id).all()
 
             class_data = []
@@ -180,7 +180,7 @@ class UpdateTeacherProfile(MethodView):
             new_email = data.get("email")
             new_mobile = data.get("mobile")
 
-            # ✅ Duplicate check
+            #  Duplicate check
             if new_email or new_mobile:
                 existing = Teacher.query.filter(
                     Teacher.id != id,
@@ -196,7 +196,7 @@ class UpdateTeacherProfile(MethodView):
                     if new_mobile and existing.mobile == new_mobile:
                         return jsonify({"error": "Mobile already exists"}), 400
 
-            # ✅ Date parsing helper
+            #  Date parsing helper
             def parse_date(value):
                 try:
                     return (
@@ -205,7 +205,7 @@ class UpdateTeacherProfile(MethodView):
                 except:
                     return None
 
-            # ✅ Safe updates
+            #  Safe updates
             teacher.first_name = data.get("first_name", teacher.first_name)
             teacher.middle_name = data.get("middle_name", teacher.middle_name)
             teacher.last_name = data.get("last_name", teacher.last_name)
@@ -250,7 +250,7 @@ class UpdateTeacherProfile(MethodView):
             teacher.username = data.get("username", teacher.username)
             teacher.status = data.get("status", teacher.status)
 
-            # ✅ Proper date conversion
+            #  Proper date conversion
             if "date_of_birth" in data:
                 teacher.date_of_birth = parse_date(data.get("date_of_birth"))
 
@@ -294,21 +294,21 @@ class ChangeTeacherPassword(MethodView):
             if not all([current_password, new_password, confirm_password]):
                 return jsonify({"error": "All fields required"}), 400
 
-            # ✅ CHECK CURRENT PASSWORD
+            #  CHECK CURRENT PASSWORD
             if not bcrypt.checkpw(
                 current_password.encode("utf-8"), teacher.password.encode("utf-8")
             ):
                 return jsonify({"error": "Current password incorrect"}), 400
 
-            # ✅ MATCH CHECK
+            #  MATCH CHECK
             if new_password != confirm_password:
                 return jsonify({"error": "Passwords do not match"}), 400
 
-            # ✅ LENGTH CHECK
+            #  LENGTH CHECK
             if len(new_password) < 8:
                 return jsonify({"error": "Min 8 characters required"}), 400
 
-            # ✅ HASH + SAVE
+            #  HASH + SAVE
             hashed = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt())
             teacher.password = hashed.decode("utf-8")
 
