@@ -617,6 +617,21 @@ CREATE TABLE IF NOT EXISTS `hostel_allocations` (
   CONSTRAINT `hostel_allocations_ibfk_2` FOREIGN KEY (`bed_id`) REFERENCES `beds` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- hostel_attendance
+CREATE TABLE IF NOT EXISTS `hostel_attendance` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `attendance_date` date NOT NULL,
+  `status` enum('Present','Absent','On Leave','Late Entry') NOT NULL,
+  `check_in_time` datetime DEFAULT NULL,
+  `remarks` varchar(255) DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_attendance_student_date` (`student_id`,`attendance_date`),
+  CONSTRAINT `hostel_attendance_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- hostel_blocks
 CREATE TABLE IF NOT EXISTS `hostel_blocks` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -666,6 +681,36 @@ CREATE TABLE IF NOT EXISTS `hostel_floors` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_floor_block_number` (`block_id`,`floor_number`),
   CONSTRAINT `hostel_floors_ibfk_1` FOREIGN KEY (`block_id`) REFERENCES `hostel_blocks` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_leave_requests
+CREATE TABLE IF NOT EXISTS `hostel_leave_requests` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `leave_type` enum('Weekend Leave','Medical Leave','Emergency Leave','Other') NOT NULL,
+  `from_date` date NOT NULL,
+  `to_date` date NOT NULL,
+  `reason` varchar(255) DEFAULT NULL,
+  `status` enum('Pending','Approved','Rejected','Returned') NOT NULL,
+  `actual_return_date` date DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `student_id` (`student_id`),
+  CONSTRAINT `hostel_leave_requests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_movements
+CREATE TABLE IF NOT EXISTS `hostel_movements` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `check_out_time` datetime NOT NULL,
+  `expected_return_time` datetime DEFAULT NULL,
+  `check_in_time` datetime DEFAULT NULL,
+  `purpose` varchar(255) DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `student_id` (`student_id`),
+  CONSTRAINT `hostel_movements_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- hostel_staff

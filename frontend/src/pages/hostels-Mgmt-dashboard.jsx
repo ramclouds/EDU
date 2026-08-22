@@ -19,6 +19,9 @@ import { useHostelStudents } from "../controllers/Hostel/useHostelStudents";
 import { useHostelRoomAllotment } from "../controllers/Hostel/useHostelRoomAllotment";
 import { useHostelStaff } from "../controllers/Hostel/useHostelStaff";
 import { useHostelVisitors } from "../controllers/Hostel/useHostelVisitors";
+import { useHostelAttendance } from "../controllers/Hostel/useHostelAttendance";
+import { useHostelMovement } from "../controllers/Hostel/useHostelMovement";
+import { useHostelLeaveRequests } from "../controllers/Hostel/useHostelLeaveRequests";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -349,6 +352,92 @@ function AdminDashboard() {
     deleteVisitor,
   } = useHostelVisitors({ activeSection, fetchWithAuth, showToast });
 
+  // ================= ATTENDANCE SECTION HOOK =================
+  const {
+    attendanceDate,
+    changeAttendanceDate,
+
+    attendance,
+    attendanceStats,
+    attendanceLoading,
+    attendanceFilters,
+
+    loadAttendance,
+    updateAttendanceFilter,
+    applyAttendanceFilters,
+    resetAttendanceFilters,
+
+    markingStudentId,
+    markAttendance,
+  } = useHostelAttendance({ activeSection, fetchWithAuth, showToast });
+
+  // ================= CHECK-IN / CHECK-OUT SECTION HOOK =================
+  const {
+    movements,
+    movementStats,
+    movementsLoading,
+    movementFilters,
+
+    loadMovements,
+    updateMovementFilter,
+    applyMovementFilters,
+    resetMovementFilters,
+
+    checkoutModalOpen,
+    checkoutForm,
+    checkoutSaving,
+    openCheckoutModal,
+    closeCheckoutModal,
+    updateCheckoutForm,
+
+    studentSearch: movementStudentSearch,
+    setStudentSearch: setMovementStudentSearch,
+    studentResults: movementStudentResults,
+    studentSearchLoading: movementStudentSearchLoading,
+    selectedStudent: selectedMovementStudent,
+    searchStudentsForMovement,
+    selectMovementStudent,
+    saveCheckout,
+
+    checkingInId,
+    checkInMovement,
+  } = useHostelMovement({ activeSection, fetchWithAuth, showToast });
+
+  // ================= LEAVE REQUESTS SECTION HOOK =================
+  const {
+    leaveRequests,
+    leaveStats,
+    leaveLoading,
+    leaveFilters,
+
+    loadLeaveRequests,
+    updateLeaveFilter,
+    applyLeaveFilters,
+    resetLeaveFilters,
+
+    leaveModalOpen,
+    leaveForm,
+    leaveSaving,
+    openLeaveModal,
+    closeLeaveModal,
+    updateLeaveForm,
+
+    studentSearch: leaveStudentSearch,
+    setStudentSearch: setLeaveStudentSearch,
+    studentResults: leaveStudentResults,
+    studentSearchLoading: leaveStudentSearchLoading,
+    selectedStudent: selectedLeaveStudent,
+    searchStudentsForLeave,
+    selectLeaveStudent,
+    saveLeaveRequest,
+
+    actioningId: leaveActioningId,
+    approveLeave,
+    rejectLeave,
+    markLeaveReturned,
+    deleteLeave,
+  } = useHostelLeaveRequests({ activeSection, fetchWithAuth, showToast });
+
   useEffect(() => {
     if (window.innerWidth >= 768) {
       setSidebarOpen(true);
@@ -404,17 +493,13 @@ function AdminDashboard() {
         {/* ========================= HOSTEL ADMIN SIDEBAR NAV ========================= */}
         <nav className="h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-4 space-y-2 text-sm">
           {[
-            // =========================================================
             // MAIN
-            // =========================================================
             {
               title: "MAIN",
               items: [["dashboard", "bi-grid", "Dashboard"]],
             },
 
-            // =========================================================
             // HOSTEL SETUP / INFRASTRUCTURE
-            // =========================================================
             {
               title: "HOSTEL SETUP",
               items: [
@@ -424,9 +509,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // RESIDENTS
-            // =========================================================
             {
               title: "HOSTEL RESIDENTS",
               items: [
@@ -437,9 +520,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // DAILY OPERATIONS
-            // =========================================================
             {
               title: "DAILY OPERATIONS",
               items: [
@@ -449,9 +530,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // HOSTEL FEES
-            // =========================================================
             {
               title: "HOSTEL FEES",
               items: [
@@ -461,9 +540,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // MESS
-            // =========================================================
             {
               title: "MESS MANAGEMENT",
               items: [
@@ -472,9 +549,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // COMPLAINTS / MAINTENANCE
-            // =========================================================
             {
               title: "HOSTEL SUPPORT",
               items: [
@@ -483,9 +558,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // COMMUNICATION
-            // =========================================================
             {
               title: "COMMUNICATION",
               items: [
@@ -494,17 +567,13 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // REPORTS
-            // =========================================================
             {
               title: "REPORTS",
               items: [["reports", "bi-bar-chart-line", "Reports & Analytics"]],
             },
 
-            // =========================================================
             // SYSTEM
-            // =========================================================
             {
               title: "SYSTEM",
               items: [
@@ -533,7 +602,7 @@ function AdminDashboard() {
                       closeSidebarOnMobile();
                     }}
                     className={`relative flex w-full items-center rounded-xl py-3
-                transition-all duration-300 ease-in-out
+                      transition-all duration-300 ease-in-out
                 ${
                   sidebarExpanded
                     ? "gap-3 px-4 justify-start"
@@ -4473,7 +4542,15 @@ function AdminDashboard() {
                             : "hover:bg-gray-50 dark:hover:bg-slate-700/50"
                         }`}
                       >
-                        <span>{student.name}</span>
+                        <span>
+                          {student.name}
+                          {student.is_hostel_resident &&
+                            student.room_number && (
+                              <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-500/10 dark:text-green-300">
+                                Room {student.room_number}
+                              </span>
+                            )}
+                        </span>
                         <span className="text-xs text-gray-400">
                           {student.student_code}
                         </span>
@@ -4499,6 +4576,1335 @@ function AdminDashboard() {
                   className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {visitorSaving ? "Saving…" : "Log Visitor"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* <!-- =========================== ATTENDANCE SECTION =========================== --> */}
+        {activeSection === "attendance" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Hostel Attendance
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Track daily student attendance, hostel presence and
+                    absentees
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    value={attendanceDate}
+                    onChange={(e) => changeAttendanceDate(e.target.value)}
+                    className="rounded-lg border-0 bg-white/20 px-3 py-2 text-sm text-white outline-none placeholder:text-white/70 focus:ring-2 focus:ring-white/40 [color-scheme:dark]"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => loadAttendance()}
+                    disabled={attendanceLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        attendanceLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+              {[
+                {
+                  label: "Total Residents",
+                  value: attendanceStats.total,
+                  icon: "bi-people",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Present",
+                  value: attendanceStats.present,
+                  icon: "bi-check-circle",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+                {
+                  label: "Absent",
+                  value: attendanceStats.absent,
+                  icon: "bi-x-circle",
+                  classes:
+                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                },
+                {
+                  label: "On Leave",
+                  value: attendanceStats.on_leave,
+                  icon: "bi-airplane",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "Late Entry",
+                  value: attendanceStats.late_entry,
+                  icon: "bi-clock-history",
+                  classes:
+                    "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {attendanceLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={attendanceFilters.search}
+                    onChange={(e) =>
+                      updateAttendanceFilter("search", e.target.value)
+                    }
+                    placeholder="Search student or room..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={attendanceFilters.status}
+                  onChange={(e) =>
+                    updateAttendanceFilter("status", e.target.value)
+                  }
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="Present">Present</option>
+                  <option value="Absent">Absent</option>
+                  <option value="On Leave">On Leave</option>
+                  <option value="Late Entry">Late Entry</option>
+                  <option value="Not Marked">Not Marked</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyAttendanceFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetAttendanceFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ATTENDANCE TABLE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Daily Attendance Records
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {attendanceDate} · {attendance.length} resident(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[880px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Room
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Block
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Check-In Time
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Attendance
+                      </th>
+                      <th className="px-6 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {attendanceLoading && attendance.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading attendance...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!attendanceLoading && attendance.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-14 text-center">
+                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            <i className="bi bi-calendar-check text-2xl" />
+                          </span>
+                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                            No residents found
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            No students match these filters, or no one is
+                            currently allocated a bed.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {attendance.map((row) => (
+                      <tr
+                        key={row.student_id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+                              {(row.student_name || "?")
+                                .split(" ")
+                                .map((part) => part[0])
+                                .join("")
+                                .slice(0, 2)
+                                .toUpperCase()}
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium text-gray-900 dark:text-white">
+                                {row.student_name}
+                              </h4>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {row.student_code}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          {row.room_number || "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {row.block_name || "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {row.check_in_time
+                            ? new Date(row.check_in_time).toLocaleTimeString()
+                            : "—"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              row.status === "Present"
+                                ? "bg-green-100 text-green-700"
+                                : row.status === "Absent"
+                                  ? "bg-red-100 text-red-700"
+                                  : row.status === "On Leave"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : row.status === "Late Entry"
+                                      ? "bg-purple-100 text-purple-700"
+                                      : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-3 text-base">
+                            <button
+                              type="button"
+                              onClick={() => markAttendance(row, "Present")}
+                              disabled={
+                                !canWriteHostel ||
+                                markingStudentId === row.student_id
+                              }
+                              title="Mark Present"
+                              className="text-green-600 hover:text-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-check-circle" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => markAttendance(row, "Absent")}
+                              disabled={
+                                !canWriteHostel ||
+                                markingStudentId === row.student_id
+                              }
+                              title="Mark Absent"
+                              className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-x-circle" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => markAttendance(row, "On Leave")}
+                              disabled={
+                                !canWriteHostel ||
+                                markingStudentId === row.student_id
+                              }
+                              title="Mark On Leave"
+                              className="text-amber-600 hover:text-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-airplane" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* <!-- =========================== CHECK-IN / CHECK-OUT SECTION =========================== --> */}
+        {activeSection === "checkin-checkout" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Check-In / Check-Out Management
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Monitor hostel entries, exits, late returns and movement
+                    records
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => loadMovements()}
+                    disabled={movementsLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        movementsLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openCheckoutModal()}
+                    disabled={!canWriteHostel}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i className="bi bi-box-arrow-right" />
+                    New Check-Out
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Inside Hostel",
+                  value: movementStats.inside,
+                  icon: "bi-house-check",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+                {
+                  label: "Checked Out",
+                  value: movementStats.checked_out,
+                  icon: "bi-box-arrow-right",
+                  classes:
+                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                },
+                {
+                  label: "Late Entries",
+                  value: movementStats.late_entries,
+                  icon: "bi-clock-history",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "Returned",
+                  value: movementStats.returned,
+                  icon: "bi-box-arrow-in-right",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {movementsLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={movementFilters.search}
+                    onChange={(e) =>
+                      updateMovementFilter("search", e.target.value)
+                    }
+                    placeholder="Search student, room or ID..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={movementFilters.status}
+                  onChange={(e) =>
+                    updateMovementFilter("status", e.target.value)
+                  }
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="Outside Hostel">Outside Hostel</option>
+                  <option value="Returned">Returned</option>
+                  <option value="Late Entry">Late Entry</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyMovementFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetMovementFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* CHECK-IN / OUT TABLE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Student Movement Records
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {movements.length} record(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[960px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Room
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Block
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Check-Out
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Expected Return
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Check-In
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {movementsLoading && movements.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading movement records...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!movementsLoading && movements.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-14 text-center">
+                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            <i className="bi bi-box-arrow-in-right text-2xl" />
+                          </span>
+                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                            No movement records found
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            No records match these filters.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {movements.map((movement) => (
+                      <tr
+                        key={movement.id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+                              {(movement.student_name || "?")
+                                .split(" ")
+                                .map((part) => part[0])
+                                .join("")
+                                .slice(0, 2)
+                                .toUpperCase()}
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium text-gray-900 dark:text-white">
+                                {movement.student_name}
+                              </h4>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {movement.student_code}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          {movement.room_number || "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {movement.block_name || "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {movement.check_out_time
+                            ? new Date(movement.check_out_time).toLocaleString()
+                            : "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {movement.expected_return_time
+                            ? new Date(
+                                movement.expected_return_time,
+                              ).toLocaleString()
+                            : "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {movement.check_in_time
+                            ? new Date(movement.check_in_time).toLocaleString()
+                            : "—"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              movement.status === "Returned"
+                                ? "bg-green-100 text-green-700"
+                                : movement.status === "Late Entry"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {movement.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-3 text-base">
+                            {movement.status === "Outside Hostel" && (
+                              <button
+                                type="button"
+                                onClick={() => checkInMovement(movement)}
+                                disabled={
+                                  !canWriteHostel ||
+                                  checkingInId === movement.id
+                                }
+                                title="Check in"
+                                className="text-green-600 hover:text-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <i className="bi bi-box-arrow-in-right" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* LATE ENTRY ALERT */}
+            {movementStats.late_entries > 0 && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                    <i className="bi bi-exclamation-triangle" />
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-amber-800 dark:text-amber-300">
+                      Late Entry Alert
+                    </h3>
+
+                    <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+                      {movementStats.late_entries} student(s) entered the hostel
+                      after their expected return time. Review the records
+                      above.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* NEW CHECK-OUT MODAL */}
+        {checkoutModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
+                New Check-Out
+              </h2>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                    Student
+                  </label>
+
+                  <div className="flex gap-2">
+                    <input
+                      value={movementStudentSearch}
+                      onChange={(e) => setMovementStudentSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          searchStudentsForMovement(movementStudentSearch);
+                        }
+                      }}
+                      placeholder="Search student by name..."
+                      className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        searchStudentsForMovement(movementStudentSearch)
+                      }
+                      className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                    >
+                      Search
+                    </button>
+                  </div>
+
+                  {selectedMovementStudent && (
+                    <p className="mt-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                      Selected: {selectedMovementStudent.name} (
+                      {selectedMovementStudent.student_code})
+                    </p>
+                  )}
+
+                  <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-gray-100 dark:border-slate-700 divide-y dark:divide-slate-700">
+                    {movementStudentSearchLoading && (
+                      <p className="py-4 text-center text-xs text-gray-400">
+                        Searching...
+                      </p>
+                    )}
+
+                    {!movementStudentSearchLoading &&
+                      movementStudentResults.length === 0 && (
+                        <p className="py-4 text-center text-xs text-gray-400">
+                          Search for a student to select them.
+                        </p>
+                      )}
+
+                    {movementStudentResults.map((student) => (
+                      <button
+                        type="button"
+                        key={student.id}
+                        onClick={() => selectMovementStudent(student)}
+                        className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
+                          selectedMovementStudent?.id === student.id
+                            ? "bg-indigo-50 dark:bg-indigo-500/20"
+                            : "hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                        }`}
+                      >
+                        <span>{student.name}</span>
+                        <span className="text-xs text-gray-400">
+                          {student.student_code}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                    Expected Return Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={checkoutForm.expected_return_time}
+                    onChange={(e) =>
+                      updateCheckoutForm("expected_return_time", e.target.value)
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <input
+                  value={checkoutForm.purpose}
+                  onChange={(e) =>
+                    updateCheckoutForm("purpose", e.target.value)
+                  }
+                  placeholder="Purpose (optional)"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeCheckoutModal}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={saveCheckout}
+                  disabled={checkoutSaving}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {checkoutSaving ? "Saving…" : "Record Check-Out"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* <!-- =========================== LEAVE REQUEST SECTION =========================== --> */}
+        {activeSection === "leave-requests" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Leave Request Management
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Manage student leave applications, approvals and return
+                    tracking
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => loadLeaveRequests()}
+                    disabled={leaveLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        leaveLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openLeaveModal()}
+                    disabled={!canWriteHostel}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i className="bi bi-plus-circle" />
+                    New Leave Request
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total Requests",
+                  value: leaveStats.total,
+                  icon: "bi-journal-text",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Pending Approval",
+                  value: leaveStats.pending,
+                  icon: "bi-hourglass-split",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "Approved",
+                  value: leaveStats.approved,
+                  icon: "bi-check-circle",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+                {
+                  label: "Rejected",
+                  value: leaveStats.rejected,
+                  icon: "bi-x-circle",
+                  classes:
+                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {leaveLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={leaveFilters.search}
+                    onChange={(e) =>
+                      updateLeaveFilter("search", e.target.value)
+                    }
+                    placeholder="Search student or leave ID..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={leaveFilters.status}
+                  onChange={(e) => updateLeaveFilter("status", e.target.value)}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Rejected">Rejected</option>
+                  <option value="Returned">Returned</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyLeaveFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetLeaveFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* LEAVE REQUEST TABLE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Leave Applications
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {leaveRequests.length} request(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[960px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Room
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Leave Type
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        From
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">To</th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Reason
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {leaveLoading && leaveRequests.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading leave requests...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!leaveLoading && leaveRequests.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-14 text-center">
+                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            <i className="bi bi-journal-check text-2xl" />
+                          </span>
+                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                            No leave requests found
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            No records match these filters.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {leaveRequests.map((leave) => (
+                      <tr
+                        key={leave.id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+                              {(leave.student_name || "?")
+                                .split(" ")
+                                .map((part) => part[0])
+                                .join("")
+                                .slice(0, 2)
+                                .toUpperCase()}
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium text-gray-900 dark:text-white">
+                                {leave.student_name}
+                              </h4>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {leave.student_code}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          {leave.block_name && leave.room_number
+                            ? `${leave.block_name}-${leave.room_number}`
+                            : "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {leave.leave_type}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {leave.from_date}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {leave.to_date}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {leave.reason || "—"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              leave.status === "Approved"
+                                ? "bg-green-100 text-green-700"
+                                : leave.status === "Pending"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : leave.status === "Rejected"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {leave.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-3 text-base">
+                            {leave.status === "Pending" && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => approveLeave(leave)}
+                                  disabled={
+                                    !canWriteHostel ||
+                                    leaveActioningId === leave.id
+                                  }
+                                  title="Approve"
+                                  className="text-green-600 hover:text-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  <i className="bi bi-check-circle" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => rejectLeave(leave)}
+                                  disabled={
+                                    !canWriteHostel ||
+                                    leaveActioningId === leave.id
+                                  }
+                                  title="Reject"
+                                  className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  <i className="bi bi-x-circle" />
+                                </button>
+                              </>
+                            )}
+
+                            {leave.status === "Approved" && (
+                              <button
+                                type="button"
+                                onClick={() => markLeaveReturned(leave)}
+                                disabled={
+                                  !canWriteHostel ||
+                                  leaveActioningId === leave.id
+                                }
+                                title="Mark returned"
+                                className="text-indigo-600 hover:text-indigo-800 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <i className="bi bi-box-arrow-in-right" />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => deleteLeave(leave)}
+                              disabled={!canWriteHostel}
+                              title="Delete"
+                              className="text-gray-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-trash" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* PENDING ALERT */}
+            {leaveStats.pending > 0 && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                    <i className="bi bi-clock-history" />
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-amber-800 dark:text-amber-300">
+                      Pending Leave Requests
+                    </h3>
+
+                    <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+                      {leaveStats.pending} leave request(s) are waiting for
+                      approval. Review pending applications to avoid delays.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* NEW LEAVE REQUEST MODAL */}
+        {leaveModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
+                New Leave Request
+              </h2>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                    Student
+                  </label>
+
+                  <div className="flex gap-2">
+                    <input
+                      value={leaveStudentSearch}
+                      onChange={(e) => setLeaveStudentSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          searchStudentsForLeave(leaveStudentSearch);
+                        }
+                      }}
+                      placeholder="Search student by name..."
+                      className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => searchStudentsForLeave(leaveStudentSearch)}
+                      className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                    >
+                      Search
+                    </button>
+                  </div>
+
+                  {selectedLeaveStudent && (
+                    <p className="mt-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                      Selected: {selectedLeaveStudent.name} (
+                      {selectedLeaveStudent.student_code})
+                    </p>
+                  )}
+
+                  <div className="mt-2 max-h-40 overflow-y-auto rounded-xl border border-gray-100 dark:border-slate-700 divide-y dark:divide-slate-700">
+                    {leaveStudentSearchLoading && (
+                      <p className="py-4 text-center text-xs text-gray-400">
+                        Searching...
+                      </p>
+                    )}
+
+                    {!leaveStudentSearchLoading &&
+                      leaveStudentResults.length === 0 && (
+                        <p className="py-4 text-center text-xs text-gray-400">
+                          Search for a student to select them.
+                        </p>
+                      )}
+
+                    {leaveStudentResults.map((student) => (
+                      <button
+                        type="button"
+                        key={student.id}
+                        onClick={() => selectLeaveStudent(student)}
+                        className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
+                          selectedLeaveStudent?.id === student.id
+                            ? "bg-indigo-50 dark:bg-indigo-500/20"
+                            : "hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                        }`}
+                      >
+                        <span>{student.name}</span>
+                        <span className="text-xs text-gray-400">
+                          {student.student_code}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <select
+                  value={leaveForm.leave_type}
+                  onChange={(e) =>
+                    updateLeaveForm("leave_type", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="Weekend Leave">Weekend Leave</option>
+                  <option value="Medical Leave">Medical Leave</option>
+                  <option value="Emergency Leave">Emergency Leave</option>
+                  <option value="Other">Other</option>
+                </select>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={leaveForm.from_date}
+                      onChange={(e) =>
+                        updateLeaveForm("from_date", e.target.value)
+                      }
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={leaveForm.to_date}
+                      onChange={(e) =>
+                        updateLeaveForm("to_date", e.target.value)
+                      }
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <textarea
+                  value={leaveForm.reason}
+                  onChange={(e) => updateLeaveForm("reason", e.target.value)}
+                  placeholder="Reason (optional)"
+                  rows={3}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeLeaveModal}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={saveLeaveRequest}
+                  disabled={leaveSaving}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {leaveSaving ? "Submitting…" : "Submit Request"}
                 </button>
               </div>
             </div>

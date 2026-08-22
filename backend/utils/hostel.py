@@ -144,7 +144,9 @@ class Hostel(db.Model):
 class HostelBlock(db.Model):
     __tablename__ = "hostel_blocks"
     __table_args__ = (
-        db.UniqueConstraint("hostel_id", "block_name", name="uq_block_hostel_name"),
+        db.UniqueConstraint(
+            "hostel_id", "block_name", name="uq_block_hostel_name"
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -188,7 +190,9 @@ class HostelFloor(db.Model):
 
     __tablename__ = "hostel_floors"
     __table_args__ = (
-        db.UniqueConstraint("block_id", "floor_number", name="uq_floor_block_number"),
+        db.UniqueConstraint(
+            "block_id", "floor_number", name="uq_floor_block_number"
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -222,7 +226,9 @@ class HostelFloor(db.Model):
 class Room(db.Model):
     __tablename__ = "rooms"
     __table_args__ = (
-        db.UniqueConstraint("floor_id", "room_number", name="uq_room_floor_number"),
+        db.UniqueConstraint(
+            "floor_id", "room_number", name="uq_room_floor_number"
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -296,7 +302,9 @@ class Bed(db.Model):
 
     __tablename__ = "beds"
     __table_args__ = (
-        db.UniqueConstraint("room_id", "bed_number", name="uq_bed_room_number"),
+        db.UniqueConstraint(
+            "room_id", "bed_number", name="uq_bed_room_number"
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -525,6 +533,122 @@ class HostelVisitor(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class HostelAttendance(db.Model):
+    """NEW MODEL. One daily attendance record per resident student -
+    Present/Absent/On Leave/Late Entry. Upserted (one row per
+    student+date) rather than appended, so re-marking a student on the
+    same day updates the existing row instead of creating duplicates."""
+
+    __tablename__ = "hostel_attendance"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "student_id", "attendance_date", name="uq_attendance_student_date"
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    student_id = db.Column(
+        db.Integer,
+        db.ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    attendance_date = db.Column(db.Date, nullable=False, default=date.today)
+
+    status = db.Column(
+        db.Enum("Present", "Absent", "On Leave", "Late Entry"),
+        nullable=False,
+        default="Present",
+    )
+
+    check_in_time = db.Column(db.DateTime)
+    remarks = db.Column(db.String(255))
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class HostelMovement(db.Model):
+    """NEW MODEL. A single out-and-back movement log for a resident
+    student - when they left, when they were expected back, and when
+    they actually returned (if at all yet). Status is derived, not
+    stored, so it can never drift out of sync with the timestamps:
+    no check_in_time -> "Outside Hostel"; checked in after
+    expected_return_time -> "Late Entry"; otherwise -> "Returned"."""
+
+    __tablename__ = "hostel_movements"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    student_id = db.Column(
+        db.Integer,
+        db.ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    check_out_time = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow
+    )
+    expected_return_time = db.Column(db.DateTime)
+    check_in_time = db.Column(db.DateTime)
+
+    purpose = db.Column(db.String(255))
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def status(self):
+        if not self.check_in_time:
+            return "Outside Hostel"
+
+        if (
+            self.expected_return_time
+            and self.check_in_time > self.expected_return_time
+        ):
+            return "Late Entry"
+
+        return "Returned"
+
+
+class HostelLeaveRequest(db.Model):
+    """NEW MODEL. A student's leave application and its approval
+    workflow: Pending -> Approved/Rejected, and once an approved leave
+    ends, Returned once the student is confirmed back."""
+
+    __tablename__ = "hostel_leave_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    student_id = db.Column(
+        db.Integer,
+        db.ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    leave_type = db.Column(
+        db.Enum("Weekend Leave", "Medical Leave", "Emergency Leave", "Other"),
+        nullable=False,
+        default="Other",
+    )
+
+    from_date = db.Column(db.Date, nullable=False)
+    to_date = db.Column(db.Date, nullable=False)
+    reason = db.Column(db.String(255))
+
+    status = db.Column(
+        db.Enum("Pending", "Approved", "Rejected", "Returned"),
+        nullable=False,
+        default="Pending",
+    )
+
+    actual_return_date = db.Column(db.Date)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # ============================= HELPERS =============================
 def safe_full_name(first_name=None, middle_name=None, last_name=None):
     parts = [
@@ -534,6 +658,31 @@ def safe_full_name(first_name=None, middle_name=None, last_name=None):
     ]
 
     return " ".join(part.strip() for part in parts if part).strip()
+
+
+def get_student_room_info(student_id):
+    """
+    Shared lookup: a resident student's current active bed -> room ->
+    floor -> block, in one place instead of duplicated inline in every
+    serializer that needs "which room/block is this student in"
+    (visitors, attendance, movements, leave requests). Returns a dict
+    of Nones if the student has no active allocation.
+    """
+
+    allocation = HostelAllocation.query.filter_by(
+        student_id=student_id, is_active=True
+    ).first()
+
+    bed = allocation.bed if allocation else None
+    room = bed.room if bed else None
+    floor = room.floor if room else None
+    block = floor.block if floor else None
+
+    return {
+        "room_number": room.room_number if room else None,
+        "block_name": block.block_name if block else None,
+        "bed_number": bed.bed_number if bed else None,
+    }
 
 
 # ============================= RBAC (READ / WRITE) =============================
@@ -558,7 +707,9 @@ def authorize_hostel_admin(required_right="read"):
 
     role = (getattr(current_user, "role", "") or "").strip().lower()
 
-    admin_type = (getattr(current_user, "admin_type", "") or "").strip().lower()
+    admin_type = (
+        getattr(current_user, "admin_type", "") or ""
+    ).strip().lower()
 
     is_super_admin = role in {
         "super_admin",
@@ -617,7 +768,9 @@ def serialize_hostel(hostel, include_stats=False):
         "hostel_type": hostel.hostel_type,
         "address": hostel.address,
         "status": hostel.status,
-        "created_at": (hostel.created_at.isoformat() if hostel.created_at else None),
+        "created_at": (
+            hostel.created_at.isoformat() if hostel.created_at else None
+        ),
     }
 
     if include_stats:
@@ -631,8 +784,12 @@ def serialize_hostel(hostel, include_stats=False):
             "floors": len(floors),
             "rooms": len(rooms),
             "beds": len(beds),
-            "occupied_beds": sum(1 for bed in beds if bed.status == "Occupied"),
-            "available_beds": sum(1 for bed in beds if bed.status == "Vacant"),
+            "occupied_beds": sum(
+                1 for bed in beds if bed.status == "Occupied"
+            ),
+            "available_beds": sum(
+                1 for bed in beds if bed.status == "Vacant"
+            ),
         }
 
     return data
@@ -646,7 +803,9 @@ def serialize_block(block, include_floor_count=True):
         "block_name": block.block_name,
         "description": block.description,
         "status": block.status,
-        "created_at": (block.created_at.isoformat() if block.created_at else None),
+        "created_at": (
+            block.created_at.isoformat() if block.created_at else None
+        ),
     }
 
     if include_floor_count:
@@ -669,7 +828,9 @@ def serialize_floor(floor, include_room_count=True):
         "floor_number": floor.floor_number,
         "floor_name": floor.floor_name,
         "status": floor.status,
-        "created_at": (floor.created_at.isoformat() if floor.created_at else None),
+        "created_at": (
+            floor.created_at.isoformat() if floor.created_at else None
+        ),
     }
 
     if include_room_count:
@@ -703,7 +864,9 @@ def serialize_bed(bed, include_occupant=True):
                 data["occupant"] = {
                     "allocation_id": allocation.id,
                     "student_id": student.id,
-                    "student_code": getattr(student, "student_id", student.id),
+                    "student_code": getattr(
+                        student, "student_id", student.id
+                    ),
                     "name": safe_full_name(
                         student.first_name,
                         getattr(student, "middle_name", None),
@@ -727,10 +890,14 @@ def serialize_room(room, include_beds=False):
         "floor_name": room.floor.floor_name if room.floor else None,
         "block_id": (room.floor.block_id if room.floor else None),
         "block_name": (
-            room.floor.block.block_name if room.floor and room.floor.block else None
+            room.floor.block.block_name
+            if room.floor and room.floor.block
+            else None
         ),
         "hostel_id": (
-            room.floor.block.hostel_id if room.floor and room.floor.block else None
+            room.floor.block.hostel_id
+            if room.floor and room.floor.block
+            else None
         ),
         "hostel_name": (
             room.floor.block.hostel.hostel_name
@@ -747,7 +914,9 @@ def serialize_room(room, include_beds=False):
         "capacity": room.capacity,
         "occupied_count": room.occupied_count,
         "available_count": room.available_count,
-        "created_at": (room.created_at.isoformat() if room.created_at else None),
+        "created_at": (
+            room.created_at.isoformat() if room.created_at else None
+        ),
     }
 
     room_wardens = RoomWarden.query.filter_by(room_id=room.id).all()
@@ -858,7 +1027,9 @@ class StudentHostelDetails(MethodView):
 
             if room:
                 roommates_query = (
-                    HostelAllocation.query.join(Bed, HostelAllocation.bed_id == Bed.id)
+                    HostelAllocation.query.join(
+                        Bed, HostelAllocation.bed_id == Bed.id
+                    )
                     .filter(
                         Bed.room_id == room.id,
                         HostelAllocation.student_id != student.id,
@@ -1056,7 +1227,9 @@ class CreateHostelComplaint(MethodView):
             complaint = HostelComplaint(
                 student_id=student_id,
                 room_id=(
-                    allocation.bed.room_id if allocation and allocation.bed else None
+                    allocation.bed.room_id
+                    if allocation and allocation.bed
+                    else None
                 ),
                 issue=issue,
             )
@@ -1185,9 +1358,7 @@ class HostelListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1256,9 +1427,7 @@ class HostelListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1279,10 +1448,7 @@ class HostelDetailAPI(MethodView):
 
         return (
             jsonify(
-                {
-                    "success": True,
-                    "hostel": serialize_hostel(hostel, include_stats=True),
-                }
+                {"success": True, "hostel": serialize_hostel(hostel, include_stats=True)}
             ),
             200,
         )
@@ -1363,9 +1529,7 @@ class HostelDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1409,9 +1573,7 @@ class HostelDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1451,9 +1613,7 @@ class HostelBlockListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1526,9 +1686,7 @@ class HostelBlockListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1615,9 +1773,7 @@ class HostelBlockDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1661,9 +1817,7 @@ class HostelBlockDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1708,9 +1862,7 @@ class HostelFloorListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1785,9 +1937,7 @@ class HostelFloorListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1882,9 +2032,7 @@ class HostelFloorDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1928,9 +2076,7 @@ class HostelFloorDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -1954,20 +2100,20 @@ class HostelRoomListAPI(MethodView):
             room_type = _clean_str(request.args.get("room_type"))
 
             query = Room.query.options(
-                joinedload(Room.floor)
-                .joinedload(HostelFloor.block)
-                .joinedload(HostelBlock.hostel)
+                joinedload(Room.floor).joinedload(HostelFloor.block).joinedload(
+                    HostelBlock.hostel
+                )
             )
 
             if floor_id:
                 query = query.filter(Room.floor_id == floor_id)
             elif block_id:
-                query = query.join(HostelFloor).filter(HostelFloor.block_id == block_id)
+                query = query.join(HostelFloor).filter(
+                    HostelFloor.block_id == block_id
+                )
             elif hostel_id:
-                query = (
-                    query.join(HostelFloor)
-                    .join(HostelBlock)
-                    .filter(HostelBlock.hostel_id == hostel_id)
+                query = query.join(HostelFloor).join(HostelBlock).filter(
+                    HostelBlock.hostel_id == hostel_id
                 )
 
             if search:
@@ -1996,9 +2142,7 @@ class HostelRoomListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2099,9 +2243,7 @@ class HostelRoomListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2121,7 +2263,9 @@ class HostelRoomDetailAPI(MethodView):
             return jsonify({"success": False, "error": "Room not found"}), 404
 
         return (
-            jsonify({"success": True, "room": serialize_room(room, include_beds=True)}),
+            jsonify(
+                {"success": True, "room": serialize_room(room, include_beds=True)}
+            ),
             200,
         )
 
@@ -2191,9 +2335,7 @@ class HostelRoomDetailAPI(MethodView):
 
             if data.get("floor_id") is not None:
                 new_floor_id = _parse_int(data.get("floor_id"))
-                new_floor = (
-                    HostelFloor.query.get(new_floor_id) if new_floor_id else None
-                )
+                new_floor = HostelFloor.query.get(new_floor_id) if new_floor_id else None
 
                 if not new_floor:
                     return jsonify({"success": False, "error": "Floor not found"}), 404
@@ -2218,9 +2360,7 @@ class HostelRoomDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2264,9 +2404,7 @@ class HostelRoomDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2294,10 +2432,8 @@ class HostelBedListAPI(MethodView):
             elif floor_id:
                 query = query.join(Room).filter(Room.floor_id == floor_id)
             elif block_id:
-                query = (
-                    query.join(Room)
-                    .join(HostelFloor)
-                    .filter(HostelFloor.block_id == block_id)
+                query = query.join(Room).join(HostelFloor).filter(
+                    HostelFloor.block_id == block_id
                 )
 
             if status:
@@ -2317,9 +2453,7 @@ class HostelBedListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2397,9 +2531,7 @@ class HostelBedListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2521,9 +2653,7 @@ class HostelBedDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2564,9 +2694,7 @@ class HostelBedDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2592,10 +2720,7 @@ class HostelBedAllocateAPI(MethodView):
             student_id = _parse_int(data.get("student_id"))
 
             if not student_id:
-                return (
-                    jsonify({"success": False, "error": "student_id is required"}),
-                    400,
-                )
+                return jsonify({"success": False, "error": "student_id is required"}), 400
 
             student = Student.query.get(student_id)
 
@@ -2661,9 +2786,7 @@ class HostelBedAllocateAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2728,9 +2851,7 @@ class HostelBedVacateAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2789,9 +2910,7 @@ class HostelStructureOverviewAPI(MethodView):
                                 1 for bed in beds if bed.status == "Occupied"
                             )
 
-                            rooms_payload.append(
-                                serialize_room(room, include_beds=True)
-                            )
+                            rooms_payload.append(serialize_room(room, include_beds=True))
 
                         floors_payload.append(
                             {
@@ -2838,9 +2957,7 @@ class HostelStructureOverviewAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -2873,11 +2990,9 @@ class HostelUnallocatedStudentsAPI(MethodView):
                     db.or_(
                         Student.first_name.ilike(like),
                         Student.last_name.ilike(like),
-                        (
-                            Student.student_id.ilike(like)
-                            if hasattr(Student, "student_id")
-                            else False
-                        ),
+                        Student.student_id.ilike(like)
+                        if hasattr(Student, "student_id")
+                        else False,
                     )
                 )
 
@@ -2905,11 +3020,93 @@ class HostelUnallocatedStudentsAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
+
+
+class HostelStudentSearchAPI(MethodView):
+    """
+    Search every student (allocated or not), for features where any
+    student is a valid target - e.g. the Visitors section, where a
+    visitor can be there to see a student who already lives in the
+    hostel. Deliberately does NOT exclude allocated students the way
+    HostelUnallocatedStudentsAPI does - that endpoint is specifically
+    for the Allocate-a-bed flow, where an already-housed student isn't
+    a valid choice. Reusing it here was the bug: a student with an
+    active bed (e.g. already checked in) would silently never show up
+    in a visitor search.
+    """
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            search = _clean_str(request.args.get("search"))
+
+            query = Student.query
+
+            if search:
+                like = f"%{search}%"
+
+                query = query.filter(
+                    db.or_(
+                        Student.first_name.ilike(like),
+                        Student.last_name.ilike(like),
+                        Student.student_id.ilike(like)
+                        if hasattr(Student, "student_id")
+                        else False,
+                    )
+                )
+
+            students = query.order_by(Student.first_name.asc()).limit(25).all()
+
+            active_allocations = {
+                row.student_id: row
+                for row in HostelAllocation.query.filter(
+                    HostelAllocation.student_id.in_([s.id for s in students]),
+                    HostelAllocation.is_active == True,
+                ).all()
+            }
+
+            results = []
+
+            for student in students:
+                allocation = active_allocations.get(student.id)
+                room = allocation.bed.room if allocation and allocation.bed else None
+
+                results.append(
+                    {
+                        "id": student.id,
+                        "student_code": getattr(student, "student_id", student.id),
+                        "name": safe_full_name(
+                            student.first_name,
+                            getattr(student, "middle_name", None),
+                            student.last_name,
+                        ),
+                        "class_name": get_student_academic_details(student)[
+                            "class_name"
+                        ],
+                        "room_number": room.room_number if room else None,
+                        "is_hostel_resident": allocation is not None,
+                    }
+                )
+
+            return jsonify({"success": True, "students": results}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while searching students")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
 
 
 # ============================= ALLOCATIONS (STUDENTS / ROOM ALLOTMENT) =============================
@@ -2964,14 +3161,20 @@ def serialize_allocation(allocation):
         "hostel_id": hostel.id if hostel else None,
         "hostel_name": hostel.hostel_name if hostel else None,
         "check_in_date": (
-            allocation.check_in_date.isoformat() if allocation.check_in_date else None
+            allocation.check_in_date.isoformat()
+            if allocation.check_in_date
+            else None
         ),
         "check_out_date": (
-            allocation.check_out_date.isoformat() if allocation.check_out_date else None
+            allocation.check_out_date.isoformat()
+            if allocation.check_out_date
+            else None
         ),
         "is_active": allocation.is_active,
         "fee_status": fee.status if fee else None,
-        "fee_amount": (float(fee.amount) if fee and fee.amount is not None else None),
+        "fee_amount": (
+            float(fee.amount) if fee and fee.amount is not None else None
+        ),
     }
 
 
@@ -2999,12 +3202,11 @@ class HostelAllocationListAPI(MethodView):
             # "active" (default) | "checked_out" | "all"
             status = _clean_str(request.args.get("status")) or "active"
 
-            query = (
-                HostelAllocation.query.join(Bed, HostelAllocation.bed_id == Bed.id)
-                .join(Room, Bed.room_id == Room.id)
-                .join(HostelFloor, Room.floor_id == HostelFloor.id)
-                .join(HostelBlock, HostelFloor.block_id == HostelBlock.id)
-            )
+            query = HostelAllocation.query.join(
+                Bed, HostelAllocation.bed_id == Bed.id
+            ).join(Room, Bed.room_id == Room.id).join(
+                HostelFloor, Room.floor_id == HostelFloor.id
+            ).join(HostelBlock, HostelFloor.block_id == HostelBlock.id)
 
             if status == "active":
                 query = query.filter(HostelAllocation.is_active == True)
@@ -3051,9 +3253,7 @@ class HostelAllocationListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3075,12 +3275,7 @@ class HostelAllocationCheckoutAPI(MethodView):
 
         if not allocation.is_active:
             return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "This allocation is already checked out",
-                    }
-                ),
+                jsonify({"success": False, "error": "This allocation is already checked out"}),
                 409,
             )
 
@@ -3115,9 +3310,7 @@ class HostelAllocationCheckoutAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3154,10 +3347,7 @@ class HostelAllocationTransferAPI(MethodView):
             new_bed_id = _parse_int(data.get("new_bed_id"))
 
             if not new_bed_id:
-                return (
-                    jsonify({"success": False, "error": "new_bed_id is required"}),
-                    400,
-                )
+                return jsonify({"success": False, "error": "new_bed_id is required"}), 400
 
             new_bed = Bed.query.get(new_bed_id)
 
@@ -3214,9 +3404,7 @@ class HostelAllocationTransferAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3281,7 +3469,9 @@ class HostelStaffListAPI(MethodView):
             stats = {
                 "total": len(rows),
                 "wardens": sum(1 for row in rows if row["role"] == "Warden"),
-                "security": sum(1 for row in rows if row["role"] == "Security Guard"),
+                "security": sum(
+                    1 for row in rows if row["role"] == "Security Guard"
+                ),
                 "support": sum(
                     1
                     for row in rows
@@ -3296,9 +3486,7 @@ class HostelStaffListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3315,10 +3503,7 @@ class HostelStaffListAPI(MethodView):
             first_name = _clean_str(data.get("first_name"))
 
             if not first_name:
-                return (
-                    jsonify({"success": False, "error": "First name is required"}),
-                    400,
-                )
+                return jsonify({"success": False, "error": "First name is required"}), 400
 
             role = _clean_str(data.get("role")) or "Other"
 
@@ -3378,9 +3563,7 @@ class HostelStaffListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3496,9 +3679,7 @@ class HostelStaffDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3519,9 +3700,7 @@ class HostelStaffDetailAPI(MethodView):
             db.session.commit()
 
             return (
-                jsonify(
-                    {"success": True, "message": "Staff member removed successfully"}
-                ),
+                jsonify({"success": True, "message": "Staff member removed successfully"}),
                 200,
             )
 
@@ -3530,9 +3709,7 @@ class HostelStaffDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3617,9 +3794,7 @@ class HostelVisitorListAPI(MethodView):
                 # directly on the visitor row.
                 block = HostelBlock.query.get(block_id)
                 if block:
-                    rows = [
-                        row for row in rows if row["block_name"] == block.block_name
-                    ]
+                    rows = [row for row in rows if row["block_name"] == block.block_name]
 
             if search:
                 needle = search.lower()
@@ -3658,9 +3833,7 @@ class HostelVisitorListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3731,9 +3904,7 @@ class HostelVisitorListAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3771,9 +3942,7 @@ class HostelVisitorDetailAPI(MethodView):
             db.session.commit()
 
             return (
-                jsonify(
-                    {"success": True, "message": "Visitor record deleted successfully"}
-                ),
+                jsonify({"success": True, "message": "Visitor record deleted successfully"}),
                 200,
             )
 
@@ -3782,9 +3951,7 @@ class HostelVisitorDetailAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3807,10 +3974,7 @@ class HostelVisitorApproveAPI(MethodView):
         if visitor.status != "Pending":
             return (
                 jsonify(
-                    {
-                        "success": False,
-                        "error": f"This visit is already {visitor.status}",
-                    }
+                    {"success": False, "error": f"This visit is already {visitor.status}"}
                 ),
                 409,
             )
@@ -3837,9 +4001,7 @@ class HostelVisitorApproveAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3862,10 +4024,7 @@ class HostelVisitorRejectAPI(MethodView):
         if visitor.status != "Pending":
             return (
                 jsonify(
-                    {
-                        "success": False,
-                        "error": f"This visit is already {visitor.status}",
-                    }
+                    {"success": False, "error": f"This visit is already {visitor.status}"}
                 ),
                 409,
             )
@@ -3891,9 +4050,7 @@ class HostelVisitorRejectAPI(MethodView):
             db.session.rollback()
 
             return (
-                jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
-                ),
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )
 
@@ -3943,8 +4100,765 @@ class HostelVisitorCheckoutAPI(MethodView):
             db.session.rollback()
 
             return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+# ============================= ATTENDANCE =============================
+def serialize_attendance_row(student, record):
+    room_info = get_student_room_info(student.id)
+
+    return {
+        "attendance_id": record.id if record else None,
+        "student_id": student.id,
+        "student_code": getattr(student, "student_id", student.id),
+        "student_name": safe_full_name(
+            student.first_name,
+            getattr(student, "middle_name", None),
+            student.last_name,
+        ),
+        "room_number": room_info["room_number"],
+        "block_name": room_info["block_name"],
+        "attendance_date": (
+            record.attendance_date.isoformat()
+            if record and record.attendance_date
+            else None
+        ),
+        "status": record.status if record else "Not Marked",
+        "check_in_time": (
+            record.check_in_time.isoformat()
+            if record and record.check_in_time
+            else None
+        ),
+        "remarks": record.remarks if record else None,
+    }
+
+
+class HostelAttendanceListAPI(MethodView):
+    """
+    Every currently-resident student for the given date (default
+    today), left-joined with their attendance record for that date if
+    one has been marked yet. This is a roster, not a plain attendance
+    table - a student who hasn't been marked yet still shows up as
+    "Not Marked" instead of silently disappearing.
+    """
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            attendance_date = _parse_date(request.args.get("date")) or date.today()
+            search = _clean_str(request.args.get("search"))
+            block_id = _parse_int(request.args.get("block_id"))
+            status_filter = _clean_str(request.args.get("status"))
+
+            allocation_query = HostelAllocation.query.filter_by(is_active=True)
+
+            if block_id:
+                allocation_query = (
+                    allocation_query.join(Bed, HostelAllocation.bed_id == Bed.id)
+                    .join(Room, Bed.room_id == Room.id)
+                    .join(HostelFloor, Room.floor_id == HostelFloor.id)
+                    .filter(HostelFloor.block_id == block_id)
+                )
+
+            resident_student_ids = [
+                row.student_id for row in allocation_query.all()
+            ]
+
+            students = (
+                Student.query.filter(Student.id.in_(resident_student_ids))
+                .order_by(Student.first_name.asc())
+                .all()
+                if resident_student_ids
+                else []
+            )
+
+            existing_records = {
+                record.student_id: record
+                for record in HostelAttendance.query.filter(
+                    HostelAttendance.attendance_date == attendance_date,
+                    HostelAttendance.student_id.in_(resident_student_ids),
+                ).all()
+            } if resident_student_ids else {}
+
+            rows = [
+                serialize_attendance_row(student, existing_records.get(student.id))
+                for student in students
+            ]
+
+            if search:
+                needle = search.lower()
+
+                rows = [
+                    row
+                    for row in rows
+                    if needle in (row["student_name"] or "").lower()
+                    or needle in str(row["student_code"] or "").lower()
+                    or needle in (row["room_number"] or "").lower()
+                ]
+
+            if status_filter:
+                rows = [row for row in rows if row["status"] == status_filter]
+
+            stats = {
+                "total": len(students),
+                "present": sum(1 for r in rows if r["status"] == "Present"),
+                "absent": sum(1 for r in rows if r["status"] == "Absent"),
+                "on_leave": sum(1 for r in rows if r["status"] == "On Leave"),
+                "late_entry": sum(1 for r in rows if r["status"] == "Late Entry"),
+            }
+
+            return (
                 jsonify(
-                    {"success": False, "error": "Database error", "detail": str(e)}
+                    {
+                        "success": True,
+                        "attendance": rows,
+                        "stats": stats,
+                        "date": attendance_date.isoformat(),
+                    }
                 ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while loading attendance")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelAttendanceMarkAPI(MethodView):
+    """Upsert one student's attendance status for one date."""
+
+    @login_required
+    def post(self):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            student_id = _parse_int(data.get("student_id"))
+            attendance_date = _parse_date(data.get("attendance_date")) or date.today()
+            status = _clean_str(data.get("status")) or "Present"
+
+            if not student_id:
+                return jsonify({"success": False, "error": "student_id is required"}), 400
+
+            if status not in {"Present", "Absent", "On Leave", "Late Entry"}:
+                return jsonify({"success": False, "error": "Invalid status"}), 400
+
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "error": "Student not found"}), 404
+
+            record = HostelAttendance.query.filter_by(
+                student_id=student_id, attendance_date=attendance_date
+            ).first()
+
+            if not record:
+                record = HostelAttendance(
+                    student_id=student_id, attendance_date=attendance_date
+                )
+                db.session.add(record)
+
+            record.status = status
+            record.remarks = _clean_str(data.get("remarks")) or None
+
+            if status in {"Present", "Late Entry"}:
+                record.check_in_time = (
+                    datetime.utcnow() if not record.check_in_time else record.check_in_time
+                )
+            else:
+                record.check_in_time = None
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Attendance updated",
+                        "attendance": serialize_attendance_row(student, record),
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while marking attendance")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+# ============================= MOVEMENTS (CHECK-IN / CHECK-OUT) =============================
+def serialize_movement(movement):
+    student = Student.query.get(movement.student_id)
+    room_info = get_student_room_info(movement.student_id)
+
+    return {
+        "id": movement.id,
+        "student_id": movement.student_id,
+        "student_code": (
+            getattr(student, "student_id", student.id) if student else None
+        ),
+        "student_name": (
+            safe_full_name(
+                student.first_name,
+                getattr(student, "middle_name", None),
+                student.last_name,
+            )
+            if student
+            else "Unknown student"
+        ),
+        "room_number": room_info["room_number"],
+        "block_name": room_info["block_name"],
+        "purpose": movement.purpose,
+        "check_out_time": (
+            movement.check_out_time.isoformat() if movement.check_out_time else None
+        ),
+        "expected_return_time": (
+            movement.expected_return_time.isoformat()
+            if movement.expected_return_time
+            else None
+        ),
+        "check_in_time": (
+            movement.check_in_time.isoformat() if movement.check_in_time else None
+        ),
+        "status": movement.status,
+        "created_at": (
+            movement.created_at.isoformat() if movement.created_at else None
+        ),
+    }
+
+
+class HostelMovementListAPI(MethodView):
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            search = _clean_str(request.args.get("search"))
+            status_filter = _clean_str(request.args.get("status"))
+            movement_date = _parse_date(request.args.get("date"))
+
+            query = HostelMovement.query
+
+            if movement_date:
+                query = query.filter(
+                    func.date(HostelMovement.check_out_time) == movement_date
+                )
+
+            movements = query.order_by(HostelMovement.check_out_time.desc()).limit(200).all()
+
+            rows = [serialize_movement(movement) for movement in movements]
+
+            if search:
+                needle = search.lower()
+
+                rows = [
+                    row
+                    for row in rows
+                    if needle in (row["student_name"] or "").lower()
+                    or needle in str(row["student_code"] or "").lower()
+                    or needle in (row["room_number"] or "").lower()
+                ]
+
+            if status_filter:
+                rows = [row for row in rows if row["status"] == status_filter]
+
+            stats = {
+                "inside": HostelAllocation.query.filter_by(is_active=True).count()
+                - sum(1 for r in rows if r["status"] == "Outside Hostel"),
+                "checked_out": sum(1 for r in rows if r["status"] == "Outside Hostel"),
+                "late_entries": sum(1 for r in rows if r["status"] == "Late Entry"),
+                "returned": sum(1 for r in rows if r["status"] == "Returned"),
+            }
+
+            return jsonify({"success": True, "movements": rows, "stats": stats}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while loading movements")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+    @login_required
+    def post(self):
+        """Log a new check-out."""
+
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            student_id = _parse_int(data.get("student_id"))
+
+            if not student_id:
+                return jsonify({"success": False, "error": "student_id is required"}), 400
+
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "error": "Student not found"}), 404
+
+            existing_open = HostelMovement.query.filter(
+                HostelMovement.student_id == student_id,
+                HostelMovement.check_in_time.is_(None),
+            ).first()
+
+            if existing_open:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "This student is already checked out and hasn't returned yet",
+                        }
+                    ),
+                    409,
+                )
+
+            expected_return_raw = data.get("expected_return_time")
+            expected_return_time = None
+
+            if expected_return_raw:
+                try:
+                    expected_return_time = datetime.fromisoformat(expected_return_raw)
+                except ValueError:
+                    expected_return_time = None
+
+            movement = HostelMovement(
+                student_id=student_id,
+                check_out_time=datetime.utcnow(),
+                expected_return_time=expected_return_time,
+                purpose=_clean_str(data.get("purpose")) or None,
+            )
+
+            db.session.add(movement)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Check-out recorded",
+                        "movement": serialize_movement(movement),
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while recording check-out")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelMovementCheckInAPI(MethodView):
+    """Mark an open movement's return - completes the check-out record."""
+
+    @login_required
+    def post(self, movement_id):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        movement = HostelMovement.query.get(movement_id)
+
+        if not movement:
+            return jsonify({"success": False, "error": "Movement record not found"}), 404
+
+        if movement.check_in_time:
+            return (
+                jsonify({"success": False, "error": "This student has already checked in"}),
+                409,
+            )
+
+        try:
+            movement.check_in_time = datetime.utcnow()
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Check-in recorded",
+                        "movement": serialize_movement(movement),
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while recording check-in")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+# ============================= LEAVE REQUESTS =============================
+def serialize_leave_request(leave):
+    student = Student.query.get(leave.student_id)
+    room_info = get_student_room_info(leave.student_id)
+
+    return {
+        "id": leave.id,
+        "student_id": leave.student_id,
+        "student_code": (
+            getattr(student, "student_id", student.id) if student else None
+        ),
+        "student_name": (
+            safe_full_name(
+                student.first_name,
+                getattr(student, "middle_name", None),
+                student.last_name,
+            )
+            if student
+            else "Unknown student"
+        ),
+        "room_number": room_info["room_number"],
+        "block_name": room_info["block_name"],
+        "leave_type": leave.leave_type,
+        "from_date": leave.from_date.isoformat() if leave.from_date else None,
+        "to_date": leave.to_date.isoformat() if leave.to_date else None,
+        "reason": leave.reason,
+        "status": leave.status,
+        "actual_return_date": (
+            leave.actual_return_date.isoformat() if leave.actual_return_date else None
+        ),
+        "created_at": leave.created_at.isoformat() if leave.created_at else None,
+    }
+
+
+class HostelLeaveRequestListAPI(MethodView):
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            search = _clean_str(request.args.get("search"))
+            status_filter = _clean_str(request.args.get("status"))
+
+            query = HostelLeaveRequest.query
+
+            if status_filter:
+                query = query.filter(HostelLeaveRequest.status == status_filter)
+
+            leaves = query.order_by(HostelLeaveRequest.id.desc()).limit(200).all()
+
+            rows = [serialize_leave_request(leave) for leave in leaves]
+
+            if search:
+                needle = search.lower()
+
+                rows = [
+                    row
+                    for row in rows
+                    if needle in (row["student_name"] or "").lower()
+                    or needle in str(row["student_code"] or "").lower()
+                ]
+
+            stats = {
+                "total": len(rows),
+                "pending": sum(1 for r in rows if r["status"] == "Pending"),
+                "approved": sum(1 for r in rows if r["status"] == "Approved"),
+                "rejected": sum(1 for r in rows if r["status"] == "Rejected"),
+            }
+
+            return jsonify({"success": True, "leave_requests": rows, "stats": stats}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while loading leave requests")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+    @login_required
+    def post(self):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            student_id = _parse_int(data.get("student_id"))
+            from_date = _parse_date(data.get("from_date"))
+            to_date = _parse_date(data.get("to_date"))
+            leave_type = _clean_str(data.get("leave_type")) or "Other"
+
+            if not student_id or not from_date or not to_date:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "student_id, from_date and to_date are required",
+                        }
+                    ),
+                    400,
+                )
+
+            if to_date < from_date:
+                return (
+                    jsonify({"success": False, "error": "to_date cannot be before from_date"}),
+                    400,
+                )
+
+            if leave_type not in {
+                "Weekend Leave",
+                "Medical Leave",
+                "Emergency Leave",
+                "Other",
+            }:
+                return jsonify({"success": False, "error": "Invalid leave_type"}), 400
+
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "error": "Student not found"}), 404
+
+            leave = HostelLeaveRequest(
+                student_id=student_id,
+                leave_type=leave_type,
+                from_date=from_date,
+                to_date=to_date,
+                reason=_clean_str(data.get("reason")) or None,
+                status="Pending",
+            )
+
+            db.session.add(leave)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Leave request submitted",
+                        "leave_request": serialize_leave_request(leave),
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while creating leave request")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelLeaveRequestDetailAPI(MethodView):
+
+    @login_required
+    def delete(self, leave_id):
+        _, access_error = authorize_hostel_admin("delete")
+
+        if access_error:
+            return access_error
+
+        leave = HostelLeaveRequest.query.get(leave_id)
+
+        if not leave:
+            return jsonify({"success": False, "error": "Leave request not found"}), 404
+
+        try:
+            db.session.delete(leave)
+            db.session.commit()
+
+            return jsonify({"success": True, "message": "Leave request deleted"}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while deleting leave request")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelLeaveRequestApproveAPI(MethodView):
+
+    @login_required
+    def post(self, leave_id):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        leave = HostelLeaveRequest.query.get(leave_id)
+
+        if not leave:
+            return jsonify({"success": False, "error": "Leave request not found"}), 404
+
+        if leave.status != "Pending":
+            return (
+                jsonify({"success": False, "error": "Only a pending request can be approved"}),
+                409,
+            )
+
+        try:
+            leave.status = "Approved"
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Leave request approved",
+                        "leave_request": serialize_leave_request(leave),
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while approving leave request")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelLeaveRequestRejectAPI(MethodView):
+
+    @login_required
+    def post(self, leave_id):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        leave = HostelLeaveRequest.query.get(leave_id)
+
+        if not leave:
+            return jsonify({"success": False, "error": "Leave request not found"}), 404
+
+        if leave.status != "Pending":
+            return (
+                jsonify({"success": False, "error": "Only a pending request can be rejected"}),
+                409,
+            )
+
+        try:
+            leave.status = "Rejected"
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Leave request rejected",
+                        "leave_request": serialize_leave_request(leave),
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while rejecting leave request")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelLeaveRequestReturnAPI(MethodView):
+    """Mark an approved leave as completed - the student is confirmed back."""
+
+    @login_required
+    def post(self, leave_id):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        leave = HostelLeaveRequest.query.get(leave_id)
+
+        if not leave:
+            return jsonify({"success": False, "error": "Leave request not found"}), 404
+
+        if leave.status != "Approved":
+            return (
+                jsonify({"success": False, "error": "Only an approved leave can be marked returned"}),
+                409,
+            )
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            leave.status = "Returned"
+            leave.actual_return_date = (
+                _parse_date(data.get("actual_return_date")) or date.today()
+            )
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Student marked as returned",
+                        "leave_request": serialize_leave_request(leave),
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while marking leave returned")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
                 500,
             )

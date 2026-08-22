@@ -145,6 +145,7 @@ from utils.hostel import (
     HostelBedVacateAPI,
     HostelStructureOverviewAPI,
     HostelUnallocatedStudentsAPI,
+    HostelStudentSearchAPI,
     HostelAllocationListAPI,
     HostelAllocationCheckoutAPI,
     HostelAllocationTransferAPI,
@@ -155,6 +156,15 @@ from utils.hostel import (
     HostelVisitorApproveAPI,
     HostelVisitorRejectAPI,
     HostelVisitorCheckoutAPI,
+    HostelAttendanceListAPI,
+    HostelAttendanceMarkAPI,
+    HostelMovementListAPI,
+    HostelMovementCheckInAPI,
+    HostelLeaveRequestListAPI,
+    HostelLeaveRequestDetailAPI,
+    HostelLeaveRequestApproveAPI,
+    HostelLeaveRequestRejectAPI,
+    HostelLeaveRequestReturnAPI,
 )
 
 from utils.announcement import (
@@ -1272,6 +1282,12 @@ def create_app():
         methods=["GET", "OPTIONS"],
     )
 
+    app.add_url_rule(
+        "/api/admin/hostel/students/search",
+        view_func=HostelStudentSearchAPI.as_view("hostel_student_search_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
     # ---- Hostel Admin: Allocations (Students / Room Allotment sections) ----
     app.add_url_rule(
         "/api/admin/hostel/allocations",
@@ -1332,6 +1348,63 @@ def create_app():
     app.add_url_rule(
         "/api/admin/hostel/visitors/<int:visitor_id>/checkout",
         view_func=HostelVisitorCheckoutAPI.as_view("hostel_visitor_checkout_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Attendance ----
+    app.add_url_rule(
+        "/api/admin/hostel/attendance",
+        view_func=HostelAttendanceListAPI.as_view("hostel_attendance_list_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/attendance/mark",
+        view_func=HostelAttendanceMarkAPI.as_view("hostel_attendance_mark_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Check-In / Check-Out (Movements) ----
+    app.add_url_rule(
+        "/api/admin/hostel/movements",
+        view_func=HostelMovementListAPI.as_view("hostel_movement_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/movements/<int:movement_id>/checkin",
+        view_func=HostelMovementCheckInAPI.as_view("hostel_movement_checkin_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Leave Requests ----
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests",
+        view_func=HostelLeaveRequestListAPI.as_view("hostel_leave_request_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests/<int:leave_id>",
+        view_func=HostelLeaveRequestDetailAPI.as_view("hostel_leave_request_detail_api"),
+        methods=["DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests/<int:leave_id>/approve",
+        view_func=HostelLeaveRequestApproveAPI.as_view("hostel_leave_request_approve_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests/<int:leave_id>/reject",
+        view_func=HostelLeaveRequestRejectAPI.as_view("hostel_leave_request_reject_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests/<int:leave_id>/return",
+        view_func=HostelLeaveRequestReturnAPI.as_view("hostel_leave_request_return_api"),
         methods=["POST", "OPTIONS"],
     )
 
