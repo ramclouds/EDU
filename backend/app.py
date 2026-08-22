@@ -165,6 +165,11 @@ from utils.hostel import (
     HostelLeaveRequestApproveAPI,
     HostelLeaveRequestRejectAPI,
     HostelLeaveRequestReturnAPI,
+    HostelMessMenuListAPI,
+    HostelMessMenuDetailAPI,
+    HostelMealAttendanceListAPI,
+    HostelMealAttendanceMarkAPI,
+    HostelMealAttendanceBulkMarkAPI,
 )
 
 from utils.announcement import (
@@ -1386,25 +1391,71 @@ def create_app():
 
     app.add_url_rule(
         "/api/admin/hostel/leave-requests/<int:leave_id>",
-        view_func=HostelLeaveRequestDetailAPI.as_view("hostel_leave_request_detail_api"),
+        view_func=HostelLeaveRequestDetailAPI.as_view(
+            "hostel_leave_request_detail_api"
+        ),
         methods=["DELETE", "OPTIONS"],
     )
 
     app.add_url_rule(
         "/api/admin/hostel/leave-requests/<int:leave_id>/approve",
-        view_func=HostelLeaveRequestApproveAPI.as_view("hostel_leave_request_approve_api"),
+        view_func=HostelLeaveRequestApproveAPI.as_view(
+            "hostel_leave_request_approve_api"
+        ),
         methods=["POST", "OPTIONS"],
     )
 
     app.add_url_rule(
         "/api/admin/hostel/leave-requests/<int:leave_id>/reject",
-        view_func=HostelLeaveRequestRejectAPI.as_view("hostel_leave_request_reject_api"),
+        view_func=HostelLeaveRequestRejectAPI.as_view(
+            "hostel_leave_request_reject_api"
+        ),
         methods=["POST", "OPTIONS"],
     )
 
     app.add_url_rule(
         "/api/admin/hostel/leave-requests/<int:leave_id>/return",
-        view_func=HostelLeaveRequestReturnAPI.as_view("hostel_leave_request_return_api"),
+        view_func=HostelLeaveRequestReturnAPI.as_view(
+            "hostel_leave_request_return_api"
+        ),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Mess Menu ----
+    app.add_url_rule(
+        "/api/admin/hostel/mess-menu",
+        view_func=HostelMessMenuListAPI.as_view("hostel_mess_menu_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/mess-menu/<int:entry_id>",
+        view_func=HostelMessMenuDetailAPI.as_view("hostel_mess_menu_detail_api"),
+        methods=["DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Meal Attendance ----
+    app.add_url_rule(
+        "/api/admin/hostel/meal-attendance",
+        view_func=HostelMealAttendanceListAPI.as_view(
+            "hostel_meal_attendance_list_api"
+        ),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/meal-attendance/mark",
+        view_func=HostelMealAttendanceMarkAPI.as_view(
+            "hostel_meal_attendance_mark_api"
+        ),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/meal-attendance/bulk-mark",
+        view_func=HostelMealAttendanceBulkMarkAPI.as_view(
+            "hostel_meal_attendance_bulk_mark_api"
+        ),
         methods=["POST", "OPTIONS"],
     )
 

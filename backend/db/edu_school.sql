@@ -699,6 +699,33 @@ CREATE TABLE IF NOT EXISTS `hostel_leave_requests` (
   CONSTRAINT `hostel_leave_requests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- hostel_meal_attendance
+CREATE TABLE IF NOT EXISTS `hostel_meal_attendance` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `meal_date` date NOT NULL,
+  `meal_type` enum('Breakfast','Lunch','Snacks','Dinner') NOT NULL,
+  `status` enum('Present','Absent') NOT NULL,
+  `marked_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_meal_attendance_student_date_meal` (`student_id`,`meal_date`,`meal_type`),
+  CONSTRAINT `hostel_meal_attendance_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_mess_menu
+CREATE TABLE IF NOT EXISTS `hostel_mess_menu` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `day_of_week` enum('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NOT NULL,
+  `meal_type` enum('Breakfast','Lunch','Snacks','Dinner') NOT NULL,
+  `items` text,
+  `timing` varchar(30) DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_mess_menu_day_meal` (`day_of_week`,`meal_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- hostel_movements
 CREATE TABLE IF NOT EXISTS `hostel_movements` (
   `id` int NOT NULL AUTO_INCREMENT,

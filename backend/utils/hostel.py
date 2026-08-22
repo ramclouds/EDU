@@ -111,6 +111,9 @@ def get_student_academic_details(student):
     }
 
 
+
+
+
 # ============================= MODELS =============================
 class Hostel(db.Model):
     __tablename__ = "hostels"
@@ -646,6 +649,89 @@ class HostelLeaveRequest(db.Model):
 
     actual_return_date = db.Column(db.Date)
 
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class HostelMessMenu(db.Model):
+    """NEW MODEL. The weekly mess menu - one row per (day_of_week,
+    meal_type) combination, e.g. Monday + Lunch. Upserted rather than
+    appended, so editing a day's menu updates the existing row instead
+    of piling up duplicates."""
+
+    __tablename__ = "hostel_mess_menu"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "day_of_week", "meal_type", name="uq_mess_menu_day_meal"
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    day_of_week = db.Column(
+        db.Enum(
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ),
+        nullable=False,
+    )
+
+    meal_type = db.Column(
+        db.Enum("Breakfast", "Lunch", "Snacks", "Dinner"),
+        nullable=False,
+    )
+
+    items = db.Column(db.Text)  # newline or comma-separated dish names
+    timing = db.Column(db.String(30))  # e.g. "7:30 AM - 9:00 AM", optional
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class HostelMealAttendance(db.Model):
+    """NEW MODEL. One record per student, per date, per meal - did they
+    eat that meal or not. Same upsert-by-unique-constraint pattern as
+    HostelAttendance, just scoped to a specific meal instead of the
+    whole day."""
+
+    __tablename__ = "hostel_meal_attendance"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "student_id",
+            "meal_date",
+            "meal_type",
+            name="uq_meal_attendance_student_date_meal",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    student_id = db.Column(
+        db.Integer,
+        db.ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    meal_date = db.Column(db.Date, nullable=False, default=date.today)
+
+    meal_type = db.Column(
+        db.Enum("Breakfast", "Lunch", "Snacks", "Dinner"),
+        nullable=False,
+    )
+
+    status = db.Column(
+        db.Enum("Present", "Absent"),
+        nullable=False,
+        default="Present",
+    )
+
+    marked_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -4856,6 +4942,461 @@ class HostelLeaveRequestReturnAPI(MethodView):
 
         except SQLAlchemyError as e:
             logger.exception("Database error while marking leave returned")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+# ============================= MESS MENU =============================
+DAY_ORDER = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
+
+MEAL_ORDER = ["Breakfast", "Lunch", "Snacks", "Dinner"]
+
+
+def serialize_mess_menu_entry(entry):
+    return {
+        "id": entry.id,
+        "day_of_week": entry.day_of_week,
+        "meal_type": entry.meal_type,
+        "items": entry.items,
+        "timing": entry.timing,
+        "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
+    }
+
+
+class HostelMessMenuListAPI(MethodView):
+    """
+    Full weekly menu grid in one call: every (day, meal) combination,
+    including ones that haven't been set yet (returned as an empty
+    entry) so the frontend can render a complete 7x4 grid without
+    guessing which cells exist.
+    """
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            entries = {
+                (entry.day_of_week, entry.meal_type): entry
+                for entry in HostelMessMenu.query.all()
+            }
+
+            grid = []
+
+            for day in DAY_ORDER:
+                meals = {}
+
+                for meal_type in MEAL_ORDER:
+                    entry = entries.get((day, meal_type))
+
+                    meals[meal_type] = (
+                        serialize_mess_menu_entry(entry)
+                        if entry
+                        else {
+                            "id": None,
+                            "day_of_week": day,
+                            "meal_type": meal_type,
+                            "items": "",
+                            "timing": "",
+                            "updated_at": None,
+                        }
+                    )
+
+                grid.append({"day_of_week": day, "meals": meals})
+
+            configured = len(entries)
+            total_slots = len(DAY_ORDER) * len(MEAL_ORDER)
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "menu": grid,
+                        "stats": {
+                            "configured": configured,
+                            "total_slots": total_slots,
+                            "missing": total_slots - configured,
+                        },
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while loading mess menu")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+    @login_required
+    def post(self):
+        """Upsert one (day, meal) cell of the menu."""
+
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            day_of_week = _clean_str(data.get("day_of_week"))
+            meal_type = _clean_str(data.get("meal_type"))
+
+            if day_of_week not in DAY_ORDER:
+                return jsonify({"success": False, "error": "Invalid day_of_week"}), 400
+
+            if meal_type not in MEAL_ORDER:
+                return jsonify({"success": False, "error": "Invalid meal_type"}), 400
+
+            entry = HostelMessMenu.query.filter_by(
+                day_of_week=day_of_week, meal_type=meal_type
+            ).first()
+
+            if not entry:
+                entry = HostelMessMenu(day_of_week=day_of_week, meal_type=meal_type)
+                db.session.add(entry)
+
+            entry.items = _clean_str(data.get("items")) or None
+            entry.timing = _clean_str(data.get("timing")) or None
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Menu updated",
+                        "entry": serialize_mess_menu_entry(entry),
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while updating mess menu")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelMessMenuDetailAPI(MethodView):
+
+    @login_required
+    def delete(self, entry_id):
+        _, access_error = authorize_hostel_admin("delete")
+
+        if access_error:
+            return access_error
+
+        entry = HostelMessMenu.query.get(entry_id)
+
+        if not entry:
+            return jsonify({"success": False, "error": "Menu entry not found"}), 404
+
+        try:
+            db.session.delete(entry)
+            db.session.commit()
+
+            return jsonify({"success": True, "message": "Menu entry cleared"}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while deleting mess menu entry")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+# ============================= MEAL ATTENDANCE =============================
+def serialize_meal_attendance_row(student, record):
+    room_info = get_student_room_info(student.id)
+
+    return {
+        "meal_attendance_id": record.id if record else None,
+        "student_id": student.id,
+        "student_code": getattr(student, "student_id", student.id),
+        "student_name": safe_full_name(
+            student.first_name,
+            getattr(student, "middle_name", None),
+            student.last_name,
+        ),
+        "room_number": room_info["room_number"],
+        "block_name": room_info["block_name"],
+        "meal_date": (
+            record.meal_date.isoformat() if record and record.meal_date else None
+        ),
+        "meal_type": record.meal_type if record else None,
+        "status": record.status if record else "Not Marked",
+        "marked_at": (
+            record.marked_at.isoformat() if record and record.marked_at else None
+        ),
+    }
+
+
+class HostelMealAttendanceListAPI(MethodView):
+    """
+    Every currently-resident student for the given date + meal type
+    (default today / Breakfast), left-joined with their meal
+    attendance record if one has been marked yet. Same roster pattern
+    as HostelAttendanceListAPI, scoped to one meal at a time.
+    """
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            meal_date = _parse_date(request.args.get("date")) or date.today()
+            meal_type = _clean_str(request.args.get("meal_type")) or "Breakfast"
+            search = _clean_str(request.args.get("search"))
+            block_id = _parse_int(request.args.get("block_id"))
+            status_filter = _clean_str(request.args.get("status"))
+
+            if meal_type not in MEAL_ORDER:
+                meal_type = "Breakfast"
+
+            allocation_query = HostelAllocation.query.filter_by(is_active=True)
+
+            if block_id:
+                allocation_query = (
+                    allocation_query.join(Bed, HostelAllocation.bed_id == Bed.id)
+                    .join(Room, Bed.room_id == Room.id)
+                    .join(HostelFloor, Room.floor_id == HostelFloor.id)
+                    .filter(HostelFloor.block_id == block_id)
+                )
+
+            resident_student_ids = [
+                row.student_id for row in allocation_query.all()
+            ]
+
+            students = (
+                Student.query.filter(Student.id.in_(resident_student_ids))
+                .order_by(Student.first_name.asc())
+                .all()
+                if resident_student_ids
+                else []
+            )
+
+            existing_records = {
+                record.student_id: record
+                for record in HostelMealAttendance.query.filter(
+                    HostelMealAttendance.meal_date == meal_date,
+                    HostelMealAttendance.meal_type == meal_type,
+                    HostelMealAttendance.student_id.in_(resident_student_ids),
+                ).all()
+            } if resident_student_ids else {}
+
+            rows = [
+                serialize_meal_attendance_row(student, existing_records.get(student.id))
+                for student in students
+            ]
+
+            if search:
+                needle = search.lower()
+
+                rows = [
+                    row
+                    for row in rows
+                    if needle in (row["student_name"] or "").lower()
+                    or needle in str(row["student_code"] or "").lower()
+                    or needle in (row["room_number"] or "").lower()
+                ]
+
+            if status_filter:
+                rows = [row for row in rows if row["status"] == status_filter]
+
+            stats = {
+                "total": len(students),
+                "present": sum(1 for r in rows if r["status"] == "Present"),
+                "absent": sum(1 for r in rows if r["status"] == "Absent"),
+                "not_marked": sum(1 for r in rows if r["status"] == "Not Marked"),
+            }
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "meal_attendance": rows,
+                        "stats": stats,
+                        "date": meal_date.isoformat(),
+                        "meal_type": meal_type,
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while loading meal attendance")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelMealAttendanceMarkAPI(MethodView):
+    """Upsert one student's attendance status for one date + meal."""
+
+    @login_required
+    def post(self):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            student_id = _parse_int(data.get("student_id"))
+            meal_date = _parse_date(data.get("meal_date")) or date.today()
+            meal_type = _clean_str(data.get("meal_type"))
+            status = _clean_str(data.get("status")) or "Present"
+
+            if not student_id:
+                return jsonify({"success": False, "error": "student_id is required"}), 400
+
+            if meal_type not in MEAL_ORDER:
+                return jsonify({"success": False, "error": "Invalid meal_type"}), 400
+
+            if status not in {"Present", "Absent"}:
+                return jsonify({"success": False, "error": "Invalid status"}), 400
+
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "error": "Student not found"}), 404
+
+            record = HostelMealAttendance.query.filter_by(
+                student_id=student_id, meal_date=meal_date, meal_type=meal_type
+            ).first()
+
+            if not record:
+                record = HostelMealAttendance(
+                    student_id=student_id, meal_date=meal_date, meal_type=meal_type
+                )
+                db.session.add(record)
+
+            record.status = status
+            record.marked_at = datetime.utcnow()
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Meal attendance updated",
+                        "meal_attendance": serialize_meal_attendance_row(student, record),
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while marking meal attendance")
+            db.session.rollback()
+
+            return (
+                jsonify({"success": False, "error": "Database error", "detail": str(e)}),
+                500,
+            )
+
+
+class HostelMealAttendanceBulkMarkAPI(MethodView):
+    """Mark every not-yet-marked resident Present for the given date +
+    meal in one call - a quick head-count shortcut so the mess staff
+    don't have to tap Present on every single row one at a time."""
+
+    @login_required
+    def post(self):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            meal_date = _parse_date(data.get("meal_date")) or date.today()
+            meal_type = _clean_str(data.get("meal_type"))
+
+            if meal_type not in MEAL_ORDER:
+                return jsonify({"success": False, "error": "Invalid meal_type"}), 400
+
+            resident_student_ids = [
+                row.student_id
+                for row in HostelAllocation.query.filter_by(is_active=True).all()
+            ]
+
+            already_marked_ids = {
+                record.student_id
+                for record in HostelMealAttendance.query.filter(
+                    HostelMealAttendance.meal_date == meal_date,
+                    HostelMealAttendance.meal_type == meal_type,
+                    HostelMealAttendance.student_id.in_(resident_student_ids),
+                ).all()
+            }
+
+            newly_marked = 0
+
+            for student_id in resident_student_ids:
+                if student_id in already_marked_ids:
+                    continue
+
+                db.session.add(
+                    HostelMealAttendance(
+                        student_id=student_id,
+                        meal_date=meal_date,
+                        meal_type=meal_type,
+                        status="Present",
+                        marked_at=datetime.utcnow(),
+                    )
+                )
+                newly_marked += 1
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": f"{newly_marked} student(s) marked Present",
+                        "newly_marked": newly_marked,
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while bulk-marking meal attendance")
             db.session.rollback()
 
             return (

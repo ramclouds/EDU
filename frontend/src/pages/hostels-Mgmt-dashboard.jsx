@@ -22,6 +22,12 @@ import { useHostelVisitors } from "../controllers/Hostel/useHostelVisitors";
 import { useHostelAttendance } from "../controllers/Hostel/useHostelAttendance";
 import { useHostelMovement } from "../controllers/Hostel/useHostelMovement";
 import { useHostelLeaveRequests } from "../controllers/Hostel/useHostelLeaveRequests";
+import {
+  useHostelMessMenu,
+  MESS_MENU_DAYS,
+  MESS_MENU_MEALS,
+} from "../controllers/Hostel/useHostelMessMenu";
+import { useHostelMealAttendance } from "../controllers/Hostel/useHostelMealAttendance";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -438,6 +444,47 @@ function AdminDashboard() {
     deleteLeave,
   } = useHostelLeaveRequests({ activeSection, fetchWithAuth, showToast });
 
+  // ================= MESS MENU SECTION HOOK =================
+  const {
+    menuGrid,
+    menuStats,
+    menuLoading,
+    loadMenu,
+
+    entryModalOpen,
+    entryForm,
+    entrySaving,
+    openEntryModal,
+    closeEntryModal,
+    updateEntryForm,
+    saveEntry,
+    clearEntry,
+  } = useHostelMessMenu({ activeSection, fetchWithAuth, showToast });
+
+  // ================= MEAL ATTENDANCE SECTION HOOK =================
+  const {
+    mealDate,
+    changeMealDate,
+    mealType,
+    changeMealType,
+
+    mealAttendance,
+    mealStats,
+    mealAttendanceLoading,
+    mealFilters,
+
+    loadMealAttendance,
+    updateMealFilter,
+    applyMealFilters,
+    resetMealFilters,
+
+    markingStudentId: markingMealStudentId,
+    markMealAttendance,
+
+    bulkMarking,
+    markAllPresent,
+  } = useHostelMealAttendance({ activeSection, fetchWithAuth, showToast });
+
   useEffect(() => {
     if (window.innerWidth >= 768) {
       setSidebarOpen(true);
@@ -493,13 +540,17 @@ function AdminDashboard() {
         {/* ========================= HOSTEL ADMIN SIDEBAR NAV ========================= */}
         <nav className="h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-4 space-y-2 text-sm">
           {[
+            // =========================================================
             // MAIN
+            // =========================================================
             {
               title: "MAIN",
               items: [["dashboard", "bi-grid", "Dashboard"]],
             },
 
+            // =========================================================
             // HOSTEL SETUP / INFRASTRUCTURE
+            // =========================================================
             {
               title: "HOSTEL SETUP",
               items: [
@@ -509,7 +560,9 @@ function AdminDashboard() {
               ],
             },
 
+            // =========================================================
             // RESIDENTS
+            // =========================================================
             {
               title: "HOSTEL RESIDENTS",
               items: [
@@ -520,7 +573,9 @@ function AdminDashboard() {
               ],
             },
 
+            // =========================================================
             // DAILY OPERATIONS
+            // =========================================================
             {
               title: "DAILY OPERATIONS",
               items: [
@@ -530,7 +585,9 @@ function AdminDashboard() {
               ],
             },
 
+            // =========================================================
             // HOSTEL FEES
+            // =========================================================
             {
               title: "HOSTEL FEES",
               items: [
@@ -540,7 +597,9 @@ function AdminDashboard() {
               ],
             },
 
+            // =========================================================
             // MESS
+            // =========================================================
             {
               title: "MESS MANAGEMENT",
               items: [
@@ -549,7 +608,9 @@ function AdminDashboard() {
               ],
             },
 
+            // =========================================================
             // COMPLAINTS / MAINTENANCE
+            // =========================================================
             {
               title: "HOSTEL SUPPORT",
               items: [
@@ -558,7 +619,9 @@ function AdminDashboard() {
               ],
             },
 
+            // =========================================================
             // COMMUNICATION
+            // =========================================================
             {
               title: "COMMUNICATION",
               items: [
@@ -567,13 +630,17 @@ function AdminDashboard() {
               ],
             },
 
+            // =========================================================
             // REPORTS
+            // =========================================================
             {
               title: "REPORTS",
               items: [["reports", "bi-bar-chart-line", "Reports & Analytics"]],
             },
 
+            // =========================================================
             // SYSTEM
+            // =========================================================
             {
               title: "SYSTEM",
               items: [
@@ -602,7 +669,7 @@ function AdminDashboard() {
                       closeSidebarOnMobile();
                     }}
                     className={`relative flex w-full items-center rounded-xl py-3
-                      transition-all duration-300 ease-in-out
+                transition-all duration-300 ease-in-out
                 ${
                   sidebarExpanded
                     ? "gap-3 px-4 justify-start"
@@ -5909,6 +5976,554 @@ function AdminDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* <!-- =========================== MESS MENU SECTION =========================== --> */}
+        {activeSection === "mess-menu" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Mess Menu
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Plan and manage the weekly hostel mess menu
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => loadMenu()}
+                  disabled={menuLoading}
+                  className="inline-flex items-center gap-2 self-start rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <i
+                    className={`bi bi-arrow-clockwise ${
+                      menuLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                {
+                  label: "Meal Slots Planned",
+                  value: menuStats.configured,
+                  icon: "bi-check2-square",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+                {
+                  label: "Total Meal Slots",
+                  value: menuStats.total_slots,
+                  icon: "bi-grid-3x3",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Not Yet Planned",
+                  value: menuStats.missing,
+                  icon: "bi-exclamation-circle",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {menuLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* WEEKLY MENU GRID */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Weekly Menu
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Click any cell to edit
+                </span>
+              </div>
+
+              {menuLoading && menuGrid.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 py-16 text-gray-500 dark:text-gray-400">
+                  <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                  Loading menu...
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[960px] text-sm">
+                    <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Day
+                        </th>
+                        {MESS_MENU_MEALS.map((meal) => (
+                          <th
+                            key={meal}
+                            className="px-4 py-3 text-left font-semibold"
+                          >
+                            {meal}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                      {menuGrid.map((dayRow) => (
+                        <tr key={dayRow.day_of_week}>
+                          <td className="px-4 py-3 align-top font-semibold text-gray-900 dark:text-white">
+                            {dayRow.day_of_week}
+                          </td>
+
+                          {MESS_MENU_MEALS.map((meal) => {
+                            const entry = dayRow.meals[meal];
+
+                            return (
+                              <td
+                                key={meal}
+                                className="group relative cursor-pointer px-4 py-3 align-top hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                                onClick={() =>
+                                  openEntryModal(
+                                    dayRow.day_of_week,
+                                    meal,
+                                    entry,
+                                  )
+                                }
+                              >
+                                {entry.items ? (
+                                  <>
+                                    <p className="whitespace-pre-line text-gray-700 dark:text-gray-200">
+                                      {entry.items}
+                                    </p>
+                                    {entry.timing && (
+                                      <p className="mt-1 text-xs text-gray-400">
+                                        {entry.timing}
+                                      </p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">
+                                    Not planned
+                                  </span>
+                                )}
+
+                                <i className="bi bi-pencil-square absolute right-2 top-2 text-xs text-gray-300 opacity-0 transition group-hover:opacity-100" />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* MENU ENTRY MODAL */}
+        {entryModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+              <h2 className="mb-1 text-lg font-bold text-gray-900 dark:text-white">
+                {entryForm.day_of_week} · {entryForm.meal_type}
+              </h2>
+              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                Edit the menu for this day and meal
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                    Items
+                  </label>
+                  <textarea
+                    value={entryForm.items}
+                    onChange={(e) => updateEntryForm("items", e.target.value)}
+                    placeholder="e.g. Idli, Sambar, Chutney, Tea"
+                    rows={4}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                    Timing (optional)
+                  </label>
+                  <input
+                    value={entryForm.timing}
+                    onChange={(e) => updateEntryForm("timing", e.target.value)}
+                    placeholder="e.g. 7:30 AM - 9:00 AM"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeEntryModal}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={saveEntry}
+                  disabled={entrySaving}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {entrySaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* <!-- =========================== MEAL ATTENDANCE SECTION =========================== --> */}
+        {activeSection === "meal-attendance" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Meal Attendance
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Track which residents took each meal, for mess billing and
+                    wastage control
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="date"
+                    value={mealDate}
+                    onChange={(e) => changeMealDate(e.target.value)}
+                    className="rounded-lg border-0 bg-white/20 px-3 py-2 text-sm text-white outline-none placeholder:text-white/70 focus:ring-2 focus:ring-white/40 [color-scheme:dark]"
+                  />
+
+                  <select
+                    value={mealType}
+                    onChange={(e) => changeMealType(e.target.value)}
+                    className="rounded-lg border-0 bg-white/20 px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-white/40 [&>option]:text-gray-900"
+                  >
+                    {MESS_MENU_MEALS.map((meal) => (
+                      <option key={meal} value={meal}>
+                        {meal}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => loadMealAttendance()}
+                    disabled={mealAttendanceLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        mealAttendanceLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={markAllPresent}
+                    disabled={!canWriteHostel || bulkMarking}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i className="bi bi-check2-all" />
+                    {bulkMarking ? "Marking…" : "Mark All Present"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total Residents",
+                  value: mealStats.total,
+                  icon: "bi-people",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Present",
+                  value: mealStats.present,
+                  icon: "bi-check-circle",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+                {
+                  label: "Absent",
+                  value: mealStats.absent,
+                  icon: "bi-x-circle",
+                  classes:
+                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                },
+                {
+                  label: "Not Marked",
+                  value: mealStats.not_marked,
+                  icon: "bi-question-circle",
+                  classes:
+                    "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {mealAttendanceLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={mealFilters.search}
+                    onChange={(e) => updateMealFilter("search", e.target.value)}
+                    placeholder="Search student or room..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={mealFilters.status}
+                  onChange={(e) => updateMealFilter("status", e.target.value)}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="Present">Present</option>
+                  <option value="Absent">Absent</option>
+                  <option value="Not Marked">Not Marked</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyMealFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetMealFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* MEAL ATTENDANCE TABLE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  {mealType} Attendance
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {mealDate} · {mealAttendance.length} resident(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Room
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Block
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {mealAttendanceLoading && mealAttendance.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading meal attendance...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!mealAttendanceLoading && mealAttendance.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-14 text-center">
+                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            <i className="bi bi-clipboard-check text-2xl" />
+                          </span>
+                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                            No residents found
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            No students match these filters, or no one is
+                            currently allocated a bed.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {mealAttendance.map((row) => (
+                      <tr
+                        key={row.student_id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+                              {(row.student_name || "?")
+                                .split(" ")
+                                .map((part) => part[0])
+                                .join("")
+                                .slice(0, 2)
+                                .toUpperCase()}
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium text-gray-900 dark:text-white">
+                                {row.student_name}
+                              </h4>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {row.student_code}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          {row.room_number || "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {row.block_name || "—"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              row.status === "Present"
+                                ? "bg-green-100 text-green-700"
+                                : row.status === "Absent"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-3 text-base">
+                            <button
+                              type="button"
+                              onClick={() => markMealAttendance(row, "Present")}
+                              disabled={
+                                !canWriteHostel ||
+                                markingMealStudentId === row.student_id
+                              }
+                              title="Mark Present"
+                              className="text-green-600 hover:text-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-check-circle" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => markMealAttendance(row, "Absent")}
+                              disabled={
+                                !canWriteHostel ||
+                                markingMealStudentId === row.student_id
+                              }
+                              title="Mark Absent"
+                              className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-x-circle" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
         )}
 
         {/* ===================== PROFILE SECTION START ========================*/}
