@@ -170,6 +170,10 @@ from utils.hostel import (
     HostelMealAttendanceListAPI,
     HostelMealAttendanceMarkAPI,
     HostelMealAttendanceBulkMarkAPI,
+    HostelComplaintListAPI,
+    HostelComplaintUpdateAPI,
+    HostelMaintenanceListAPI,
+    HostelMaintenanceDetailAPI,
 )
 
 from utils.announcement import (
@@ -1391,33 +1395,25 @@ def create_app():
 
     app.add_url_rule(
         "/api/admin/hostel/leave-requests/<int:leave_id>",
-        view_func=HostelLeaveRequestDetailAPI.as_view(
-            "hostel_leave_request_detail_api"
-        ),
+        view_func=HostelLeaveRequestDetailAPI.as_view("hostel_leave_request_detail_api"),
         methods=["DELETE", "OPTIONS"],
     )
 
     app.add_url_rule(
         "/api/admin/hostel/leave-requests/<int:leave_id>/approve",
-        view_func=HostelLeaveRequestApproveAPI.as_view(
-            "hostel_leave_request_approve_api"
-        ),
+        view_func=HostelLeaveRequestApproveAPI.as_view("hostel_leave_request_approve_api"),
         methods=["POST", "OPTIONS"],
     )
 
     app.add_url_rule(
         "/api/admin/hostel/leave-requests/<int:leave_id>/reject",
-        view_func=HostelLeaveRequestRejectAPI.as_view(
-            "hostel_leave_request_reject_api"
-        ),
+        view_func=HostelLeaveRequestRejectAPI.as_view("hostel_leave_request_reject_api"),
         methods=["POST", "OPTIONS"],
     )
 
     app.add_url_rule(
         "/api/admin/hostel/leave-requests/<int:leave_id>/return",
-        view_func=HostelLeaveRequestReturnAPI.as_view(
-            "hostel_leave_request_return_api"
-        ),
+        view_func=HostelLeaveRequestReturnAPI.as_view("hostel_leave_request_return_api"),
         methods=["POST", "OPTIONS"],
     )
 
@@ -1437,17 +1433,13 @@ def create_app():
     # ---- Hostel Admin: Meal Attendance ----
     app.add_url_rule(
         "/api/admin/hostel/meal-attendance",
-        view_func=HostelMealAttendanceListAPI.as_view(
-            "hostel_meal_attendance_list_api"
-        ),
+        view_func=HostelMealAttendanceListAPI.as_view("hostel_meal_attendance_list_api"),
         methods=["GET", "OPTIONS"],
     )
 
     app.add_url_rule(
         "/api/admin/hostel/meal-attendance/mark",
-        view_func=HostelMealAttendanceMarkAPI.as_view(
-            "hostel_meal_attendance_mark_api"
-        ),
+        view_func=HostelMealAttendanceMarkAPI.as_view("hostel_meal_attendance_mark_api"),
         methods=["POST", "OPTIONS"],
     )
 
@@ -1457,6 +1449,32 @@ def create_app():
             "hostel_meal_attendance_bulk_mark_api"
         ),
         methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Complaints ----
+    app.add_url_rule(
+        "/api/admin/hostel/complaints",
+        view_func=HostelComplaintListAPI.as_view("hostel_complaint_list_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/complaints/<int:complaint_id>",
+        view_func=HostelComplaintUpdateAPI.as_view("hostel_complaint_update_api"),
+        methods=["PUT", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Maintenance ----
+    app.add_url_rule(
+        "/api/admin/hostel/maintenance",
+        view_func=HostelMaintenanceListAPI.as_view("hostel_maintenance_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/maintenance/<int:request_id>",
+        view_func=HostelMaintenanceDetailAPI.as_view("hostel_maintenance_detail_api"),
+        methods=["PUT", "DELETE", "OPTIONS"],
     )
 
     # MY CLASSES

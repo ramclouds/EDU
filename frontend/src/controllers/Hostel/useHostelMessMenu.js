@@ -28,12 +28,6 @@ const EMPTY_ENTRY_FORM = {
     timing: "",
 };
 
-/**
- * Drives the "Mess Menu" dashboard section: the full weekly menu grid
- * (7 days x 4 meals), edited one cell at a time via upsert - no
- * separate create/edit distinction, saving a cell just overwrites
- * whatever was there for that day+meal.
- */
 export function useHostelMessMenu({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 

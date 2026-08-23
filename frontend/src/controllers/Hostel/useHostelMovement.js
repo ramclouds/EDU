@@ -22,12 +22,6 @@ const EMPTY_CHECKOUT_FORM = {
     purpose: "",
 };
 
-/**
- * Drives the "Check-In / Check-Out" dashboard section: log a student
- * leaving the hostel (with an expected return time) and mark them back
- * in later. Status (Outside Hostel / Returned / Late Entry) is derived
- * server-side from the timestamps, never stored/typed directly.
- */
 export function useHostelMovement({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 

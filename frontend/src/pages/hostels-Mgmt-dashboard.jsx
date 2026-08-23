@@ -28,6 +28,8 @@ import {
   MESS_MENU_MEALS,
 } from "../controllers/Hostel/useHostelMessMenu";
 import { useHostelMealAttendance } from "../controllers/Hostel/useHostelMealAttendance";
+import { useHostelComplaints } from "../controllers/Hostel/useHostelComplaints";
+import { useHostelMaintenance } from "../controllers/Hostel/useHostelMaintenance";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -121,14 +123,7 @@ function AdminDashboard() {
     allowedModules,
   } = useAdminProfile({ fetchWithAuth, showToast });
 
-  // Read vs Full Access for this whole dashboard, driven by Role &
-  // Permission Management on the Super Admin dashboard. Read Only ->
-  // can view/filter everywhere below, but every add/edit/delete/
-  // allocate/vacate action is hidden or blocked.
   const { canWriteHostel, hostelAccessLevel } = useHostelPermission();
-
-  // Every dashboard (including this one) this admin currently has
-  // access to - powers the "OTHER DASHBOARDS" sidebar links below.
   const { dashboards: accessibleDashboards } = useDashboardAccess();
 
   const otherAccessibleDashboards = (accessibleDashboards || []).filter(
@@ -484,6 +479,52 @@ function AdminDashboard() {
     bulkMarking,
     markAllPresent,
   } = useHostelMealAttendance({ activeSection, fetchWithAuth, showToast });
+
+  // ================= COMPLAINTS SECTION HOOK =================
+  const {
+    complaints,
+    complaintStats,
+    complaintsLoading,
+    complaintFilters,
+
+    loadComplaints,
+    updateComplaintFilter,
+    applyComplaintFilters,
+    resetComplaintFilters,
+
+    selectedComplaint,
+    complaintModalOpen,
+    complaintSaving,
+    openComplaintModal,
+    closeComplaintModal,
+    updateSelectedComplaint,
+    saveComplaint,
+    deleteComplaint,
+  } = useHostelComplaints({ activeSection, fetchWithAuth, showToast });
+
+  // ================= MAINTENANCE SECTION HOOK =================
+  const {
+    requests: maintenanceRequests,
+    maintenanceStats,
+    maintenanceLoading,
+    maintenanceFilters,
+
+    loadMaintenance,
+    updateMaintenanceFilter,
+    applyMaintenanceFilters,
+    resetMaintenanceFilters,
+
+    maintenanceModalOpen,
+    maintenanceForm,
+    maintenanceSaving,
+    openCreateMaintenanceModal,
+    openEditMaintenanceModal,
+    closeMaintenanceModal,
+    updateMaintenanceForm,
+    saveMaintenance,
+    deleteMaintenance,
+    quickUpdateStatus,
+  } = useHostelMaintenance({ activeSection, fetchWithAuth, showToast });
 
   useEffect(() => {
     if (window.innerWidth >= 768) {
@@ -6524,6 +6565,936 @@ function AdminDashboard() {
               </div>
             </div>
           </section>
+        )}
+
+        {/* <!-- =========================== COMPLAINTS SECTION =========================== --> */}
+        {activeSection === "complaints" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Hostel Complaints
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Complaints filed by residents through their student portal
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => loadComplaints()}
+                  disabled={complaintsLoading}
+                  className="inline-flex items-center gap-2 self-start rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <i
+                    className={`bi bi-arrow-clockwise ${
+                      complaintsLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total Complaints",
+                  value: complaintStats.total,
+                  icon: "bi-chat-square-text",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Pending",
+                  value: complaintStats.pending,
+                  icon: "bi-hourglass-split",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "In Progress",
+                  value: complaintStats.in_progress,
+                  icon: "bi-arrow-repeat",
+                  classes:
+                    "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+                },
+                {
+                  label: "Resolved",
+                  value: complaintStats.resolved,
+                  icon: "bi-check-circle",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {complaintsLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={complaintFilters.search}
+                    onChange={(e) =>
+                      updateComplaintFilter("search", e.target.value)
+                    }
+                    placeholder="Search student, room or issue..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={complaintFilters.status}
+                  onChange={(e) =>
+                    updateComplaintFilter("status", e.target.value)
+                  }
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="Pending">Pending</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Resolved">Resolved</option>
+                </select>
+
+                <select
+                  value={complaintFilters.priority}
+                  onChange={(e) =>
+                    updateComplaintFilter("priority", e.target.value)
+                  }
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Priorities</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyComplaintFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetComplaintFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* COMPLAINTS TABLE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Complaint Records
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {complaints.length} complaint(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[960px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Room
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Issue
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Category
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Priority
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {complaintsLoading && complaints.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading complaints...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!complaintsLoading && complaints.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-14 text-center">
+                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            <i className="bi bi-chat-square-text text-2xl" />
+                          </span>
+                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                            No complaints found
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            No records match these filters.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {complaints.map((complaint) => (
+                      <tr
+                        key={complaint.id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {complaint.student_name}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {complaint.student_code}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          {complaint.room_number || "—"}
+                        </td>
+
+                        <td className="max-w-xs px-6 py-4 text-gray-600 dark:text-gray-300">
+                          <p className="line-clamp-2">{complaint.issue}</p>
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {complaint.category}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              complaint.priority === "Urgent"
+                                ? "bg-red-100 text-red-700"
+                                : complaint.priority === "High"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : complaint.priority === "Medium"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {complaint.priority}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              complaint.status === "Resolved"
+                                ? "bg-green-100 text-green-700"
+                                : complaint.status === "In Progress"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {complaint.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-3 text-base">
+                            <button
+                              type="button"
+                              onClick={() => openComplaintModal(complaint)}
+                              title="Triage"
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <i className="bi bi-pencil-square" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => deleteComplaint(complaint)}
+                              disabled={!canWriteHostel}
+                              title="Delete"
+                              className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-trash" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* COMPLAINT TRIAGE MODAL */}
+        {complaintModalOpen && selectedComplaint && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+              <h2 className="mb-1 text-lg font-bold text-gray-900 dark:text-white">
+                {selectedComplaint.student_name}
+              </h2>
+              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                Room {selectedComplaint.room_number || "—"}
+              </p>
+
+              <div className="mb-4 rounded-xl bg-gray-50 p-3 text-sm text-gray-700 dark:bg-slate-700/50 dark:text-gray-200">
+                {selectedComplaint.issue}
+              </div>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <select
+                    value={selectedComplaint.category}
+                    onChange={(e) =>
+                      updateSelectedComplaint("category", e.target.value)
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  >
+                    <option value="Electrical">Electrical</option>
+                    <option value="Plumbing">Plumbing</option>
+                    <option value="Cleaning">Cleaning</option>
+                    <option value="Furniture">Furniture</option>
+                    <option value="Internet">Internet</option>
+                    <option value="Other">Other</option>
+                  </select>
+
+                  <select
+                    value={selectedComplaint.priority}
+                    onChange={(e) =>
+                      updateSelectedComplaint("priority", e.target.value)
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+
+                <select
+                  value={selectedComplaint.status}
+                  onChange={(e) =>
+                    updateSelectedComplaint("status", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Resolved">Resolved</option>
+                </select>
+
+                <textarea
+                  value={selectedComplaint.resolution_notes || ""}
+                  onChange={(e) =>
+                    updateSelectedComplaint("resolution_notes", e.target.value)
+                  }
+                  placeholder="Resolution notes (optional)"
+                  rows={3}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeComplaintModal}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={saveComplaint}
+                  disabled={complaintSaving}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {complaintSaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* <!-- =========================== MAINTENANCE SECTION =========================== --> */}
+        {activeSection === "maintenance" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Maintenance Requests
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Infrastructure and equipment work, assignable to hostel
+                    staff
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => loadMaintenance()}
+                    disabled={maintenanceLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        maintenanceLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openCreateMaintenanceModal()}
+                    disabled={!canWriteHostel}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i className="bi bi-plus-lg" />
+                    New Request
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total Requests",
+                  value: maintenanceStats.total,
+                  icon: "bi-tools",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Open",
+                  value: maintenanceStats.open,
+                  icon: "bi-exclamation-circle",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "In Progress",
+                  value: maintenanceStats.in_progress,
+                  icon: "bi-arrow-repeat",
+                  classes:
+                    "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+                },
+                {
+                  label: "Resolved",
+                  value: maintenanceStats.resolved,
+                  icon: "bi-check-circle",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {maintenanceLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={maintenanceFilters.search}
+                    onChange={(e) =>
+                      updateMaintenanceFilter("search", e.target.value)
+                    }
+                    placeholder="Search title, room or block..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={maintenanceFilters.status}
+                  onChange={(e) =>
+                    updateMaintenanceFilter("status", e.target.value)
+                  }
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="Open">Open</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Resolved">Resolved</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+
+                <select
+                  value={maintenanceFilters.priority}
+                  onChange={(e) =>
+                    updateMaintenanceFilter("priority", e.target.value)
+                  }
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Priorities</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyMaintenanceFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetMaintenanceFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* MAINTENANCE TABLE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Maintenance Log
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {maintenanceRequests.length} request(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[960px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Request
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Location
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Category
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Assigned To
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Priority
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {maintenanceLoading && maintenanceRequests.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading maintenance requests...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!maintenanceLoading &&
+                      maintenanceRequests.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="py-14 text-center">
+                            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                              <i className="bi bi-tools text-2xl" />
+                            </span>
+                            <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                              No maintenance requests found
+                            </h3>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                              No records match these filters, or none have been
+                              logged yet.
+                            </p>
+
+                            <button
+                              type="button"
+                              onClick={() => openCreateMaintenanceModal()}
+                              disabled={!canWriteHostel}
+                              className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              New Request
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+
+                    {maintenanceRequests.map((req) => (
+                      <tr
+                        key={req.id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {req.title}
+                          </h4>
+                          {req.description && (
+                            <p className="line-clamp-1 text-xs text-gray-500 dark:text-gray-400">
+                              {req.description}
+                            </p>
+                          )}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {req.room_number
+                            ? `Room ${req.room_number}`
+                            : req.block_name
+                              ? `Block ${req.block_name}`
+                              : "Hostel-wide"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {req.category}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {req.assigned_staff_name || "Unassigned"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              req.priority === "Urgent"
+                                ? "bg-red-100 text-red-700"
+                                : req.priority === "High"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : req.priority === "Medium"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {req.priority}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              req.status === "Resolved"
+                                ? "bg-green-100 text-green-700"
+                                : req.status === "In Progress"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : req.status === "Cancelled"
+                                    ? "bg-gray-100 text-gray-600"
+                                    : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-3 text-base">
+                            {req.status === "Open" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  quickUpdateStatus(req, "In Progress")
+                                }
+                                disabled={!canWriteHostel}
+                                title="Start work"
+                                className="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <i className="bi bi-play-circle" />
+                              </button>
+                            )}
+
+                            {req.status === "In Progress" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  quickUpdateStatus(req, "Resolved")
+                                }
+                                disabled={!canWriteHostel}
+                                title="Mark resolved"
+                                className="text-green-600 hover:text-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <i className="bi bi-check-circle" />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => openEditMaintenanceModal(req)}
+                              disabled={!canWriteHostel}
+                              title="Edit"
+                              className="text-indigo-600 hover:text-indigo-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-pencil-square" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => deleteMaintenance(req)}
+                              disabled={!canWriteHostel}
+                              title="Delete"
+                              className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-trash" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* MAINTENANCE MODAL */}
+        {maintenanceModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
+                {maintenanceForm.id
+                  ? "Edit Maintenance Request"
+                  : "New Maintenance Request"}
+              </h2>
+
+              <div className="space-y-3">
+                <input
+                  value={maintenanceForm.title}
+                  onChange={(e) =>
+                    updateMaintenanceForm("title", e.target.value)
+                  }
+                  placeholder="Title (e.g. AC not working)"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+
+                <textarea
+                  value={maintenanceForm.description}
+                  onChange={(e) =>
+                    updateMaintenanceForm("description", e.target.value)
+                  }
+                  placeholder="Description (optional)"
+                  rows={3}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    value={maintenanceForm.room_id}
+                    onChange={(e) =>
+                      updateMaintenanceForm("room_id", e.target.value)
+                    }
+                    placeholder="Room ID (optional)"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+
+                  <select
+                    value={maintenanceForm.block_id}
+                    onChange={(e) =>
+                      updateMaintenanceForm("block_id", e.target.value)
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  >
+                    <option value="">No block (hostel-wide)</option>
+                    {blockOptions.map((block) => (
+                      <option key={block.id} value={block.id}>
+                        {block.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <p className="text-xs text-gray-400">
+                  Set either a Room ID or a Block, or leave both blank for a
+                  hostel-wide request.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <select
+                    value={maintenanceForm.category}
+                    onChange={(e) =>
+                      updateMaintenanceForm("category", e.target.value)
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  >
+                    <option value="Electrical">Electrical</option>
+                    <option value="Plumbing">Plumbing</option>
+                    <option value="Carpentry">Carpentry</option>
+                    <option value="HVAC">HVAC</option>
+                    <option value="Painting">Painting</option>
+                    <option value="Other">Other</option>
+                  </select>
+
+                  <select
+                    value={maintenanceForm.priority}
+                    onChange={(e) =>
+                      updateMaintenanceForm("priority", e.target.value)
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+
+                <select
+                  value={maintenanceForm.assigned_staff_id}
+                  onChange={(e) =>
+                    updateMaintenanceForm("assigned_staff_id", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">Unassigned</option>
+                  {staffList.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.name} ({staff.role})
+                    </option>
+                  ))}
+                </select>
+
+                {maintenanceForm.id && (
+                  <>
+                    <select
+                      value={maintenanceForm.status}
+                      onChange={(e) =>
+                        updateMaintenanceForm("status", e.target.value)
+                      }
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    >
+                      <option value="Open">Open</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Resolved</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+
+                    <textarea
+                      value={maintenanceForm.resolution_notes}
+                      onChange={(e) =>
+                        updateMaintenanceForm(
+                          "resolution_notes",
+                          e.target.value,
+                        )
+                      }
+                      placeholder="Resolution notes (optional)"
+                      rows={2}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+                  </>
+                )}
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeMaintenanceModal}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={saveMaintenance}
+                  disabled={maintenanceSaving}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {maintenanceSaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ===================== PROFILE SECTION START ========================*/}

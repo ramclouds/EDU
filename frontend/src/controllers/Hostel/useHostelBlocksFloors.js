@@ -37,13 +37,7 @@ const EMPTY_STATS = {
     available_beds: 0,
 };
 
-/**
- * Drives the "Floors & Blocks" dashboard section: the full
- * Hostel -> Block -> Floor structure tree plus create/edit/delete
- * modals for all three levels. Rooms/Beds themselves are managed by
- * useHostelRooms.js / useHostelBeds.js - this hook only goes as deep
- * as Floor, matching the section's own scope.
- */
+
 export function useHostelBlocksFloors({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 

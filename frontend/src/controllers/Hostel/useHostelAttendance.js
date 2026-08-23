@@ -19,11 +19,6 @@ const EMPTY_STATS = {
     late_entry: 0,
 };
 
-/**
- * Drives the "Attendance" dashboard section: a daily roster of every
- * currently-resident student (present or not yet marked), with a
- * date picker and quick Present/Absent/On Leave mark actions.
- */
 export function useHostelAttendance({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 

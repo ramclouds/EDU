@@ -652,6 +652,11 @@ CREATE TABLE IF NOT EXISTS `hostel_complaints` (
   `room_id` int DEFAULT NULL,
   `issue` text,
   `status` enum('Pending','In Progress','Resolved') DEFAULT NULL,
+  `category` enum('Electrical','Plumbing','Cleaning','Furniture','Internet','Other') DEFAULT NULL,
+  `priority` enum('Low','Medium','High','Urgent') DEFAULT NULL,
+  `resolution_notes` text,
+  `created_at` datetime DEFAULT NULL,
+  `resolved_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `student_id` (`student_id`),
   KEY `room_id` (`room_id`),
@@ -697,6 +702,29 @@ CREATE TABLE IF NOT EXISTS `hostel_leave_requests` (
   PRIMARY KEY (`id`),
   KEY `student_id` (`student_id`),
   CONSTRAINT `hostel_leave_requests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_maintenance_requests
+CREATE TABLE IF NOT EXISTS `hostel_maintenance_requests` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `room_id` int DEFAULT NULL,
+  `block_id` int DEFAULT NULL,
+  `title` varchar(150) NOT NULL,
+  `description` text,
+  `category` enum('Electrical','Plumbing','Carpentry','HVAC','Painting','Other') DEFAULT NULL,
+  `priority` enum('Low','Medium','High','Urgent') DEFAULT NULL,
+  `status` enum('Open','In Progress','Resolved','Cancelled') NOT NULL,
+  `assigned_staff_id` int DEFAULT NULL,
+  `resolution_notes` text,
+  `created_at` datetime DEFAULT NULL,
+  `resolved_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `room_id` (`room_id`),
+  KEY `block_id` (`block_id`),
+  KEY `assigned_staff_id` (`assigned_staff_id`),
+  CONSTRAINT `hostel_maintenance_requests_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `hostel_maintenance_requests_ibfk_2` FOREIGN KEY (`block_id`) REFERENCES `hostel_blocks` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `hostel_maintenance_requests_ibfk_3` FOREIGN KEY (`assigned_staff_id`) REFERENCES `hostel_staff` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- hostel_meal_attendance

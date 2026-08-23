@@ -25,11 +25,6 @@ const EMPTY_VISITOR_FORM = {
     purpose: "",
 };
 
-/**
- * Drives the "Visitors Management" dashboard section: log a new visitor
- * request, search/filter existing ones, and the approve / reject /
- * check-out workflow.
- */
 export function useHostelVisitors({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 

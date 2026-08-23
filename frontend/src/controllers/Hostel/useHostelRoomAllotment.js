@@ -17,12 +17,6 @@ const EMPTY_STATS = {
     fee_pending: 0,
 };
 
-/**
- * Drives the "Room Allotment" dashboard section: the same allocation
- * records as useHostelStudents.js, presented room/bed-first, with a
- * Transfer action (move a student to a different vacant bed) on top
- * of check-out.
- */
 export function useHostelRoomAllotment({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 
@@ -179,9 +173,9 @@ export function useHostelRoomAllotment({ activeSection, fetchWithAuth, showToast
         [canWriteHostel, loadAllotments, notify, request],
     );
 
-    // ============================================================
+
     // TRANSFER
-    // ============================================================
+
     const openTransferModal = useCallback(
         async (allotment) => {
             if (!canWriteHostel) {

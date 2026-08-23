@@ -30,11 +30,6 @@ const EMPTY_STAFF_FORM = {
     status: "Active",
 };
 
-/**
- * Drives the "Hostel Staff Management" dashboard section: wardens,
- * security guards, cleaners, cooks and maintenance staff. Search/filter,
- * create/edit/delete.
- */
 export function useHostelStaff({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 

@@ -23,12 +23,6 @@ const EMPTY_ROOM_FORM = {
     initial_bed_count: "0",
 };
 
-/**
- * Drives the "Rooms" dashboard section: list/filter every room across
- * every floor & block, and create/edit/delete a room. Beds themselves
- * are managed by useHostelBeds.js - opening a room from here can hand
- * off to that section pre-filtered to just this room.
- */
 export function useHostelRooms({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 

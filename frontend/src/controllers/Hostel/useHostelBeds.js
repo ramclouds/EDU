@@ -17,11 +17,6 @@ const EMPTY_BED_FORM = {
     bed_type: "Standard",
 };
 
-/**
- * Drives the "Bed Management" dashboard section: list/filter every
- * bed, create/edit/delete a bed, and the check-in/check-out actions
- * (allocate a student to a vacant bed, vacate an occupied one).
- */
 export function useHostelBeds({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 
@@ -146,9 +141,9 @@ export function useHostelBeds({ activeSection, fetchWithAuth, showToast }) {
         loadBeds({ filters });
     }, [loadBeds]);
 
-    // ============================================================
+
     // BED CRUD
-    // ============================================================
+
     const openCreateBedModal = useCallback((roomId) => {
         setBedForm({ ...EMPTY_BED_FORM, room_id: roomId || "" });
         setBedModalOpen(true);
@@ -245,9 +240,8 @@ export function useHostelBeds({ activeSection, fetchWithAuth, showToast }) {
         [canWriteHostel, loadBeds, notify, request],
     );
 
-    // ============================================================
+
     // ALLOCATE (CHECK-IN)
-    // ============================================================
     const openAllocateModal = useCallback(
         (bed) => {
             if (!canWriteHostel) {
@@ -332,9 +326,9 @@ export function useHostelBeds({ activeSection, fetchWithAuth, showToast }) {
         }
     }, [allocateTargetBed, canWriteHostel, loadBeds, notify, request, selectedStudentId]);
 
-    // ============================================================
+
     // VACATE (CHECK-OUT)
-    // ============================================================
+
     const vacateBed = useCallback(
         async (bed) => {
             if (!canWriteHostel) {

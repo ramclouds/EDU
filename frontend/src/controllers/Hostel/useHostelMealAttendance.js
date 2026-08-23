@@ -19,12 +19,6 @@ const EMPTY_STATS = {
     not_marked: 0,
 };
 
-/**
- * Drives the "Meal Attendance" dashboard section: a per-meal roster
- * (date + meal type) of every currently-resident student, with quick
- * Present/Absent mark actions and a "Mark All Present" shortcut for
- * the ones nobody has touched yet.
- */
 export function useHostelMealAttendance({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 

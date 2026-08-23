@@ -23,11 +23,6 @@ const EMPTY_LEAVE_FORM = {
     reason: "",
 };
 
-/**
- * Drives the "Leave Requests" dashboard section: submit a leave request
- * on a student's behalf, and the Pending -> Approved/Rejected -> Returned
- * workflow.
- */
 export function useHostelLeaveRequests({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 
