@@ -30,6 +30,11 @@ import {
 import { useHostelMealAttendance } from "../controllers/Hostel/useHostelMealAttendance";
 import { useHostelComplaints } from "../controllers/Hostel/useHostelComplaints";
 import { useHostelMaintenance } from "../controllers/Hostel/useHostelMaintenance";
+import { useHostelFeeManagement } from "../controllers/Hostel/useHostelFeeManagement";
+import { useHostelPayments } from "../controllers/Hostel/useHostelPayments";
+import { useHostelPendingDues } from "../controllers/Hostel/useHostelPendingDues";
+import { useHostelReports } from "../controllers/Hostel/useHostelReports";
+import { useHostelActivityLogs } from "../controllers/Hostel/useHostelActivityLogs";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -123,7 +128,14 @@ function AdminDashboard() {
     allowedModules,
   } = useAdminProfile({ fetchWithAuth, showToast });
 
+  // Read vs Full Access for this whole dashboard, driven by Role &
+  // Permission Management on the Super Admin dashboard. Read Only ->
+  // can view/filter everywhere below, but every add/edit/delete/
+  // allocate/vacate action is hidden or blocked.
   const { canWriteHostel, hostelAccessLevel } = useHostelPermission();
+
+  // Every dashboard (including this one) this admin currently has
+  // access to - powers the "OTHER DASHBOARDS" sidebar links below.
   const { dashboards: accessibleDashboards } = useDashboardAccess();
 
   const otherAccessibleDashboards = (accessibleDashboards || []).filter(
@@ -526,6 +538,103 @@ function AdminDashboard() {
     quickUpdateStatus,
   } = useHostelMaintenance({ activeSection, fetchWithAuth, showToast });
 
+  // ================= FEE MANAGEMENT SECTION HOOK =================
+  const {
+    structures: feeStructures,
+    structuresLoading: feeStructuresLoading,
+    fees: feeManagementFees,
+    feeStats: feeManagementStats,
+    feesLoading: feeManagementLoading,
+    refreshAll: refreshFeeManagement,
+    loadFees: loadFeeManagementFees,
+
+    structureModalOpen,
+    structureForm,
+    structureSaving,
+    openCreateStructureModal,
+    openEditStructureModal,
+    closeStructureModal,
+    updateStructureForm,
+    saveStructure,
+    deleteStructure,
+
+    generateModalOpen,
+    generateForm,
+    generateSaving,
+    openGenerateModal,
+    closeGenerateModal,
+    updateGenerateForm,
+    generateInvoices,
+  } = useHostelFeeManagement({ activeSection, fetchWithAuth, showToast });
+
+  // ================= PAYMENT SECTION HOOK =================
+  const {
+    payments,
+    paymentStats,
+    paymentsLoading,
+    paymentFilters,
+
+    loadPayments,
+    updatePaymentFilter,
+    applyPaymentFilters,
+    resetPaymentFilters,
+
+    paymentModalOpen,
+    paymentForm,
+    paymentSaving,
+    openPaymentModal,
+    closePaymentModal,
+    updatePaymentForm,
+
+    studentSearch: paymentStudentSearch,
+    setStudentSearch: setPaymentStudentSearch,
+    studentResults: paymentStudentResults,
+    studentSearchLoading: paymentStudentSearchLoading,
+    selectedStudent: selectedPaymentStudent,
+    searchStudentsForPayment,
+    selectPaymentStudent,
+
+    studentFees,
+    studentFeesLoading,
+    selectedFee,
+    selectPaymentFee,
+
+    savePayment,
+  } = useHostelPayments({ activeSection, fetchWithAuth, showToast });
+
+  // ================= PENDING DUES SECTION HOOK =================
+  const {
+    dues,
+    duesStats,
+    duesLoading,
+    duesFilters,
+
+    loadDues,
+    updateDuesFilter,
+    applyDuesFilters,
+    resetDuesFilters,
+  } = useHostelPendingDues({ activeSection, fetchWithAuth, showToast });
+
+  // ================= REPORTS & ANALYTICS SECTION HOOK =================
+  const { report, reportLoading, loadReport } = useHostelReports({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
+  // ================= ACTIVITY LOGS SECTION HOOK =================
+  const {
+    logs,
+    logStats,
+    logsLoading,
+    logFilters,
+
+    loadLogs,
+    updateLogFilter,
+    applyLogFilters,
+    resetLogFilters,
+  } = useHostelActivityLogs({ activeSection, fetchWithAuth, showToast });
+
   useEffect(() => {
     if (window.innerWidth >= 768) {
       setSidebarOpen(true);
@@ -657,6 +766,9 @@ function AdminDashboard() {
               items: [
                 ["complaints", "bi-tools", "Complaints"],
                 ["maintenance", "bi-wrench-adjustable", "Maintenance"],
+                ["fee-management", "bi-cash-stack", "Fee Management"],
+                ["payment", "bi-credit-card", "Payment"],
+                ["pending-dues", "bi-exclamation-diamond", "Pending Dues"],
               ],
             },
 
@@ -700,16 +812,16 @@ function AdminDashboard() {
               {section.items.map(([key, icon, label]) => {
                 const isActive = activeSection === key;
 
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    title={!sidebarExpanded ? label : ""}
-                    onClick={() => {
-                      setActiveSection(key);
-                      closeSidebarOnMobile();
-                    }}
-                    className={`relative flex w-full items-center rounded-xl py-3
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      title={!sidebarExpanded ? label : ""}
+                      onClick={() => {
+                        setActiveSection(key);
+                        closeSidebarOnMobile();
+                      }}
+                      className={`relative flex w-full items-center rounded-xl py-3
                 transition-all duration-300 ease-in-out
                 ${
                   sidebarExpanded
@@ -721,26 +833,26 @@ function AdminDashboard() {
                     ? "bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-500/20 dark:to-indigo-500/20 text-purple-700 dark:text-purple-300 font-semibold shadow"
                     : "text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white"
                 }`}
-                  >
-                    {isActive && (
-                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-purple-600 rounded-r-full" />
-                    )}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-purple-600 rounded-r-full" />
+                      )}
 
-                    <i className={`bi ${icon} text-base shrink-0`} />
+                      <i className={`bi ${icon} text-base shrink-0`} />
 
-                    <span
-                      className={`whitespace-nowrap truncate overflow-hidden transition-all duration-300 ease-in-out
+                      <span
+                        className={`whitespace-nowrap truncate overflow-hidden transition-all duration-300 ease-in-out
                   ${
                     sidebarExpanded
                       ? "opacity-100 max-w-[190px]"
                       : "opacity-0 max-w-0"
                   }`}
-                    >
-                      {label}
-                    </span>
-                  </button>
-                );
-              })}
+                      >
+                        {label}
+                      </span>
+                    </button>
+                  );
+                })}
             </div>
           ))}
 
@@ -7495,6 +7607,1771 @@ function AdminDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* <!-- =========================== FEE MANAGEMENT SECTION =========================== --> */}
+        {activeSection === "fee-management" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Fee Management
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Define fee structures and generate invoices for residents
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => refreshFeeManagement()}
+                    disabled={feeManagementLoading || feeStructuresLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        feeManagementLoading || feeStructuresLoading
+                          ? "animate-spin"
+                          : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openCreateStructureModal()}
+                    disabled={!canWriteHostel}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i className="bi bi-plus-lg" />
+                    New Fee Structure
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total Invoiced",
+                  value: `₹${feeManagementStats.total_amount ?? 0}`,
+                  icon: "bi-receipt",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Collected",
+                  value: `₹${feeManagementStats.total_collected ?? 0}`,
+                  icon: "bi-cash-coin",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+                {
+                  label: "Outstanding",
+                  value: `₹${feeManagementStats.total_pending ?? 0}`,
+                  icon: "bi-hourglass-split",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "Overdue Invoices",
+                  value: feeManagementStats.overdue_count ?? 0,
+                  icon: "bi-exclamation-circle",
+                  classes:
+                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {feeManagementLoading ? "…" : stat.value}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FEE STRUCTURES */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Fee Structures
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {feeStructures.length} structure(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[880px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Fee Type
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Hostel
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Academic Year
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {feeStructuresLoading && feeStructures.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading fee structures...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!feeStructuresLoading && feeStructures.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-14 text-center">
+                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            <i className="bi bi-cash-stack text-2xl" />
+                          </span>
+                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                            No fee structures yet
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Create one to start generating invoices.
+                          </p>
+
+                          <button
+                            type="button"
+                            onClick={() => openCreateStructureModal()}
+                            disabled={!canWriteHostel}
+                            className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            New Fee Structure
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+
+                    {feeStructures.map((structure) => (
+                      <tr
+                        key={structure.id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          {structure.fee_type}
+                          {structure.description && (
+                            <p className="text-xs font-normal text-gray-500 dark:text-gray-400">
+                              {structure.description}
+                            </p>
+                          )}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {structure.hostel_name || "All Hostels"}
+                        </td>
+
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          ₹{structure.amount}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {structure.academic_year || "—"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              structure.status === "Active"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {structure.status}
+                          </span>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-end gap-3 text-base">
+                            <button
+                              type="button"
+                              onClick={() => openGenerateModal(structure)}
+                              disabled={!canWriteHostel}
+                              title="Generate invoices"
+                              className="text-emerald-600 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-send-check" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => openEditStructureModal(structure)}
+                              disabled={!canWriteHostel}
+                              title="Edit"
+                              className="text-indigo-600 hover:text-indigo-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-pencil-square" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => deleteStructure(structure)}
+                              disabled={!canWriteHostel}
+                              title="Delete"
+                              className="text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <i className="bi bi-trash" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* FEE INVOICES OVERVIEW */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  All Fee Invoices
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {feeManagementFees.length} invoice(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[880px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Fee Type
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Paid
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Balance
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {feeManagementLoading && feeManagementFees.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading invoices...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!feeManagementLoading &&
+                      feeManagementFees.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="py-14 text-center text-gray-500 dark:text-gray-400"
+                          >
+                            No invoices generated yet.
+                          </td>
+                        </tr>
+                      )}
+
+                    {feeManagementFees.map((fee) => (
+                      <tr
+                        key={fee.id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {fee.student_name}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {fee.student_code}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {fee.fee_type}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          ₹{fee.amount}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          ₹{fee.paid_amount}
+                        </td>
+
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          ₹{fee.balance}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              fee.status === "Paid"
+                                ? "bg-green-100 text-green-700"
+                                : fee.status === "Partially Paid"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : fee.status === "Overdue"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {fee.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* FEE STRUCTURE MODAL */}
+        {structureModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
+                {structureForm.id ? "Edit Fee Structure" : "New Fee Structure"}
+              </h2>
+
+              <div className="space-y-3">
+                <select
+                  value={structureForm.fee_type}
+                  onChange={(e) =>
+                    updateStructureForm("fee_type", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="Admission">Admission</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Quarterly">Quarterly</option>
+                  <option value="Annual">Annual</option>
+                  <option value="Security Deposit">Security Deposit</option>
+                  <option value="Mess Fee">Mess Fee</option>
+                  <option value="Other">Other</option>
+                </select>
+
+                <select
+                  value={structureForm.hostel_id}
+                  onChange={(e) =>
+                    updateStructureForm("hostel_id", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Hostels</option>
+                  {hostelOptions.map((hostel) => (
+                    <option key={hostel.id} value={hostel.id}>
+                      {hostel.name}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="number"
+                  value={structureForm.amount}
+                  onChange={(e) =>
+                    updateStructureForm("amount", e.target.value)
+                  }
+                  placeholder="Amount (₹)"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+
+                <input
+                  value={structureForm.academic_year}
+                  onChange={(e) =>
+                    updateStructureForm("academic_year", e.target.value)
+                  }
+                  placeholder="Academic year (e.g. 2026-27)"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+
+                <input
+                  value={structureForm.description}
+                  onChange={(e) =>
+                    updateStructureForm("description", e.target.value)
+                  }
+                  placeholder="Description (optional)"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+
+                <select
+                  value={structureForm.status}
+                  onChange={(e) =>
+                    updateStructureForm("status", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeStructureModal}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={saveStructure}
+                  disabled={structureSaving}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {structureSaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* GENERATE INVOICES MODAL */}
+        {generateModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+              <h2 className="mb-1 text-lg font-bold text-gray-900 dark:text-white">
+                Generate Invoices
+              </h2>
+              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                Creates an invoice for every current resident who doesn't
+                already have one for this fee structure.
+              </p>
+
+              <div className="space-y-3">
+                <select
+                  value={generateForm.fee_structure_id}
+                  onChange={(e) =>
+                    updateGenerateForm("fee_structure_id", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">Select fee structure…</option>
+                  {feeStructures.map((structure) => (
+                    <option key={structure.id} value={structure.id}>
+                      {structure.fee_type} - ₹{structure.amount} (
+                      {structure.hostel_name || "All Hostels"})
+                    </option>
+                  ))}
+                </select>
+
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                    Due Date (optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={generateForm.due_date}
+                    onChange={(e) =>
+                      updateGenerateForm("due_date", e.target.value)
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeGenerateModal}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={generateInvoices}
+                  disabled={generateSaving}
+                  className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {generateSaving ? "Generating…" : "Generate"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* <!-- =========================== PAYMENT SECTION =========================== --> */}
+        {activeSection === "payment" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">Payment</h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Record payments against a student's fee invoices and browse
+                    the payment history
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => loadPayments()}
+                    disabled={paymentsLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        paymentsLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openPaymentModal()}
+                    disabled={!canWriteHostel}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i className="bi bi-cash-coin" />
+                    Record Payment
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Total Payments
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                      {paymentsLoading
+                        ? "…"
+                        : (paymentStats.total_payments ?? 0)}
+                    </p>
+                  </div>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                    <i className="bi bi-receipt-cutoff text-lg" />
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      Total Collected
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                      {paymentsLoading
+                        ? "…"
+                        : `₹${paymentStats.total_collected ?? 0}`}
+                    </p>
+                  </div>
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300">
+                    <i className="bi bi-cash-stack text-lg" />
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={paymentFilters.search}
+                    onChange={(e) =>
+                      updatePaymentFilter("search", e.target.value)
+                    }
+                    placeholder="Search student or transaction ref..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={paymentFilters.payment_method}
+                  onChange={(e) =>
+                    updatePaymentFilter("payment_method", e.target.value)
+                  }
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Methods</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Other">Other</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyPaymentFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetPaymentFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* PAYMENT HISTORY TABLE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Payment History
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {payments.length} transaction(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[880px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Fee Type
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Method
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Reference
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Date
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {paymentsLoading && payments.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading payments...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!paymentsLoading && payments.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-14 text-center">
+                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                            <i className="bi bi-credit-card text-2xl" />
+                          </span>
+                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                            No payments recorded yet
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            No records match these filters.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {payments.map((payment) => (
+                      <tr
+                        key={payment.id}
+                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <td className="px-6 py-4">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {payment.student_name}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {payment.student_code}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {payment.fee_type || "—"}
+                        </td>
+
+                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                          ₹{payment.amount}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {payment.payment_method}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {payment.transaction_reference || "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {payment.payment_date || "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* RECORD PAYMENT MODAL */}
+        {paymentModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
+                Record Payment
+              </h2>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                    Student
+                  </label>
+
+                  <div className="flex gap-2">
+                    <input
+                      value={paymentStudentSearch}
+                      onChange={(e) => setPaymentStudentSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          searchStudentsForPayment(paymentStudentSearch);
+                        }
+                      }}
+                      placeholder="Search student by name..."
+                      className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        searchStudentsForPayment(paymentStudentSearch)
+                      }
+                      className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                    >
+                      Search
+                    </button>
+                  </div>
+
+                  <div className="mt-2 max-h-32 overflow-y-auto rounded-xl border border-gray-100 dark:border-slate-700 divide-y dark:divide-slate-700">
+                    {paymentStudentSearchLoading && (
+                      <p className="py-4 text-center text-xs text-gray-400">
+                        Searching...
+                      </p>
+                    )}
+
+                    {!paymentStudentSearchLoading &&
+                      paymentStudentResults.length === 0 && (
+                        <p className="py-4 text-center text-xs text-gray-400">
+                          Search for a student to select them.
+                        </p>
+                      )}
+
+                    {paymentStudentResults.map((student) => (
+                      <button
+                        type="button"
+                        key={student.id}
+                        onClick={() => selectPaymentStudent(student)}
+                        className={`flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
+                          selectedPaymentStudent?.id === student.id
+                            ? "bg-indigo-50 dark:bg-indigo-500/20"
+                            : "hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                        }`}
+                      >
+                        <span>{student.name}</span>
+                        <span className="text-xs text-gray-400">
+                          {student.student_code}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedPaymentStudent && (
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                      Outstanding Invoice
+                    </label>
+
+                    {studentFeesLoading && (
+                      <p className="py-3 text-center text-xs text-gray-400">
+                        Loading dues...
+                      </p>
+                    )}
+
+                    {!studentFeesLoading && studentFees.length === 0 && (
+                      <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:bg-slate-700/50 dark:text-gray-400">
+                        This student has no outstanding invoices.
+                      </p>
+                    )}
+
+                    <div className="space-y-1">
+                      {studentFees.map((fee) => (
+                        <button
+                          type="button"
+                          key={fee.id}
+                          onClick={() => selectPaymentFee(fee)}
+                          className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left text-sm ${
+                            selectedFee?.id === fee.id
+                              ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
+                              : "border-gray-100 hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-700/50"
+                          }`}
+                        >
+                          <span>{fee.fee_type}</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-200">
+                            Balance ₹{fee.balance}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <input
+                  type="number"
+                  value={paymentForm.amount}
+                  onChange={(e) => updatePaymentForm("amount", e.target.value)}
+                  placeholder="Amount (₹)"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+
+                <select
+                  value={paymentForm.payment_method}
+                  onChange={(e) =>
+                    updatePaymentForm("payment_method", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Other">Other</option>
+                </select>
+
+                <input
+                  value={paymentForm.transaction_reference}
+                  onChange={(e) =>
+                    updatePaymentForm("transaction_reference", e.target.value)
+                  }
+                  placeholder="Transaction reference (optional)"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+
+                <input
+                  type="date"
+                  value={paymentForm.payment_date}
+                  onChange={(e) =>
+                    updatePaymentForm("payment_date", e.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closePaymentModal}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:hover:bg-slate-600"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={savePayment}
+                  disabled={paymentSaving}
+                  className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {paymentSaving ? "Saving…" : "Record Payment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* <!-- =========================== PENDING DUES SECTION =========================== --> */}
+        {activeSection === "pending-dues" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Pending Dues
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Every invoice with an outstanding balance, most overdue
+                    first
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => loadDues()}
+                  disabled={duesLoading}
+                  className="inline-flex items-center gap-2 self-start rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <i
+                    className={`bi bi-arrow-clockwise ${
+                      duesLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total Outstanding",
+                  value: `₹${duesStats.total_pending ?? 0}`,
+                  icon: "bi-hourglass-split",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "Overdue Invoices",
+                  value: duesStats.overdue_count ?? 0,
+                  icon: "bi-exclamation-circle",
+                  classes:
+                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                },
+                {
+                  label: "Total Invoiced",
+                  value: `₹${duesStats.total_amount ?? 0}`,
+                  icon: "bi-receipt",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Collected So Far",
+                  value: `₹${duesStats.total_collected ?? 0}`,
+                  icon: "bi-cash-coin",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {duesLoading ? "…" : stat.value}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={duesFilters.search}
+                    onChange={(e) => updateDuesFilter("search", e.target.value)}
+                    placeholder="Search student or room..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={duesFilters.status}
+                  onChange={(e) => updateDuesFilter("status", e.target.value)}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All (Pending / Partial / Overdue)</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Partially Paid">Partially Paid</option>
+                  <option value="Overdue">Overdue</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyDuesFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetDuesFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* PENDING DUES TABLE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Outstanding Invoices
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {dues.length} invoice(s)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[960px] text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
+                    <tr>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Student
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Room
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Fee Type
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Balance
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Due Date
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                    {duesLoading && dues.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-16 text-center">
+                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
+                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                            Loading pending dues...
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {!duesLoading && dues.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-14 text-center">
+                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-300">
+                            <i className="bi bi-check2-circle text-2xl" />
+                          </span>
+                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                            No outstanding dues
+                          </h3>
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            Every invoice matching these filters is fully paid.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
+
+                    {dues.map((fee) => (
+                      <tr
+                        key={fee.id}
+                        className={`transition hover:bg-gray-50 dark:hover:bg-slate-700/40 ${
+                          fee.status === "Overdue"
+                            ? "bg-red-50/50 dark:bg-red-500/5"
+                            : ""
+                        }`}
+                      >
+                        <td className="px-6 py-4">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {fee.student_name}
+                          </h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {fee.student_code}
+                          </p>
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {fee.room_number || "—"}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {fee.fee_type}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          ₹{fee.amount}
+                        </td>
+
+                        <td className="px-6 py-4 font-semibold text-red-600 dark:text-red-400">
+                          ₹{fee.balance}
+                        </td>
+
+                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">
+                          {fee.due_date || "—"}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                              fee.status === "Overdue"
+                                ? "bg-red-100 text-red-700"
+                                : fee.status === "Partially Paid"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {fee.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {duesStats.overdue_count > 0 && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-500/30 dark:bg-red-500/10">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+                    <i className="bi bi-exclamation-triangle" />
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-red-800 dark:text-red-300">
+                      Overdue Fees
+                    </h3>
+
+                    <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                      {duesStats.overdue_count} invoice(s) are past their due
+                      date. Head to the Payment section to record a collection.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* <!-- =========================== REPORTS & ANALYTICS SECTION =========================== --> */}
+        {activeSection === "reports" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Reports &amp; Analytics
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    A snapshot across occupancy, fees, complaints and attendance
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => loadReport()}
+                  disabled={reportLoading}
+                  className="inline-flex items-center gap-2 self-start rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <i
+                    className={`bi bi-arrow-clockwise ${
+                      reportLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* TOP-LEVEL KPIs */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Occupancy Rate",
+                  value: `${report.occupancy.occupancy_rate}%`,
+                  sub: `${report.occupancy.occupied_beds} / ${report.occupancy.total_beds} beds`,
+                  icon: "bi-house-check",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Fee Collection Rate",
+                  value: `${report.fees.collection_rate}%`,
+                  sub: `₹${report.fees.total_collected} of ₹${report.fees.total_invoiced}`,
+                  icon: "bi-cash-coin",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+                {
+                  label: "Complaint Resolution",
+                  value: `${report.complaints.resolution_rate}%`,
+                  sub: `${report.complaints.resolved} / ${report.complaints.total} resolved`,
+                  icon: "bi-check2-circle",
+                  classes:
+                    "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+                },
+                {
+                  label: "Active Residents",
+                  value: report.occupancy.active_residents,
+                  sub: `${report.movement.currently_outside} currently outside`,
+                  icon: "bi-people",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {reportLoading ? "…" : stat.value}
+                      </p>
+
+                      <p className="mt-1 text-xs text-gray-400">{stat.sub}</p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {/* OCCUPANCY BY BLOCK */}
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <h3 className="mb-4 font-semibold text-gray-900 dark:text-white">
+                  Occupancy by Block
+                </h3>
+
+                {reportLoading && report.occupancy.by_block.length === 0 && (
+                  <p className="py-8 text-center text-sm text-gray-400">
+                    Loading...
+                  </p>
+                )}
+
+                {!reportLoading && report.occupancy.by_block.length === 0 && (
+                  <p className="py-8 text-center text-sm text-gray-400">
+                    No blocks with beds configured yet.
+                  </p>
+                )}
+
+                <div className="space-y-3">
+                  {report.occupancy.by_block.map((block) => (
+                    <div key={block.block_name}>
+                      <div className="mb-1 flex items-center justify-between text-sm">
+                        <span className="font-medium text-gray-700 dark:text-gray-200">
+                          Block {block.block_name}
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400">
+                          {block.occupied_beds}/{block.total_beds} (
+                          {block.occupancy_rate}%)
+                        </span>
+                      </div>
+
+                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
+                        <div
+                          className="h-full rounded-full bg-indigo-500"
+                          style={{ width: `${block.occupancy_rate}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ATTENDANCE TREND (LAST 7 DAYS) */}
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <h3 className="mb-4 font-semibold text-gray-900 dark:text-white">
+                  Attendance - Last 7 Days
+                </h3>
+
+                {reportLoading && report.attendance_trend.length === 0 && (
+                  <p className="py-8 text-center text-sm text-gray-400">
+                    Loading...
+                  </p>
+                )}
+
+                <div className="flex items-end justify-between gap-2 h-40">
+                  {report.attendance_trend.map((day) => {
+                    const total = Math.max(day.marked, 1);
+                    const presentPct = Math.round((day.present / total) * 100);
+
+                    return (
+                      <div
+                        key={day.date}
+                        className="flex flex-1 flex-col items-center gap-1"
+                      >
+                        <div className="flex h-32 w-full items-end overflow-hidden rounded-lg bg-gray-100 dark:bg-slate-700">
+                          <div
+                            className="w-full bg-green-500 transition-all"
+                            style={{
+                              height: day.marked > 0 ? `${presentPct}%` : "2%",
+                            }}
+                            title={`${day.present} present / ${day.marked} marked`}
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(day.date).toLocaleDateString(undefined, {
+                            weekday: "short",
+                          })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* FEES & MAINTENANCE SUMMARY */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <h3 className="mb-4 font-semibold text-gray-900 dark:text-white">
+                  Fee Collection
+                </h3>
+
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Total Invoiced
+                    </span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      ₹{report.fees.total_invoiced}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Collected
+                    </span>
+                    <span className="font-semibold text-green-600">
+                      ₹{report.fees.total_collected}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Outstanding
+                    </span>
+                    <span className="font-semibold text-red-500">
+                      ₹{report.fees.total_pending}
+                    </span>
+                  </div>
+
+                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
+                    <div
+                      className="h-full rounded-full bg-green-500"
+                      style={{ width: `${report.fees.collection_rate}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <h3 className="mb-4 font-semibold text-gray-900 dark:text-white">
+                  Complaints &amp; Maintenance
+                </h3>
+
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Complaints Resolved
+                    </span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      {report.complaints.resolved} / {report.complaints.total}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Maintenance Resolved
+                    </span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      {report.maintenance.resolved} / {report.maintenance.total}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Vacant Beds
+                    </span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      {report.occupancy.vacant_beds}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Beds Under Maintenance
+                    </span>
+                    <span className="font-semibold text-gray-900 dark:text-white">
+                      {report.occupancy.maintenance_beds}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* <!-- =========================== ACTIVITY LOGS SECTION =========================== --> */}
+        {activeSection === "activity-logs" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Activity Logs
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    An audit trail of significant admin actions across the
+                    hostel module
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => loadLogs()}
+                  disabled={logsLoading}
+                  className="inline-flex items-center gap-2 self-start rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <i
+                    className={`bi bi-arrow-clockwise ${
+                      logsLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total Actions",
+                  value: logStats.total,
+                  icon: "bi-shield-check",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Allocations",
+                  value: logStats.by_category?.Allocation || 0,
+                  icon: "bi-house-check",
+                  classes:
+                    "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+                },
+                {
+                  label: "Payments",
+                  value: logStats.by_category?.Payment || 0,
+                  icon: "bi-cash-coin",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+                {
+                  label: "Leave / Visitor",
+                  value:
+                    (logStats.by_category?.Leave || 0) +
+                    (logStats.by_category?.Visitor || 0),
+                  icon: "bi-person-lines-fill",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {logsLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={logFilters.search}
+                    onChange={(e) => updateLogFilter("search", e.target.value)}
+                    placeholder="Search description or admin..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={logFilters.category}
+                  onChange={(e) => updateLogFilter("category", e.target.value)}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="">All Categories</option>
+                  <option value="Allocation">Allocation</option>
+                  <option value="Payment">Payment</option>
+                  <option value="Complaint">Complaint</option>
+                  <option value="Maintenance">Maintenance</option>
+                  <option value="Leave">Leave</option>
+                  <option value="Staff">Staff</option>
+                  <option value="Visitor">Visitor</option>
+                  <option value="Structure">Structure</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={applyLogFilters}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700"
+                  >
+                    <i className="bi bi-funnel" />
+                    Filter
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetLogFilters}
+                    title="Reset filters"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ACTIVITY LOG TIMELINE */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  Recent Activity
+                </h3>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {logs.length} entr{logs.length === 1 ? "y" : "ies"}
+                </span>
+              </div>
+
+              <div className="max-h-[600px] overflow-y-auto">
+                {logsLoading && logs.length === 0 && (
+                  <div className="flex flex-col items-center gap-3 py-16 text-gray-500 dark:text-gray-400">
+                    <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                    Loading activity...
+                  </div>
+                )}
+
+                {!logsLoading && logs.length === 0 && (
+                  <div className="mx-auto max-w-sm py-14 text-center">
+                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                      <i className="bi bi-shield-check text-2xl" />
+                    </span>
+                    <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                      No activity yet
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Actions taken across the hostel module will show up here.
+                    </p>
+                  </div>
+                )}
+
+                <ul className="divide-y divide-gray-100 dark:divide-slate-700">
+                  {logs.map((log) => {
+                    const categoryStyles = {
+                      Allocation:
+                        "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+                      Payment:
+                        "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300",
+                      Complaint:
+                        "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+                      Maintenance:
+                        "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300",
+                      Leave:
+                        "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300",
+                      Staff:
+                        "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300",
+                      Visitor:
+                        "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
+                      Structure:
+                        "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300",
+                    };
+
+                    const categoryIcons = {
+                      Allocation: "bi-house-check",
+                      Payment: "bi-cash-coin",
+                      Complaint: "bi-chat-square-text",
+                      Maintenance: "bi-tools",
+                      Leave: "bi-journal-check",
+                      Staff: "bi-people",
+                      Visitor: "bi-person-lines-fill",
+                      Structure: "bi-building",
+                    };
+
+                    return (
+                      <li
+                        key={log.id}
+                        className="flex items-start gap-3 px-5 py-4 transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
+                      >
+                        <span
+                          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                            categoryStyles[log.category] ||
+                            "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+                          }`}
+                        >
+                          <i
+                            className={`bi ${
+                              categoryIcons[log.category] || "bi-dot"
+                            }`}
+                          />
+                        </span>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-gray-800 dark:text-gray-100">
+                            {log.description}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-400">
+                            {log.admin_name} ·{" "}
+                            {log.created_at
+                              ? new Date(log.created_at).toLocaleString()
+                              : "—"}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                            categoryStyles[log.category] ||
+                            "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+                          }`}
+                        >
+                          {log.category}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          </section>
         )}
 
         {/* ===================== PROFILE SECTION START ========================*/}

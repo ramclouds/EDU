@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import re
 
 from flask import jsonify, request
@@ -27,6 +27,7 @@ def clean_text(value):
 
 
 def get_student_academic_details(student):
+
     academic_record = (
         db.session.query(StudentAcademicRecord)
         .filter(
@@ -242,6 +243,7 @@ class Room(db.Model):
 
     @property
     def capacity(self):
+
         return self.beds.count()
 
     @property
@@ -342,6 +344,46 @@ class HostelAllocation(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class HostelFeeStructure(db.Model):
+
+    __tablename__ = "hostel_fee_structures"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    fee_type = db.Column(
+        db.Enum(
+            "Admission",
+            "Monthly",
+            "Quarterly",
+            "Annual",
+            "Security Deposit",
+            "Mess Fee",
+            "Other",
+        ),
+        nullable=False,
+        default="Monthly",
+    )
+
+    hostel_id = db.Column(
+        db.Integer,
+        db.ForeignKey("hostels.id", ondelete="SET NULL"),
+    )
+
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    academic_year = db.Column(db.String(20))
+    description = db.Column(db.String(255))
+
+    status = db.Column(
+        db.Enum("Active", "Inactive"),
+        default="Active",
+        nullable=False,
+    )
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    hostel = db.relationship("Hostel", foreign_keys=[hostel_id])
+
+
 class HostelFee(db.Model):
     __tablename__ = "hostel_fees"
 
@@ -358,6 +400,90 @@ class HostelFee(db.Model):
         db.Enum("Pending", "Paid", "Overdue"),
         default="Pending",
     )
+    fee_structure_id = db.Column(
+        db.Integer,
+        db.ForeignKey("hostel_fee_structures.id", ondelete="SET NULL"),
+    )
+    fee_type = db.Column(
+        db.Enum(
+            "Admission",
+            "Monthly",
+            "Quarterly",
+            "Annual",
+            "Security Deposit",
+            "Mess Fee",
+            "Other",
+        ),
+    )
+    due_date = db.Column(db.Date)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    fee_structure = db.relationship(
+        "HostelFeeStructure", foreign_keys=[fee_structure_id]
+    )
+    payments = db.relationship(
+        "HostelFeePayment",
+        backref="fee",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+
+
+class HostelFeePayment(db.Model):
+    __tablename__ = "hostel_fee_payments"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    fee_id = db.Column(
+        db.Integer,
+        db.ForeignKey("hostel_fees.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+
+    payment_method = db.Column(
+        db.Enum("Cash", "Card", "UPI", "Bank Transfer", "Cheque", "Other"),
+        default="Cash",
+    )
+
+    transaction_reference = db.Column(db.String(100))
+    notes = db.Column(db.String(255))
+
+    payment_date = db.Column(db.Date, default=date.today)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class HostelActivityLog(db.Model):
+
+    __tablename__ = "hostel_activity_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    admin_id = db.Column(
+        db.Integer,
+        db.ForeignKey("admins.id", ondelete="SET NULL"),
+    )
+    admin_name = db.Column(db.String(150))
+
+    category = db.Column(
+        db.Enum(
+            "Allocation",
+            "Payment",
+            "Complaint",
+            "Maintenance",
+            "Leave",
+            "Staff",
+            "Visitor",
+            "Structure",
+        ),
+        nullable=False,
+    )
+
+    action = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class HostelComplaint(db.Model):
@@ -382,6 +508,7 @@ class HostelComplaint(db.Model):
         default="Pending",
     )
 
+    # these) keeps working unchanged.
     category = db.Column(
         db.Enum("Electrical", "Plumbing", "Cleaning", "Furniture", "Internet", "Other"),
         default="Other",
@@ -397,6 +524,7 @@ class HostelComplaint(db.Model):
 
 
 class HostelMaintenanceRequest(db.Model):
+
     __tablename__ = "hostel_maintenance_requests"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -497,10 +625,6 @@ class HostelStaff(db.Model):
 
 
 class HostelVisitor(db.Model):
-    """NEW MODEL. Every visitor entry request/log for a hostel student -
-    who they are, who they're visiting, and their approval/entry
-    status."""
-
     __tablename__ = "hostel_visitors"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -536,7 +660,6 @@ class HostelVisitor(db.Model):
 
 
 class HostelAttendance(db.Model):
-
     __tablename__ = "hostel_attendance"
     __table_args__ = (
         db.UniqueConstraint(
@@ -601,6 +724,7 @@ class HostelMovement(db.Model):
 
 
 class HostelLeaveRequest(db.Model):
+
     __tablename__ = "hostel_leave_requests"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -728,6 +852,145 @@ def get_student_room_info(student_id):
         "room_number": room.room_number if room else None,
         "block_name": block.block_name if block else None,
         "bed_number": bed.bed_number if bed else None,
+    }
+
+
+# ============================= RBAC (READ / WRITE) =============================
+def get_fee_payment_summary(fee):
+    """
+    The real, always-correct status/balance for a fee invoice, derived
+    live from its payments rather than trusting a manually-set status
+    column that could drift out of sync as installments come in.
+    """
+
+    paid = sum(float(p.amount) for p in fee.payments)
+    amount = float(fee.amount or 0)
+    balance = round(amount - paid, 2)
+
+    if balance <= 0:
+        status = "Paid"
+    elif paid > 0:
+        status = "Partially Paid"
+    elif fee.due_date and fee.due_date < date.today():
+        status = "Overdue"
+    else:
+        status = "Pending"
+
+    return {"paid_amount": round(paid, 2), "balance": max(balance, 0), "status": status}
+
+
+def serialize_fee(fee):
+    student = Student.query.get(fee.student_id) if fee.student_id else None
+    room_info = get_student_room_info(fee.student_id) if fee.student_id else {}
+    summary = get_fee_payment_summary(fee)
+
+    return {
+        "id": fee.id,
+        "student_id": fee.student_id,
+        "student_code": (
+            getattr(student, "student_id", student.id) if student else None
+        ),
+        "student_name": (
+            safe_full_name(
+                student.first_name,
+                getattr(student, "middle_name", None),
+                student.last_name,
+            )
+            if student
+            else "Unknown student"
+        ),
+        "room_number": room_info.get("room_number"),
+        "block_name": room_info.get("block_name"),
+        "fee_type": fee.fee_type or "Other",
+        "amount": float(fee.amount) if fee.amount is not None else 0,
+        "paid_amount": summary["paid_amount"],
+        "balance": summary["balance"],
+        "status": summary["status"],
+        "due_date": fee.due_date.isoformat() if fee.due_date else None,
+        "created_at": fee.created_at.isoformat() if fee.created_at else None,
+    }
+
+
+def serialize_fee_structure(structure):
+    return {
+        "id": structure.id,
+        "fee_type": structure.fee_type,
+        "hostel_id": structure.hostel_id,
+        "hostel_name": structure.hostel.hostel_name if structure.hostel else None,
+        "amount": float(structure.amount) if structure.amount is not None else 0,
+        "academic_year": structure.academic_year,
+        "description": structure.description,
+        "status": structure.status,
+        "created_at": (
+            structure.created_at.isoformat() if structure.created_at else None
+        ),
+    }
+
+
+def serialize_payment(payment):
+    fee = payment.fee
+    student = Student.query.get(fee.student_id) if fee and fee.student_id else None
+
+    return {
+        "id": payment.id,
+        "fee_id": payment.fee_id,
+        "student_id": fee.student_id if fee else None,
+        "student_code": (
+            getattr(student, "student_id", student.id) if student else None
+        ),
+        "student_name": (
+            safe_full_name(
+                student.first_name,
+                getattr(student, "middle_name", None),
+                student.last_name,
+            )
+            if student
+            else "Unknown student"
+        ),
+        "fee_type": fee.fee_type if fee else None,
+        "amount": float(payment.amount) if payment.amount is not None else 0,
+        "payment_method": payment.payment_method,
+        "transaction_reference": payment.transaction_reference,
+        "notes": payment.notes,
+        "payment_date": (
+            payment.payment_date.isoformat() if payment.payment_date else None
+        ),
+        "created_at": payment.created_at.isoformat() if payment.created_at else None,
+    }
+
+
+def log_hostel_activity(category, action, description):
+    current_user = getattr(request, "user", None)
+
+    admin_name = (
+        safe_full_name(
+            getattr(current_user, "first_name", None),
+            getattr(current_user, "middle_name", None),
+            getattr(current_user, "last_name", None),
+        )
+        if current_user
+        else ""
+    ) or "System"
+
+    db.session.add(
+        HostelActivityLog(
+            admin_id=getattr(current_user, "id", None),
+            admin_name=admin_name,
+            category=category,
+            action=action,
+            description=description,
+        )
+    )
+
+
+def serialize_activity_log(log):
+    return {
+        "id": log.id,
+        "admin_name": log.admin_name,
+        "category": log.category,
+        "action": log.action,
+        "description": log.description,
+        "created_at": log.created_at.isoformat() if log.created_at else None,
     }
 
 
@@ -1019,6 +1282,7 @@ class StudentHostelDetails(MethodView):
                     200,
                 )
 
+            # ================= ROOM (via Bed) =================
             bed = Bed.query.get(allocation.bed_id)
             room = bed.room if bed else None
 
@@ -2248,6 +2512,7 @@ class HostelRoomListAPI(MethodView):
 
             db.session.add(room)
             db.session.flush()  # room.id is now available
+
             initial_bed_count = _parse_int(data.get("initial_bed_count"), 0) or 0
             initial_bed_count = max(0, min(initial_bed_count, 12))
 
@@ -2824,6 +3089,14 @@ class HostelBedAllocateAPI(MethodView):
             bed.status = "Occupied"
 
             db.session.add(allocation)
+
+            log_hostel_activity(
+                "Allocation",
+                "bed_allocated",
+                f"Allocated bed {bed.bed_number} to "
+                f"{safe_full_name(student.first_name, getattr(student, 'middle_name', None), student.last_name)}",
+            )
+
             db.session.commit()
 
             return (
@@ -2890,6 +3163,12 @@ class HostelBedVacateAPI(MethodView):
                 new_status = "Vacant"
 
             bed.status = new_status
+
+            log_hostel_activity(
+                "Allocation",
+                "bed_vacated",
+                f"Vacated bed {bed.bed_number} (student id {allocation.student_id})",
+            )
 
             db.session.commit()
 
@@ -3220,6 +3499,7 @@ def serialize_allocation(allocation):
 
 
 class HostelAllocationListAPI(MethodView):
+
     @login_required
     def get(self):
         _, access_error = authorize_hostel_admin("read")
@@ -3333,6 +3613,16 @@ class HostelAllocationCheckoutAPI(MethodView):
             if bed:
                 bed.status = "Vacant"
 
+            student = Student.query.get(allocation.student_id)
+
+            log_hostel_activity(
+                "Allocation",
+                "student_checked_out",
+                f"Checked out "
+                f"{safe_full_name(student.first_name, getattr(student, 'middle_name', None), student.last_name) if student else 'a student'} "
+                f"from Room {bed.room.room_number if bed and bed.room else '—'}",
+            )
+
             db.session.commit()
 
             return (
@@ -3420,8 +3710,6 @@ class HostelAllocationTransferAPI(MethodView):
             if old_bed:
                 old_bed.status = "Vacant"
 
-            # ...then open a fresh allocation on the new bed, preserving
-            # a continuous stay history instead of overwriting it.
             new_allocation = HostelAllocation(
                 student_id=allocation.student_id,
                 bed_id=new_bed.id,
@@ -3432,6 +3720,17 @@ class HostelAllocationTransferAPI(MethodView):
             new_bed.status = "Occupied"
 
             db.session.add(new_allocation)
+
+            student = Student.query.get(allocation.student_id)
+
+            log_hostel_activity(
+                "Allocation",
+                "student_transferred",
+                f"Transferred "
+                f"{safe_full_name(student.first_name, getattr(student, 'middle_name', None), student.last_name) if student else 'a student'} "
+                f"from bed {old_bed.bed_number if old_bed else '—'} to bed {new_bed.bed_number}",
+            )
+
             db.session.commit()
 
             return (
@@ -3596,6 +3895,14 @@ class HostelStaffListAPI(MethodView):
 
             staff.staff_code = f"STF{1000 + staff.id}"
 
+            log_hostel_activity(
+                "Staff",
+                "staff_added",
+                f"Added staff member "
+                f"{safe_full_name(staff.first_name, staff.middle_name, staff.last_name)} "
+                f"({staff.role})",
+            )
+
             db.session.commit()
 
             return (
@@ -3751,7 +4058,16 @@ class HostelStaffDetailAPI(MethodView):
             return jsonify({"success": False, "error": "Staff member not found"}), 404
 
         try:
+            staff_name = safe_full_name(
+                staff.first_name, staff.middle_name, staff.last_name
+            )
+
             db.session.delete(staff)
+
+            log_hostel_activity(
+                "Staff", "staff_removed", f"Removed staff member {staff_name}"
+            )
+
             db.session.commit()
 
             return (
@@ -3848,9 +4164,6 @@ class HostelVisitorListAPI(MethodView):
 
             if block_id:
                 rows = [row for row in rows if row.get("block_name")]
-                # block_id filtering happens post-serialize since block is
-                # resolved via the student's live allocation, not stored
-                # directly on the visitor row.
                 block = HostelBlock.query.get(block_id)
                 if block:
                     rows = [
@@ -4055,6 +4368,12 @@ class HostelVisitorApproveAPI(MethodView):
             visitor.status = "Approved"
             visitor.check_in_time = datetime.utcnow()
 
+            log_hostel_activity(
+                "Visitor",
+                "visitor_approved",
+                f"Approved visit from {visitor.visitor_name}",
+            )
+
             db.session.commit()
 
             return (
@@ -4109,6 +4428,12 @@ class HostelVisitorRejectAPI(MethodView):
         try:
             visitor.status = "Rejected"
 
+            log_hostel_activity(
+                "Visitor",
+                "visitor_rejected",
+                f"Rejected visit from {visitor.visitor_name}",
+            )
+
             db.session.commit()
 
             return (
@@ -4160,6 +4485,12 @@ class HostelVisitorCheckoutAPI(MethodView):
         try:
             visitor.check_out_time = datetime.utcnow()
             visitor.status = "Checked Out"
+
+            log_hostel_activity(
+                "Visitor",
+                "visitor_checked_out",
+                f"Checked out visitor {visitor.visitor_name}",
+            )
 
             db.session.commit()
 
@@ -4217,7 +4548,6 @@ def serialize_attendance_row(student, record):
 
 
 class HostelAttendanceListAPI(MethodView):
-
     @login_required
     def get(self):
         _, access_error = authorize_hostel_admin("read")
@@ -4864,6 +5194,16 @@ class HostelLeaveRequestApproveAPI(MethodView):
 
         try:
             leave.status = "Approved"
+
+            student = Student.query.get(leave.student_id)
+
+            log_hostel_activity(
+                "Leave",
+                "leave_approved",
+                f"Approved {leave.leave_type} for "
+                f"{safe_full_name(student.first_name, getattr(student, 'middle_name', None), student.last_name) if student else 'a student'}",
+            )
+
             db.session.commit()
 
             return (
@@ -4916,6 +5256,16 @@ class HostelLeaveRequestRejectAPI(MethodView):
 
         try:
             leave.status = "Rejected"
+
+            student = Student.query.get(leave.student_id)
+
+            log_hostel_activity(
+                "Leave",
+                "leave_rejected",
+                f"Rejected {leave.leave_type} for "
+                f"{safe_full_name(student.first_name, getattr(student, 'middle_name', None), student.last_name) if student else 'a student'}",
+            )
+
             db.session.commit()
 
             return (
@@ -4973,6 +5323,16 @@ class HostelLeaveRequestReturnAPI(MethodView):
             leave.status = "Returned"
             leave.actual_return_date = (
                 _parse_date(data.get("actual_return_date")) or date.today()
+            )
+
+            student = Student.query.get(leave.student_id)
+
+            log_hostel_activity(
+                "Leave",
+                "leave_return_marked",
+                f"Marked "
+                f"{safe_full_name(student.first_name, getattr(student, 'middle_name', None), student.last_name) if student else 'a student'} "
+                f"as returned from leave",
             )
 
             db.session.commit()
@@ -5208,6 +5568,7 @@ def serialize_meal_attendance_row(student, record):
 
 
 class HostelMealAttendanceListAPI(MethodView):
+
     @login_required
     def get(self):
         _, access_error = authorize_hostel_admin("read")
@@ -5310,7 +5671,6 @@ class HostelMealAttendanceListAPI(MethodView):
 
 
 class HostelMealAttendanceMarkAPI(MethodView):
-    """Upsert one student's attendance status for one date + meal."""
 
     @login_required
     def post(self):
@@ -5622,6 +5982,16 @@ class HostelComplaintUpdateAPI(MethodView):
                     _clean_str(data.get("resolution_notes")) or None
                 )
 
+            student = Student.query.get(complaint.student_id)
+
+            log_hostel_activity(
+                "Complaint",
+                "complaint_updated",
+                f"Updated complaint from "
+                f"{safe_full_name(student.first_name, getattr(student, 'middle_name', None), student.last_name) if student else 'a student'} "
+                f"to status: {complaint.status}",
+            )
+
             db.session.commit()
 
             return (
@@ -5838,6 +6208,13 @@ class HostelMaintenanceListAPI(MethodView):
             )
 
             db.session.add(maintenance_request)
+
+            log_hostel_activity(
+                "Maintenance",
+                "maintenance_request_created",
+                f"Logged maintenance request: {title}",
+            )
+
             db.session.commit()
 
             return (
@@ -5951,6 +6328,13 @@ class HostelMaintenanceDetailAPI(MethodView):
                     _clean_str(data.get("description")) or None
                 )
 
+            log_hostel_activity(
+                "Maintenance",
+                "maintenance_request_updated",
+                f'Updated maintenance request "{maintenance_request.title}" '
+                f"to status: {maintenance_request.status}",
+            )
+
             db.session.commit()
 
             return (
@@ -6001,6 +6385,836 @@ class HostelMaintenanceDetailAPI(MethodView):
 
         except SQLAlchemyError as e:
             logger.exception("Database error while deleting maintenance request")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+
+# ============================= FEE STRUCTURES (FEE MANAGEMENT) =============================
+class HostelFeeStructureListAPI(MethodView):
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            status = _clean_str(request.args.get("status"))
+            fee_type = _clean_str(request.args.get("fee_type"))
+
+            query = HostelFeeStructure.query
+
+            if status:
+                query = query.filter(HostelFeeStructure.status == status)
+
+            if fee_type:
+                query = query.filter(HostelFeeStructure.fee_type == fee_type)
+
+            structures = query.order_by(HostelFeeStructure.id.desc()).all()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "structures": [serialize_fee_structure(s) for s in structures],
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while listing fee structures")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+    @login_required
+    def post(self):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            fee_type = _clean_str(data.get("fee_type")) or "Monthly"
+
+            if fee_type not in {
+                "Admission",
+                "Monthly",
+                "Quarterly",
+                "Annual",
+                "Security Deposit",
+                "Mess Fee",
+                "Other",
+            }:
+                return jsonify({"success": False, "error": "Invalid fee_type"}), 400
+
+            amount = _parse_decimal(data.get("amount"))
+
+            if amount is None or amount <= 0:
+                return (
+                    jsonify({"success": False, "error": "A valid amount is required"}),
+                    400,
+                )
+
+            hostel_id = _parse_int(data.get("hostel_id"))
+
+            if hostel_id and not Hostel.query.get(hostel_id):
+                return jsonify({"success": False, "error": "Hostel not found"}), 404
+
+            structure = HostelFeeStructure(
+                fee_type=fee_type,
+                hostel_id=hostel_id,
+                amount=amount,
+                academic_year=_clean_str(data.get("academic_year")) or None,
+                description=_clean_str(data.get("description")) or None,
+                status=_clean_str(data.get("status")) or "Active",
+            )
+
+            db.session.add(structure)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Fee structure created",
+                        "structure": serialize_fee_structure(structure),
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while creating fee structure")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+
+class HostelFeeStructureDetailAPI(MethodView):
+
+    @login_required
+    def put(self, structure_id):
+        _, access_error = authorize_hostel_admin("edit")
+
+        if access_error:
+            return access_error
+
+        structure = HostelFeeStructure.query.get(structure_id)
+
+        if not structure:
+            return jsonify({"success": False, "error": "Fee structure not found"}), 404
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            if data.get("fee_type") is not None:
+                fee_type = _clean_str(data.get("fee_type"))
+
+                if fee_type not in {
+                    "Admission",
+                    "Monthly",
+                    "Quarterly",
+                    "Annual",
+                    "Security Deposit",
+                    "Mess Fee",
+                    "Other",
+                }:
+                    return jsonify({"success": False, "error": "Invalid fee_type"}), 400
+
+                structure.fee_type = fee_type
+
+            if "amount" in data:
+                amount = _parse_decimal(data.get("amount"))
+
+                if amount is None or amount <= 0:
+                    return (
+                        jsonify(
+                            {"success": False, "error": "A valid amount is required"}
+                        ),
+                        400,
+                    )
+
+                structure.amount = amount
+
+            if data.get("hostel_id") is not None:
+                hostel_id = _parse_int(data.get("hostel_id"))
+
+                if hostel_id and not Hostel.query.get(hostel_id):
+                    return jsonify({"success": False, "error": "Hostel not found"}), 404
+
+                structure.hostel_id = hostel_id
+
+            if data.get("academic_year") is not None:
+                structure.academic_year = _clean_str(data.get("academic_year")) or None
+
+            if data.get("description") is not None:
+                structure.description = _clean_str(data.get("description")) or None
+
+            if data.get("status") is not None:
+                status = _clean_str(data.get("status"))
+
+                if status not in {"Active", "Inactive"}:
+                    return jsonify({"success": False, "error": "Invalid status"}), 400
+
+                structure.status = status
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Fee structure updated",
+                        "structure": serialize_fee_structure(structure),
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while updating fee structure")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+    @login_required
+    def delete(self, structure_id):
+        _, access_error = authorize_hostel_admin("delete")
+
+        if access_error:
+            return access_error
+
+        structure = HostelFeeStructure.query.get(structure_id)
+
+        if not structure:
+            return jsonify({"success": False, "error": "Fee structure not found"}), 404
+
+        try:
+            db.session.delete(structure)
+            db.session.commit()
+
+            return jsonify({"success": True, "message": "Fee structure deleted"}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while deleting fee structure")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+
+class HostelFeeGenerateAPI(MethodView):
+
+    @login_required
+    def post(self):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            structure_id = _parse_int(data.get("fee_structure_id"))
+            structure = (
+                HostelFeeStructure.query.get(structure_id) if structure_id else None
+            )
+
+            if not structure:
+                return (
+                    jsonify({"success": False, "error": "Fee structure not found"}),
+                    404,
+                )
+
+            due_date = _parse_date(data.get("due_date"))
+
+            allocation_query = HostelAllocation.query.filter_by(is_active=True)
+
+            if structure.hostel_id:
+                allocation_query = (
+                    allocation_query.join(Bed, HostelAllocation.bed_id == Bed.id)
+                    .join(Room, Bed.room_id == Room.id)
+                    .join(HostelFloor, Room.floor_id == HostelFloor.id)
+                    .join(HostelBlock, HostelFloor.block_id == HostelBlock.id)
+                    .filter(HostelBlock.hostel_id == structure.hostel_id)
+                )
+
+            student_ids = {a.student_id for a in allocation_query.all()}
+
+            existing_student_ids = {
+                fee.student_id
+                for fee in HostelFee.query.filter(
+                    HostelFee.fee_structure_id == structure.id,
+                    HostelFee.student_id.in_(student_ids) if student_ids else False,
+                ).all()
+            }
+
+            created = 0
+
+            for student_id in student_ids - existing_student_ids:
+                db.session.add(
+                    HostelFee(
+                        student_id=student_id,
+                        fee_structure_id=structure.id,
+                        fee_type=structure.fee_type,
+                        amount=structure.amount,
+                        due_date=due_date,
+                        status="Pending",
+                    )
+                )
+                created += 1
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": (
+                            f"Generated {created} new fee invoice(s). "
+                            f"{len(existing_student_ids)} student(s) already had one."
+                        ),
+                        "created": created,
+                        "skipped": len(existing_student_ids),
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while generating fee invoices")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+
+# ============================= FEE INVOICES (FEE MANAGEMENT OVERVIEW / PENDING DUES) =============================
+class HostelFeeListAPI(MethodView):
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            search = _clean_str(request.args.get("search"))
+            status = _clean_str(request.args.get("status"))
+            fee_type = _clean_str(request.args.get("fee_type"))
+            # "dues_only=true" is what the Pending Dues section uses -
+            # anything with balance > 0.
+            dues_only = _clean_str(request.args.get("dues_only")).lower() == "true"
+
+            query = HostelFee.query
+
+            if fee_type:
+                query = query.filter(HostelFee.fee_type == fee_type)
+
+            fees = query.order_by(HostelFee.id.desc()).all()
+
+            rows = [serialize_fee(fee) for fee in fees]
+
+            if status:
+                rows = [row for row in rows if row["status"] == status]
+
+            if dues_only:
+                rows = [row for row in rows if row["balance"] > 0]
+
+            if search:
+                needle = search.lower()
+
+                rows = [
+                    row
+                    for row in rows
+                    if needle in (row["student_name"] or "").lower()
+                    or needle in str(row["student_code"] or "").lower()
+                    or needle in (row["room_number"] or "").lower()
+                ]
+
+            stats = {
+                "total_invoices": len(rows),
+                "total_amount": round(sum(r["amount"] for r in rows), 2),
+                "total_collected": round(sum(r["paid_amount"] for r in rows), 2),
+                "total_pending": round(sum(r["balance"] for r in rows), 2),
+                "overdue_count": sum(1 for r in rows if r["status"] == "Overdue"),
+            }
+
+            return jsonify({"success": True, "fees": rows, "stats": stats}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while listing fee invoices")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+
+class HostelFeeDetailAPI(MethodView):
+
+    @login_required
+    def get(self, fee_id):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        fee = HostelFee.query.get(fee_id)
+
+        if not fee:
+            return jsonify({"success": False, "error": "Fee invoice not found"}), 404
+
+        payments = [
+            serialize_payment(p)
+            for p in fee.payments.order_by(HostelFeePayment.payment_date.desc())
+        ]
+
+        return (
+            jsonify({"success": True, "fee": serialize_fee(fee), "payments": payments}),
+            200,
+        )
+
+    @login_required
+    def delete(self, fee_id):
+        _, access_error = authorize_hostel_admin("delete")
+
+        if access_error:
+            return access_error
+
+        fee = HostelFee.query.get(fee_id)
+
+        if not fee:
+            return jsonify({"success": False, "error": "Fee invoice not found"}), 404
+
+        try:
+            if fee.payments.count() > 0:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": (
+                                "This invoice has recorded payments against it "
+                                "and can't be deleted."
+                            ),
+                        }
+                    ),
+                    409,
+                )
+
+            db.session.delete(fee)
+            db.session.commit()
+
+            return jsonify({"success": True, "message": "Fee invoice deleted"}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while deleting fee invoice")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+
+# ============================= PAYMENTS =============================
+class HostelFeePaymentListAPI(MethodView):
+    """Payment transaction history, and recording a new payment
+    against a fee invoice."""
+
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            search = _clean_str(request.args.get("search"))
+            payment_method = _clean_str(request.args.get("payment_method"))
+
+            query = HostelFeePayment.query
+
+            if payment_method:
+                query = query.filter(HostelFeePayment.payment_method == payment_method)
+
+            payments = query.order_by(HostelFeePayment.id.desc()).all()
+
+            rows = [serialize_payment(p) for p in payments]
+
+            if search:
+                needle = search.lower()
+
+                rows = [
+                    row
+                    for row in rows
+                    if needle in (row["student_name"] or "").lower()
+                    or needle in str(row["student_code"] or "").lower()
+                    or needle in (row["transaction_reference"] or "").lower()
+                ]
+
+            stats = {
+                "total_payments": len(rows),
+                "total_collected": round(sum(r["amount"] for r in rows), 2),
+            }
+
+            return jsonify({"success": True, "payments": rows, "stats": stats}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while listing payments")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+    @login_required
+    def post(self):
+        _, access_error = authorize_hostel_admin("write")
+
+        if access_error:
+            return access_error
+
+        try:
+            data = request.get_json(silent=True) or {}
+
+            fee_id = _parse_int(data.get("fee_id"))
+            fee = HostelFee.query.get(fee_id) if fee_id else None
+
+            if not fee:
+                return (
+                    jsonify({"success": False, "error": "Fee invoice not found"}),
+                    404,
+                )
+
+            amount = _parse_decimal(data.get("amount"))
+
+            if amount is None or amount <= 0:
+                return (
+                    jsonify({"success": False, "error": "A valid amount is required"}),
+                    400,
+                )
+
+            current_balance = get_fee_payment_summary(fee)["balance"]
+
+            if amount > current_balance + 0.01:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": (
+                                f"Amount exceeds the remaining balance of "
+                                f"₹{current_balance}"
+                            ),
+                        }
+                    ),
+                    400,
+                )
+
+            payment_method = _clean_str(data.get("payment_method")) or "Cash"
+
+            if payment_method not in {
+                "Cash",
+                "Card",
+                "UPI",
+                "Bank Transfer",
+                "Cheque",
+                "Other",
+            }:
+                return (
+                    jsonify({"success": False, "error": "Invalid payment_method"}),
+                    400,
+                )
+
+            payment = HostelFeePayment(
+                fee_id=fee.id,
+                amount=amount,
+                payment_method=payment_method,
+                transaction_reference=(
+                    _clean_str(data.get("transaction_reference")) or None
+                ),
+                notes=_clean_str(data.get("notes")) or None,
+                payment_date=_parse_date(data.get("payment_date")) or date.today(),
+            )
+
+            db.session.add(payment)
+            db.session.flush()
+            fee.status = get_fee_payment_summary(fee)["status"]
+
+            student = Student.query.get(fee.student_id)
+
+            log_hostel_activity(
+                "Payment",
+                "payment_recorded",
+                f"Recorded ₹{amount} ({payment_method}) payment from "
+                f"{safe_full_name(student.first_name, getattr(student, 'middle_name', None), student.last_name) if student else 'a student'} "
+                f"towards {fee.fee_type or 'a fee'}",
+            )
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Payment recorded",
+                        "payment": serialize_payment(payment),
+                        "fee": serialize_fee(fee),
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while recording payment")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+
+# ============================= ACTIVITY LOGS =============================
+class HostelActivityLogListAPI(MethodView):
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            search = _clean_str(request.args.get("search"))
+            category = _clean_str(request.args.get("category"))
+            limit = _parse_int(request.args.get("limit"), 200) or 200
+            limit = min(max(limit, 1), 500)
+
+            query = HostelActivityLog.query
+
+            if category:
+                query = query.filter(HostelActivityLog.category == category)
+
+            logs = query.order_by(HostelActivityLog.id.desc()).limit(limit).all()
+
+            rows = [serialize_activity_log(log) for log in logs]
+
+            if search:
+                needle = search.lower()
+
+                rows = [
+                    row
+                    for row in rows
+                    if needle in (row["description"] or "").lower()
+                    or needle in (row["admin_name"] or "").lower()
+                    or needle in (row["action"] or "").lower()
+                ]
+
+            category_counts = {}
+
+            for row in rows:
+                category_counts[row["category"]] = (
+                    category_counts.get(row["category"], 0) + 1
+                )
+
+            stats = {"total": len(rows), "by_category": category_counts}
+
+            return jsonify({"success": True, "logs": rows, "stats": stats}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while listing activity logs")
+            db.session.rollback()
+
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error", "detail": str(e)}
+                ),
+                500,
+            )
+
+
+# ============================= REPORTS & ANALYTICS =============================
+class HostelReportsAPI(MethodView):
+    @login_required
+    def get(self):
+        _, access_error = authorize_hostel_admin("read")
+
+        if access_error:
+            return access_error
+
+        try:
+            # ---- Occupancy ----
+            total_beds = Bed.query.count()
+            occupied_beds = Bed.query.filter(Bed.status == "Occupied").count()
+            vacant_beds = Bed.query.filter(Bed.status == "Vacant").count()
+            maintenance_beds = Bed.query.filter(Bed.status == "Maintenance").count()
+
+            occupancy_rate = (
+                round((occupied_beds / total_beds) * 100, 1) if total_beds else 0
+            )
+
+            block_occupancy = []
+
+            for block in HostelBlock.query.order_by(HostelBlock.block_name).all():
+                block_beds = (
+                    Bed.query.join(Room, Bed.room_id == Room.id)
+                    .join(HostelFloor, Room.floor_id == HostelFloor.id)
+                    .filter(HostelFloor.block_id == block.id)
+                )
+                total = block_beds.count()
+                occupied = block_beds.filter(Bed.status == "Occupied").count()
+
+                if total:
+                    block_occupancy.append(
+                        {
+                            "block_name": block.block_name,
+                            "total_beds": total,
+                            "occupied_beds": occupied,
+                            "occupancy_rate": round((occupied / total) * 100, 1),
+                        }
+                    )
+
+            # ---- Fees ----
+            all_fees = HostelFee.query.all()
+            fee_summaries = [get_fee_payment_summary(fee) for fee in all_fees]
+
+            total_invoiced = round(sum(float(fee.amount or 0) for fee in all_fees), 2)
+            total_collected = round(sum(s["paid_amount"] for s in fee_summaries), 2)
+            total_pending = round(sum(s["balance"] for s in fee_summaries), 2)
+            collection_rate = (
+                round((total_collected / total_invoiced) * 100, 1)
+                if total_invoiced
+                else 0
+            )
+
+            # ---- Complaints & Maintenance ----
+            complaint_total = HostelComplaint.query.count()
+            complaint_resolved = HostelComplaint.query.filter(
+                HostelComplaint.status == "Resolved"
+            ).count()
+            complaint_resolution_rate = (
+                round((complaint_resolved / complaint_total) * 100, 1)
+                if complaint_total
+                else 0
+            )
+
+            maintenance_total = HostelMaintenanceRequest.query.count()
+            maintenance_resolved = HostelMaintenanceRequest.query.filter(
+                HostelMaintenanceRequest.status == "Resolved"
+            ).count()
+
+            # ---- Attendance (last 7 days, daily roll-call) ----
+            attendance_trend = []
+
+            for offset in range(6, -1, -1):
+                day = date.today() - timedelta(days=offset)
+
+                day_records = HostelAttendance.query.filter(
+                    HostelAttendance.attendance_date == day
+                ).all()
+
+                present = sum(1 for r in day_records if r.status == "Present")
+                absent = sum(1 for r in day_records if r.status == "Absent")
+
+                attendance_trend.append(
+                    {
+                        "date": day.isoformat(),
+                        "present": present,
+                        "absent": absent,
+                        "marked": len(day_records),
+                    }
+                )
+
+            # ---- Movement ----
+            outside_now = HostelMovement.query.filter(
+                HostelMovement.check_in_time.is_(None)
+            ).count()
+
+            # ---- Students ----
+            active_residents = HostelAllocation.query.filter_by(is_active=True).count()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "occupancy": {
+                            "total_beds": total_beds,
+                            "occupied_beds": occupied_beds,
+                            "vacant_beds": vacant_beds,
+                            "maintenance_beds": maintenance_beds,
+                            "occupancy_rate": occupancy_rate,
+                            "active_residents": active_residents,
+                            "by_block": block_occupancy,
+                        },
+                        "fees": {
+                            "total_invoiced": total_invoiced,
+                            "total_collected": total_collected,
+                            "total_pending": total_pending,
+                            "collection_rate": collection_rate,
+                        },
+                        "complaints": {
+                            "total": complaint_total,
+                            "resolved": complaint_resolved,
+                            "resolution_rate": complaint_resolution_rate,
+                        },
+                        "maintenance": {
+                            "total": maintenance_total,
+                            "resolved": maintenance_resolved,
+                        },
+                        "attendance_trend": attendance_trend,
+                        "movement": {"currently_outside": outside_now},
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception("Database error while generating hostel report")
             db.session.rollback()
 
             return (

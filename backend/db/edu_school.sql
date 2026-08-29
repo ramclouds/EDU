@@ -1,5 +1,5 @@
 -- Dumping database structure for edu_school
-CREATE DATABASE IF NOT EXISTS `edu_school` 
+CREATE DATABASE IF NOT EXISTS `edu_school`;
 USE `edu_school`;
 
 -- academic_classes
@@ -601,6 +601,20 @@ CREATE TABLE IF NOT EXISTS `hostels` (
   UNIQUE KEY `hostel_name` (`hostel_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- hostel_activity_logs
+CREATE TABLE IF NOT EXISTS `hostel_activity_logs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `admin_id` int DEFAULT NULL,
+  `admin_name` varchar(150) DEFAULT NULL,
+  `category` enum('Allocation','Payment','Complaint','Maintenance','Leave','Staff','Visitor','Structure') NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `description` text NOT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `admin_id` (`admin_id`),
+  CONSTRAINT `hostel_activity_logs_ibfk_1` FOREIGN KEY (`admin_id`) REFERENCES `admins` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- hostel_allocations
 CREATE TABLE IF NOT EXISTS `hostel_allocations` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -670,9 +684,45 @@ CREATE TABLE IF NOT EXISTS `hostel_fees` (
   `student_id` int DEFAULT NULL,
   `amount` decimal(10,2) DEFAULT NULL,
   `status` enum('Pending','Paid','Overdue') DEFAULT NULL,
+  `fee_structure_id` int DEFAULT NULL,
+  `fee_type` enum('Admission','Monthly','Quarterly','Annual','Security Deposit','Mess Fee','Other') DEFAULT NULL,
+  `due_date` date DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `student_id` (`student_id`),
-  CONSTRAINT `hostel_fees_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+  KEY `fee_structure_id` (`fee_structure_id`),
+  CONSTRAINT `hostel_fees_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `hostel_fees_ibfk_2` FOREIGN KEY (`fee_structure_id`) REFERENCES `hostel_fee_structures` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_fee_payments
+CREATE TABLE IF NOT EXISTS `hostel_fee_payments` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `fee_id` int NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_method` enum('Cash','Card','UPI','Bank Transfer','Cheque','Other') DEFAULT NULL,
+  `transaction_reference` varchar(100) DEFAULT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `payment_date` date DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fee_id` (`fee_id`),
+  CONSTRAINT `hostel_fee_payments_ibfk_1` FOREIGN KEY (`fee_id`) REFERENCES `hostel_fees` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- hostel_fee_structures
+CREATE TABLE IF NOT EXISTS `hostel_fee_structures` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `fee_type` enum('Admission','Monthly','Quarterly','Annual','Security Deposit','Mess Fee','Other') NOT NULL,
+  `hostel_id` int DEFAULT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `academic_year` varchar(20) DEFAULT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL,
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `hostel_id` (`hostel_id`),
+  CONSTRAINT `hostel_fee_structures_ibfk_1` FOREIGN KEY (`hostel_id`) REFERENCES `hostels` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- hostel_floors
@@ -939,8 +989,8 @@ CREATE TABLE IF NOT EXISTS `rbac_audit_logs` (
   `user_agent` varchar(500) DEFAULT NULL,
   `created_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `ix_rbac_audit_logs_created_at` (`created_at`),
-  KEY `ix_rbac_audit_logs_action` (`action`)
+  KEY `ix_rbac_audit_logs_action` (`action`),
+  KEY `ix_rbac_audit_logs_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- rbac_modules
@@ -1013,11 +1063,11 @@ CREATE TABLE IF NOT EXISTS `rbac_user_permission_overrides` (
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_rbac_user_module_override` (`user_type`,`user_id`,`module_id`),
-  KEY `ix_rbac_user_permission_overrides_is_temporary` (`is_temporary`),
-  KEY `ix_rbac_user_permission_overrides_expires_at` (`expires_at`),
-  KEY `ix_rbac_user_permission_overrides_user_id` (`user_id`),
-  KEY `ix_rbac_user_permission_overrides_user_type` (`user_type`),
   KEY `ix_rbac_user_permission_overrides_module_id` (`module_id`),
+  KEY `ix_rbac_user_permission_overrides_user_id` (`user_id`),
+  KEY `ix_rbac_user_permission_overrides_is_temporary` (`is_temporary`),
+  KEY `ix_rbac_user_permission_overrides_user_type` (`user_type`),
+  KEY `ix_rbac_user_permission_overrides_expires_at` (`expires_at`),
   CONSTRAINT `rbac_user_permission_overrides_ibfk_1` FOREIGN KEY (`module_id`) REFERENCES `rbac_modules` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
