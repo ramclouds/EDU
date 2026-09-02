@@ -18,6 +18,7 @@ export function useAdminDashboard(activeSection, setActiveSection) {
 
     // 🔔 Notices
     const [announcements, setNotices] = useState([]);
+    const [noticeSubmitting, setNoticeSubmitting] = useState(false);
 
     //  🔥 COMBINED NOTIFICATIONS 
     const combinedNotifications = [
@@ -28,6 +29,11 @@ export function useAdminDashboard(activeSection, setActiveSection) {
         })),
         ...(announcements || []).map(n => ({
             ...n,
+            // 🐛 BUGFIX: notices come back from the API with a
+            // `description` field, not `message`. The bell dropdown and
+            // toast both read `item.message`, so notice text was always
+            // rendering blank. Fall back through both field names.
+            message: n.message || n.description || "",
             source: "notice",
             time: n.date || n.created_at || new Date().toISOString()
         }))
@@ -153,7 +159,11 @@ export function useAdminDashboard(activeSection, setActiveSection) {
 
     // AUTO FETCH
     useEffect(() => {
-        fetchNotifications();
+        // 🐛 BUGFIX: `loading` was initialized to `true` and never set to
+        // `false` anywhere in the original hook, so any UI relying on it
+        // would show a permanent loading state. Clear it once the first
+        // notifications fetch settles.
+        fetchNotifications().finally(() => setLoading(false));
 
         const interval = setInterval(fetchNotifications, 15000); // refresh every 15 sec
         return () => clearInterval(interval);
@@ -176,6 +186,44 @@ export function useAdminDashboard(activeSection, setActiveSection) {
 
         } catch (err) {
             console.error("Mark read error:", err);
+            showToast("Failed to mark notification as read", "error");
+        }
+    };
+
+    // MARK ALL AS READ (NEW — was missing entirely, no way to clear the bell in bulk)
+    const markAllNotificationsRead = async () => {
+        if (!notifications.some(n => !n.is_read)) return;
+
+        try {
+            await fetchWithAuth(`${BASE_URL}/notifications/read-all`, {
+                method: "POST"
+            });
+
+            setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+            setNotificationUnread(0);
+        } catch (err) {
+            console.error("Mark all read error:", err);
+            showToast("Failed to mark all notifications as read", "error");
+        }
+    };
+
+    // DELETE NOTIFICATION (NEW — no way to dismiss/remove a notification before)
+    const deleteNotification = async (id) => {
+        try {
+            await fetchWithAuth(`${BASE_URL}/notifications/${id}`, {
+                method: "DELETE"
+            });
+
+            setNotifications(prev => {
+                const target = prev.find(n => n.id === id);
+                if (target && !target.is_read) {
+                    setNotificationUnread(u => Math.max(u - 1, 0));
+                }
+                return prev.filter(n => n.id !== id);
+            });
+        } catch (err) {
+            console.error("Delete notification error:", err);
+            showToast("Failed to delete notification", "error");
         }
     };
 
@@ -207,11 +255,15 @@ export function useAdminDashboard(activeSection, setActiveSection) {
     const handleNotificationClick = async (n) => {
         try {
             if (n.source === "notice") {
-                await markNoticeAsRead(n.id);
-                setActiveSection("announcements"); // ✅ correct
+                if (!n.is_read) await markNoticeAsRead(n.id);
+                setActiveSection?.("announcements");
             } else {
-                await markNotificationRead(n.id);
-                setActiveSection("studentLeave"); // ✅ correct
+                if (!n.is_read) await markNotificationRead(n.id);
+                // 🐛 BUGFIX: sidebar/section key is "leave-requests", not
+                // "studentLeave" — the old value matched nothing, so
+                // clicking a leave notification just closed the dropdown
+                // and left the admin on whatever section they were on.
+                setActiveSection?.("leave-requests");
             }
         } catch (err) {
             console.error(err);
@@ -219,42 +271,126 @@ export function useAdminDashboard(activeSection, setActiveSection) {
     };
 
     // =================  NOTICES START =================
-    useEffect(() => {
+    // 🐛 BUGFIX: fetchNotices used to be declared *inside* the effect, so
+    // there was no way to re-fetch after creating/editing/removing a
+    // notice — the list only ever refreshed on the 30s interval. Moved it
+    // out so create/update/delete can trigger an immediate refresh.
+    const fetchNotices = async () => {
         const { user } = getAuth();
         if (!user) return;
 
-        const fetchNotices = async () => {
-            try {
-                setNoticeLoading(true);
-                const res = await fetchWithAuth(
-                    `${BASE_URL}/announcements/admin/${user.id}?page=1&limit=20`
-                );
+        try {
+            setNoticeLoading(true);
+            const res = await fetchWithAuth(
+                `${BASE_URL}/announcements/admin/${user.id}?page=1&limit=20`
+            );
 
-                const json = await res.json();
-                const data = json.data || [];
+            const json = await res.json();
+            const data = json.data || [];
 
-                // sort unread first
-                const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
-                    if (a.is_read === b.is_read) return 0;
-                    return a.is_read ? 1 : -1;
-                });
+            // sort unread first
+            const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
+                if (a.is_read === b.is_read) return 0;
+                return a.is_read ? 1 : -1;
+            });
 
-                setNotices(sorted);
+            setNotices(sorted);
 
-                const unread = sorted.filter((n) => !n.is_read).length;
-                setUnreadCount(unread);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setNoticeLoading(false);
-            }
-        };
+            const unread = sorted.filter((n) => !n.is_read).length;
+            setUnreadCount(unread);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setNoticeLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchNotices();
 
         const interval = setInterval(fetchNotices, 30000);
         return () => clearInterval(interval);
     }, []);
+
+    // CREATE NOTICE (NEW — there was previously no way to publish an
+    // announcement from the dashboard at all)
+    const createNotice = async (payload) => {
+        setNoticeSubmitting(true);
+        try {
+            const res = await fetchWithAuth(`${BASE_URL}/announcements/create`, {
+                method: "POST",
+                body: JSON.stringify(payload),
+            });
+
+            const json = await res.json();
+
+            if (!res.ok) {
+                showToast(json.error || "Failed to create announcement", "error");
+                return { success: false, error: json.error };
+            }
+
+            showToast("Announcement published", "success");
+            await fetchNotices();
+            return { success: true, notice: json };
+        } catch (err) {
+            console.error("Create notice error:", err);
+            showToast("Failed to create announcement", "error");
+            return { success: false, error: err.message };
+        } finally {
+            setNoticeSubmitting(false);
+        }
+    };
+
+    // UPDATE NOTICE (NEW)
+    const updateNotice = async (noticeId, payload) => {
+        setNoticeSubmitting(true);
+        try {
+            const res = await fetchWithAuth(`${BASE_URL}/announcements/${noticeId}`, {
+                method: "PUT",
+                body: JSON.stringify(payload),
+            });
+
+            const json = await res.json();
+
+            if (!res.ok) {
+                showToast(json.error || "Failed to update announcement", "error");
+                return { success: false, error: json.error };
+            }
+
+            showToast("Announcement updated", "success");
+            await fetchNotices();
+            return { success: true, notice: json.notice };
+        } catch (err) {
+            console.error("Update notice error:", err);
+            showToast("Failed to update announcement", "error");
+            return { success: false, error: err.message };
+        } finally {
+            setNoticeSubmitting(false);
+        }
+    };
+
+    // DELETE (DEACTIVATE) NOTICE (NEW)
+    const deleteNotice = async (noticeId) => {
+        try {
+            const res = await fetchWithAuth(`${BASE_URL}/announcements/${noticeId}`, {
+                method: "DELETE",
+            });
+
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                showToast(json.error || "Failed to remove announcement", "error");
+                return { success: false };
+            }
+
+            setNotices(prev => prev.filter(n => n.id !== noticeId));
+            showToast("Announcement removed", "success");
+            return { success: true };
+        } catch (err) {
+            console.error("Delete notice error:", err);
+            showToast("Failed to remove announcement", "error");
+            return { success: false };
+        }
+    };
 
     //  NOTICE STATS 
     useEffect(() => {
@@ -332,9 +468,14 @@ export function useAdminDashboard(activeSection, setActiveSection) {
         unreadCount,
         announcements,
         noticeStats,
+        noticeSubmitting,
 
         // 🔔 NOTICES
         markNoticeAsRead,
+        fetchNotices,
+        createNotice,
+        updateNotice,
+        deleteNotice,
 
         // 🍞 TOAST
         toast,
@@ -342,6 +483,9 @@ export function useAdminDashboard(activeSection, setActiveSection) {
         notificationUnread,
         notificationLoading,
         markNotificationRead,
+        markAllNotificationsRead,
+        deleteNotification,
+        fetchNotifications,
 
         combinedNotifications,
         sortedNotifications,

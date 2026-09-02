@@ -43,8 +43,59 @@ function AdminDashboard() {
   const [activeSection, setActiveSection] = useState(
     location.state?.activeSection || "dashboard",
   );
-  const [noticeTab, setNoticeTab] = useState("announcements");
   const [search, setSearch] = useState("");
+
+  // ================= NOTIFICATIONS SECTION (LOCAL UI STATE) =================
+  const [notificationFilter, setNotificationFilter] = useState("all"); // "all" | "unread"
+
+  // ================= ANNOUNCEMENTS SECTION (LOCAL UI STATE) =================
+  const [noticeSearch, setNoticeSearch] = useState("");
+  const [noticePriorityFilter, setNoticePriorityFilter] = useState("all");
+  const [noticeModalOpen, setNoticeModalOpen] = useState(false);
+  const [noticeModalMode, setNoticeModalMode] = useState("create"); // "create" | "edit"
+  const [noticeBeingEdited, setNoticeBeingEdited] = useState(null);
+  const [noticeDeleteTarget, setNoticeDeleteTarget] = useState(null);
+  const EMPTY_NOTICE_FORM = {
+    title: "",
+    description: "",
+    category: "General",
+    priority: "Medium",
+    notice_date: new Date().toISOString().slice(0, 10),
+    expiry_date: "",
+    audience: "All",
+  };
+  const [noticeForm, setNoticeForm] = useState(EMPTY_NOTICE_FORM);
+  const [noticeFormError, setNoticeFormError] = useState("");
+
+  const openCreateNoticeModal = () => {
+    setNoticeModalMode("create");
+    setNoticeBeingEdited(null);
+    setNoticeForm(EMPTY_NOTICE_FORM);
+    setNoticeFormError("");
+    setNoticeModalOpen(true);
+  };
+
+  const openEditNoticeModal = (notice) => {
+    setNoticeModalMode("edit");
+    setNoticeBeingEdited(notice);
+    setNoticeForm({
+      title: notice.title || "",
+      description: notice.description || notice.message || "",
+      category: notice.category || "General",
+      priority: notice.priority || "Medium",
+      notice_date: (notice.notice_date || notice.date || "").slice(0, 10),
+      expiry_date: (notice.expiry_date || "").slice(0, 10),
+      audience: notice.audience || "All",
+    });
+    setNoticeFormError("");
+    setNoticeModalOpen(true);
+  };
+
+  const closeNoticeModal = () => {
+    setNoticeModalOpen(false);
+    setNoticeBeingEdited(null);
+    setNoticeFormError("");
+  };
 
   // ================= DASHBOARD HOOK =================
   const {
@@ -90,13 +141,21 @@ function AdminDashboard() {
     unreadCount,
     announcements,
     noticeStats,
+    noticeSubmitting,
     markNoticeAsRead,
+    fetchNotices,
+    createNotice,
+    updateNotice,
+    deleteNotice,
 
     // notifications
     notifications,
     notificationUnread,
     notificationLoading,
     markNotificationRead,
+    markAllNotificationsRead,
+    deleteNotification,
+    fetchNotifications,
 
     combinedNotifications,
     sortedNotifications,
@@ -104,7 +163,12 @@ function AdminDashboard() {
     handleNotificationClick,
 
     toast,
-  } = useAdminDashboard(activeSection);
+    // 🐛 BUGFIX: this hook was previously called as
+    // useAdminDashboard(activeSection) — without setActiveSection, so
+    // handleNotificationClick's setActiveSection(...) call threw
+    // "setActiveSection is not a function" the moment anyone clicked a
+    // notification in the bell dropdown.
+  } = useAdminDashboard(activeSection, setActiveSection);
 
   // ================= PROFILE HOOK =================
   const {
@@ -641,6 +705,99 @@ function AdminDashboard() {
     }
   }, []);
 
+  // ================= DASHBOARD OVERVIEW (LIVE DATA) =================
+  // The landing "dashboard" tab has no dedicated section-hook of its own —
+  // it's a live rollup of numbers each domain section already fetches
+  // (structure, reports, staff, visitors, leave requests, dues, activity
+  // logs). Pulling them together here means the dashboard always reflects
+  // real DB state instead of a static/mock summary.
+  const refreshDashboardOverview = (opts = {}) => {
+    loadStructure(opts);
+    loadReport();
+    loadStaff();
+    loadVisitors();
+    loadLeaveRequests();
+    loadDues();
+    loadLogs();
+  };
+
+  useEffect(() => {
+    if (activeSection === "dashboard") {
+      refreshDashboardOverview({ silent: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection]);
+
+  const dashboardLoading =
+    structureLoading ||
+    reportLoading ||
+    staffLoading ||
+    visitorsLoading ||
+    leaveLoading ||
+    duesLoading ||
+    logsLoading;
+
+  const formatTimeAgo = (isoString) => {
+    if (!isoString) return "";
+
+    const then = new Date(isoString).getTime();
+    if (Number.isNaN(then)) return "";
+
+    const diffSeconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
+
+    if (diffSeconds < 60) return "just now";
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return new Date(isoString).toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+    });
+  };
+
+  const ACTIVITY_CATEGORY_STYLES = {
+    Allocation: {
+      icon: "bi-door-open",
+      classes:
+        "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300",
+    },
+    Payment: {
+      icon: "bi-cash-coin",
+      classes:
+        "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
+    },
+    Complaint: {
+      icon: "bi-megaphone",
+      classes:
+        "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+    },
+    Maintenance: {
+      icon: "bi-tools",
+      classes:
+        "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300",
+    },
+    Leave: {
+      icon: "bi-calendar2-x",
+      classes: "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
+    },
+    Staff: {
+      icon: "bi-person-badge",
+      classes: "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
+    },
+    Visitor: {
+      icon: "bi-person-plus",
+      classes:
+        "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-300",
+    },
+    Structure: {
+      icon: "bi-diagram-3",
+      classes: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300",
+    },
+  };
+
   return (
     <div className="flex">
       {/* MOBILE OVERLAY */}
@@ -1083,15 +1240,34 @@ function AdminDashboard() {
                 md:right-0 md:top-[calc(100%+12px)] md:w-96 md:translate-x-0"
                     >
                       <div className="flex items-center justify-between border-b p-4 font-semibold text-gray-800 dark:border-slate-700 dark:text-white">
-                        <span>Notifications</span>
+                        <span>
+                          Notifications
+                          {totalUnread > 0 && (
+                            <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
+                              {totalUnread} new
+                            </span>
+                          )}
+                        </span>
 
-                        <button
-                          type="button"
-                          onClick={() => setShowNotifications(false)}
-                          className="text-xs text-gray-500 transition hover:text-red-500"
-                        >
-                          ✕
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {totalUnread > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => markAllNotificationsRead?.()}
+                              className="text-xs font-medium text-purple-600 transition hover:text-purple-800 dark:text-purple-300"
+                            >
+                              Mark all read
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setShowNotifications(false)}
+                            className="text-xs text-gray-500 transition hover:text-red-500"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
 
                       <div className="max-h-80 overflow-y-auto">
@@ -1122,7 +1298,7 @@ function AdminDashboard() {
                                 </p>
 
                                 <p className="mt-1 truncate text-xs text-gray-500">
-                                  {item.message || ""}
+                                  {item.message || item.description || ""}
                                 </p>
 
                                 <p className="mt-1 text-xs text-gray-400">
@@ -1131,6 +1307,32 @@ function AdminDashboard() {
                               </button>
                             ))
                         )}
+                      </div>
+
+                      <div className="grid grid-cols-2 divide-x border-t text-xs font-medium dark:divide-slate-700 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveSection("notifications");
+                            setShowNotifications(false);
+                          }}
+                          className="p-3 text-gray-600 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                        >
+                          <i className="bi bi-bell me-1" />
+                          All notifications
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveSection("announcements");
+                            setShowNotifications(false);
+                          }}
+                          className="p-3 text-gray-600 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                        >
+                          <i className="bi bi-megaphone me-1" />
+                          All announcements
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1262,22 +1464,24 @@ function AdminDashboard() {
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold">Hostel Dashboard</h2>
+                  <h2 className="text-lg font-semibold sm:text-xl">
+                    Hostel Dashboard
+                  </h2>
 
                   <p className="mt-1 text-sm text-blue-100">
-                    Structure, occupancy and student allocation overview
+                    Live occupancy, approvals and activity across the hostel
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => loadStructure({ silent: true })}
-                  disabled={structureLoading}
-                  className="self-start rounded-lg bg-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/25 disabled:opacity-50"
+                  onClick={() => refreshDashboardOverview()}
+                  disabled={dashboardLoading}
+                  className="inline-flex items-center gap-2 self-start rounded-lg bg-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <i
-                    className={`bi bi-arrow-clockwise mr-2 ${
-                      structureLoading ? "inline-block animate-spin" : ""
+                    className={`bi bi-arrow-clockwise ${
+                      dashboardLoading ? "animate-spin" : ""
                     }`}
                   ></i>
                   Refresh
@@ -1286,112 +1490,525 @@ function AdminDashboard() {
             </div>
 
             {/* PRIMARY KPIs */}
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6">
               {[
-                [
-                  "Hostels",
-                  structureStats.hostels,
-                  "bi-building",
-                  "bg-indigo-100 text-indigo-700",
-                ],
-                [
-                  "Blocks",
-                  structureStats.blocks,
-                  "bi-diagram-3",
-                  "bg-blue-100 text-blue-700",
-                ],
-                [
-                  "Floors",
-                  structureStats.floors,
-                  "bi-layers",
-                  "bg-cyan-100 text-cyan-700",
-                ],
-                [
-                  "Rooms",
-                  structureStats.rooms,
-                  "bi-door-open",
-                  "bg-purple-100 text-purple-700",
-                ],
-                [
-                  "Occupied Beds",
-                  structureStats.occupied_beds,
-                  "bi-person-check",
-                  "bg-red-100 text-red-700",
-                ],
-                [
-                  "Available Beds",
-                  structureStats.available_beds,
-                  "bi-door-closed",
-                  "bg-green-100 text-green-700",
-                ],
-              ].map(([label, value, icon, iconClass]) => (
-                <div
-                  key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                {
+                  label: "Active Residents",
+                  value: report?.occupancy?.active_residents,
+                  loading: reportLoading,
+                  icon: "bi-people",
+                  iconClass:
+                    "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300",
+                  onClick: () => setActiveSection("students"),
+                },
+                {
+                  label: "Occupancy Rate",
+                  value:
+                    report?.occupancy?.occupancy_rate != null
+                      ? `${report.occupancy.occupancy_rate}%`
+                      : undefined,
+                  loading: reportLoading,
+                  icon: "bi-pie-chart",
+                  iconClass:
+                    "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
+                  onClick: () => setActiveSection("beds"),
+                },
+                {
+                  label: "Available Beds",
+                  value: structureStats.available_beds,
+                  loading: structureLoading,
+                  icon: "bi-door-closed",
+                  iconClass:
+                    "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300",
+                  onClick: () => setActiveSection("beds"),
+                },
+                {
+                  label: "Rooms",
+                  value: structureStats.rooms,
+                  loading: structureLoading,
+                  icon: "bi-door-open",
+                  iconClass:
+                    "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300",
+                  onClick: () => setActiveSection("rooms"),
+                },
+                {
+                  label: "Hostel Staff",
+                  value: staffStats?.total,
+                  loading: staffLoading,
+                  icon: "bi-person-badge",
+                  iconClass:
+                    "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
+                  onClick: () => setActiveSection("staff"),
+                },
+                {
+                  label: "Pending Leave",
+                  value: leaveStats?.pending,
+                  loading: leaveLoading,
+                  icon: "bi-calendar2-x",
+                  iconClass:
+                    "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+                  onClick: () => setActiveSection("leave-requests"),
+                },
+              ].map((kpi) => (
+                <button
+                  type="button"
+                  key={kpi.label}
+                  onClick={kpi.onClick}
+                  className="rounded-xl border border-gray-100 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        {label}
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {kpi.label}
                       </p>
 
                       <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-                        {structureLoading ? "…" : (value ?? 0)}
+                        {kpi.loading ? "…" : (kpi.value ?? 0)}
                       </p>
                     </div>
 
                     <span
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${kpi.iconClass}`}
                     >
-                      <i className={`bi ${icon}`}></i>
+                      <i className={`bi ${kpi.icon}`}></i>
                     </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* QUICK LINKS */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {[
-                {
-                  key: "floors",
-                  title: "Manage Structure",
-                  desc: "Hostels, blocks and floors",
-                  icon: "bi-diagram-3",
-                },
-                {
-                  key: "rooms",
-                  title: "Manage Rooms",
-                  desc: "Room inventory and status",
-                  icon: "bi-door-open",
-                },
-                {
-                  key: "beds",
-                  title: "Manage Beds",
-                  desc: "Bed allocation and vacancy",
-                  icon: "bi-house-check",
-                },
-              ].map((card) => (
-                <button
-                  type="button"
-                  key={card.key}
-                  onClick={() => setActiveSection(card.key)}
-                  className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
-                >
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-                    <i className={`bi ${card.icon} text-xl`}></i>
-                  </span>
-
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {card.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {card.desc}
-                    </p>
                   </div>
                 </button>
               ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              {/* NEEDS ATTENTION */}
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 xl:col-span-1">
+                <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                  <i className="bi bi-exclamation-triangle text-amber-500" />
+                  Needs Attention
+                </h3>
+
+                <div className="mt-4 space-y-2">
+                  {(() => {
+                    const openComplaints = Math.max(
+                      (report?.complaints?.total ?? 0) -
+                        (report?.complaints?.resolved ?? 0),
+                      0,
+                    );
+                    const openMaintenance = Math.max(
+                      (report?.maintenance?.total ?? 0) -
+                        (report?.maintenance?.resolved ?? 0),
+                      0,
+                    );
+
+                    const items = [
+                      {
+                        key: "leave",
+                        label: "Pending leave requests",
+                        count: leaveStats?.pending ?? 0,
+                        icon: "bi-calendar2-x",
+                        classes:
+                          "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
+                        target: "leave-requests",
+                      },
+                      {
+                        key: "visitors",
+                        label: "Visitor approvals waiting",
+                        count: visitorStats?.pending ?? 0,
+                        icon: "bi-person-plus",
+                        classes:
+                          "bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-500/10 dark:text-fuchsia-300",
+                        target: "visitors",
+                      },
+                      {
+                        key: "complaints",
+                        label: "Open complaints",
+                        count: openComplaints,
+                        icon: "bi-megaphone",
+                        classes:
+                          "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                        target: "complaints",
+                      },
+                      {
+                        key: "maintenance",
+                        label: "Open maintenance requests",
+                        count: openMaintenance,
+                        icon: "bi-tools",
+                        classes:
+                          "bg-slate-50 text-slate-700 dark:bg-slate-700/50 dark:text-slate-300",
+                        target: "maintenance",
+                      },
+                      {
+                        key: "dues",
+                        label: "Overdue fee invoices",
+                        count: duesStats?.overdue_count ?? 0,
+                        icon: "bi-cash-coin",
+                        classes:
+                          "bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300",
+                        target: "pending-dues",
+                      },
+                    ].filter((item) => item.count > 0);
+
+                    if (dashboardLoading && items.length === 0) {
+                      return (
+                        <div className="space-y-2">
+                          {[...Array(3)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="h-12 animate-pulse rounded-xl bg-gray-100 dark:bg-slate-700"
+                            />
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    if (items.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center gap-2 py-8 text-center">
+                          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-300">
+                            <i className="bi bi-check2-circle text-xl" />
+                          </span>
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                            All caught up — nothing pending
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return items.map((item) => (
+                      <button
+                        type="button"
+                        key={item.key}
+                        onClick={() => setActiveSection(item.target)}
+                        className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                      >
+                        <span
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${item.classes}`}
+                        >
+                          <i className={`bi ${item.icon}`} />
+                        </span>
+
+                        <span className="min-w-0 flex-1 truncate text-sm text-gray-700 dark:text-gray-200">
+                          {item.label}
+                        </span>
+
+                        <span className="shrink-0 rounded-full bg-gray-900/5 px-2 py-0.5 text-xs font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                          {item.count}
+                        </span>
+
+                        <i className="bi bi-chevron-right shrink-0 text-xs text-gray-400" />
+                      </button>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* FEE COLLECTION + ATTENDANCE TREND */}
+              <div className="space-y-4 xl:col-span-2">
+                {/* FEE COLLECTION */}
+                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                      <i className="bi bi-cash-stack text-emerald-500" />
+                      Fee Collection
+                    </h3>
+
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                      {reportLoading
+                        ? "…"
+                        : `${report?.fees?.collection_rate ?? 0}%`}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-green-600 transition-all duration-700"
+                      style={{
+                        width: `${Math.min(report?.fees?.collection_rate ?? 0, 100)}%`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Invoiced
+                      </p>
+                      <p className="mt-0.5 font-semibold text-gray-900 dark:text-white">
+                        ₹
+                        {reportLoading
+                          ? "…"
+                          : (report?.fees?.total_invoiced ?? 0).toLocaleString()}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Collected
+                      </p>
+                      <p className="mt-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                        ₹
+                        {reportLoading
+                          ? "…"
+                          : (report?.fees?.total_collected ?? 0).toLocaleString()}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Pending
+                      </p>
+                      <p className="mt-0.5 font-semibold text-amber-600 dark:text-amber-400">
+                        ₹
+                        {reportLoading
+                          ? "…"
+                          : (report?.fees?.total_pending ?? 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ATTENDANCE TREND */}
+                <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                    <i className="bi bi-graph-up text-cyan-500" />
+                    Attendance — Last 7 Days
+                  </h3>
+
+                  {reportLoading && !report?.attendance_trend ? (
+                    <div className="mt-4 h-32 animate-pulse rounded-xl bg-gray-100 dark:bg-slate-700" />
+                  ) : !report?.attendance_trend?.length ? (
+                    <p className="mt-4 text-center text-sm text-gray-400">
+                      No attendance recorded yet
+                    </p>
+                  ) : (
+                    <div className="mt-5 flex h-32 items-end justify-between gap-2 sm:gap-3">
+                      {report.attendance_trend.map((day) => {
+                        const pct = day.marked
+                          ? Math.round((day.present / day.marked) * 100)
+                          : 0;
+
+                        return (
+                          <div
+                            key={day.date}
+                            className="flex flex-1 flex-col items-center gap-1.5"
+                          >
+                            <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                              {pct}%
+                            </span>
+
+                            <div className="flex h-20 w-full items-end overflow-hidden rounded-lg bg-gray-100 dark:bg-slate-700">
+                              <div
+                                className="w-full rounded-lg bg-gradient-to-t from-cyan-500 to-blue-500 transition-all duration-700"
+                                style={{ height: `${Math.max(pct, 4)}%` }}
+                              />
+                            </div>
+
+                            <span className="text-[10px] text-gray-400">
+                              {new Date(day.date).toLocaleDateString(undefined, {
+                                weekday: "narrow",
+                              })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              {/* RECENT ACTIVITY */}
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 xl:col-span-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                    <i className="bi bi-clock-history text-indigo-500" />
+                    Recent Activity
+                  </h3>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection("activity-logs")}
+                    className="text-xs font-medium text-indigo-600 transition hover:text-indigo-800 dark:text-indigo-300"
+                  >
+                    View all
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  {logsLoading && !logs?.length ? (
+                    <div className="space-y-3">
+                      {[...Array(4)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-12 animate-pulse rounded-xl bg-gray-100 dark:bg-slate-700"
+                        />
+                      ))}
+                    </div>
+                  ) : !logs?.length ? (
+                    <p className="py-8 text-center text-sm text-gray-400">
+                      No activity recorded yet
+                    </p>
+                  ) : (
+                    <ul className="divide-y dark:divide-slate-700">
+                      {logs.slice(0, 6).map((log) => {
+                        const style =
+                          ACTIVITY_CATEGORY_STYLES[log.category] || {
+                            icon: "bi-info-circle",
+                            classes:
+                              "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300",
+                          };
+
+                        return (
+                          <li
+                            key={log.id}
+                            className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                          >
+                            <span
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${style.classes}`}
+                            >
+                              <i className={`bi ${style.icon}`} />
+                            </span>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm text-gray-800 dark:text-gray-100">
+                                {log.description}
+                              </p>
+                              <p className="mt-0.5 text-xs text-gray-400">
+                                {log.admin_name || "System"} ·{" "}
+                                {formatTimeAgo(log.created_at)}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {/* TODAY SNAPSHOT */}
+              <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <h3 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                  <i className="bi bi-sun text-amber-500" />
+                  Today
+                </h3>
+
+                <div className="mt-4 space-y-3">
+                  {[
+                    {
+                      label: "Visitors checked in",
+                      value: visitorStats?.today,
+                      loading: visitorsLoading,
+                      icon: "bi-person-plus",
+                    },
+                    {
+                      label: "Currently outside",
+                      value: report?.movement?.currently_outside,
+                      loading: reportLoading,
+                      icon: "bi-signpost-split",
+                    },
+                    {
+                      label: "Wardens & security",
+                      value:
+                        (staffStats?.wardens ?? 0) + (staffStats?.security ?? 0),
+                      loading: staffLoading,
+                      icon: "bi-shield-check",
+                    },
+                  ].map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-slate-900/50"
+                    >
+                      <span className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <i className={`bi ${row.icon} text-gray-400`} />
+                        {row.label}
+                      </span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {row.loading ? "…" : (row.value ?? 0)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* QUICK LINKS */}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Quick Links
+              </h3>
+
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+                {[
+                  {
+                    key: "floors",
+                    title: "Structure",
+                    desc: "Hostels, blocks & floors",
+                    icon: "bi-diagram-3",
+                  },
+                  {
+                    key: "rooms",
+                    title: "Rooms",
+                    desc: "Inventory & status",
+                    icon: "bi-door-open",
+                  },
+                  {
+                    key: "beds",
+                    title: "Beds",
+                    desc: "Allocation & vacancy",
+                    icon: "bi-house-check",
+                  },
+                  {
+                    key: "students",
+                    title: "Students",
+                    desc: "Residents directory",
+                    icon: "bi-people",
+                  },
+                  {
+                    key: "staff",
+                    title: "Staff",
+                    desc: "Wardens & support team",
+                    icon: "bi-person-badge",
+                  },
+                  {
+                    key: "complaints",
+                    title: "Complaints",
+                    desc: "Track & resolve issues",
+                    icon: "bi-megaphone",
+                  },
+                  {
+                    key: "fee-management",
+                    title: "Fees",
+                    desc: "Structures & invoices",
+                    icon: "bi-cash-stack",
+                  },
+                  {
+                    key: "reports",
+                    title: "Reports",
+                    desc: "Analytics & trends",
+                    icon: "bi-bar-chart",
+                  },
+                ].map((card) => (
+                  <button
+                    type="button"
+                    key={card.key}
+                    onClick={() => setActiveSection(card.key)}
+                    className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 sm:p-5"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                      <i className={`bi ${card.icon} text-lg`}></i>
+                    </span>
+
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900 dark:text-white">
+                        {card.title}
+                      </p>
+                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                        {card.desc}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </section>
         )}
@@ -1400,7 +2017,7 @@ function AdminDashboard() {
         {activeSection === "floors" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -1560,58 +2177,92 @@ function AdminDashboard() {
                 {hostels.map((hostel) => (
                   <div
                     key={hostel.id}
-                    className="border dark:border-slate-700 rounded-2xl mb-6 overflow-hidden"
+                    className="mb-6 overflow-hidden rounded-2xl border border-gray-100 shadow-sm transition hover:shadow-md dark:border-slate-700"
                   >
                     {/* Hostel header */}
-                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 flex flex-col sm:flex-row justify-between gap-3">
-                      <div>
-                        <h3 className="text-xl font-semibold">
-                          {hostel.hostel_name}
-                        </h3>
-                        <p className="text-indigo-100 text-sm">
-                          {hostel.hostel_type} Hostel · {hostel.status}
-                        </p>
+                    <div className="relative flex flex-col gap-4 overflow-hidden bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-600 p-5 text-white sm:flex-row sm:items-center sm:justify-between">
+                      <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+
+                      <div className="relative flex items-center gap-3">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/15 text-xl backdrop-blur-sm">
+                          <i className="bi bi-building" />
+                        </span>
+
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-semibold">
+                              {hostel.hostel_name}
+                            </h3>
+
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                hostel.status === "Active"
+                                  ? "bg-emerald-400/20 text-emerald-100"
+                                  : "bg-white/15 text-white/80"
+                              }`}
+                            >
+                              {hostel.status}
+                            </span>
+                          </div>
+
+                          <p className="mt-0.5 text-sm text-indigo-100">
+                            {hostel.hostel_type} Hostel ·{" "}
+                            {(hostel.blocks || []).length} block(s)
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="space-x-2 flex flex-wrap gap-2">
+                      <div className="relative flex flex-wrap gap-2">
                         <button
+                          type="button"
                           onClick={() => openCreateBlockModal(hostel.id)}
                           disabled={!canWriteHostel}
-                          className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Add block"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-2 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          + Block
+                          <i className="bi bi-plus-lg" />
+                          Block
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => openEditHostelModal(hostel)}
                           disabled={!canWriteHostel}
-                          className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Edit hostel"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 text-white backdrop-blur-sm transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Edit
+                          <i className="bi bi-pencil-square" />
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => deleteHostel(hostel)}
                           disabled={!canWriteHostel}
-                          className="bg-red-500/80 hover:bg-red-500 px-4 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Delete hostel"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/25 text-white backdrop-blur-sm transition hover:bg-red-500/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Delete
+                          <i className="bi bi-trash" />
                         </button>
                       </div>
                     </div>
 
                     {/* Blocks */}
-                    <div className="p-4 sm:p-6 space-y-5">
+                    <div className="space-y-4 bg-white p-4 dark:bg-slate-800 sm:p-6">
                       {(hostel.blocks || []).length === 0 && (
-                        <p className="text-gray-400 text-sm">
-                          No blocks yet in this hostel.
-                        </p>
+                        <div className="flex flex-col items-center gap-2 py-8 text-center">
+                          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-slate-700">
+                            <i className="bi bi-diagram-3" />
+                          </span>
+                          <p className="text-sm text-gray-400">
+                            No blocks yet in this hostel.
+                          </p>
+                        </div>
                       )}
 
                       {(hostel.blocks || []).map((block) => (
                         <div
                           key={block.id}
-                          className="border dark:border-slate-700 rounded-xl"
+                          className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700"
                         >
                           <div
                             role="button"
@@ -1623,64 +2274,72 @@ function AdminDashboard() {
                                 toggleBlockExpanded(block.id);
                               }
                             }}
-                            className="w-full bg-slate-100 dark:bg-slate-700/60 p-4 flex justify-between items-center text-left cursor-pointer"
+                            className="flex w-full cursor-pointer items-center justify-between gap-3 bg-slate-50 p-4 text-left transition hover:bg-slate-100 dark:bg-slate-700/40 dark:hover:bg-slate-700/60"
                           >
-                            <div>
-                              <h4 className="font-semibold flex items-center gap-2">
-                                <i
-                                  className={`bi ${
-                                    expandedBlocks[block.id]
-                                      ? "bi-chevron-down"
-                                      : "bi-chevron-right"
-                                  } text-xs`}
-                                />
-                                Block {block.block_name}
-                              </h4>
-                              <small className="text-gray-500">
-                                Floors: {(block.floors || []).length}
-                                {block.description
-                                  ? ` · ${block.description}`
-                                  : ""}
-                              </small>
+                            <div className="flex min-w-0 items-center gap-3">
+                              <i
+                                className={`bi bi-chevron-right shrink-0 text-xs text-gray-400 transition-transform duration-200 ${
+                                  expandedBlocks[block.id] ? "rotate-90" : ""
+                                }`}
+                              />
+
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300">
+                                <i className="bi bi-diagram-3 text-sm" />
+                              </span>
+
+                              <div className="min-w-0">
+                                <h4 className="truncate font-semibold text-gray-900 dark:text-white">
+                                  Block {block.block_name}
+                                </h4>
+                                <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                                  {(block.floors || []).length} floor(s)
+                                  {block.description
+                                    ? ` · ${block.description}`
+                                    : ""}
+                                </p>
+                              </div>
                             </div>
 
                             <div
-                              className="flex gap-2"
+                              className="flex shrink-0 gap-1.5"
                               onClick={(event) => event.stopPropagation()}
                             >
                               <button
                                 type="button"
                                 onClick={() => openCreateFloorModal(block.id)}
                                 disabled={!canWriteHostel}
-                                className="bg-green-600 text-white px-3 py-2 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Add floor"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-700 transition hover:bg-green-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-green-500/20 dark:text-green-300 dark:hover:bg-green-500/30"
                               >
-                                + Floor
+                                <i className="bi bi-plus-lg text-xs" />
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => openEditBlockModal(block)}
                                 disabled={!canWriteHostel}
-                                className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Edit block"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 transition hover:bg-indigo-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/30"
                               >
-                                Edit
+                                <i className="bi bi-pencil-square text-xs" />
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => deleteBlock(block)}
                                 disabled={!canWriteHostel}
-                                className="bg-red-500 text-white px-3 py-2 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Delete block"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-red-700 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-500/20 dark:text-red-300 dark:hover:bg-red-500/30"
                               >
-                                Delete
+                                <i className="bi bi-trash text-xs" />
                               </button>
                             </div>
                           </div>
 
                           {expandedBlocks[block.id] && (
-                            <div className="p-4 sm:p-5 space-y-4">
+                            <div className="space-y-3 border-t border-gray-100 p-4 dark:border-slate-700 sm:p-5">
                               {(block.floors || []).length === 0 && (
-                                <p className="text-gray-400 text-sm">
+                                <p className="py-2 text-center text-sm text-gray-400">
                                   No floors yet in this block.
                                 </p>
                               )}
@@ -1688,7 +2347,7 @@ function AdminDashboard() {
                               {(block.floors || []).map((floor) => (
                                 <div
                                   key={floor.id}
-                                  className="border dark:border-slate-700 rounded-xl"
+                                  className="overflow-hidden rounded-lg border border-gray-100 dark:border-slate-700"
                                 >
                                   <div
                                     role="button"
@@ -1705,27 +2364,34 @@ function AdminDashboard() {
                                         toggleFloorExpanded(floor.id);
                                       }
                                     }}
-                                    className="w-full bg-slate-50 dark:bg-slate-700/30 p-4 flex justify-between items-center text-left cursor-pointer"
+                                    className="flex w-full cursor-pointer items-center justify-between gap-3 bg-white p-3.5 text-left transition hover:bg-gray-50 dark:bg-slate-800 dark:hover:bg-slate-700/40"
                                   >
-                                    <div>
-                                      <h5 className="font-semibold flex items-center gap-2">
-                                        <i
-                                          className={`bi ${
-                                            expandedFloors[floor.id]
-                                              ? "bi-chevron-down"
-                                              : "bi-chevron-right"
-                                          } text-xs`}
-                                        />
-                                        {floor.floor_name ||
-                                          `Floor ${floor.floor_number}`}
-                                      </h5>
-                                      <small className="text-gray-500">
-                                        Rooms: {(floor.rooms || []).length}
-                                      </small>
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      <i
+                                        className={`bi bi-chevron-right shrink-0 text-[11px] text-gray-400 transition-transform duration-200 ${
+                                          expandedFloors[floor.id]
+                                            ? "rotate-90"
+                                            : ""
+                                        }`}
+                                      />
+
+                                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300">
+                                        <i className="bi bi-layers text-xs" />
+                                      </span>
+
+                                      <div className="min-w-0">
+                                        <h5 className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                                          {floor.floor_name ||
+                                            `Floor ${floor.floor_number}`}
+                                        </h5>
+                                        <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                                          {(floor.rooms || []).length} room(s)
+                                        </p>
+                                      </div>
                                     </div>
 
                                     <div
-                                      className="flex gap-2"
+                                      className="flex shrink-0 gap-1.5"
                                       onClick={(event) =>
                                         event.stopPropagation()
                                       }
@@ -1736,9 +2402,10 @@ function AdminDashboard() {
                                           openCreateRoomModal(floor.id)
                                         }
                                         disabled={!canWriteHostel}
-                                        className="bg-green-600 text-white px-3 py-2 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Add room"
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-700 transition hover:bg-green-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-green-500/20 dark:text-green-300 dark:hover:bg-green-500/30"
                                       >
-                                        + Room
+                                        <i className="bi bi-plus-lg text-xs" />
                                       </button>
 
                                       <button
@@ -1747,96 +2414,121 @@ function AdminDashboard() {
                                           openEditFloorModal(floor)
                                         }
                                         disabled={!canWriteHostel}
-                                        className="bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Edit floor"
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 transition hover:bg-indigo-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/30"
                                       >
-                                        Edit
+                                        <i className="bi bi-pencil-square text-xs" />
                                       </button>
 
                                       <button
                                         type="button"
                                         onClick={() => deleteFloor(floor)}
                                         disabled={!canWriteHostel}
-                                        className="bg-red-500 text-white px-3 py-2 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Delete floor"
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-red-700 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-500/20 dark:text-red-300 dark:hover:bg-red-500/30"
                                       >
-                                        Delete
+                                        <i className="bi bi-trash text-xs" />
                                       </button>
                                     </div>
                                   </div>
 
                                   {expandedFloors[floor.id] && (
-                                    <div className="grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-4 p-4">
+                                    <div className="grid grid-cols-1 gap-3 border-t border-gray-100 bg-gray-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/30 sm:grid-cols-2 lg:grid-cols-4">
                                       {(floor.rooms || []).length === 0 && (
-                                        <p className="text-gray-400 text-sm col-span-full">
+                                        <p className="col-span-full py-2 text-center text-sm text-gray-400">
                                           No rooms yet on this floor.
                                         </p>
                                       )}
 
-                                      {(floor.rooms || []).map((room) => (
-                                        <div
-                                          key={room.id}
-                                          className="rounded-xl border border-gray-100 p-4 transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700"
-                                        >
-                                          <div className="flex justify-between items-center mb-3">
-                                            <h5 className="font-bold">
-                                              {room.room_number}
-                                            </h5>
+                                      {(floor.rooms || []).map((room) => {
+                                        const occupancyPct = room.capacity
+                                          ? Math.round(
+                                              (room.occupied_count /
+                                                room.capacity) *
+                                                100,
+                                            )
+                                          : 0;
 
-                                            <span
-                                              className={`px-2 py-1 rounded text-xs ${
-                                                room.available_count > 0
-                                                  ? "bg-green-100 text-green-700"
-                                                  : "bg-red-100 text-red-700"
-                                              }`}
-                                            >
-                                              {room.available_count > 0
-                                                ? "Available"
-                                                : "Full"}
-                                            </span>
-                                          </div>
-
-                                          <div className="space-y-1 text-sm text-gray-500">
-                                            <p>
-                                              Capacity:{" "}
-                                              <strong className="text-gray-800 dark:text-gray-200">
-                                                {room.capacity} Beds
-                                              </strong>
-                                            </p>
-                                            <p>
-                                              Occupied:{" "}
-                                              <strong className="text-gray-800 dark:text-gray-200">
-                                                {room.occupied_count}
-                                              </strong>
-                                            </p>
-                                            <p>
-                                              Available:{" "}
-                                              <strong className="text-gray-800 dark:text-gray-200">
-                                                {room.available_count}
-                                              </strong>
-                                            </p>
-                                          </div>
-
-                                          <button
-                                            onClick={() => {
-                                              setActiveSection("beds");
-                                              updateBedFilter(
-                                                "room_id",
-                                                room.id,
-                                              );
-                                              loadBeds({
-                                                filters: {
-                                                  room_id: room.id,
-                                                  floor_id: "",
-                                                  block_id: "",
-                                                  status: "",
-                                                },
-                                              });
-                                            }}
-                                            className="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm"
+                                        return (
+                                          <div
+                                            key={room.id}
+                                            className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
                                           >
-                                            View Beds
-                                          </button>
-                                        </div>
-                                      ))}
+                                            <div
+                                              className={`h-1 w-full ${
+                                                room.available_count > 0
+                                                  ? "bg-emerald-500"
+                                                  : "bg-red-500"
+                                              }`}
+                                            />
+
+                                            <div className="p-3.5">
+                                              <div className="mb-2 flex items-center justify-between">
+                                                <h5 className="font-bold text-gray-900 dark:text-white">
+                                                  {room.room_number}
+                                                </h5>
+
+                                                <span
+                                                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                                    room.available_count > 0
+                                                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
+                                                      : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                                  }`}
+                                                >
+                                                  {room.available_count > 0
+                                                    ? "Available"
+                                                    : "Full"}
+                                                </span>
+                                              </div>
+
+                                              <div className="mb-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                                <span>
+                                                  {room.occupied_count}/
+                                                  {room.capacity} beds
+                                                </span>
+                                                <span>{occupancyPct}%</span>
+                                              </div>
+
+                                              <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
+                                                <div
+                                                  className={`h-full rounded-full transition-all duration-500 ${
+                                                    occupancyPct >= 100
+                                                      ? "bg-red-500"
+                                                      : occupancyPct >= 60
+                                                        ? "bg-amber-500"
+                                                        : "bg-emerald-500"
+                                                  }`}
+                                                  style={{
+                                                    width: `${Math.min(occupancyPct, 100)}%`,
+                                                  }}
+                                                />
+                                              </div>
+
+                                              <button
+                                                onClick={() => {
+                                                  setActiveSection("beds");
+                                                  updateBedFilter(
+                                                    "room_id",
+                                                    room.id,
+                                                  );
+                                                  loadBeds({
+                                                    filters: {
+                                                      room_id: room.id,
+                                                      floor_id: "",
+                                                      block_id: "",
+                                                      status: "",
+                                                    },
+                                                  });
+                                                }}
+                                                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-50 py-2 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                                              >
+                                                <i className="bi bi-grid-3x3-gap" />
+                                                View Beds
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </div>
@@ -1857,9 +2549,24 @@ function AdminDashboard() {
         {hostelModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
-              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
-                {hostelForm.id ? "Edit Hostel" : "New Hostel"}
-              </h2>
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+                    <i className="bi bi-building" />
+                  </span>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    {hostelForm.id ? "Edit Hostel" : "New Hostel"}
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeHostelModal}
+                  className="text-gray-400 transition hover:text-red-500"
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
 
               <div className="space-y-3">
                 <input
@@ -1924,9 +2631,24 @@ function AdminDashboard() {
         {blockModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
-              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
-                {blockForm.id ? "Edit Block" : "New Block"}
-              </h2>
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-300">
+                    <i className="bi bi-diagram-3" />
+                  </span>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    {blockForm.id ? "Edit Block" : "New Block"}
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeBlockModal}
+                  className="text-gray-400 transition hover:text-red-500"
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
 
               <div className="space-y-3">
                 <select
@@ -1995,9 +2717,24 @@ function AdminDashboard() {
         {floorModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
-              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
-                {floorForm.id ? "Edit Floor" : "New Floor"}
-              </h2>
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300">
+                    <i className="bi bi-layers" />
+                  </span>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    {floorForm.id ? "Edit Floor" : "New Floor"}
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeFloorModal}
+                  className="text-gray-400 transition hover:text-red-500"
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
 
               <div className="space-y-3">
                 <select
@@ -2067,7 +2804,7 @@ function AdminDashboard() {
         {activeSection === "rooms" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">Rooms</h2>
@@ -2202,93 +2939,120 @@ function AdminDashboard() {
                 </div>
               )}
 
-              <div className="grid lg:grid-cols-4 md:grid-cols-3 sm:grid-cols-2 gap-4">
-                {rooms.map((room) => (
-                  <div
-                    key={room.id}
-                    className="rounded-xl border border-gray-100 p-4 transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700"
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <h5 className="font-bold">{room.room_number}</h5>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {rooms.map((room) => {
+                  const occupancyPct = room.capacity
+                    ? Math.round((room.occupied_count / room.capacity) * 100)
+                    : 0;
 
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${
-                          room.status === "Active"
-                            ? "bg-green-100 text-green-700"
-                            : room.status === "Maintenance"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-gray-200 text-gray-600"
+                  const statusStyles =
+                    room.status === "Active"
+                      ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
+                      : room.status === "Maintenance"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                        : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300";
+
+                  return (
+                    <div
+                      key={room.id}
+                      className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <div
+                        className={`h-1.5 w-full ${
+                          room.available_count > 0
+                            ? "bg-gradient-to-r from-emerald-500 to-green-500"
+                            : "bg-gradient-to-r from-red-500 to-rose-500"
                         }`}
-                      >
-                        {room.status}
-                      </span>
+                      />
+
+                      <div className="p-4">
+                        <div className="mb-1 flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                              <i className="bi bi-door-open text-sm" />
+                            </span>
+                            <h5 className="font-bold text-gray-900 dark:text-white">
+                              {room.room_number}
+                            </h5>
+                          </div>
+
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusStyles}`}
+                          >
+                            {room.status}
+                          </span>
+                        </div>
+
+                        <p className="mb-3 truncate text-xs text-gray-500 dark:text-gray-400">
+                          {room.hostel_name} · Block {room.block_name} ·{" "}
+                          {room.floor_name || `Floor ${room.floor_number}`}
+                        </p>
+
+                        <div className="mb-3 flex items-center gap-2">
+                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300">
+                            {room.room_type}
+                          </span>
+
+                          {room.monthly_rent !== null &&
+                            room.monthly_rent !== undefined && (
+                              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                ₹{room.monthly_rent}/mo
+                              </span>
+                            )}
+                        </div>
+
+                        <div className="mb-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>
+                            {room.occupied_count}/{room.capacity} beds
+                            occupied
+                          </span>
+                          <span>{occupancyPct}%</span>
+                        </div>
+
+                        <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-slate-700">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              occupancyPct >= 100
+                                ? "bg-red-500"
+                                : occupancyPct >= 60
+                                  ? "bg-amber-500"
+                                  : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${Math.min(occupancyPct, 100)}%` }}
+                          />
+                        </div>
+
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => openRoomDetails(room)}
+                            title="View details"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
+                          >
+                            <i className="bi bi-eye text-xs" />
+                          </button>
+
+                          <button
+                            onClick={() => openEditRoomModal(room)}
+                            disabled={!canWriteHostel}
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indigo-50 py-2 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                          >
+                            <i className="bi bi-pencil-square" />
+                            Edit
+                          </button>
+
+                          <button
+                            onClick={() => deleteRoom(room)}
+                            disabled={!canWriteHostel}
+                            title="Delete room"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+                          >
+                            <i className="bi bi-trash text-xs" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-
-                    <p className="text-xs text-gray-500 mb-2">
-                      {room.hostel_name} · Block {room.block_name} ·{" "}
-                      {room.floor_name || `Floor ${room.floor_number}`}
-                    </p>
-
-                    <div className="space-y-1 text-sm text-gray-500">
-                      <p>
-                        Type:{" "}
-                        <strong className="text-gray-800 dark:text-gray-200">
-                          {room.room_type}
-                        </strong>
-                      </p>
-                      <p>
-                        Capacity:{" "}
-                        <strong className="text-gray-800 dark:text-gray-200">
-                          {room.capacity} Beds
-                        </strong>
-                      </p>
-                      <p>
-                        Occupied:{" "}
-                        <strong className="text-gray-800 dark:text-gray-200">
-                          {room.occupied_count}
-                        </strong>{" "}
-                        · Available:{" "}
-                        <strong className="text-gray-800 dark:text-gray-200">
-                          {room.available_count}
-                        </strong>
-                      </p>
-                      {room.monthly_rent !== null &&
-                        room.monthly_rent !== undefined && (
-                          <p>
-                            Rent:{" "}
-                            <strong className="text-gray-800 dark:text-gray-200">
-                              ₹{room.monthly_rent}/mo
-                            </strong>
-                          </p>
-                        )}
-                    </div>
-
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => openRoomDetails(room)}
-                        className="flex-1 bg-slate-100 dark:bg-slate-700 py-2 rounded-lg text-xs font-medium"
-                      >
-                        View
-                      </button>
-
-                      <button
-                        onClick={() => openEditRoomModal(room)}
-                        disabled={!canWriteHostel}
-                        className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        onClick={() => deleteRoom(room)}
-                        disabled={!canWriteHostel}
-                        className="flex-1 bg-red-500 text-white py-2 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -2298,9 +3062,24 @@ function AdminDashboard() {
         {roomModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
-              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
-                {roomForm.id ? "Edit Room" : "New Room"}
-              </h2>
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+                    <i className="bi bi-door-open" />
+                  </span>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    {roomForm.id ? "Edit Room" : "New Room"}
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeRoomModal}
+                  className="text-gray-400 transition hover:text-red-500"
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
 
               <div className="space-y-3">
                 <select
@@ -2420,103 +3199,142 @@ function AdminDashboard() {
         {/* ROOM DETAILS MODAL */}
         {roomDetailsOpen && selectedRoom && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-lg border border-gray-100 dark:border-slate-700">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h2 className="text-lg font-semibold">
-                    Room {selectedRoom.room_number}
-                  </h2>
-                  <p className="text-xs text-gray-500">
-                    {selectedRoom.hostel_name} · Block {selectedRoom.block_name}{" "}
-                    ·{" "}
-                    {selectedRoom.floor_name ||
-                      `Floor ${selectedRoom.floor_number}`}
-                  </p>
+            <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-start justify-between bg-gradient-to-r from-violet-500 to-purple-600 p-5 text-white">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
+                    <i className="bi bi-door-open" />
+                  </span>
+                  <div>
+                    <h2 className="text-lg font-semibold">
+                      Room {selectedRoom.room_number}
+                    </h2>
+                    <p className="text-xs text-violet-100">
+                      {selectedRoom.hostel_name} · Block{" "}
+                      {selectedRoom.block_name} ·{" "}
+                      {selectedRoom.floor_name ||
+                        `Floor ${selectedRoom.floor_number}`}
+                    </p>
+                  </div>
                 </div>
 
                 <button
                   onClick={closeRoomDetails}
-                  className="text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                  className="text-white/80 transition hover:text-white"
                 >
                   <i className="bi bi-x-lg"></i>
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mb-4 text-center">
-                <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                  <p className="text-xs text-gray-500">Capacity</p>
-                  <p className="text-xl font-bold">{selectedRoom.capacity}</p>
-                </div>
-                <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                  <p className="text-xs text-gray-500">Occupied</p>
-                  <p className="text-xl font-bold text-red-500">
-                    {selectedRoom.occupied_count}
-                  </p>
-                </div>
-                <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-                  <p className="text-xs text-gray-500">Available</p>
-                  <p className="text-xl font-bold text-emerald-600">
-                    {selectedRoom.available_count}
-                  </p>
-                </div>
-              </div>
-
-              <h4 className="text-sm font-semibold mb-2">Wardens</h4>
-              {(selectedRoom.wardens || []).length === 0 ? (
-                <p className="text-sm text-gray-400 mb-4">
-                  No warden assigned.
-                </p>
-              ) : (
-                <ul className="text-sm space-y-1 mb-4">
-                  {selectedRoom.wardens.map((warden) => (
-                    <li key={warden.id}>
-                      {warden.name} · {warden.mobile}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <h4 className="text-sm font-semibold mb-2">Beds</h4>
-              <div className="space-y-1 mb-4">
-                {(selectedRoom.beds || []).map((bed) => (
-                  <div
-                    key={bed.id}
-                    className="flex justify-between bg-gray-50 dark:bg-slate-700/40 rounded p-2 text-sm"
-                  >
-                    <span>Bed {bed.bed_number}</span>
-                    <span
-                      className={
-                        bed.status === "Occupied"
-                          ? "text-green-600 font-medium"
-                          : "text-orange-500"
-                      }
-                    >
-                      {bed.status === "Occupied" && bed.occupant
-                        ? bed.occupant.name
-                        : bed.status}
-                    </span>
+              <div className="max-h-[70vh] overflow-y-auto p-5">
+                <div className="mb-5 grid grid-cols-3 gap-3 text-center">
+                  <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Capacity
+                    </p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">
+                      {selectedRoom.capacity}
+                    </p>
                   </div>
-                ))}
-              </div>
+                  <div className="rounded-xl bg-red-50 p-3 dark:bg-red-500/10">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Occupied
+                    </p>
+                    <p className="text-xl font-bold text-red-500">
+                      {selectedRoom.occupied_count}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-500/10">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Available
+                    </p>
+                    <p className="text-xl font-bold text-emerald-600">
+                      {selectedRoom.available_count}
+                    </p>
+                  </div>
+                </div>
 
-              <button
-                onClick={() => {
-                  closeRoomDetails();
-                  setActiveSection("beds");
-                  updateBedFilter("room_id", selectedRoom.id);
-                  loadBeds({
-                    filters: {
-                      room_id: selectedRoom.id,
-                      floor_id: "",
-                      block_id: "",
-                      status: "",
-                    },
-                  });
-                }}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm"
-              >
-                Manage Beds
-              </button>
+                <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
+                  <i className="bi bi-shield-check text-gray-400" />
+                  Wardens
+                </h4>
+                {(selectedRoom.wardens || []).length === 0 ? (
+                  <p className="mb-5 text-sm text-gray-400">
+                    No warden assigned.
+                  </p>
+                ) : (
+                  <ul className="mb-5 space-y-1.5">
+                    {selectedRoom.wardens.map((warden) => (
+                      <li
+                        key={warden.id}
+                        className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-900/40"
+                      >
+                        <span className="text-gray-700 dark:text-gray-200">
+                          {warden.name}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {warden.mobile}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
+                  <i className="bi bi-grid-3x3-gap text-gray-400" />
+                  Beds
+                </h4>
+                <div className="mb-5 space-y-1.5">
+                  {(selectedRoom.beds || []).map((bed) => (
+                    <div
+                      key={bed.id}
+                      className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-900/40"
+                    >
+                      <span className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            bed.status === "Occupied"
+                              ? "bg-green-500"
+                              : "bg-orange-400"
+                          }`}
+                        />
+                        Bed {bed.bed_number}
+                      </span>
+                      <span
+                        className={
+                          bed.status === "Occupied"
+                            ? "font-medium text-green-600"
+                            : "text-orange-500"
+                        }
+                      >
+                        {bed.status === "Occupied" && bed.occupant
+                          ? bed.occupant.name
+                          : bed.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => {
+                    closeRoomDetails();
+                    setActiveSection("beds");
+                    updateBedFilter("room_id", selectedRoom.id);
+                    loadBeds({
+                      filters: {
+                        room_id: selectedRoom.id,
+                        floor_id: "",
+                        block_id: "",
+                        status: "",
+                      },
+                    });
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 active:scale-95"
+                >
+                  <i className="bi bi-grid-3x3-gap" />
+                  Manage Beds
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2526,7 +3344,7 @@ function AdminDashboard() {
         {activeSection === "beds" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -2614,9 +3432,9 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* BED TABLE */}
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-slate-700">
+            {/* BED GRID */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-6">
+              <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-semibold text-gray-900 dark:text-white">
                   Beds
                 </h3>
@@ -2625,143 +3443,148 @@ function AdminDashboard() {
                 </span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/40 dark:text-gray-400">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold">Bed</th>
-                      <th className="px-4 py-3 text-left font-semibold">
-                        Room
-                      </th>
-                      <th className="px-4 py-3 text-left font-semibold">
-                        Type
-                      </th>
-                      <th className="px-4 py-3 text-left font-semibold">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left font-semibold">
-                        Occupant
-                      </th>
-                      <th className="px-4 py-3 text-right font-semibold">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
+              {bedsLoading && beds.length === 0 && (
+                <div className="flex flex-col items-center gap-3 py-16 text-gray-500 dark:text-gray-400">
+                  <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                  Loading beds...
+                </div>
+              )}
 
-                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                    {bedsLoading && beds.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="py-16 text-center">
-                          <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
-                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
-                            Loading beds...
+              {!bedsLoading && beds.length === 0 && (
+                <div className="mx-auto max-w-sm py-14 text-center">
+                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                    <i className="bi bi-grid-3x3-gap text-2xl" />
+                  </span>
+                  <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
+                    No beds found
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    No beds match these filters, or none exist yet.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {beds.map((bed) => {
+                  const statusAccent =
+                    bed.status === "Vacant"
+                      ? "from-emerald-500 to-green-500"
+                      : bed.status === "Occupied"
+                        ? "from-red-500 to-rose-500"
+                        : bed.status === "Maintenance"
+                          ? "from-amber-500 to-orange-500"
+                          : "from-blue-500 to-indigo-500";
+
+                  const statusBadge =
+                    bed.status === "Vacant"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                      : bed.status === "Occupied"
+                        ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                        : bed.status === "Maintenance"
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                          : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300";
+
+                  return (
+                    <div
+                      key={bed.id}
+                      className="overflow-hidden rounded-2xl border border-gray-100 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700"
+                    >
+                      <div className={`h-1.5 w-full bg-gradient-to-r ${statusAccent}`} />
+
+                      <div className="bg-white p-4 dark:bg-slate-800">
+                        <div className="mb-2 flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+                              <i className="bi bi-grid-3x3-gap text-sm" />
+                            </span>
+                            <div>
+                              <p className="font-bold text-gray-900 dark:text-white">
+                                Bed {bed.bed_number}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                Room #{bed.room_id} · {bed.bed_type}
+                              </p>
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    )}
 
-                    {!bedsLoading && beds.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="py-14 text-center">
-                          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-                            <i className="bi bi-grid-3x3-gap text-2xl" />
-                          </span>
-                          <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
-                            No beds found
-                          </h3>
-                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            No beds match these filters, or none exist yet.
-                          </p>
-                        </td>
-                      </tr>
-                    )}
-
-                    {beds.map((bed) => (
-                      <tr
-                        key={bed.id}
-                        className="transition hover:bg-gray-50 dark:hover:bg-slate-700/40"
-                      >
-                        <td className="px-4 py-3 font-medium">
-                          {bed.bed_number}
-                        </td>
-                        <td className="px-4 py-3">Room #{bed.room_id}</td>
-                        <td className="px-4 py-3">{bed.bed_type}</td>
-                        <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-1 rounded text-xs ${
-                              bed.status === "Vacant"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : bed.status === "Occupied"
-                                  ? "bg-red-100 text-red-700"
-                                  : bed.status === "Maintenance"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-blue-100 text-blue-700"
-                            }`}
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusBadge}`}
                           >
                             {bed.status}
                           </span>
-                        </td>
-                        <td className="px-4 py-3">
+                        </div>
+
+                        <div className="mb-3 flex min-h-[2rem] items-center gap-2 rounded-lg bg-gray-50 px-2.5 py-1.5 text-sm dark:bg-slate-900/40">
                           {bed.occupant ? (
-                            <span>
-                              {bed.occupant.name}{" "}
-                              <span className="text-gray-400 text-xs">
-                                ({bed.occupant.student_code})
+                            <>
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                {bed.occupant.name?.charAt(0) || "?"}
                               </span>
-                            </span>
+                              <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-200">
+                                {bed.occupant.name}
+                              </span>
+                              <span className="shrink-0 text-xs text-gray-400">
+                                {bed.occupant.student_code}
+                              </span>
+                            </>
                           ) : (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-xs text-gray-400">
+                              No occupant
+                            </span>
                           )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end gap-2 flex-wrap">
-                            {bed.status === "Vacant" && (
-                              <button
-                                onClick={() => openAllocateModal(bed)}
-                                disabled={!canWriteHostel}
-                                className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Allocate
-                              </button>
-                            )}
+                        </div>
 
-                            {bed.status === "Occupied" && (
-                              <button
-                                onClick={() => vacateBed(bed)}
-                                disabled={
-                                  !canWriteHostel || vacatingBedId === bed.id
-                                }
-                                className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {vacatingBedId === bed.id
-                                  ? "Vacating…"
-                                  : "Vacate"}
-                              </button>
-                            )}
-
+                        <div className="flex flex-wrap gap-1.5">
+                          {bed.status === "Vacant" && (
                             <button
-                              onClick={() => openEditBedModal(bed)}
+                              onClick={() => openAllocateModal(bed)}
                               disabled={!canWriteHostel}
-                              className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-xs font-medium text-white transition hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
                             >
-                              Edit
+                              <i className="bi bi-person-plus" />
+                              Allocate
                             </button>
+                          )}
 
+                          {bed.status === "Occupied" && (
                             <button
-                              onClick={() => deleteBed(bed)}
+                              onClick={() => vacateBed(bed)}
                               disabled={
-                                !canWriteHostel || bed.status === "Occupied"
+                                !canWriteHostel || vacatingBedId === bed.id
                               }
-                              className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-orange-500 py-2 text-xs font-medium text-white transition hover:bg-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
                             >
-                              Delete
+                              <i className="bi bi-box-arrow-right" />
+                              {vacatingBedId === bed.id
+                                ? "Vacating…"
+                                : "Vacate"}
                             </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          )}
+
+                          <button
+                            onClick={() => openEditBedModal(bed)}
+                            disabled={!canWriteHostel}
+                            title="Edit bed"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                          >
+                            <i className="bi bi-pencil-square text-xs" />
+                          </button>
+
+                          <button
+                            onClick={() => deleteBed(bed)}
+                            disabled={
+                              !canWriteHostel || bed.status === "Occupied"
+                            }
+                            title="Delete bed"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+                          >
+                            <i className="bi bi-trash text-xs" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -2771,9 +3594,24 @@ function AdminDashboard() {
         {bedModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
-              <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
-                {bedForm.id ? "Edit Bed" : "New Bed"}
-              </h2>
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+                    <i className="bi bi-grid-3x3-gap" />
+                  </span>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                    {bedForm.id ? "Edit Bed" : "New Bed"}
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeBedModal}
+                  className="text-gray-400 transition hover:text-red-500"
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
 
               <div className="space-y-3">
                 <input
@@ -2825,11 +3663,30 @@ function AdminDashboard() {
         {allocateModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
-              <h2 className="text-lg font-semibold mb-1">Allocate Bed</h2>
-              <p className="text-xs text-gray-500 mb-4">
-                Bed {allocateTargetBed?.bed_number} · Room #
-                {allocateTargetBed?.room_id}
-              </p>
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                    <i className="bi bi-person-plus" />
+                  </span>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Allocate Bed
+                    </h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Bed {allocateTargetBed?.bed_number} · Room #
+                      {allocateTargetBed?.room_id}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeAllocateModal}
+                  className="text-gray-400 transition hover:text-red-500"
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
 
               <div className="space-y-3">
                 <div className="flex gap-2">
@@ -2847,7 +3704,7 @@ function AdminDashboard() {
 
                   <button
                     onClick={() => searchUnallocatedStudents(studentSearch)}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm"
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 active:scale-95"
                   >
                     Search
                   </button>
@@ -2905,7 +3762,7 @@ function AdminDashboard() {
                 <button
                   onClick={allocateBed}
                   disabled={allocateSaving || !selectedStudentId}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm disabled:opacity-50"
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
                 >
                   {allocateSaving ? "Allocating…" : "Allocate"}
                 </button>
@@ -2917,7 +3774,7 @@ function AdminDashboard() {
         {activeSection === "students" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -3189,12 +4046,12 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               row.fee_status === "Paid"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : row.fee_status === "Overdue"
-                                  ? "bg-red-100 text-red-700"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
                                   : row.fee_status === "Pending"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-gray-100 text-gray-600"
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {row.fee_status || "—"}
@@ -3205,8 +4062,8 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               row.is_active
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-gray-100 text-gray-600"
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                                : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {row.is_active ? "Active" : "Checked Out"}
@@ -3384,7 +4241,7 @@ function AdminDashboard() {
         {activeSection === "room-allotment" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -3633,8 +4490,8 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               row.is_active
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
+                                : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {row.is_active ? "Active" : "Checked Out"}
@@ -3750,7 +4607,7 @@ function AdminDashboard() {
         {activeSection === "staff" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -4036,10 +4893,10 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               staff.status === "Active"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : staff.status === "On Leave"
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-gray-100 text-gray-600"
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                  : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {staff.status}
@@ -4096,7 +4953,7 @@ function AdminDashboard() {
               </h2>
 
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <input
                     value={staffForm.first_name}
                     onChange={(e) =>
@@ -4277,7 +5134,7 @@ function AdminDashboard() {
         {activeSection === "visitors" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -4574,12 +5431,12 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               visitor.status === "Approved"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : visitor.status === "Pending"
-                                  ? "bg-amber-100 text-amber-700"
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                                   : visitor.status === "Rejected"
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-gray-100 text-gray-600"
+                                    ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {visitor.status}
@@ -4806,7 +5663,7 @@ function AdminDashboard() {
         {activeSection === "attendance" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -5072,14 +5929,14 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               row.status === "Present"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : row.status === "Absent"
-                                  ? "bg-red-100 text-red-700"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
                                   : row.status === "On Leave"
-                                    ? "bg-amber-100 text-amber-700"
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                                     : row.status === "Late Entry"
-                                      ? "bg-purple-100 text-purple-700"
-                                      : "bg-gray-100 text-gray-600"
+                                      ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
+                                      : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {row.status}
@@ -5141,7 +5998,7 @@ function AdminDashboard() {
         {activeSection === "checkin-checkout" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -5420,10 +6277,10 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               movement.status === "Returned"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : movement.status === "Late Entry"
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-red-100 text-red-700"
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                  : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
                             }`}
                           >
                             {movement.status}
@@ -5609,7 +6466,7 @@ function AdminDashboard() {
         {activeSection === "leave-requests" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -5879,12 +6736,12 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               leave.status === "Approved"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : leave.status === "Pending"
-                                  ? "bg-amber-100 text-amber-700"
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                                   : leave.status === "Rejected"
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-gray-100 text-gray-600"
+                                    ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {leave.status}
@@ -6070,7 +6927,7 @@ function AdminDashboard() {
                   <option value="Other">Other</option>
                 </select>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
                       From Date
@@ -6135,7 +6992,7 @@ function AdminDashboard() {
         {activeSection === "mess-menu" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-yellow-600 to-orange-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -6164,7 +7021,7 @@ function AdminDashboard() {
             </div>
 
             {/* KPI CARDS */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
                 {
                   label: "Meal Slots Planned",
@@ -6365,7 +7222,7 @@ function AdminDashboard() {
         {activeSection === "meal-attendance" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-lime-600 to-emerald-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -6631,10 +7488,10 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               row.status === "Present"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : row.status === "Absent"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-gray-100 text-gray-600"
+                                  ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                  : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {row.status}
@@ -6683,7 +7540,7 @@ function AdminDashboard() {
         {activeSection === "complaints" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -6931,12 +7788,12 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               complaint.priority === "Urgent"
-                                ? "bg-red-100 text-red-700"
+                                ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
                                 : complaint.priority === "High"
-                                  ? "bg-orange-100 text-orange-700"
+                                  ? "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300"
                                   : complaint.priority === "Medium"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-gray-100 text-gray-600"
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {complaint.priority}
@@ -6947,10 +7804,10 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               complaint.status === "Resolved"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : complaint.status === "In Progress"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-amber-100 text-amber-700"
+                                  ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                             }`}
                           >
                             {complaint.status}
@@ -7004,7 +7861,7 @@ function AdminDashboard() {
               </div>
 
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <select
                     value={selectedComplaint.category}
                     onChange={(e) =>
@@ -7083,7 +7940,7 @@ function AdminDashboard() {
         {activeSection === "maintenance" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-slate-600 to-gray-700 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -7362,12 +8219,12 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               req.priority === "Urgent"
-                                ? "bg-red-100 text-red-700"
+                                ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
                                 : req.priority === "High"
-                                  ? "bg-orange-100 text-orange-700"
+                                  ? "bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300"
                                   : req.priority === "Medium"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-gray-100 text-gray-600"
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                    : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {req.priority}
@@ -7378,12 +8235,12 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               req.status === "Resolved"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : req.status === "In Progress"
-                                  ? "bg-blue-100 text-blue-700"
+                                  ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
                                   : req.status === "Cancelled"
-                                    ? "bg-gray-100 text-gray-600"
-                                    : "bg-amber-100 text-amber-700"
+                                    ? "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+                                    : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                             }`}
                           >
                             {req.status}
@@ -7480,7 +8337,7 @@ function AdminDashboard() {
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <input
                     value={maintenanceForm.room_id}
                     onChange={(e) =>
@@ -7511,7 +8368,7 @@ function AdminDashboard() {
                   hostel-wide request.
                 </p>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <select
                     value={maintenanceForm.category}
                     onChange={(e) =>
@@ -7613,7 +8470,7 @@ function AdminDashboard() {
         {activeSection === "fee-management" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-green-600 to-emerald-700 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -7815,8 +8672,8 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               structure.status === "Active"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
+                                : "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
                             }`}
                           >
                             {structure.status}
@@ -7957,12 +8814,12 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               fee.status === "Paid"
-                                ? "bg-green-100 text-green-700"
+                                ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300"
                                 : fee.status === "Partially Paid"
-                                  ? "bg-blue-100 text-blue-700"
+                                  ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
                                   : fee.status === "Overdue"
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-amber-100 text-amber-700"
+                                    ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
+                                    : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                             }`}
                           >
                             {fee.status}
@@ -8149,7 +9006,7 @@ function AdminDashboard() {
         {activeSection === "payment" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">Payment</h2>
@@ -8568,7 +9425,7 @@ function AdminDashboard() {
         {activeSection === "pending-dues" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-rose-600 to-red-700 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -8811,10 +9668,10 @@ function AdminDashboard() {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${
                               fee.status === "Overdue"
-                                ? "bg-red-100 text-red-700"
+                                ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300"
                                 : fee.status === "Partially Paid"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : "bg-amber-100 text-amber-700"
+                                  ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
                             }`}
                           >
                             {fee.status}
@@ -8854,7 +9711,7 @@ function AdminDashboard() {
         {activeSection === "reports" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -9121,7 +9978,7 @@ function AdminDashboard() {
         {activeSection === "activity-logs" && (
           <section className="section active p-4 sm:p-6 space-y-6">
             {/* HEADER */}
-            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+            <div className="rounded-2xl bg-gradient-to-r from-slate-700 to-gray-800 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
@@ -9371,6 +10228,818 @@ function AdminDashboard() {
                 </ul>
               </div>
             </div>
+          </section>
+        )}
+
+        {/* ===================== NOTIFICATIONS SECTION START ===================== */}
+        {activeSection === "notifications" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+                    <i className="bi bi-bell" />
+                    Notifications
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Leave requests and system alerts sent to your account
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fetchNotifications && fetchNotifications()}
+                    disabled={notificationLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        notificationLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+
+                  {notificationUnread > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        markAllNotificationsRead && markAllNotificationsRead()
+                      }
+                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-700 shadow transition hover:bg-white/90"
+                    >
+                      <i className="bi bi-check2-all" />
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+              {[
+                {
+                  label: "Total",
+                  value: notifications.length,
+                  icon: "bi-bell",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Unread",
+                  value: notificationUnread,
+                  icon: "bi-envelope-exclamation",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "Read",
+                  value: Math.max(
+                    notifications.length - notificationUnread,
+                    0,
+                  ),
+                  icon: "bi-envelope-open",
+                  classes:
+                    "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {notificationLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTER TABS */}
+            <div className="flex w-fit items-center gap-1 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {[
+                ["all", "All"],
+                ["unread", "Unread"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setNotificationFilter(key)}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
+                    notificationFilter === key
+                      ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
+                      : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {label}
+                  {key === "unread" && notificationUnread > 0 && (
+                    <span className="rounded-full bg-purple-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {notificationUnread}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* LIST */}
+            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {notificationLoading && notifications.length === 0 ? (
+                <div className="space-y-3 p-5">
+                  {[...Array(4)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-16 animate-pulse rounded-xl bg-gray-100 dark:bg-slate-700"
+                    />
+                  ))}
+                </div>
+              ) : (
+                (() => {
+                  const filtered = (notifications || []).filter((n) =>
+                    notificationFilter === "unread" ? !n.is_read : true,
+                  );
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center gap-2 p-12 text-center">
+                        <i className="bi bi-bell-slash text-3xl text-gray-300 dark:text-slate-600" />
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                          {notificationFilter === "unread"
+                            ? "You're all caught up — no unread notifications"
+                            : "No notifications yet"}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <ul className="divide-y dark:divide-slate-700">
+                      {filtered.map((n) => (
+                        <li
+                          key={n.id}
+                          className={`flex items-start gap-4 p-4 transition sm:p-5 ${
+                            !n.is_read
+                              ? "bg-purple-50/60 dark:bg-purple-500/5"
+                              : ""
+                          }`}
+                        >
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-500/20 dark:text-purple-300">
+                            <i className="bi bi-calendar2-check" />
+                          </span>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate font-medium text-gray-800 dark:text-white">
+                                {n.title}
+                              </p>
+
+                              {!n.is_read && (
+                                <span className="h-2 w-2 shrink-0 rounded-full bg-purple-500" />
+                              )}
+                            </div>
+
+                            <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-300">
+                              {n.message}
+                            </p>
+
+                            <p className="mt-1 text-xs text-gray-400">
+                              {n.time}
+                            </p>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {!n.is_read && (
+                              <button
+                                type="button"
+                                title="Mark as read"
+                                onClick={() =>
+                                  markNotificationRead &&
+                                  markNotificationRead(n.id)
+                                }
+                                className="rounded-lg p-2 text-gray-400 transition hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-500/10"
+                              >
+                                <i className="bi bi-check2" />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              title="Delete"
+                              onClick={() =>
+                                deleteNotification && deleteNotification(n.id)
+                              }
+                              className="rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+                            >
+                              <i className="bi bi-trash" />
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                })()
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ===================== ANNOUNCEMENTS SECTION START ===================== */}
+        {activeSection === "announcements" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+                    <i className="bi bi-megaphone" />
+                    Announcements
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Notices published to students, teachers and staff
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fetchNotices && fetchNotices()}
+                    disabled={noticeLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i
+                      className={`bi bi-arrow-clockwise ${
+                        noticeLoading ? "animate-spin" : ""
+                      }`}
+                    />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openCreateNoticeModal}
+                    disabled={!canWriteHostel}
+                    title={
+                      !canWriteHostel
+                        ? "Read-only access — ask your Super Admin for Full Access"
+                        : ""
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-700 shadow transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <i className="bi bi-plus-lg" />
+                    New Announcement
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                {
+                  label: "Total",
+                  value: noticeStats.total,
+                  icon: "bi-megaphone",
+                  classes:
+                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "High Priority",
+                  value: noticeStats.important,
+                  icon: "bi-exclamation-circle",
+                  classes:
+                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                },
+                {
+                  label: "This Week",
+                  value: noticeStats.thisWeek,
+                  icon: "bi-calendar-week",
+                  classes:
+                    "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300",
+                },
+                {
+                  label: "Unread",
+                  value: unreadCount,
+                  icon: "bi-envelope-exclamation",
+                  classes:
+                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {noticeLoading ? "…" : Number(stat.value || 0)}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="relative xl:col-span-2">
+                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+
+                  <input
+                    type="search"
+                    value={noticeSearch}
+                    onChange={(e) => setNoticeSearch(e.target.value)}
+                    placeholder="Search announcements..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <select
+                  value={noticePriorityFilter}
+                  onChange={(e) => setNoticePriorityFilter(e.target.value)}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="High">High Priority</option>
+                  <option value="Medium">Medium Priority</option>
+                  <option value="Low">Low Priority</option>
+                </select>
+              </div>
+            </div>
+
+            {/* LIST */}
+            <div className="space-y-4">
+              {noticeLoading && announcements.length === 0 ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-28 animate-pulse rounded-2xl bg-gray-100 dark:bg-slate-800"
+                    />
+                  ))}
+                </div>
+              ) : (
+                (() => {
+                  const filtered = (announcements || []).filter((n) => {
+                    const matchesSearch =
+                      !noticeSearch.trim() ||
+                      n.title
+                        ?.toLowerCase()
+                        .includes(noticeSearch.trim().toLowerCase()) ||
+                      (n.description || n.message || "")
+                        .toLowerCase()
+                        .includes(noticeSearch.trim().toLowerCase());
+
+                    const matchesPriority =
+                      noticePriorityFilter === "all" ||
+                      n.priority === noticePriorityFilter;
+
+                    return matchesSearch && matchesPriority;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-gray-100 bg-white p-12 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <i className="bi bi-megaphone text-3xl text-gray-300 dark:text-slate-600" />
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                          {announcements.length === 0
+                            ? "No announcements published yet"
+                            : "No announcements match your filters"}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  const priorityClasses = {
+                    High: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+                    Medium:
+                      "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
+                    Low: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300",
+                  };
+
+                  return filtered.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md dark:bg-slate-800 ${
+                        !n.is_read
+                          ? "border-indigo-200 dark:border-indigo-500/40"
+                          : "border-gray-100 dark:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-gray-900 dark:text-white">
+                              {n.title}
+                            </h3>
+
+                            {!n.is_read && (
+                              <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                            )}
+
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                priorityClasses[n.priority] ||
+                                priorityClasses.Medium
+                              }`}
+                            >
+                              {n.priority}
+                            </span>
+
+                            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300">
+                              {n.category}
+                            </span>
+
+                            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300">
+                              <i className="bi bi-people me-1" />
+                              {n.audience}
+                            </span>
+                          </div>
+
+                          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                            {n.description || n.message}
+                          </p>
+
+                          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                            <span>
+                              <i className="bi bi-calendar3 me-1" />
+                              {n.date || n.notice_date}
+                            </span>
+
+                            {n.expiry_date && (
+                              <span>
+                                <i className="bi bi-hourglass-split me-1" />
+                                Expires {n.expiry_date}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {!n.is_read && (
+                            <button
+                              type="button"
+                              title="Mark as read"
+                              onClick={() =>
+                                markNoticeAsRead && markNoticeAsRead(n.id)
+                              }
+                              className="rounded-lg p-2 text-gray-400 transition hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10"
+                            >
+                              <i className="bi bi-check2" />
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            title={
+                              !canWriteHostel
+                                ? "Read-only access"
+                                : "Edit announcement"
+                            }
+                            disabled={!canWriteHostel}
+                            onClick={() => openEditNoticeModal(n)}
+                            className="rounded-lg p-2 text-gray-400 transition hover:bg-indigo-50 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-indigo-500/10"
+                          >
+                            <i className="bi bi-pencil-square" />
+                          </button>
+
+                          <button
+                            type="button"
+                            title={
+                              !canWriteHostel
+                                ? "Read-only access"
+                                : "Remove announcement"
+                            }
+                            disabled={!canWriteHostel}
+                            onClick={() => setNoticeDeleteTarget(n)}
+                            className="rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-500/10"
+                          >
+                            <i className="bi bi-trash" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ));
+                })()
+              )}
+            </div>
+
+            {/* CREATE / EDIT MODAL */}
+            {noticeModalOpen && (
+              <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+                <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl dark:bg-slate-800">
+                  <div className="flex items-center justify-between border-b p-5 dark:border-slate-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {noticeModalMode === "create"
+                        ? "New Announcement"
+                        : "Edit Announcement"}
+                    </h3>
+
+                    <button
+                      type="button"
+                      onClick={closeNoticeModal}
+                      className="text-gray-400 transition hover:text-red-500"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+
+                      if (!noticeForm.title.trim()) {
+                        setNoticeFormError("Title is required");
+                        return;
+                      }
+
+                      if (!noticeForm.description.trim()) {
+                        setNoticeFormError("Description is required");
+                        return;
+                      }
+
+                      if (!noticeForm.notice_date) {
+                        setNoticeFormError("Notice date is required");
+                        return;
+                      }
+
+                      setNoticeFormError("");
+
+                      const payload = {
+                        title: noticeForm.title.trim(),
+                        description: noticeForm.description.trim(),
+                        category: noticeForm.category,
+                        priority: noticeForm.priority,
+                        notice_date: noticeForm.notice_date,
+                        expiry_date: noticeForm.expiry_date || null,
+                        audience: noticeForm.audience,
+                      };
+
+                      const result =
+                        noticeModalMode === "create"
+                          ? await createNotice(payload)
+                          : await updateNotice(
+                              noticeBeingEdited.id,
+                              payload,
+                            );
+
+                      if (result?.success) {
+                        closeNoticeModal();
+                      } else if (result?.error) {
+                        setNoticeFormError(result.error);
+                      }
+                    }}
+                    className="max-h-[70vh] space-y-4 overflow-y-auto p-5"
+                  >
+                    {noticeFormError && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                        {noticeFormError}
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        value={noticeForm.title}
+                        onChange={(e) =>
+                          setNoticeForm((f) => ({
+                            ...f,
+                            title: e.target.value,
+                          }))
+                        }
+                        placeholder="e.g. Hostel closed for maintenance"
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Description
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={noticeForm.description}
+                        onChange={(e) =>
+                          setNoticeForm((f) => ({
+                            ...f,
+                            description: e.target.value,
+                          }))
+                        }
+                        placeholder="Details residents need to know..."
+                        className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Category
+                        </label>
+                        <select
+                          value={noticeForm.category}
+                          onChange={(e) =>
+                            setNoticeForm((f) => ({
+                              ...f,
+                              category: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        >
+                          {[
+                            "Academic",
+                            "Examination",
+                            "Holiday",
+                            "Event",
+                            "General",
+                          ].map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Priority
+                        </label>
+                        <select
+                          value={noticeForm.priority}
+                          onChange={(e) =>
+                            setNoticeForm((f) => ({
+                              ...f,
+                              priority: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        >
+                          {["High", "Medium", "Low"].map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Notice Date
+                        </label>
+                        <input
+                          type="date"
+                          value={noticeForm.notice_date}
+                          onChange={(e) =>
+                            setNoticeForm((f) => ({
+                              ...f,
+                              notice_date: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Expiry Date{" "}
+                          <span className="text-gray-400">(optional)</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={noticeForm.expiry_date}
+                          onChange={(e) =>
+                            setNoticeForm((f) => ({
+                              ...f,
+                              expiry_date: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Audience
+                      </label>
+                      <select
+                        value={noticeForm.audience}
+                        onChange={(e) =>
+                          setNoticeForm((f) => ({
+                            ...f,
+                            audience: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      >
+                        {["All", "Students", "Teachers", "Admins", "Staff"].map(
+                          (a) => (
+                            <option key={a} value={a}>
+                              {a}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 border-t pt-4 dark:border-slate-700">
+                      <button
+                        type="button"
+                        onClick={closeNoticeModal}
+                        className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={noticeSubmitting}
+                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {noticeSubmitting && (
+                          <i className="bi bi-arrow-repeat animate-spin" />
+                        )}
+                        {noticeModalMode === "create"
+                          ? "Publish"
+                          : "Save Changes"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* DELETE CONFIRM MODAL */}
+            {noticeDeleteTarget && (
+              <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+                <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl dark:bg-slate-800">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-300">
+                    <i className="bi bi-exclamation-triangle text-xl" />
+                  </div>
+
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Remove announcement?
+                  </h3>
+
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    "{noticeDeleteTarget.title}" will be taken down from
+                    everyone's feed. This can't be undone from here.
+                  </p>
+
+                  <div className="mt-6 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNoticeDeleteTarget(null)}
+                      className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await deleteNotice(noticeDeleteTarget.id);
+                        setNoticeDeleteTarget(null);
+                      }}
+                      className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow transition hover:bg-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
 
