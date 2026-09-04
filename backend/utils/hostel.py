@@ -828,6 +828,49 @@ class HostelMealAttendance(db.Model):
 
 
 # ============================= HELPERS =============================
+def serialize_complaint(c):
+    return {
+        "id": c.id,
+        "issue": c.issue,
+        "category": c.category,
+        "priority": c.priority,
+        "status": c.status,
+        "resolution_notes": c.resolution_notes,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+        "resolved_at": c.resolved_at.isoformat() if c.resolved_at else None,
+    }
+
+
+def serialize_leave_request(lr):
+    return {
+        "id": lr.id,
+        "leave_type": lr.leave_type,
+        "from_date": lr.from_date.isoformat() if lr.from_date else None,
+        "to_date": lr.to_date.isoformat() if lr.to_date else None,
+        "reason": lr.reason,
+        "status": lr.status,
+        "actual_return_date": (
+            lr.actual_return_date.isoformat() if lr.actual_return_date else None
+        ),
+        "created_at": lr.created_at.isoformat() if lr.created_at else None,
+    }
+
+
+def serialize_visitor(v):
+    return {
+        "id": v.id,
+        "visitor_code": v.visitor_code,
+        "visitor_name": v.visitor_name,
+        "visitor_mobile": v.visitor_mobile,
+        "relation": v.relation,
+        "purpose": v.purpose,
+        "status": v.status,
+        "check_in_time": v.check_in_time.isoformat() if v.check_in_time else None,
+        "check_out_time": v.check_out_time.isoformat() if v.check_out_time else None,
+        "created_at": v.created_at.isoformat() if v.created_at else None,
+    }
+
+
 def safe_full_name(first_name=None, middle_name=None, last_name=None):
     parts = [
         first_name or "",
@@ -1267,6 +1310,7 @@ class StudentHostelDetails(MethodView):
                             "data": {
                                 "room_number": None,
                                 "room_type": None,
+                                "room_status": None,
                                 "block": None,
                                 "floor": None,
                                 "bed_number": None,
@@ -1274,8 +1318,29 @@ class StudentHostelDetails(MethodView):
                                 "check_out_date": None,
                                 "warden": None,
                                 "roommates": [],
-                                "complaints": [],
+                                "complaints": [
+                                    serialize_complaint(c)
+                                    for c in HostelComplaint.query.filter_by(
+                                        student_id=student.id
+                                    )
+                                    .order_by(HostelComplaint.id.desc())
+                                    .limit(10)
+                                    .all()
+                                ],
+                                "fee_summary": {
+                                    "total_amount": 0,
+                                    "total_paid": 0,
+                                    "total_balance": 0,
+                                    "pending_count": 0,
+                                    "overdue_count": 0,
+                                    "next_due_date": None,
+                                    "next_due_amount": None,
+                                    "invoice_count": 0,
+                                },
                                 "fee_status": None,
+                                "today_attendance": None,
+                                "pending_leave_count": 0,
+                                "pending_visitor_count": 0,
                             },
                         }
                     ),
@@ -1344,32 +1409,88 @@ class StudentHostelDetails(MethodView):
             complaints_query = (
                 HostelComplaint.query.filter_by(student_id=student.id)
                 .order_by(HostelComplaint.id.desc())
+                .limit(10)
                 .all()
             )
 
-            complaints = []
+            complaints = [serialize_complaint(c) for c in complaints_query]
 
-            for c in complaints_query:
-                complaints.append(
-                    {
-                        "id": c.id,
-                        "issue": c.issue,
-                        "status": c.status,
-                    }
-                )
+            # ================= FEES (AGGREGATE) =================
+            fees_query = HostelFee.query.filter_by(student_id=student.id).all()
 
-            # ================= FEES =================
-            fee = HostelFee.query.filter_by(student_id=student.id).first()
+            total_amount = 0.0
+            total_paid = 0.0
+            pending_count = 0
+            overdue_count = 0
+            next_due = None
+
+            for f in fees_query:
+                summary = get_fee_payment_summary(f)
+                total_amount += float(f.amount or 0)
+                total_paid += summary["paid_amount"]
+
+                if summary["status"] in ("Pending", "Partially Paid"):
+                    pending_count += 1
+
+                if summary["status"] == "Overdue":
+                    overdue_count += 1
+
+                if summary["status"] != "Paid" and f.due_date:
+                    if next_due is None or f.due_date < next_due["due_date"]:
+                        next_due = {
+                            "due_date": f.due_date,
+                            "amount": summary["balance"],
+                        }
+
+            fee_summary = {
+                "total_amount": round(total_amount, 2),
+                "total_paid": round(total_paid, 2),
+                "total_balance": round(total_amount - total_paid, 2),
+                "pending_count": pending_count,
+                "overdue_count": overdue_count,
+                "next_due_date": (
+                    next_due["due_date"].isoformat() if next_due else None
+                ),
+                "next_due_amount": next_due["amount"] if next_due else None,
+                "invoice_count": len(fees_query),
+            }
+
+            # ================= TODAY'S ATTENDANCE =================
+            today_attendance = HostelAttendance.query.filter_by(
+                student_id=student.id, attendance_date=date.today()
+            ).first()
+
+            # ================= PENDING REQUEST COUNTS =================
+            pending_leave_count = HostelLeaveRequest.query.filter_by(
+                student_id=student.id, status="Pending"
+            ).count()
+
+            pending_visitor_count = HostelVisitor.query.filter_by(
+                student_id=student.id, status="Pending"
+            ).count()
 
             # ================= RESPONSE =================
             response_data = {
+                "hostel_id": block.hostel_id if block else None,
+                "hostel_name": (
+                    Hostel.query.get(block.hostel_id).hostel_name
+                    if block and block.hostel_id
+                    else None
+                ),
+                "block_id": block.id if block else None,
+                "room_id": room.id if room else None,
                 "room_number": room.room_number if room else None,
                 "room_type": room.room_type if room else None,
+                "room_status": room.status if room else None,
+                "capacity": room.capacity if room else None,
+                "occupied_count": room.occupied_count if room else None,
+                "available_count": room.available_count if room else None,
                 "block": block.block_name if block else None,
                 "floor": floor.floor_number if floor else None,
                 "floor_name": floor.floor_name if floor else None,
-                "capacity": room.capacity if room else None,
+                "bed_id": bed.id if bed else None,
                 "bed_number": bed.bed_number if bed else None,
+                "bed_type": bed.bed_type if bed else None,
                 "check_in_date": (
                     allocation.check_in_date.isoformat()
                     if allocation.check_in_date
@@ -1396,10 +1517,29 @@ class StudentHostelDetails(MethodView):
                 ),
                 "roommates": roommates,
                 "complaints": complaints,
-                "fee_status": fee.status if fee else None,
-                "fee_amount": (
-                    float(fee.amount) if fee and fee.amount is not None else None
+                "fee_summary": fee_summary,
+                # kept for backward compatibility with older clients
+                "fee_status": (
+                    "Overdue"
+                    if overdue_count
+                    else (
+                        "Pending" if pending_count else ("Paid" if fees_query else None)
+                    )
                 ),
+                "today_attendance": (
+                    {
+                        "status": today_attendance.status,
+                        "check_in_time": (
+                            today_attendance.check_in_time.isoformat()
+                            if today_attendance.check_in_time
+                            else None
+                        ),
+                    }
+                    if today_attendance
+                    else None
+                ),
+                "pending_leave_count": pending_leave_count,
+                "pending_visitor_count": pending_visitor_count,
             }
 
             return (
@@ -1483,6 +1623,22 @@ class CreateHostelComplaint(MethodView):
                     400,
                 )
 
+            category = data.get("category") or "Other"
+            priority = data.get("priority") or "Medium"
+
+            if category not in (
+                "Electrical",
+                "Plumbing",
+                "Cleaning",
+                "Furniture",
+                "Internet",
+                "Other",
+            ):
+                category = "Other"
+
+            if priority not in ("Low", "Medium", "High", "Urgent"):
+                priority = "Medium"
+
             # ================= STUDENT CHECK =================
             student = Student.query.get(student_id)
 
@@ -1509,6 +1665,8 @@ class CreateHostelComplaint(MethodView):
                     allocation.bed.room_id if allocation and allocation.bed else None
                 ),
                 issue=issue,
+                category=category,
+                priority=priority,
             )
 
             db.session.add(complaint)
@@ -1519,11 +1677,7 @@ class CreateHostelComplaint(MethodView):
                     {
                         "success": True,
                         "message": "Complaint submitted successfully",
-                        "data": {
-                            "complaint_id": complaint.id,
-                            "issue": complaint.issue,
-                            "status": complaint.status,
-                        },
+                        "data": serialize_complaint(complaint),
                     }
                 ),
                 201,
@@ -1554,6 +1708,606 @@ class CreateHostelComplaint(MethodView):
 
             db.session.rollback()
 
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Something went wrong",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+
+# ============================= STUDENT: FEES =============================
+class StudentHostelFeesAPI(MethodView):
+    """Read-only view of a student's own hostel fee invoices + payment history."""
+
+    @login_required
+    def get(self, student_id):
+        try:
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "message": "Student not found"}), 404
+
+            fees = (
+                HostelFee.query.filter_by(student_id=student.id)
+                .order_by(HostelFee.id.desc())
+                .all()
+            )
+
+            total_amount = 0.0
+            total_paid = 0.0
+
+            fee_list = []
+
+            for f in fees:
+                summary = get_fee_payment_summary(f)
+                total_amount += float(f.amount or 0)
+                total_paid += summary["paid_amount"]
+
+                payments = [
+                    {
+                        "id": p.id,
+                        "amount": float(p.amount) if p.amount is not None else None,
+                        "payment_method": p.payment_method,
+                        "transaction_reference": p.transaction_reference,
+                        "notes": p.notes,
+                        "payment_date": (
+                            p.payment_date.isoformat() if p.payment_date else None
+                        ),
+                    }
+                    for p in f.payments.order_by(HostelFeePayment.payment_date.desc())
+                ]
+
+                fee_list.append(
+                    {
+                        "id": f.id,
+                        "fee_type": f.fee_type,
+                        "amount": float(f.amount) if f.amount is not None else None,
+                        "due_date": f.due_date.isoformat() if f.due_date else None,
+                        "paid_amount": summary["paid_amount"],
+                        "balance": summary["balance"],
+                        "status": summary["status"],
+                        "payments": payments,
+                    }
+                )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Fee details fetched successfully",
+                        "data": {
+                            "fees": fee_list,
+                            "summary": {
+                                "total_amount": round(total_amount, 2),
+                                "total_paid": round(total_paid, 2),
+                                "total_balance": round(total_amount - total_paid, 2),
+                            },
+                        },
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception(f"DB error fetching fees for student_id={student_id}")
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Database error occurred",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+        except Exception as e:
+            logger.exception(f"Error fetching fees for student_id={student_id}")
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Something went wrong",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+
+# ============================= STUDENT: LEAVE REQUESTS =============================
+class StudentHostelLeaveRequestAPI(MethodView):
+
+    @login_required
+    def get(self, student_id):
+        try:
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "message": "Student not found"}), 404
+
+            leaves = (
+                HostelLeaveRequest.query.filter_by(student_id=student.id)
+                .order_by(HostelLeaveRequest.id.desc())
+                .all()
+            )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Leave requests fetched successfully",
+                        "data": [serialize_leave_request(lr) for lr in leaves],
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            logger.exception(
+                f"Error fetching leave requests for student_id={student_id}"
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Something went wrong",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+    @login_required
+    def post(self, student_id):
+        try:
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "message": "Student not found"}), 404
+
+            data = request.get_json(silent=True)
+
+            if not data:
+                return (
+                    jsonify({"success": False, "message": "Request body is required"}),
+                    400,
+                )
+
+            leave_type = data.get("leave_type") or "Other"
+
+            if leave_type not in (
+                "Weekend Leave",
+                "Medical Leave",
+                "Emergency Leave",
+                "Other",
+            ):
+                leave_type = "Other"
+
+            from_date = _parse_date(data.get("from_date"))
+            to_date = _parse_date(data.get("to_date"))
+            reason = _clean_str(data.get("reason"))
+
+            if not from_date or not to_date:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Valid from_date and to_date are required",
+                        }
+                    ),
+                    400,
+                )
+
+            if to_date < from_date:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "to_date cannot be before from_date",
+                        }
+                    ),
+                    400,
+                )
+
+            if from_date < date.today():
+                return (
+                    jsonify(
+                        {"success": False, "message": "from_date cannot be in the past"}
+                    ),
+                    400,
+                )
+
+            leave = HostelLeaveRequest(
+                student_id=student.id,
+                leave_type=leave_type,
+                from_date=from_date,
+                to_date=to_date,
+                reason=reason or None,
+                status="Pending",
+            )
+
+            db.session.add(leave)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Leave request submitted successfully",
+                        "data": serialize_leave_request(leave),
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception(
+                f"DB error creating leave request for student_id={student_id}"
+            )
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Database error occurred",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+        except Exception as e:
+            logger.exception(
+                f"Error creating leave request for student_id={student_id}"
+            )
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Something went wrong",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+
+class StudentHostelLeaveRequestCancelAPI(MethodView):
+
+    @login_required
+    def delete(self, student_id, leave_id):
+        try:
+            leave = HostelLeaveRequest.query.filter_by(
+                id=leave_id, student_id=student_id
+            ).first()
+
+            if not leave:
+                return (
+                    jsonify({"success": False, "message": "Leave request not found"}),
+                    404,
+                )
+
+            if leave.status != "Pending":
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Only pending leave requests can be withdrawn",
+                        }
+                    ),
+                    400,
+                )
+
+            db.session.delete(leave)
+            db.session.commit()
+
+            return jsonify({"success": True, "message": "Leave request withdrawn"}), 200
+
+        except SQLAlchemyError as e:
+            logger.exception(f"DB error cancelling leave_id={leave_id}")
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Database error occurred",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+        except Exception as e:
+            logger.exception(f"Error cancelling leave_id={leave_id}")
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Something went wrong",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+
+# ============================= STUDENT: VISITORS =============================
+class StudentHostelVisitorAPI(MethodView):
+
+    @login_required
+    def get(self, student_id):
+        try:
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "message": "Student not found"}), 404
+
+            visitors = (
+                HostelVisitor.query.filter_by(student_id=student.id)
+                .order_by(HostelVisitor.id.desc())
+                .all()
+            )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Visitor requests fetched successfully",
+                        "data": [serialize_visitor(v) for v in visitors],
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            logger.exception(f"Error fetching visitors for student_id={student_id}")
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Something went wrong",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+    @login_required
+    def post(self, student_id):
+        try:
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "message": "Student not found"}), 404
+
+            data = request.get_json(silent=True)
+
+            if not data:
+                return (
+                    jsonify({"success": False, "message": "Request body is required"}),
+                    400,
+                )
+
+            visitor_name = _clean_str(data.get("visitor_name"))
+            visitor_mobile = _clean_str(data.get("visitor_mobile"))
+            relation = data.get("relation") or "Other"
+            purpose = _clean_str(data.get("purpose"))
+
+            if not visitor_name:
+                return (
+                    jsonify({"success": False, "message": "Visitor name is required"}),
+                    400,
+                )
+
+            if relation not in ("Parent", "Guardian", "Friend", "Relative", "Other"):
+                relation = "Other"
+
+            visitor_code = (
+                f"VIS{int(datetime.utcnow().timestamp() * 1000) % 10_000_000}"
+            )
+
+            visitor = HostelVisitor(
+                visitor_code=visitor_code,
+                visitor_name=visitor_name,
+                visitor_mobile=visitor_mobile or None,
+                student_id=student.id,
+                relation=relation,
+                purpose=purpose or None,
+                status="Pending",
+            )
+
+            db.session.add(visitor)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Visitor request submitted successfully",
+                        "data": serialize_visitor(visitor),
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as e:
+            logger.exception(
+                f"DB error creating visitor request for student_id={student_id}"
+            )
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Database error occurred",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+        except Exception as e:
+            logger.exception(
+                f"Error creating visitor request for student_id={student_id}"
+            )
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Something went wrong",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+
+# ============================= STUDENT: MESS MENU =============================
+class StudentHostelMessMenuAPI(MethodView):
+
+    @login_required
+    def get(self, student_id):
+        try:
+            day_order = [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+            ]
+            meal_order = ["Breakfast", "Lunch", "Snacks", "Dinner"]
+
+            entries = HostelMessMenu.query.all()
+
+            menu = {day: [] for day in day_order}
+
+            for e in entries:
+                menu.setdefault(e.day_of_week, []).append(
+                    {
+                        "meal_type": e.meal_type,
+                        "items": e.items,
+                        "timing": e.timing,
+                    }
+                )
+
+            for day in menu:
+                menu[day].sort(
+                    key=lambda m: (
+                        meal_order.index(m["meal_type"])
+                        if m["meal_type"] in meal_order
+                        else 99
+                    )
+                )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Mess menu fetched successfully",
+                        "data": {
+                            "today": day_order[date.today().weekday()],
+                            "menu": menu,
+                        },
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            logger.exception("Error fetching mess menu")
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Something went wrong",
+                        "error": str(e),
+                    }
+                ),
+                500,
+            )
+
+
+# ============================= STUDENT: ATTENDANCE =============================
+class StudentHostelAttendanceAPI(MethodView):
+
+    @login_required
+    def get(self, student_id):
+        try:
+            student = Student.query.get(student_id)
+
+            if not student:
+                return jsonify({"success": False, "message": "Student not found"}), 404
+
+            records = (
+                HostelAttendance.query.filter_by(student_id=student.id)
+                .order_by(HostelAttendance.attendance_date.desc())
+                .limit(30)
+                .all()
+            )
+
+            today_record = next(
+                (r for r in records if r.attendance_date == date.today()), None
+            )
+
+            present_count = sum(1 for r in records if r.status == "Present")
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Attendance fetched successfully",
+                        "data": {
+                            "today": (
+                                {
+                                    "status": today_record.status,
+                                    "check_in_time": (
+                                        today_record.check_in_time.isoformat()
+                                        if today_record.check_in_time
+                                        else None
+                                    ),
+                                }
+                                if today_record
+                                else None
+                            ),
+                            "attendance_rate": (
+                                round((present_count / len(records)) * 100, 1)
+                                if records
+                                else None
+                            ),
+                            "history": [
+                                {
+                                    "date": r.attendance_date.isoformat(),
+                                    "status": r.status,
+                                    "check_in_time": (
+                                        r.check_in_time.isoformat()
+                                        if r.check_in_time
+                                        else None
+                                    ),
+                                    "remarks": r.remarks,
+                                }
+                                for r in records
+                            ],
+                        },
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            logger.exception(f"Error fetching attendance for student_id={student_id}")
             return (
                 jsonify(
                     {

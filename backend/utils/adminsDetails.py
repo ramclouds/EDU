@@ -32,8 +32,8 @@ ADMIN_TYPE_CONFIG = {
         "permission": "all-dashboards",
     },
     "Academic Admin": {
-        "dashboard_type": "admin-dashboard",
-        "dashboard_route": "/admin-dashboard",
+        "dashboard_type": "academic-Mgmt-dashboard",
+        "dashboard_route": "/academic-admin-dashboard",
         "permission": "academic-admin-dashboard",
     },
     "HR Admin": {
@@ -117,6 +117,8 @@ def normalize_permissions(value):
             permissions.append(permission)
 
     return permissions
+
+
 def normalize_rights(value):
     """
     Return only supported action rights.
@@ -973,4 +975,3 @@ class ChangeAdminPassword(MethodView):
             )
 
             return jsonify({"error": "Something went wrong"}), 500
-        

@@ -360,8 +360,14 @@ class MarkNotificationReadAPI(MethodView):
     def post(self, notification_id):
         current_user = get_current_user()
 
+        # 🐛 BUGFIX: only filtered by user_id, not role. user_id is not
+        # guaranteed unique *across* roles (a student and a teacher could
+        # both have id=7), so a user could accidentally mark — or with the
+        # delete endpoint below, delete — another role's notification.
         notification = Notification.query.filter_by(
-            id=notification_id, user_id=current_user.id
+            id=notification_id,
+            user_id=current_user.id,
+            role=current_user.role,
         ).first()
 
         if not notification:
@@ -370,7 +376,7 @@ class MarkNotificationReadAPI(MethodView):
         notification.is_read = True
         db.session.commit()
 
-        return jsonify({"message": "Marked as read"})
+        return jsonify({"message": "Marked as read", "id": notification.id})
 
 
 #  MARK ALL AS READ
@@ -382,7 +388,16 @@ class MarkAllNotificationsReadAPI(MethodView):
     def post(self):
         current_user = get_current_user()
 
-        Notification.query.filter_by(user_id=current_user.id).update({"is_read": True})
+        # 🐛 BUGFIX: missing role filter (see note above) and no
+        # synchronize_session setting — SQLAlchemy's default
+        # ("evaluate") can raise on some bulk UPDATE filters. Also
+        # scope the update to unread rows only, since that's all this
+        # endpoint needs to touch.
+        Notification.query.filter_by(
+            user_id=current_user.id,
+            role=current_user.role,
+            is_read=False,
+        ).update({"is_read": True}, synchronize_session=False)
 
         db.session.commit()
 
@@ -399,7 +414,9 @@ class DeleteNotificationAPI(MethodView):
         current_user = get_current_user()
 
         notification = Notification.query.filter_by(
-            id=notification_id, user_id=current_user.id
+            id=notification_id,
+            user_id=current_user.id,
+            role=current_user.role,
         ).first()
 
         if not notification:
@@ -408,7 +425,7 @@ class DeleteNotificationAPI(MethodView):
         db.session.delete(notification)
         db.session.commit()
 
-        return jsonify({"message": "Notification deleted"})
+        return jsonify({"message": "Notification deleted", "id": notification_id})
 
 
 # UNREAD COUNT
@@ -420,8 +437,9 @@ class UnreadNotificationCountAPI(MethodView):
     def get(self):
         current_user = get_current_user()
 
+        # 🐛 BUGFIX: missing role filter, same issue as above.
         count = Notification.query.filter_by(
-            user_id=current_user.id, is_read=False
+            user_id=current_user.id, role=current_user.role, is_read=False
         ).count()
 
         return jsonify({"unread_count": count})

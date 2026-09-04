@@ -1039,8 +1039,8 @@ CREATE TABLE IF NOT EXISTS `rbac_role_permissions` (
   `can_delete` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_rbac_role_module` (`role_id`,`module_id`),
-  KEY `ix_rbac_role_permissions_role_id` (`role_id`),
   KEY `ix_rbac_role_permissions_module_id` (`module_id`),
+  KEY `ix_rbac_role_permissions_role_id` (`role_id`),
   CONSTRAINT `rbac_role_permissions_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `rbac_roles` (`id`) ON DELETE CASCADE,
   CONSTRAINT `rbac_role_permissions_ibfk_2` FOREIGN KEY (`module_id`) REFERENCES `rbac_modules` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -1063,10 +1063,10 @@ CREATE TABLE IF NOT EXISTS `rbac_user_permission_overrides` (
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_rbac_user_module_override` (`user_type`,`user_id`,`module_id`),
-  KEY `ix_rbac_user_permission_overrides_module_id` (`module_id`),
   KEY `ix_rbac_user_permission_overrides_user_id` (`user_id`),
   KEY `ix_rbac_user_permission_overrides_is_temporary` (`is_temporary`),
   KEY `ix_rbac_user_permission_overrides_user_type` (`user_type`),
+  KEY `ix_rbac_user_permission_overrides_module_id` (`module_id`),
   KEY `ix_rbac_user_permission_overrides_expires_at` (`expires_at`),
   CONSTRAINT `rbac_user_permission_overrides_ibfk_1` FOREIGN KEY (`module_id`) REFERENCES `rbac_modules` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

@@ -116,6 +116,57 @@ export function useStudentLibrary({
         setLibraryRecordModalOpen,
     ] = useState(false);
 
+    // ================= BOOK CATALOG (BROWSE / SEARCH) =================
+    const catalogLoadedRef = useRef(false);
+
+    const [
+        catalogBooks,
+        setCatalogBooks,
+    ] = useState([]);
+
+    const [
+        catalogCategories,
+        setCatalogCategories,
+    ] = useState([]);
+
+    const [
+        catalogAuthors,
+        setCatalogAuthors,
+    ] = useState([]);
+
+    const [
+        catalogLoading,
+        setCatalogLoading,
+    ] = useState(false);
+
+    const [
+        catalogSearch,
+        setCatalogSearch,
+    ] = useState("");
+
+    const [
+        catalogCategoryId,
+        setCatalogCategoryId,
+    ] = useState("");
+
+    const [
+        catalogAuthorId,
+        setCatalogAuthorId,
+    ] = useState("");
+
+    const [
+        catalogStatusFilter,
+        setCatalogStatusFilter,
+    ] = useState("");
+
+    const [
+        catalogPagination,
+        setCatalogPagination,
+    ] = useState({
+        ...EMPTY_PAGINATION,
+        per_page: 12,
+    });
+
     useEffect(() => {
         fetchRef.current = fetchWithAuth;
     }, [fetchWithAuth]);
@@ -291,6 +342,100 @@ export function useStudentLibrary({
             loadStudentLibrary,
         ]);
 
+    const fetchCatalog =
+        useCallback(
+            async ({
+                page = 1,
+                silent = false,
+            } = {}) => {
+                setCatalogLoading(true);
+
+                try {
+                    const params = new URLSearchParams();
+
+                    if (catalogSearch.trim()) {
+                        params.set("search", catalogSearch.trim());
+                    }
+
+                    if (catalogCategoryId) {
+                        params.set("category_id", catalogCategoryId);
+                    }
+
+                    if (catalogAuthorId) {
+                        params.set("author_id", catalogAuthorId);
+                    }
+
+                    if (catalogStatusFilter) {
+                        params.set("status", catalogStatusFilter);
+                    }
+
+                    params.set("page", page);
+                    params.set("per_page", 12);
+
+                    const data = await request(
+                        `${BASE_URL}/student/library/catalog?${params.toString()}`,
+                    );
+
+                    setCatalogBooks(
+                        Array.isArray(data.books) ? data.books : [],
+                    );
+
+                    setCatalogCategories(
+                        Array.isArray(data.categories)
+                            ? data.categories
+                            : [],
+                    );
+
+                    setCatalogAuthors(
+                        Array.isArray(data.authors) ? data.authors : [],
+                    );
+
+                    setCatalogPagination({
+                        ...EMPTY_PAGINATION,
+                        ...(data.pagination || {}),
+                        pages: Math.max(
+                            Number(data.pagination?.pages) || 1,
+                            1,
+                        ),
+                    });
+                } catch (error) {
+                    console.error(
+                        "Library catalog load error:",
+                        error,
+                    );
+
+                    if (!silent) {
+                        notify(
+                            error.message ||
+                            "Unable to load library catalog",
+                            "error",
+                        );
+                    }
+                } finally {
+                    setCatalogLoading(false);
+                }
+            },
+            [
+                notify,
+                request,
+                catalogSearch,
+                catalogCategoryId,
+                catalogAuthorId,
+                catalogStatusFilter,
+            ],
+        );
+
+    const searchCatalog = useCallback(() => {
+        return fetchCatalog({ page: 1 });
+    }, [fetchCatalog]);
+
+    const changeCatalogPage = useCallback(
+        (page) => {
+            return fetchCatalog({ page });
+        },
+        [fetchCatalog],
+    );
+
     const openLibraryRecord =
         useCallback(
             (record) => {
@@ -399,6 +544,7 @@ export function useStudentLibrary({
             activeSection !== "library"
         ) {
             loadedRef.current = false;
+            catalogLoadedRef.current = false;
             return;
         }
 
@@ -412,6 +558,28 @@ export function useStudentLibrary({
     }, [
         activeSection,
         loadStudentLibrary,
+    ]);
+
+    useEffect(() => {
+        if (activeSection !== "library") {
+            return;
+        }
+
+        if (libraryActiveTab !== "catalog") {
+            return;
+        }
+
+        if (catalogLoadedRef.current) {
+            return;
+        }
+
+        catalogLoadedRef.current = true;
+
+        fetchCatalog({ page: 1 });
+    }, [
+        activeSection,
+        libraryActiveTab,
+        fetchCatalog,
     ]);
 
     return {
@@ -448,5 +616,27 @@ export function useStudentLibrary({
 
         openLibraryRecord,
         closeLibraryRecord,
+
+        // catalog
+        catalogBooks,
+        catalogCategories,
+        catalogAuthors,
+        catalogLoading,
+        catalogPagination,
+
+        catalogSearch,
+        setCatalogSearch,
+
+        catalogCategoryId,
+        setCatalogCategoryId,
+
+        catalogAuthorId,
+        setCatalogAuthorId,
+
+        catalogStatusFilter,
+        setCatalogStatusFilter,
+
+        searchCatalog,
+        changeCatalogPage,
     };
 }

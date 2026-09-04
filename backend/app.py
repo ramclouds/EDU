@@ -131,6 +131,12 @@ from utils.examResult import (
 from utils.hostel import (
     StudentHostelDetails,
     CreateHostelComplaint,
+    StudentHostelFeesAPI,
+    StudentHostelLeaveRequestAPI,
+    StudentHostelLeaveRequestCancelAPI,
+    StudentHostelVisitorAPI,
+    StudentHostelMessMenuAPI,
+    StudentHostelAttendanceAPI,
     HostelListAPI,
     HostelDetailAPI,
     HostelBlockListAPI,
@@ -195,6 +201,7 @@ from utils.announcement import (
 from utils.library import (
     StudentLibraryAPI,
     StudentLibraryDashboardAPI,
+    StudentLibraryCatalogAPI,
     LibraryCategoryListAPI,
     LibraryCategoryDetailAPI,
     LibraryCategoryStatusAPI,
@@ -1083,6 +1090,12 @@ def create_app():
     )
 
     app.add_url_rule(
+        "/api/student/library/catalog",
+        view_func=StudentLibraryCatalogAPI.as_view("student_library_catalog_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
         "/api/admin/library/students/<int:student_id>/fine-payments",
         view_func=LibraryStudentFinePaymentAPI.as_view(
             "library_student_fine_payment_api"
@@ -1205,6 +1218,44 @@ def create_app():
         "/api/student/<int:student_id>/hostel/complaint",
         view_func=CreateHostelComplaint.as_view("student_hostel_complaint"),
         methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/fees",
+        view_func=StudentHostelFeesAPI.as_view("student_hostel_fees"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/leave-requests",
+        view_func=StudentHostelLeaveRequestAPI.as_view("student_hostel_leave_requests"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/leave-requests/<int:leave_id>",
+        view_func=StudentHostelLeaveRequestCancelAPI.as_view(
+            "student_hostel_leave_request_cancel"
+        ),
+        methods=["DELETE"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/visitors",
+        view_func=StudentHostelVisitorAPI.as_view("student_hostel_visitors"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/mess-menu",
+        view_func=StudentHostelMessMenuAPI.as_view("student_hostel_mess_menu"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/attendance",
+        view_func=StudentHostelAttendanceAPI.as_view("student_hostel_attendance"),
+        methods=["GET"],
     )
 
     # ---- Hostel Admin: Hostels ----
