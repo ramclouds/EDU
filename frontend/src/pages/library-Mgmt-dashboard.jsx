@@ -136,8 +136,12 @@ function AdminDashboard() {
     totalUnread,
     handleNotificationClick,
 
+    markAllNotificationsRead,
+    deleteNotification,
+    fetchNotifications,
+
     toast,
-  } = useAdminDashboard(activeSection);
+  } = useAdminDashboard(activeSection, setActiveSection);
 
   // ================= PROFILE HOOK =================
   const {
@@ -1066,15 +1070,34 @@ function AdminDashboard() {
                 md:right-0 md:top-[calc(100%+12px)] md:w-96 md:translate-x-0"
                     >
                       <div className="flex items-center justify-between border-b p-4 font-semibold text-gray-800 dark:border-slate-700 dark:text-white">
-                        <span>Notifications</span>
+                        <span>
+                          Notifications
+                          {totalUnread > 0 && (
+                            <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                              {totalUnread} new
+                            </span>
+                          )}
+                        </span>
 
-                        <button
-                          type="button"
-                          onClick={() => setShowNotifications(false)}
-                          className="text-xs text-gray-500 transition hover:text-red-500"
-                        >
-                          ✕
-                        </button>
+                        <div className="flex items-center gap-3">
+                          {totalUnread > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => markAllNotificationsRead?.()}
+                              className="text-xs font-medium text-indigo-600 transition hover:text-indigo-800 dark:text-indigo-300"
+                            >
+                              Mark all read
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setShowNotifications(false)}
+                            className="text-xs text-gray-500 transition hover:text-red-500"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
 
                       <div className="max-h-80 overflow-y-auto">
@@ -1115,6 +1138,18 @@ function AdminDashboard() {
                             ))
                         )}
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveSection("notifications");
+                          setShowNotifications(false);
+                        }}
+                        className="w-full border-t p-3 text-center text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-slate-700 dark:text-gray-300 dark:hover:bg-slate-700"
+                      >
+                        <i className="bi bi-bell me-1" />
+                        All notifications
+                      </button>
                     </div>
                   )}
                 </div>

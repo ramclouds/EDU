@@ -1,351 +1,1103 @@
-import { useEffect, useState, useRef } from "react";
-import Chart from "chart.js/auto";
-import { useNavigate } from "react-router-dom";
-import { BASE_URL } from "../config/appConfig";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 
+import { BASE_URL } from "../../config/appConfig";
 
-export function useAdminDashboard(activeSection, setActiveSection) {
-    const navigate = useNavigate();
+/* =========================================================
+   DASHBOARD PERMISSIONS
+========================================================= */
 
-    // 🔄 Loading States
-    const [loading, setLoading] = useState(true);
-    const [noticeLoading, setNoticeLoading] = useState(false);
+const DASHBOARD_PERMISSIONS = {
+    SUPER_ADMIN: "all-dashboards",
+    ACADEMIC_ADMIN: "academic-admin-dashboard",
+    HR_ADMIN: "hr-admin-dashboard",
+    HOSTEL_ADMIN: "hostel-admin-dashboard",
+    LIBRARY_ADMIN: "library-admin-dashboard",
+    ACCOUNTS_ADMIN: "accounts-admin-dashboard",
+};
 
-    // 🔔 Notifications (NEW)
-    const [notifications, setNotifications] = useState([]);
-    const [notificationUnread, setNotificationUnread] = useState(0);
-    const [notificationLoading, setNotificationLoading] = useState(false);
+const ALL_RIGHTS = ["read", "write", "edit"];
 
-    // 🔔 Notices
-    const [announcements, setNotices] = useState([]);
+/* =========================================================
+   ADMIN TYPE CONFIGURATION
+========================================================= */
 
-    //  🔥 COMBINED NOTIFICATIONS 
-    const combinedNotifications = [
-        ...(notifications || []).map(n => ({
-            ...n,
-            source: "leave",
-            time: n.time || n.created_at || new Date().toISOString()
-        })),
-        ...(announcements || []).map(n => ({
-            ...n,
-            source: "notice",
-            time: n.date || n.created_at || new Date().toISOString()
-        }))
+const ADMIN_TYPE_CONFIG = {
+    "Academic Admin": {
+        dashboardType: "admin-dashboard",
+        dashboardRoute: "/admin-dashboard",
+        permission: DASHBOARD_PERMISSIONS.ACADEMIC_ADMIN,
+        flag: "academic",
+    },
+
+    "HR Admin": {
+        dashboardType: "hr-Mgmt-dashboard",
+        dashboardRoute: "/hr-admin-dashboard",
+        permission: DASHBOARD_PERMISSIONS.HR_ADMIN,
+        flag: "hr",
+    },
+
+    "Hostel Admin": {
+        dashboardType: "hostels-Mgmt-dashboard",
+        dashboardRoute: "/hostel-admin-dashboard",
+        permission: DASHBOARD_PERMISSIONS.HOSTEL_ADMIN,
+        flag: "hostel",
+    },
+
+    "Library Admin": {
+        dashboardType: "library-Mgmt-dashboard",
+        dashboardRoute: "/library-admin-dashboard",
+        permission: DASHBOARD_PERMISSIONS.LIBRARY_ADMIN,
+        flag: "library",
+    },
+
+    "Accounts Admin": {
+        dashboardType: "accounts-Mgmt-dashboard",
+        dashboardRoute: "/accounts-admin-dashboard",
+        permission: DASHBOARD_PERMISSIONS.ACCOUNTS_ADMIN,
+        flag: "accounts",
+    },
+};
+
+/* =========================================================
+   SAFE JSON PARSER
+========================================================= */
+
+const safeJson = (value, fallback = null) => {
+    try {
+        return JSON.parse(value);
+    } catch {
+        return fallback;
+    }
+};
+
+/* =========================================================
+   NORMALIZE STRING / ARRAY VALUES
+========================================================= */
+
+const normalizeList = (value) => {
+    if (!value) return [];
+
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => String(item).trim())
+            .filter(Boolean);
+    }
+
+    if (typeof value === "string") {
+        const trimmedValue = value.trim();
+
+        if (!trimmedValue) return [];
+
+        const parsedValue = safeJson(trimmedValue);
+
+        if (Array.isArray(parsedValue)) {
+            return parsedValue
+                .map((item) => String(item).trim())
+                .filter(Boolean);
+        }
+
+        return trimmedValue
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+
+    return [];
+};
+
+/* =========================================================
+   NORMALIZE PERMISSIONS
+========================================================= */
+
+const normalizePermissions = (value) => {
+    return [
+        ...new Set(
+            normalizeList(value).map((permission) =>
+                permission.toLowerCase(),
+            ),
+        ),
+    ];
+};
+
+/* =========================================================
+   NORMALIZE RIGHTS
+========================================================= */
+
+const normalizeRights = (value) => {
+    return [
+        ...new Set(
+            normalizeList(value)
+                .map((right) => right.toLowerCase())
+                .filter((right) => ALL_RIGHTS.includes(right)),
+        ),
+    ];
+};
+
+/* =========================================================
+   BUILD ADMIN ACCESS
+========================================================= */
+
+const buildAccess = (admin = {}) => {
+    const role = String(admin.role || "")
+        .trim()
+        .toLowerCase();
+
+    const adminType = String(admin.admin_type || "").trim();
+
+    const storedPermissions = normalizePermissions(
+        admin.permissions,
+    );
+
+    const storedModules = normalizePermissions(
+        admin.modules_enabled,
+    );
+
+    const storedRights = normalizeRights(admin.access_level);
+
+    const isSuperAdmin =
+        role === "super_admin" ||
+        adminType === "Super Admin";
+
+    /*
+     * SUPER ADMIN
+     * Permission: all-dashboards
+     * Rights: read, write, edit
+     */
+    if (isSuperAdmin) {
+        return {
+            dashboardType: "super-admin-dashboard",
+            dashboardRoute: "/super-admin-dashboard",
+
+            isSuperAdmin: true,
+            isAcademicAdmin: false,
+            isHRAdmin: false,
+            isHostelAdmin: false,
+            isLibraryAdmin: false,
+            isAccountsAdmin: false,
+
+            dashboardPermissions: [
+                DASHBOARD_PERMISSIONS.SUPER_ADMIN,
+            ],
+
+            permissions: [
+                DASHBOARD_PERMISSIONS.SUPER_ADMIN,
+            ],
+
+            modules: ["*"],
+            allowedModules: ["*"],
+
+            rights: ALL_RIGHTS,
+
+            canRead: true,
+            canWrite: true,
+            canEdit: true,
+            canDelete: true,
+
+            canAccess: () => true,
+            canAccessDashboard: () => true,
+            hasPermission: () => true,
+            hasRight: () => true,
+        };
+    }
+
+    const config = ADMIN_TYPE_CONFIG[adminType];
+
+    /*
+     * KNOWN ADMIN TYPES:
+     * Academic, HR, Hostel, Library and Accounts
+     */
+    if (config) {
+        const dashboardPermissions = [
+            ...new Set([
+                config.permission,
+                ...storedPermissions,
+            ]),
+        ];
+
+        /*
+         * modules_enabled may contain old values.
+         * Do not automatically use old module values as permissions.
+         *
+         * Only dashboard permission is used for dashboard access.
+         */
+        const allowedModules = [
+            ...new Set([
+                config.permission,
+                ...storedModules.filter((module) =>
+                    Object.values(
+                        DASHBOARD_PERMISSIONS,
+                    ).includes(module),
+                ),
+            ]),
+        ];
+
+        const canRead = storedRights.includes("read");
+        const canWrite = storedRights.includes("write");
+        const canEdit = storedRights.includes("edit");
+
+        return {
+            dashboardType: config.dashboardType,
+            dashboardRoute: config.dashboardRoute,
+
+            isSuperAdmin: false,
+            isAcademicAdmin:
+                config.flag === "academic",
+            isHRAdmin: config.flag === "hr",
+            isHostelAdmin: config.flag === "hostel",
+            isLibraryAdmin: config.flag === "library",
+            isAccountsAdmin:
+                config.flag === "accounts",
+
+            dashboardPermissions,
+            permissions: dashboardPermissions,
+
+            modules: allowedModules,
+            allowedModules,
+
+            rights: storedRights,
+
+            canRead,
+            canWrite,
+            canEdit,
+
+            /*
+             * Delete can be connected separately later.
+             * Currently edit permission also controls delete.
+             */
+            canDelete: canEdit,
+
+            canAccess: (permissionName) => {
+                const normalizedPermission = String(
+                    permissionName || "",
+                )
+                    .trim()
+                    .toLowerCase();
+
+                return dashboardPermissions.includes(
+                    normalizedPermission,
+                );
+            },
+
+            canAccessDashboard: (dashboardName) => {
+                const normalizedDashboard = String(
+                    dashboardName || "",
+                )
+                    .trim()
+                    .toLowerCase();
+
+                return dashboardPermissions.includes(
+                    normalizedDashboard,
+                );
+            },
+
+            hasPermission: (permissionName) => {
+                const normalizedPermission = String(
+                    permissionName || "",
+                )
+                    .trim()
+                    .toLowerCase();
+
+                return dashboardPermissions.includes(
+                    normalizedPermission,
+                );
+            },
+
+            hasRight: (rightName) => {
+                const normalizedRight = String(
+                    rightName || "",
+                )
+                    .trim()
+                    .toLowerCase();
+
+                return storedRights.includes(
+                    normalizedRight,
+                );
+            },
+        };
+    }
+
+    /*
+     * FALLBACK ADMIN
+     */
+    const fallbackPermissions = [
+        ...new Set([
+            ...storedPermissions,
+            ...storedModules.filter((module) =>
+                Object.values(
+                    DASHBOARD_PERMISSIONS,
+                ).includes(module),
+            ),
+        ]),
     ];
 
-    const sortedNotifications = [...combinedNotifications].sort((a, b) => {
-        if (a.is_read !== b.is_read) return a.is_read ? 1 : -1;
-        return new Date(b.time || b.date) - new Date(a.time || a.date);
-    });
+    const canRead = storedRights.includes("read");
+    const canWrite = storedRights.includes("write");
+    const canEdit = storedRights.includes("edit");
 
-    const [unreadCount, setUnreadCount] = useState(0);
-    const totalUnread =
-        (announcements?.filter(n => !n.is_read).length || 0) +
-        (notifications?.filter(n => !n.is_read).length || 0);
+    return {
+        dashboardType: "admin-dashboard",
+        dashboardRoute: "/admin-dashboard",
 
-    const [noticeStats, setNoticeStats] = useState({
-        total: 0,
-        important: 0,
-        thisWeek: 0,
-    });
+        isSuperAdmin: false,
+        isAcademicAdmin: false,
+        isHRAdmin: false,
+        isHostelAdmin: false,
+        isLibraryAdmin: false,
+        isAccountsAdmin: false,
 
-    // 🔐 Password
-    const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-    const [passwordLoading, setPasswordLoading] = useState(false);
+        dashboardPermissions: fallbackPermissions,
+        permissions: fallbackPermissions,
+
+        modules: fallbackPermissions,
+        allowedModules: fallbackPermissions,
+
+        rights: storedRights,
+
+        canRead,
+        canWrite,
+        canEdit,
+        canDelete: canEdit,
+
+        canAccess: (permissionName) => {
+            const normalizedPermission = String(
+                permissionName || "",
+            )
+                .trim()
+                .toLowerCase();
+
+            return fallbackPermissions.includes(
+                normalizedPermission,
+            );
+        },
+
+        canAccessDashboard: (dashboardName) => {
+            const normalizedDashboard = String(
+                dashboardName || "",
+            )
+                .trim()
+                .toLowerCase();
+
+            return fallbackPermissions.includes(
+                normalizedDashboard,
+            );
+        },
+
+        hasPermission: (permissionName) => {
+            const normalizedPermission = String(
+                permissionName || "",
+            )
+                .trim()
+                .toLowerCase();
+
+            return fallbackPermissions.includes(
+                normalizedPermission,
+            );
+        },
+
+        hasRight: (rightName) => {
+            const normalizedRight = String(
+                rightName || "",
+            )
+                .trim()
+                .toLowerCase();
+
+            return storedRights.includes(
+                normalizedRight,
+            );
+        },
+    };
+};
+
+/* =========================================================
+   ADMIN PROFILE HOOK
+========================================================= */
+
+export function useAdminProfile({
+    fetchWithAuth,
+    showToast: externalToast,
+} = {}) {
+    const [admin, setAdmin] = useState({});
+    const [formData, setFormData] = useState({});
+
+    const [loading, setLoading] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+
+    const [
+        passwordModalOpen,
+        setPasswordModalOpen,
+    ] = useState(false);
+
+    const [
+        passwordLoading,
+        setPasswordLoading,
+    ] = useState(false);
+
     const [passwordData, setPasswordData] = useState({
         current_password: "",
         new_password: "",
         confirm_password: "",
     });
 
-    // 🍞 Toast
     const [toast, setToast] = useState({
         show: false,
         message: "",
         type: "success",
     });
 
-    // 🔐 AUTH HELPERS
-    const getAuth = () => {
-        try {
-            return {
-                user: JSON.parse(localStorage.getItem("user")),
-                token: localStorage.getItem("token"),
-            };
-        } catch {
-            return { user: null, token: null };
-        }
-    };
+    const fetchedRef = useRef(false);
+    const toastTimerRef = useRef(null);
 
-    // 🍞  UI HELPERS
-    const showToast = (message, type = "success") => {
-        setToast({ show: true, message, type });
-        setTimeout(() => {
-            setToast({ show: false, message: "", type });
-        }, 3000);
-    };
+    const access = useMemo(
+        () => buildAccess(admin),
+        [admin],
+    );
 
-    // 🌐  API HELPER (COMMON FETCH)
-    const fetchWithAuth = async (url, options = {}) => {
-        const { token } = getAuth();
+    /* =====================================================
+       TOAST
+    ===================================================== */
 
-        const res = await fetch(url, {
-            ...options,
-            headers: {
-                "Content-Type": "application/json",
-                ...(options.headers || {}),
-                Authorization: `Bearer ${token}`,
-            },
-        });
+    const showToast = useCallback(
+        (message, type = "success") => {
+            if (externalToast) {
+                externalToast(message, type);
+                return;
+            }
 
-        // ✅ auto logout if unauthorized
-        if (res.status === 401) {
-            localStorage.clear();
-            navigate("/");
-            throw new Error("Unauthorized");
-        }
+            if (toastTimerRef.current) {
+                clearTimeout(toastTimerRef.current);
+            }
 
-        return res;
-    };
-
-    // ===================== Notifications  ===================
-    const fetchNotifications = async () => {
-        try {
-            setNotificationLoading(true);
-
-            const res = await fetchWithAuth(
-                `${BASE_URL}/notifications`
-            );
-
-            const json = await res.json();
-
-            const data = Array.isArray(json)
-                ? json
-                : Array.isArray(json.data)
-                    ? json.data
-                    : [];
-
-            const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
-                if (a.is_read !== b.is_read) {
-                    return a.is_read ? 1 : -1;
-                }
-
-                return (
-                    new Date(b.created_at || b.time || 0) -
-                    new Date(a.created_at || a.time || 0)
-                );
-            });
-
-            setNotifications(sorted);
-
-            const unread = sorted.filter(
-                (n) => !n.is_read
-            ).length;
-
-            setNotificationUnread(unread);
-
-        } catch (err) {
-            console.error("Notification fetch error:", err);
-        } finally {
-            setNotificationLoading(false);
-        }
-    };
-
-    // AUTO FETCH
-    useEffect(() => {
-        fetchNotifications();
-
-        const interval = setInterval(fetchNotifications, 15000); // refresh every 15 sec
-        return () => clearInterval(interval);
-    }, []);
-
-    // MARK AS READ FUNCTION
-    const markNotificationRead = async (id) => {
-        try {
-            await fetchWithAuth(`${BASE_URL}/notifications/read/${id}`, {
-                method: "POST"
-            });
-
-            setNotifications(prev =>
-                prev.map(n =>
-                    n.id === id ? { ...n, is_read: true } : n
-                )
-            );
-
-            setNotificationUnread(prev => Math.max(prev - 1, 0));
-
-        } catch (err) {
-            console.error("Mark read error:", err);
-        }
-    };
-
-    const lastNotificationRef = useRef(null);
-
-    useEffect(() => {
-        if (!notifications.length) return;
-
-        const latest = notifications[0];
-
-        if (lastNotificationRef.current === latest.id) return;
-
-        if (!latest.is_read) {
             setToast({
                 show: true,
-                message: `📩 ${latest.title} - ${latest.message || ""}`,
-                type: "success",
+                message,
+                type,
             });
 
-            lastNotificationRef.current = latest.id;
-
-            setTimeout(() => {
-                setToast(prev => ({ ...prev, show: false }));
-            }, 4000);
-        }
-    }, [notifications]);
-
-    //  🔥 CLICK HANDLER 
-    const handleNotificationClick = async (n) => {
-        try {
-            if (n.source === "notice") {
-                await markNoticeAsRead(n.id);
-                setActiveSection("announcements"); // ✅ correct
-            } else {
-                await markNotificationRead(n.id);
-                setActiveSection("studentLeave"); // ✅ correct
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    // =================  NOTICES START =================
-    useEffect(() => {
-        const { user } = getAuth();
-        if (!user) return;
-
-        const fetchNotices = async () => {
-            try {
-                setNoticeLoading(true);
-                const res = await fetchWithAuth(
-                    `${BASE_URL}/announcements/admin/${user.id}?page=1&limit=20`
-                );
-
-                const json = await res.json();
-                const data = json.data || [];
-
-                // sort unread first
-                const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
-                    if (a.is_read === b.is_read) return 0;
-                    return a.is_read ? 1 : -1;
+            toastTimerRef.current = setTimeout(() => {
+                setToast({
+                    show: false,
+                    message: "",
+                    type,
                 });
+            }, 3000);
+        },
+        [externalToast],
+    );
 
-                setNotices(sorted);
+    /* =====================================================
+       GET AUTH DATA
+    ===================================================== */
 
-                const unread = sorted.filter((n) => !n.is_read).length;
-                setUnreadCount(unread);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setNoticeLoading(false);
+    const getAuth = useCallback(() => {
+        return {
+            user: safeJson(
+                localStorage.getItem("user"),
+                null,
+            ),
+            token: localStorage.getItem("token"),
+        };
+    }, []);
+
+    /* =====================================================
+       UPDATE LOCAL STORAGE USER
+    ===================================================== */
+
+    const updateStoredUser = useCallback(
+        (adminData = {}) => {
+            const existingUser = safeJson(
+                localStorage.getItem("user"),
+                {},
+            );
+
+            const adminAccess = buildAccess(adminData);
+
+            const updatedUser = {
+                ...existingUser,
+
+                id:
+                    adminData.id ??
+                    existingUser.id,
+
+                admin_id:
+                    adminData.admin_id ??
+                    existingUser.admin_id,
+
+                user_id:
+                    adminData.user_id ??
+                    existingUser.user_id,
+
+                role:
+                    adminData.role ??
+                    existingUser.role,
+
+                admin_type:
+                    adminData.admin_type ??
+                    existingUser.admin_type,
+
+                permissions:
+                    adminData.permissions ??
+                    existingUser.permissions,
+
+                modules_enabled:
+                    adminData.modules_enabled ??
+                    existingUser.modules_enabled,
+
+                access_level:
+                    adminData.access_level ??
+                    existingUser.access_level,
+
+                dashboard_type:
+                    adminData.dashboard_type ??
+                    adminAccess.dashboardType,
+
+                dashboard_route:
+                    adminAccess.dashboardRoute,
+
+                dashboard_permissions:
+                    adminAccess.dashboardPermissions,
+
+                rights: adminAccess.rights,
+
+                can_read: adminAccess.canRead,
+                can_write: adminAccess.canWrite,
+                can_edit: adminAccess.canEdit,
+
+                is_super_admin:
+                    adminAccess.isSuperAdmin,
+
+                is_academic_admin:
+                    adminAccess.isAcademicAdmin,
+
+                is_hr_admin:
+                    adminAccess.isHRAdmin,
+
+                is_hostel_admin:
+                    adminAccess.isHostelAdmin,
+
+                is_library_admin:
+                    adminAccess.isLibraryAdmin,
+
+                is_accounts_admin:
+                    adminAccess.isAccountsAdmin,
+            };
+
+            localStorage.setItem(
+                "user",
+                JSON.stringify(updatedUser),
+            );
+
+            return updatedUser;
+        },
+        [],
+    );
+
+    /* =====================================================
+       LOGOUT
+    ===================================================== */
+
+    const handleLogout = useCallback(() => {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+
+        window.location.href = "/";
+    }, []);
+
+    /* =====================================================
+       LOAD ADMIN PROFILE
+    ===================================================== */
+
+    const loadAdminProfile = useCallback(async () => {
+        const { user } = getAuth();
+
+        if (!user?.id) {
+            showToast(
+                "Admin user information not found",
+                "error",
+            );
+            return;
+        }
+
+        if (typeof fetchWithAuth !== "function") {
+            console.error(
+                "useAdminProfile: fetchWithAuth is not a function",
+            );
+
+            showToast(
+                "Authentication request function is unavailable",
+                "error",
+            );
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            const response = await fetchWithAuth(
+                `${BASE_URL}/${user.id}/admin`,
+            );
+
+            const data = await response
+                .json()
+                .catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    "Failed to load admin profile",
+                );
+            }
+
+            const normalizedAdmin = {
+                ...data,
+
+                permissions:
+                    data.permissions || "",
+
+                access_level:
+                    data.access_level || "",
+
+                modules_enabled:
+                    data.modules_enabled || "",
+            };
+
+            setAdmin(normalizedAdmin);
+            setFormData(normalizedAdmin);
+
+            updateStoredUser(normalizedAdmin);
+        } catch (error) {
+            console.error(
+                "Load admin profile error:",
+                error,
+            );
+
+            showToast(
+                error.message ||
+                "Failed to load admin profile",
+                "error",
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, [
+        fetchWithAuth,
+        getAuth,
+        showToast,
+        updateStoredUser,
+    ]);
+
+    /* =====================================================
+       INITIAL LOAD
+    ===================================================== */
+
+    useEffect(() => {
+        if (fetchedRef.current) return;
+
+        fetchedRef.current = true;
+        loadAdminProfile();
+
+        return () => {
+            if (toastTimerRef.current) {
+                clearTimeout(toastTimerRef.current);
             }
         };
+    }, [loadAdminProfile]);
 
-        fetchNotices();
+    /* =====================================================
+       PROFILE FORM CHANGE
+    ===================================================== */
 
-        const interval = setInterval(fetchNotices, 30000);
-        return () => clearInterval(interval);
+    const handleChange = useCallback((event) => {
+        const {
+            name,
+            value,
+            type,
+            checked,
+        } = event.target;
+
+        setFormData((previous) => ({
+            ...previous,
+            [name]:
+                type === "checkbox"
+                    ? checked
+                    : value,
+        }));
     }, []);
 
-    //  NOTICE STATS 
-    useEffect(() => {
-        if (activeSection !== "announcements") return;
+    /* =====================================================
+       DIRECT FORM FIELD UPDATE
+    ===================================================== */
 
-        const total = announcements.length;
+    const updateFormField = useCallback(
+        (name, value) => {
+            setFormData((previous) => ({
+                ...previous,
+                [name]: value,
+            }));
+        },
+        [],
+    );
 
-        const important = announcements.filter(
-            (n) => n.priority === "High"
-        ).length;
+    /* =====================================================
+       RESET PROFILE FORM
+    ===================================================== */
 
-        const thisWeek = announcements.filter((n) => {
-            const d = new Date(n.date);
-            const now = new Date();
-            const diff = (now - d) / (1000 * 60 * 60 * 24);
-            return diff <= 7;
-        }).length; setNoticeStats({ total, important, thisWeek });
-    }, [activeSection, announcements]);
+    const resetForm = useCallback(() => {
+        setFormData(admin);
+        setEditMode(false);
+    }, [admin]);
 
-    // MARK READ
-    const markNoticeAsRead = async (noticeId) => {
-        const { user } = getAuth();
+    /* =====================================================
+       SAVE PROFILE
+    ===================================================== */
+
+    const handleSave = useCallback(async () => {
+        if (!admin?.id) {
+            showToast(
+                "Admin profile ID is missing",
+                "error",
+            );
+            return;
+        }
+
+        if (typeof fetchWithAuth !== "function") {
+            showToast(
+                "Authentication request function is unavailable",
+                "error",
+            );
+            return;
+        }
 
         try {
-            await fetchWithAuth(
-                `${BASE_URL}/announcements/read/${noticeId}/${user.id}`,
-                { method: "POST" }
+            setLoading(true);
+
+            const response = await fetchWithAuth(
+                `${BASE_URL}/${admin.id}/admin/update`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
+                    body: JSON.stringify(formData),
+                },
             );
 
-            setNotices((prev) =>
-                prev.map((n) =>
-                    n.id === noticeId ? { ...n, is_read: true } : n
-                )
+            const data = await response
+                .json()
+                .catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    "Admin profile update failed",
+                );
+            }
+
+            const updatedAdmin = {
+                ...admin,
+                ...formData,
+                ...(data.admin || {}),
+            };
+
+            setAdmin(updatedAdmin);
+            setFormData(updatedAdmin);
+            setEditMode(false);
+
+            updateStoredUser(updatedAdmin);
+
+            showToast(
+                data.message ||
+                "Profile updated successfully",
+                "success",
+            );
+        } catch (error) {
+            console.error(
+                "Update admin profile error:",
+                error,
             );
 
-            setUnreadCount((prev) => Math.max(prev - 1, 0));
-        } catch (err) {
-            console.error(err);
+            showToast(
+                error.message ||
+                "Admin profile update failed",
+                "error",
+            );
+        } finally {
+            setLoading(false);
         }
-    };
+    }, [
+        admin,
+        fetchWithAuth,
+        formData,
+        showToast,
+        updateStoredUser,
+    ]);
 
-    const lastNoticeRef = useRef(null);
+    /* =====================================================
+       PASSWORD FORM CHANGE
+    ===================================================== */
 
-    useEffect(() => {
-        if (!announcements.length) return;
+    const handlePasswordChange = useCallback(
+        (event) => {
+            const { name, value } = event.target;
 
-        const latest = announcements[0];
+            setPasswordData((previous) => ({
+                ...previous,
+                [name]: value,
+            }));
+        },
+        [],
+    );
 
-        if (lastNoticeRef.current === latest.id) return;
+    /* =====================================================
+       RESET PASSWORD FORM
+    ===================================================== */
 
-        if (!latest.is_read) {
-            setToast({
-                show: true,
-                message: `📢 ${latest.title}`,
-                type: "success",
-            });
+    const resetPasswordForm = useCallback(() => {
+        setPasswordData({
+            current_password: "",
+            new_password: "",
+            confirm_password: "",
+        });
+    }, []);
 
-            lastNoticeRef.current = latest.id;
+    /* =====================================================
+       CLOSE PASSWORD MODAL
+    ===================================================== */
 
-            setTimeout(() => {
-                setToast(prev => ({ ...prev, show: false }));
-            }, 4000);
-        }
-    }, [announcements]);
+    const closePasswordModal = useCallback(() => {
+        setPasswordModalOpen(false);
+        resetPasswordForm();
+    }, [resetPasswordForm]);
 
+    /* =====================================================
+       CHANGE PASSWORD
+    ===================================================== */
+
+    const handleChangePassword =
+        useCallback(async () => {
+            const { user } = getAuth();
+
+            if (!user?.id) {
+                showToast(
+                    "Admin user information not found",
+                    "error",
+                );
+                return;
+            }
+
+            if (
+                !passwordData.current_password ||
+                !passwordData.new_password ||
+                !passwordData.confirm_password
+            ) {
+                showToast(
+                    "All password fields are required",
+                    "error",
+                );
+                return;
+            }
+
+            if (
+                passwordData.new_password !==
+                passwordData.confirm_password
+            ) {
+                showToast(
+                    "New password and confirm password do not match",
+                    "error",
+                );
+                return;
+            }
+
+            if (
+                passwordData.new_password.length < 8
+            ) {
+                showToast(
+                    "New password must be at least 8 characters",
+                    "error",
+                );
+                return;
+            }
+
+            if (
+                passwordData.current_password ===
+                passwordData.new_password
+            ) {
+                showToast(
+                    "New password must be different from current password",
+                    "error",
+                );
+                return;
+            }
+
+            if (
+                typeof fetchWithAuth !== "function"
+            ) {
+                showToast(
+                    "Authentication request function is unavailable",
+                    "error",
+                );
+                return;
+            }
+
+            try {
+                setPasswordLoading(true);
+
+                const response =
+                    await fetchWithAuth(
+                        `${BASE_URL}/admin/${user.id}/change-password`,
+                        {
+                            method: "PUT",
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+                            },
+                            body: JSON.stringify(
+                                passwordData,
+                            ),
+                        },
+                    );
+
+                const data = await response
+                    .json()
+                    .catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.error ||
+                        "Password update failed",
+                    );
+                }
+
+                showToast(
+                    data.message ||
+                    "Password updated successfully",
+                    "success",
+                );
+
+                closePasswordModal();
+            } catch (error) {
+                console.error(
+                    "Change password error:",
+                    error,
+                );
+
+                showToast(
+                    error.message ||
+                    "Password update failed",
+                    "error",
+                );
+            } finally {
+                setPasswordLoading(false);
+            }
+        }, [
+            closePasswordModal,
+            fetchWithAuth,
+            getAuth,
+            passwordData,
+            showToast,
+        ]);
+
+    /* =====================================================
+       REFRESH PROFILE
+    ===================================================== */
+
+    const refreshAdminProfile =
+        useCallback(async () => {
+            await loadAdminProfile();
+        }, [loadAdminProfile]);
+
+    /* =====================================================
+       RETURN
+    ===================================================== */
 
     return {
-        // shared helpers
-        fetchWithAuth,
+        /* Profile */
+        admin,
+        setAdmin,
+
+        formData,
+        setFormData,
+
+        loading,
+
+        editMode,
+        setEditMode,
+
+        handleChange,
+        updateFormField,
+        handleSave,
+        resetForm,
+
+        loadAdminProfile,
+        refreshAdminProfile,
+
+        /* Password */
+        passwordModalOpen,
+        setPasswordModalOpen,
+
+        passwordData,
+        setPasswordData,
+
+        passwordLoading,
+
+        handlePasswordChange,
+        handleChangePassword,
+
+        resetPasswordForm,
+        closePasswordModal,
+
+        /* Toast */
+        toast,
         showToast,
 
-        // 🔄 LOADING STATES
-        loading,
-        noticeLoading,
-        unreadCount,
-        announcements,
-        noticeStats,
+        /* Authentication */
+        getAuth,
+        handleLogout,
 
-        // 🔔 NOTICES
-        markNoticeAsRead,
+        /* Dashboard */
+        dashboardType: access.dashboardType,
+        dashboardRoute: access.dashboardRoute,
 
-        // 🍞 TOAST
-        toast,
-        notifications,
-        notificationUnread,
-        notificationLoading,
-        markNotificationRead,
+        /* Admin types */
+        isSuperAdmin: access.isSuperAdmin,
+        isAcademicAdmin: access.isAcademicAdmin,
+        isHRAdmin: access.isHRAdmin,
+        isHostelAdmin: access.isHostelAdmin,
+        isLibraryAdmin: access.isLibraryAdmin,
+        isAccountsAdmin:
+            access.isAccountsAdmin,
 
-        combinedNotifications,
-        sortedNotifications,
-        totalUnread,
-        handleNotificationClick,
+        /* Dashboard permissions */
+        dashboardPermissions:
+            access.dashboardPermissions,
+
+        permissions: access.permissions,
+
+        modules: access.modules,
+        allowedModules: access.allowedModules,
+
+        /* Rights */
+        rights: access.rights,
+
+        canRead: access.canRead,
+        canWrite: access.canWrite,
+        canEdit: access.canEdit,
+        canDelete: access.canDelete,
+
+        /* Permission methods */
+        canAccess: access.canAccess,
+        canAccessDashboard:
+            access.canAccessDashboard,
+
+        hasPermission: access.hasPermission,
+        hasRight: access.hasRight,
     };
 }
+
+export default useAdminProfile; 

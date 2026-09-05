@@ -131,6 +131,63 @@ from utils.examResult import (
 from utils.hostel import (
     StudentHostelDetails,
     CreateHostelComplaint,
+    StudentHostelFeesAPI,
+    StudentHostelLeaveRequestAPI,
+    StudentHostelLeaveRequestCancelAPI,
+    StudentHostelVisitorAPI,
+    StudentHostelMessMenuAPI,
+    StudentHostelAttendanceAPI,
+    HostelListAPI,
+    HostelDetailAPI,
+    HostelBlockListAPI,
+    HostelBlockDetailAPI,
+    HostelFloorListAPI,
+    HostelFloorDetailAPI,
+    HostelRoomListAPI,
+    HostelRoomDetailAPI,
+    HostelBedListAPI,
+    HostelBedDetailAPI,
+    HostelBedAllocateAPI,
+    HostelBedVacateAPI,
+    HostelStructureOverviewAPI,
+    HostelUnallocatedStudentsAPI,
+    HostelStudentSearchAPI,
+    HostelAllocationListAPI,
+    HostelAllocationCheckoutAPI,
+    HostelAllocationTransferAPI,
+    HostelStaffListAPI,
+    HostelStaffDetailAPI,
+    HostelVisitorListAPI,
+    HostelVisitorDetailAPI,
+    HostelVisitorApproveAPI,
+    HostelVisitorRejectAPI,
+    HostelVisitorCheckoutAPI,
+    HostelAttendanceListAPI,
+    HostelAttendanceMarkAPI,
+    HostelMovementListAPI,
+    HostelMovementCheckInAPI,
+    HostelLeaveRequestListAPI,
+    HostelLeaveRequestDetailAPI,
+    HostelLeaveRequestApproveAPI,
+    HostelLeaveRequestRejectAPI,
+    HostelLeaveRequestReturnAPI,
+    HostelMessMenuListAPI,
+    HostelMessMenuDetailAPI,
+    HostelMealAttendanceListAPI,
+    HostelMealAttendanceMarkAPI,
+    HostelMealAttendanceBulkMarkAPI,
+    HostelComplaintListAPI,
+    HostelComplaintUpdateAPI,
+    HostelMaintenanceListAPI,
+    HostelMaintenanceDetailAPI,
+    HostelFeeStructureListAPI,
+    HostelFeeStructureDetailAPI,
+    HostelFeeGenerateAPI,
+    HostelFeeListAPI,
+    HostelFeeDetailAPI,
+    HostelFeePaymentListAPI,
+    HostelActivityLogListAPI,
+    HostelReportsAPI,
 )
 
 from utils.announcement import (
@@ -144,6 +201,7 @@ from utils.announcement import (
 from utils.library import (
     StudentLibraryAPI,
     StudentLibraryDashboardAPI,
+    StudentLibraryCatalogAPI,
     LibraryCategoryListAPI,
     LibraryCategoryDetailAPI,
     LibraryCategoryStatusAPI,
@@ -1032,6 +1090,12 @@ def create_app():
     )
 
     app.add_url_rule(
+        "/api/student/library/catalog",
+        view_func=StudentLibraryCatalogAPI.as_view("student_library_catalog_api"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
         "/api/admin/library/students/<int:student_id>/fine-payments",
         view_func=LibraryStudentFinePaymentAPI.as_view(
             "library_student_fine_payment_api"
@@ -1154,6 +1218,389 @@ def create_app():
         "/api/student/<int:student_id>/hostel/complaint",
         view_func=CreateHostelComplaint.as_view("student_hostel_complaint"),
         methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/fees",
+        view_func=StudentHostelFeesAPI.as_view("student_hostel_fees"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/leave-requests",
+        view_func=StudentHostelLeaveRequestAPI.as_view("student_hostel_leave_requests"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/leave-requests/<int:leave_id>",
+        view_func=StudentHostelLeaveRequestCancelAPI.as_view(
+            "student_hostel_leave_request_cancel"
+        ),
+        methods=["DELETE"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/visitors",
+        view_func=StudentHostelVisitorAPI.as_view("student_hostel_visitors"),
+        methods=["GET", "POST"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/mess-menu",
+        view_func=StudentHostelMessMenuAPI.as_view("student_hostel_mess_menu"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/student/<int:student_id>/hostel/attendance",
+        view_func=StudentHostelAttendanceAPI.as_view("student_hostel_attendance"),
+        methods=["GET"],
+    )
+
+    # ---- Hostel Admin: Hostels ----
+    app.add_url_rule(
+        "/api/admin/hostel/hostels",
+        view_func=HostelListAPI.as_view("hostel_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/hostels/<int:hostel_id>",
+        view_func=HostelDetailAPI.as_view("hostel_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Blocks ----
+    app.add_url_rule(
+        "/api/admin/hostel/blocks",
+        view_func=HostelBlockListAPI.as_view("hostel_block_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/blocks/<int:block_id>",
+        view_func=HostelBlockDetailAPI.as_view("hostel_block_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Floors ----
+    app.add_url_rule(
+        "/api/admin/hostel/floors",
+        view_func=HostelFloorListAPI.as_view("hostel_floor_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/floors/<int:floor_id>",
+        view_func=HostelFloorDetailAPI.as_view("hostel_floor_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Rooms ----
+    app.add_url_rule(
+        "/api/admin/hostel/rooms",
+        view_func=HostelRoomListAPI.as_view("hostel_room_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/rooms/<int:room_id>",
+        view_func=HostelRoomDetailAPI.as_view("hostel_room_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Beds ----
+    app.add_url_rule(
+        "/api/admin/hostel/beds",
+        view_func=HostelBedListAPI.as_view("hostel_bed_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/beds/<int:bed_id>",
+        view_func=HostelBedDetailAPI.as_view("hostel_bed_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/beds/<int:bed_id>/allocate",
+        view_func=HostelBedAllocateAPI.as_view("hostel_bed_allocate_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/beds/<int:bed_id>/vacate",
+        view_func=HostelBedVacateAPI.as_view("hostel_bed_vacate_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Structure overview + allocation helper ----
+    app.add_url_rule(
+        "/api/admin/hostel/structure",
+        view_func=HostelStructureOverviewAPI.as_view("hostel_structure_overview_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/students/unallocated",
+        view_func=HostelUnallocatedStudentsAPI.as_view(
+            "hostel_unallocated_students_api"
+        ),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/students/search",
+        view_func=HostelStudentSearchAPI.as_view("hostel_student_search_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Allocations (Students / Room Allotment sections) ----
+    app.add_url_rule(
+        "/api/admin/hostel/allocations",
+        view_func=HostelAllocationListAPI.as_view("hostel_allocation_list_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/allocations/<int:allocation_id>/checkout",
+        view_func=HostelAllocationCheckoutAPI.as_view("hostel_allocation_checkout_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/allocations/<int:allocation_id>/transfer",
+        view_func=HostelAllocationTransferAPI.as_view("hostel_allocation_transfer_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Staff ----
+    app.add_url_rule(
+        "/api/admin/hostel/staff",
+        view_func=HostelStaffListAPI.as_view("hostel_staff_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/staff/<int:staff_id>",
+        view_func=HostelStaffDetailAPI.as_view("hostel_staff_detail_api"),
+        methods=["GET", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Visitors ----
+    app.add_url_rule(
+        "/api/admin/hostel/visitors",
+        view_func=HostelVisitorListAPI.as_view("hostel_visitor_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/visitors/<int:visitor_id>",
+        view_func=HostelVisitorDetailAPI.as_view("hostel_visitor_detail_api"),
+        methods=["GET", "DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/visitors/<int:visitor_id>/approve",
+        view_func=HostelVisitorApproveAPI.as_view("hostel_visitor_approve_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/visitors/<int:visitor_id>/reject",
+        view_func=HostelVisitorRejectAPI.as_view("hostel_visitor_reject_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/visitors/<int:visitor_id>/checkout",
+        view_func=HostelVisitorCheckoutAPI.as_view("hostel_visitor_checkout_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Attendance ----
+    app.add_url_rule(
+        "/api/admin/hostel/attendance",
+        view_func=HostelAttendanceListAPI.as_view("hostel_attendance_list_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/attendance/mark",
+        view_func=HostelAttendanceMarkAPI.as_view("hostel_attendance_mark_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Check-In / Check-Out (Movements) ----
+    app.add_url_rule(
+        "/api/admin/hostel/movements",
+        view_func=HostelMovementListAPI.as_view("hostel_movement_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/movements/<int:movement_id>/checkin",
+        view_func=HostelMovementCheckInAPI.as_view("hostel_movement_checkin_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Leave Requests ----
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests",
+        view_func=HostelLeaveRequestListAPI.as_view("hostel_leave_request_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests/<int:leave_id>",
+        view_func=HostelLeaveRequestDetailAPI.as_view(
+            "hostel_leave_request_detail_api"
+        ),
+        methods=["DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests/<int:leave_id>/approve",
+        view_func=HostelLeaveRequestApproveAPI.as_view(
+            "hostel_leave_request_approve_api"
+        ),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests/<int:leave_id>/reject",
+        view_func=HostelLeaveRequestRejectAPI.as_view(
+            "hostel_leave_request_reject_api"
+        ),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/leave-requests/<int:leave_id>/return",
+        view_func=HostelLeaveRequestReturnAPI.as_view(
+            "hostel_leave_request_return_api"
+        ),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Mess Menu ----
+    app.add_url_rule(
+        "/api/admin/hostel/mess-menu",
+        view_func=HostelMessMenuListAPI.as_view("hostel_mess_menu_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/mess-menu/<int:entry_id>",
+        view_func=HostelMessMenuDetailAPI.as_view("hostel_mess_menu_detail_api"),
+        methods=["DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Meal Attendance ----
+    app.add_url_rule(
+        "/api/admin/hostel/meal-attendance",
+        view_func=HostelMealAttendanceListAPI.as_view(
+            "hostel_meal_attendance_list_api"
+        ),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/meal-attendance/mark",
+        view_func=HostelMealAttendanceMarkAPI.as_view(
+            "hostel_meal_attendance_mark_api"
+        ),
+        methods=["POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/meal-attendance/bulk-mark",
+        view_func=HostelMealAttendanceBulkMarkAPI.as_view(
+            "hostel_meal_attendance_bulk_mark_api"
+        ),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Complaints ----
+    app.add_url_rule(
+        "/api/admin/hostel/complaints",
+        view_func=HostelComplaintListAPI.as_view("hostel_complaint_list_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/complaints/<int:complaint_id>",
+        view_func=HostelComplaintUpdateAPI.as_view("hostel_complaint_update_api"),
+        methods=["PUT", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Maintenance ----
+    app.add_url_rule(
+        "/api/admin/hostel/maintenance",
+        view_func=HostelMaintenanceListAPI.as_view("hostel_maintenance_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/maintenance/<int:request_id>",
+        view_func=HostelMaintenanceDetailAPI.as_view("hostel_maintenance_detail_api"),
+        methods=["PUT", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Fee Structures (Fee Management) ----
+    app.add_url_rule(
+        "/api/admin/hostel/fee-structures",
+        view_func=HostelFeeStructureListAPI.as_view("hostel_fee_structure_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/fee-structures/<int:structure_id>",
+        view_func=HostelFeeStructureDetailAPI.as_view(
+            "hostel_fee_structure_detail_api"
+        ),
+        methods=["PUT", "DELETE", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/fee-structures/generate",
+        view_func=HostelFeeGenerateAPI.as_view("hostel_fee_generate_api"),
+        methods=["POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Fee Invoices (Fee Management overview / Pending Dues) ----
+    app.add_url_rule(
+        "/api/admin/hostel/fees",
+        view_func=HostelFeeListAPI.as_view("hostel_fee_list_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/hostel/fees/<int:fee_id>",
+        view_func=HostelFeeDetailAPI.as_view("hostel_fee_detail_api"),
+        methods=["GET", "DELETE", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Payments ----
+    app.add_url_rule(
+        "/api/admin/hostel/payments",
+        view_func=HostelFeePaymentListAPI.as_view("hostel_fee_payment_list_api"),
+        methods=["GET", "POST", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Activity Logs ----
+    app.add_url_rule(
+        "/api/admin/hostel/activity-logs",
+        view_func=HostelActivityLogListAPI.as_view("hostel_activity_log_list_api"),
+        methods=["GET", "OPTIONS"],
+    )
+
+    # ---- Hostel Admin: Reports & Analytics ----
+    app.add_url_rule(
+        "/api/admin/hostel/reports",
+        view_func=HostelReportsAPI.as_view("hostel_reports_api"),
+        methods=["GET", "OPTIONS"],
     )
 
     # MY CLASSES

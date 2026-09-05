@@ -19,8 +19,9 @@ import { useStudentEnrollment } from "../controllers/Enrollments/useStudentEnrol
 import { useMyClasses } from "../controllers/MyClasses/useMyClass";
 import { useTeacherManagement } from "../controllers/MyClasses/useTeachersManagement";
 import { useSubjectManagements } from "../controllers/Subjects/useSubjectManagements";
-import { useExamResultManagement } from "../controllers/ExamResult/useExamResultManagement";
+import { useExamResultManagement } from "../controllers/Academic/useExamResultManagement";
 import { useRolePermissionManagement } from "../controllers/Auth/useRolePermissionManagement";
+import { useLibraryOverview } from "../controllers/Library/useLibraryOverview";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -33,6 +34,23 @@ function AdminDashboard() {
   // driven by Role & Permission Management rather than assumed, so a
   // future "restricted super admin" style role also works correctly.
   const { canView: canViewDashboard } = useDashboardAccess();
+
+  // Real-time library stats for the overview widget below - see
+  // controllers/Library/useLibraryOverview.js. Only fetched/rendered
+  // when this Super Admin actually has view access to the library
+  // dashboard, matching the same gate used for the sidebar link.
+  const {
+    stats: libraryStats,
+    occupancyRate: libraryOccupancyRate,
+    recentActivity: libraryRecentActivity,
+    overdueAlerts: libraryOverdueAlerts,
+    recentBooks: libraryRecentBooks,
+    loading: libraryOverviewLoading,
+    refreshing: libraryOverviewRefreshing,
+    error: libraryOverviewError,
+    lastUpdated: libraryOverviewUpdatedAt,
+    refresh: refreshLibraryOverview,
+  } = useLibraryOverview();
 
   // ================= DASHBOARD HOOK =================
   const {
@@ -622,6 +640,7 @@ function AdminDashboard() {
                 ["timetable", "bi-clock", "Timetable"],
                 ["attendance", "bi-calendar-check", "Attendance"],
                 ["exams", "bi-award", "Exams & Results"],
+                ["academic-dashboard", "bi-mortarboard", "Academic Dashboard"],
               ],
             },
             {
@@ -678,6 +697,7 @@ function AdminDashboard() {
               "accounts-dashboard": "accounts-admin-dashboard",
               "hostels-dashboard": "hostel-admin-dashboard",
               "hr-dashboard": "hr-admin-dashboard",
+              "academic-dashboard": "academic-admin-dashboard",
             };
 
             const visibleItems = section.items.filter(([key]) => {
@@ -705,6 +725,7 @@ function AdminDashboard() {
                     "accounts-dashboard",
                     "hostels-dashboard",
                     "hr-dashboard",
+                    "academic-dashboard",
                   ].includes(key);
 
                   const isActive = !isDashboardLink && activeSection === key;
@@ -756,6 +777,19 @@ function AdminDashboard() {
 
                         if (key === "hr-dashboard") {
                           navigate("/hr-admin-dashboard", {
+                            state: {
+                              from: "super-admin-dashboard",
+                              accessBy: "super_admin",
+                              activeSection: "dashboard",
+                            },
+                          });
+
+                          closeSidebarOnMobile();
+                          return;
+                        }
+
+                        if (key === "academic-dashboard") {
+                          navigate("/academic-admin-dashboard", {
                             state: {
                               from: "super-admin-dashboard",
                               accessBy: "super_admin",
@@ -1143,10 +1177,378 @@ function AdminDashboard() {
         </div>
         {/* ===================== DASHBOARD SECTION START =========================== */}
         {activeSection === "dashboard" && (
-          <section>
-            <h1>hello Super Admin</h1>
+          <section className="space-y-6">
+            {/* =====================================================
+        WELCOME HEADER
+    ====================================================== */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h1 className="text-xl font-bold text-slate-900">
+                Welcome back, Super Admin
+              </h1>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Here&apos;s a real-time snapshot of what&apos;s happening
+                across the school.
+              </p>
+            </div>
+
+            {/* =====================================================
+        LIBRARY OVERVIEW - real-time data via useLibraryOverview
+        (controllers/Library/useLibraryOverview.js -> GET
+        /api/admin/library/dashboard). Gated the same way as the
+        sidebar's Library link so it stays consistent if a
+        restricted Super Admin role is ever introduced.
+    ====================================================== */}
+            {canViewDashboard("library-admin-dashboard") && (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                      <i className="fas fa-book text-xl" />
+                    </div>
+
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">
+                        Library Overview
+                      </h2>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        {libraryOverviewUpdatedAt
+                          ? `Updated ${libraryOverviewUpdatedAt.toLocaleTimeString()}`
+                          : "Live circulation, inventory and fine stats."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={refreshLibraryOverview}
+                      disabled={
+                        libraryOverviewLoading || libraryOverviewRefreshing
+                      }
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <i
+                        className={`fas fa-sync-alt ${
+                          libraryOverviewRefreshing ? "animate-spin" : ""
+                        }`}
+                      />
+                      Refresh
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate("/library-admin-dashboard", {
+                          state: {
+                            from: "super-admin-dashboard",
+                            accessBy: "super_admin",
+                            activeSection: "dashboard",
+                          },
+                        })
+                      }
+                      className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                    >
+                      Open Library Dashboard
+                      <i className="fas fa-arrow-right" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  {libraryOverviewLoading ? (
+                    <div className="flex min-h-[200px] items-center justify-center">
+                      <div className="text-center">
+                        <i className="fas fa-spinner animate-spin text-3xl text-indigo-600" />
+
+                        <p className="mt-3 text-sm font-medium text-slate-500">
+                          Loading library stats...
+                        </p>
+                      </div>
+                    </div>
+                  ) : libraryOverviewError ? (
+                    <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 text-center">
+                      <i className="fas fa-triangle-exclamation text-2xl text-rose-500" />
+
+                      <p className="text-sm font-medium text-rose-600">
+                        {libraryOverviewError}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={refreshLibraryOverview}
+                        className="mt-1 text-sm font-semibold text-indigo-600 hover:underline"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* =========================================
+                  STAT CARDS
+              ========================================== */}
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                        {[
+                          {
+                            label: "Titles",
+                            value: libraryStats.total_titles,
+                            icon: "fas fa-book",
+                            wrap: "bg-indigo-100 text-indigo-700",
+                          },
+                          {
+                            label: "Total Copies",
+                            value: libraryStats.total_copies,
+                            icon: "fas fa-layer-group",
+                            wrap: "bg-slate-100 text-slate-700",
+                          },
+                          {
+                            label: "Currently Issued",
+                            value: libraryStats.currently_issued,
+                            icon: "fas fa-right-from-bracket",
+                            wrap: "bg-amber-100 text-amber-700",
+                          },
+                          {
+                            label: "Available",
+                            value: libraryStats.available_copies,
+                            icon: "fas fa-circle-check",
+                            wrap: "bg-emerald-100 text-emerald-700",
+                          },
+                          {
+                            label: "Overdue",
+                            value: libraryStats.overdue_books,
+                            icon: "fas fa-triangle-exclamation",
+                            wrap: "bg-rose-100 text-rose-700",
+                          },
+                          {
+                            label: "Due Soon",
+                            value: libraryStats.due_soon,
+                            icon: "fas fa-clock",
+                            wrap: "bg-orange-100 text-orange-700",
+                          },
+                        ].map((card) => (
+                          <div
+                            key={card.label}
+                            className="rounded-xl border border-slate-200 p-4"
+                          >
+                            <div
+                              className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${card.wrap}`}
+                            >
+                              <i className={`${card.icon} text-sm`} />
+                            </div>
+
+                            <p className="text-xl font-bold text-slate-900">
+                              {card.value ?? 0}
+                            </p>
+
+                            <p className="text-xs text-slate-500">
+                              {card.label}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* =========================================
+                  OCCUPANCY + FINE SUMMARY
+              ========================================== */}
+                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-xl border border-slate-200 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Copies In Circulation
+                          </p>
+
+                          <div className="mt-2 flex items-center gap-3">
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className="h-full rounded-full bg-indigo-600"
+                                style={{
+                                  width: `${Math.min(
+                                    libraryOccupancyRate,
+                                    100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+
+                            <span className="text-sm font-bold text-slate-900">
+                              {libraryOccupancyRate}%
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Fine Collected
+                          </p>
+
+                          <p className="mt-2 text-lg font-bold text-emerald-700">
+                            &#8377;{Number(libraryStats.fine_collected || 0).toFixed(2)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Fine Pending
+                          </p>
+
+                          <p className="mt-2 text-lg font-bold text-rose-700">
+                            &#8377;{Number(libraryStats.fine_pending || 0).toFixed(2)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Fine Waived
+                          </p>
+
+                          <p className="mt-2 text-lg font-bold text-slate-700">
+                            &#8377;{Number(libraryStats.fine_waived || 0).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* =========================================
+                  RECENT ACTIVITY + OVERDUE ALERTS
+              ========================================== */}
+                      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        <div className="rounded-xl border border-slate-200">
+                          <div className="border-b border-slate-200 p-4">
+                            <h3 className="text-sm font-bold text-slate-900">
+                              Recent Activity
+                            </h3>
+                          </div>
+
+                          <div className="max-h-72 overflow-y-auto p-2">
+                            {libraryRecentActivity.length === 0 ? (
+                              <p className="p-3 text-sm text-slate-400">
+                                No recent library activity.
+                              </p>
+                            ) : (
+                              libraryRecentActivity.map((activity) => (
+                                <div
+                                  key={activity.id}
+                                  className="flex items-start gap-3 rounded-lg p-3 hover:bg-slate-50"
+                                >
+                                  <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                                    <i
+                                      className={`text-xs ${
+                                        activity.type === "issue"
+                                          ? "fas fa-arrow-up text-amber-600"
+                                          : activity.type === "return"
+                                          ? "fas fa-arrow-down text-emerald-600"
+                                          : activity.type === "payment"
+                                          ? "fas fa-indian-rupee-sign text-emerald-600"
+                                          : "fas fa-hand-holding-dollar text-slate-500"
+                                      }`}
+                                    />
+                                  </div>
+
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm text-slate-700">
+                                      {activity.title}
+                                    </p>
+
+                                    {activity.date && (
+                                      <p className="text-xs text-slate-400">
+                                        {new Date(
+                                          activity.date
+                                        ).toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200">
+                          <div className="flex items-center justify-between border-b border-slate-200 p-4">
+                            <h3 className="text-sm font-bold text-slate-900">
+                              Overdue Alerts
+                            </h3>
+
+                            {libraryOverdueAlerts.length > 0 && (
+                              <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+                                {libraryOverdueAlerts.length}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="max-h-72 overflow-y-auto p-2">
+                            {libraryOverdueAlerts.length === 0 ? (
+                              <p className="p-3 text-sm text-slate-400">
+                                No overdue books right now.
+                              </p>
+                            ) : (
+                              libraryOverdueAlerts.map((alert) => (
+                                <div
+                                  key={`${alert.member_type}-${alert.id}`}
+                                  className="flex items-center justify-between gap-3 rounded-lg p-3 hover:bg-slate-50"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium text-slate-700">
+                                      {alert.book_title}
+                                    </p>
+
+                                    <p className="truncate text-xs text-slate-400">
+                                      {alert.member_name}
+                                      {alert.member_code
+                                        ? ` (${alert.member_code})`
+                                        : ""}
+                                    </p>
+                                  </div>
+
+                                  <span className="shrink-0 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                                    {alert.overdue_days}d overdue
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* =========================================
+                  RECENTLY ADDED BOOKS
+              ========================================== */}
+                      {libraryRecentBooks.length > 0 && (
+                        <div className="mt-6">
+                          <h3 className="mb-3 text-sm font-bold text-slate-900">
+                            Recently Added Books
+                          </h3>
+
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                            {libraryRecentBooks.map((book) => (
+                              <div
+                                key={book.id}
+                                className="rounded-xl border border-slate-200 p-3"
+                              >
+                                <p className="truncate text-sm font-semibold text-slate-800">
+                                  {book.title}
+                                </p>
+
+                                <p className="truncate text-xs text-slate-400">
+                                  {book.author || "Unknown author"}
+                                </p>
+
+                                <p className="mt-2 text-xs text-slate-500">
+                                  {book.available_copies}/{book.total_copies}{" "}
+                                  available
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
         )}
+
 
         {activeSection === "roles" && (
           <section className="space-y-6">
