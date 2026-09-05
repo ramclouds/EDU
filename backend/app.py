@@ -98,7 +98,7 @@ from utils.timetable import (
     AdminTimetablePDFAPI,
 )
 
-from utils.examResult import (
+from utils.academic import (
     StudentExamResultsAPI,
     PerformanceAPI,
     UpcomingExamsAPI,
