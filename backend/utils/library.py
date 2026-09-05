@@ -5752,7 +5752,7 @@ class LibraryMembersAPI(MethodView):
 
             members = []
 
-            # == ADMINS ==
+            # = ADMINS ==
             if role_filter in {
                 "",
                 "admin",
@@ -5810,19 +5810,6 @@ class LibraryMembersAPI(MethodView):
                         )
                     )
 
-                    # BUG FIX: this used to hardcode active/returned/overdue
-                    # book counts and pending_fine to 0 for every admin,
-                    # regardless of their actual AdminBookIssue records -
-                    # that's why an admin with a real, overdue-fined issue
-                    # (e.g. LIB-ADM-000001) still showed ₹0.00 / 0 / 0 here.
-                    # Mirrors the Non-Teaching Staff block below, using
-                    # AdminBookIssue instead of StaffBookIssue. Admins have
-                    # no dedicated fine-payment ledger (get_fine_payment_model
-                    # returns None for "admin"), so nothing is ever recorded
-                    # as paid/waived - pending_fine is simply the full
-                    # calculated fine across their issues, same as what the
-                    # generic circulation/returns views already compute via
-                    # get_issue_paid_fine()/get_issue_waived_fine().
                     admin_issues = (
                         AdminBookIssue.query.filter(AdminBookIssue.admin_id == admin.id)
                         .order_by(AdminBookIssue.id.desc())
@@ -5894,7 +5881,7 @@ class LibraryMembersAPI(MethodView):
                         }
                     )
 
-            # == NON-TEACHING STAFF ==
+            # = NON-TEACHING STAFF ==
             if role_filter in {
                 "",
                 "staff",
@@ -6412,7 +6399,7 @@ class LibraryMemberDetailsAPI(MethodView):
                 400,
             )
 
-        # == ADMIN ==
+        # = ADMIN ==
         if member_type == "admin":
             admin = db.session.get(
                 Admin,
@@ -6436,12 +6423,6 @@ class LibraryMemberDetailsAPI(MethodView):
 
             admin_data = admin.to_dict()
 
-            # BUG FIX: this branch used to return hardcoded zero stats and
-            # empty issue lists for every admin, so opening "View" on an
-            # admin from the All Members list showed nothing even when
-            # real issues existed (e.g. LIB-ADM-000001). Reuses the same
-            # generic circulation serializers the Transactions/Circulation
-            # views already use for admins, so the numbers match exactly.
             admin_issues = (
                 AdminBookIssue.query.filter(AdminBookIssue.admin_id == admin.id)
                 .order_by(AdminBookIssue.id.desc())
@@ -6525,7 +6506,7 @@ class LibraryMemberDetailsAPI(MethodView):
                 200,
             )
 
-        # = NON-TEACHING STAFF =
+        #  NON-TEACHING STAFF
         if member_type == "staff":
             staff = db.session.get(
                 NonTeachingStaff,
@@ -7063,9 +7044,7 @@ class LibraryCirculationAPI(MethodView):
                 reverse=True,
             )
 
-            # ==
             # EXPORT ALL FILTERED RECORDS AS CSV
-            # ==
             if export_format == "csv":
                 output = io.StringIO()
 
@@ -7254,13 +7233,9 @@ class LibraryCirculationAPI(MethodView):
             ]
 
             currently_issued = sum(1 for row in active_rows)
-
             due_soon = sum(1 for row in active_rows if row.get("status") == "Due Soon")
-
             overdue = sum(1 for row in active_rows if row.get("status") == "Overdue")
-
             returned = sum(1 for row in issue_rows if row.get("status") == "Returned")
-
             outstanding_fine = sum(
                 float(
                     row.get(
@@ -8768,7 +8743,6 @@ def calculate_issue_fine_amount(issue):
     )
 
     fine_per_day = Decimal(str(issue.fine_per_day or DUE_RUPEES))
-
     fine_amount = fine_per_day * Decimal(overdue_days)
 
     return {
@@ -8784,11 +8758,8 @@ def get_fine_status(
     waived_amount,
 ):
     fine_amount = Decimal(str(fine_amount or 0))
-
     collected_amount = Decimal(str(collected_amount or 0))
-
     waived_amount = Decimal(str(waived_amount or 0))
-
     resolved_amount = collected_amount + waived_amount
 
     pending_amount = max(
@@ -8830,9 +8801,7 @@ def serialize_library_fine(
         return None
 
     member_field = configuration["member_field"]
-
     member_model = configuration["member_model"]
-
     member_id = getattr(
         issue,
         member_field,
@@ -9166,15 +9135,10 @@ class LibraryFinesAPI(MethodView):
             )
 
             search = clean_text(request.args.get("search")).lower()
-
             member_type_filter = clean_text(request.args.get("member_type")).lower()
-
             status_filter = clean_text(request.args.get("status")).lower()
-
             date_from = clean_text(request.args.get("date_from"))
-
             date_to = clean_text(request.args.get("date_to"))
-
             export_format = clean_text(request.args.get("export")).lower()
 
             parsed_date_from = None
@@ -10186,9 +10150,7 @@ class LibraryTransactionsAPI(MethodView):
                 reverse=True,
             )
 
-            # ==
             # FILTERED CSV EXPORT
-            # ==
             if export_format == "csv":
                 output = io.StringIO()
                 output.write("\ufeff")
@@ -10485,9 +10447,9 @@ class LibraryReportsAPI(MethodView):
             return access_error
 
         try:
-            # =
+
             # FILTERS
-            # =
+
             member_type_filter = clean_text(request.args.get("member_type")).lower()
 
             status_filter = clean_text(request.args.get("status")).lower()
@@ -10588,9 +10550,8 @@ class LibraryReportsAPI(MethodView):
                 ]
             )
 
-            # =
             # LOAD CIRCULATION DATA
-            # =
+
             report_rows = []
 
             for member_type in selected_types:
@@ -10619,9 +10580,8 @@ class LibraryReportsAPI(MethodView):
 
                     report_rows.append(row)
 
-            # =
             # SEARCH
-            # =
+
             if search:
                 report_rows = [
                     row
@@ -10681,9 +10641,8 @@ class LibraryReportsAPI(MethodView):
                     ).lower()
                 ]
 
-            # =
             # STATUS FILTER
-            # =
+
             if status_filter:
                 report_rows = [
                     row
@@ -10707,9 +10666,8 @@ class LibraryReportsAPI(MethodView):
                 reverse=True,
             )
 
-            # =
             # BOOK STATISTICS
-            # =
+
             total_titles = Book.query.filter(Book.is_deleted.is_(False)).count()
 
             book_copy_stats = (
@@ -10731,9 +10689,8 @@ class LibraryReportsAPI(MethodView):
 
             available_copies = int(book_copy_stats[1] or 0)
 
-            # =
             # CIRCULATION KPIs
-            # =
+
             currently_issued = sum(
                 1
                 for row in report_rows
@@ -10757,10 +10714,9 @@ class LibraryReportsAPI(MethodView):
                 1 for row in report_rows if row.get("status") == "Due Soon"
             )
 
-            # =
             # MEMBER DISTRIBUTION
             # Based on circulation records after filters.
-            # =
+
             member_distribution_map = {
                 "student": 0,
                 "teacher": 0,
@@ -10811,10 +10767,9 @@ class LibraryReportsAPI(MethodView):
 
             total_active_members = sum(item["value"] for item in member_distribution)
 
-            # =
             # ISSUE TREND
             # Group by calendar date.
-            # =
+
             trend_map = {}
 
             for row in report_rows:
@@ -10848,9 +10803,8 @@ class LibraryReportsAPI(MethodView):
             if len(issue_trend) > 30:
                 issue_trend = issue_trend[-30:]
 
-            # =
             # MOST ISSUED BOOKS
-            # =
+
             book_usage = {}
 
             for row in report_rows:
@@ -10891,12 +10845,11 @@ class LibraryReportsAPI(MethodView):
                 reverse=True,
             )[:5]
 
-            # =
             # FINE ANALYTICS
             # Admin is intentionally excluded because the
             # current fine-payment system supports
             # student/teacher/staff.
-            # =
+
             total_fine_generated = Decimal("0")
 
             total_fine_collected = Decimal("0")
@@ -10984,9 +10937,8 @@ class LibraryReportsAPI(MethodView):
                         )
                     )
 
-            # =
             # CATEGORY ANALYTICS
-            # =
+
             category_rows = (
                 db.session.query(
                     BookCategory.name,
@@ -11025,10 +10977,9 @@ class LibraryReportsAPI(MethodView):
                 ) in category_rows
             ]
 
-            # =
             # CSV EXPORT
             # Exports ALL matching report rows before paging.
-            # =
+
             if export_format == "csv":
 
                 output = io.StringIO()
@@ -11148,9 +11099,8 @@ class LibraryReportsAPI(MethodView):
                     },
                 )
 
-            # =
             # PAGINATION
-            # =
+
             total_records = len(report_rows)
 
             pages = max(
@@ -11279,9 +11229,8 @@ class LibraryDashboardAPI(MethodView):
         try:
             today = date.today()
 
-            # =
             # BOOK INVENTORY
-            # =
+
             book_stats = (
                 db.session.query(
                     func.count(Book.id),
@@ -11299,19 +11248,14 @@ class LibraryDashboardAPI(MethodView):
             )
 
             total_titles = int(book_stats[0] or 0)
-
             total_copies = int(book_stats[1] or 0)
-
             available_copies = int(book_stats[2] or 0)
-
             issued_copies = max(
                 total_copies - available_copies,
                 0,
             )
 
-            # =
             # CIRCULATION
-            # =
             circulation_rows = []
 
             member_types = [
@@ -11368,9 +11312,7 @@ class LibraryDashboardAPI(MethodView):
                 if row.get("issue_date") == today.isoformat()
             ]
 
-            # =
             # MEMBER COUNTS
-            # =
             total_students = Student.query.count()
 
             total_teachers = Teacher.query.count()
@@ -11397,9 +11339,7 @@ class LibraryDashboardAPI(MethodView):
 
             total_members = total_students + total_teachers + total_staff + total_admins
 
-            # =
             # FINE / REVENUE STATS
-            # =
             total_collected = Decimal("0")
             total_waived = Decimal("0")
             total_pending = Decimal("0")
@@ -11457,9 +11397,7 @@ class LibraryDashboardAPI(MethodView):
                         )
                     )
 
-            # =
             # ISSUE TREND - LAST 7 DAYS
-            # =
             issue_trend = []
 
             for offset in range(
@@ -11492,9 +11430,7 @@ class LibraryDashboardAPI(MethodView):
                     }
                 )
 
-            # =
             # COLLECTION TREND - LAST 7 DAYS
-            # =
             revenue_map = {}
 
             for offset in range(
@@ -11550,9 +11486,7 @@ class LibraryDashboardAPI(MethodView):
                 ) in revenue_map.items()
             ]
 
-            # =
             # RECENT ACTIVITIES
-            # =
             activities = []
 
             for row in circulation_rows:
@@ -11669,9 +11603,7 @@ class LibraryDashboardAPI(MethodView):
 
             recent_activity = activities[:10]
 
-            # =
             # RECENTLY ADDED BOOKS
-            # =
             recent_books_query = Book.query.filter(Book.is_deleted.is_(False))
 
             if hasattr(
@@ -11684,9 +11616,7 @@ class LibraryDashboardAPI(MethodView):
 
             recent_books = recent_books_query.limit(5).all()
 
-            # =
             # OVERDUE ALERTS
-            # =
             overdue_rows.sort(
                 key=lambda row: (
                     row.get(
@@ -11782,26 +11712,26 @@ class LibraryDashboardAPI(MethodView):
             )
 
         except SQLAlchemyError:
-            logger.exception("Database error while loading " "library dashboard")
+            logger.exception("Database error while loading library dashboard")
 
             return (
                 jsonify(
                     {
                         "success": False,
-                        "error": ("Unable to load " "library dashboard"),
+                        "error": ("Unable to load library dashboard"),
                     }
                 ),
                 500,
             )
 
         except Exception:
-            logger.exception("Unexpected error while loading " "library dashboard")
+            logger.exception("Unexpected error while loading library dashboard")
 
             return (
                 jsonify(
                     {
                         "success": False,
-                        "error": ("Unable to load " "library dashboard"),
+                        "error": ("Unable to load library dashboard"),
                     }
                 ),
                 500,
@@ -11809,8 +11739,6 @@ class LibraryDashboardAPI(MethodView):
 
 
 # STUDENT LIBRARY SELF-SERVICE DASHBOARD
-
-
 class StudentLibraryCatalogAPI(MethodView):
     """Read-only book catalog browse/search for the logged-in student."""
 
@@ -11982,11 +11910,10 @@ class StudentLibraryDashboardAPI(MethodView):
                     ),
                     401,
                 )
-
-            # ==
-            # RESOLVE LOGGED-IN STUDENT
-            # ==
             student = Student.query.filter(Student.user_id == current_user.id).first()
+
+            if not student:
+                student = Student.query.get(current_user.id)
 
             if not student:
                 return (
@@ -11999,9 +11926,7 @@ class StudentLibraryDashboardAPI(MethodView):
                     404,
                 )
 
-            # ==
             # STUDENT ISSUE HISTORY
-            # ==
             issues = (
                 BookIssue.query.filter(BookIssue.student_id == student.id)
                 .order_by(BookIssue.id.desc())
@@ -12070,9 +11995,7 @@ class StudentLibraryDashboardAPI(MethodView):
                 }
             ]
 
-            # ==
             # FINES
-            # ==
             fines = []
 
             for issue in issues:
@@ -12094,9 +12017,7 @@ class StudentLibraryDashboardAPI(MethodView):
                 ):
                     fines.append(fine)
 
-            # ==
             # PAYMENTS
-            # ==
             payments = (
                 LibraryFinePayment.query.filter(
                     LibraryFinePayment.student_id == student.id
@@ -12116,9 +12037,7 @@ class StudentLibraryDashboardAPI(MethodView):
                 if transaction:
                     payment_rows.append(transaction)
 
-            # ==
             # SUMMARY
-            # ==
             currently_issued = len(current_books)
 
             overdue = sum(1 for row in current_books if row.get("status") == "Overdue")
@@ -12173,9 +12092,7 @@ class StudentLibraryDashboardAPI(MethodView):
                 for fine in fines
             )
 
-            # ==
             # LIBRARY NOTIFICATIONS
-            # ==
             notifications = []
 
             try:
@@ -12222,9 +12139,7 @@ class StudentLibraryDashboardAPI(MethodView):
             except Exception:
                 notification_rows = []
 
-            # ==
             # BORROWING LIMIT
-            # ==
             borrow_limit = 3
 
             remaining_limit = max(
@@ -12288,26 +12203,26 @@ class StudentLibraryDashboardAPI(MethodView):
             )
 
         except SQLAlchemyError:
-            logger.exception("Database error while " "loading student library")
+            logger.exception("Database error while loading student library")
 
             return (
                 jsonify(
                     {
                         "success": False,
-                        "error": ("Unable to load " "student library"),
+                        "error": ("Unable to load student library"),
                     }
                 ),
                 500,
             )
 
         except Exception:
-            logger.exception("Unexpected error while " "loading student library")
+            logger.exception("Unexpected error while loading student library")
 
             return (
                 jsonify(
                     {
                         "success": False,
-                        "error": ("Unable to load " "student library"),
+                        "error": ("Unable to load student library"),
                     }
                 ),
                 500,

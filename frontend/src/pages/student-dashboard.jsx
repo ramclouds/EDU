@@ -1939,16 +1939,18 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                     >
                       <i className={`bi ${tab.icon}`}></i>
                       {tab.label}
-                      {tab.id === "leave" && hostel?.pending_leave_count > 0 && (
-                        <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">
-                          {hostel.pending_leave_count}
-                        </span>
-                      )}
-                      {tab.id === "visitors" && hostel?.pending_visitor_count > 0 && (
-                        <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">
-                          {hostel.pending_visitor_count}
-                        </span>
-                      )}
+                      {tab.id === "leave" &&
+                        hostel?.pending_leave_count > 0 && (
+                          <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">
+                            {hostel.pending_leave_count}
+                          </span>
+                        )}
+                      {tab.id === "visitors" &&
+                        hostel?.pending_visitor_count > 0 && (
+                          <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300">
+                            {hostel.pending_visitor_count}
+                          </span>
+                        )}
                     </button>
                   ))}
                 </div>
@@ -1958,8 +1960,8 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   <div className="space-y-6">
                     {!hostel?.room_number ? (
                       <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm text-center text-sm text-gray-500 dark:text-gray-400">
-                        No active hostel allocation found. Please contact the hostel
-                        administration if you believe this is an error.
+                        No active hostel allocation found. Please contact the
+                        hostel administration if you believe this is an error.
                       </div>
                     ) : (
                       <>
@@ -1988,7 +1990,8 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                               Occupancy
                             </p>
                             <h4 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                              {hostel?.occupied_count ?? "-"}/{hostel?.capacity ?? "-"}
+                              {hostel?.occupied_count ?? "-"}/
+                              {hostel?.capacity ?? "-"}
                             </h4>
                           </div>
 
@@ -2003,7 +2006,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                                   : "text-green-600 dark:text-green-400"
                               }`}
                             >
-                              {formatCurrency(hostel?.fee_summary?.total_balance ?? 0)}
+                              {formatCurrency(
+                                hostel?.fee_summary?.total_balance ?? 0,
+                              )}
                             </h4>
                           </div>
                         </div>
@@ -2035,11 +2040,15 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                                 {hostel?.bed_type ? `(${hostel.bed_type})` : ""}
                               </p>
                               <p>
-                                <span className="font-medium">Check-in Date:</span>{" "}
+                                <span className="font-medium">
+                                  Check-in Date:
+                                </span>{" "}
                                 {formatDate(hostel?.check_in_date)}
                               </p>
                               <p>
-                                <span className="font-medium">Check-out Date:</span>{" "}
+                                <span className="font-medium">
+                                  Check-out Date:
+                                </span>{" "}
                                 {formatDate(hostel?.check_out_date)}
                               </p>
                             </div>
@@ -2210,7 +2219,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                             <table className="w-full text-xs sm:text-sm min-w-[640px]">
                               <thead className="bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-300">
                                 <tr>
-                                  <th className="py-3 px-3 text-left">Fee Type</th>
+                                  <th className="py-3 px-3 text-left">
+                                    Fee Type
+                                  </th>
                                   <th className="text-left px-3">Due Date</th>
                                   <th className="text-right px-3">Amount</th>
                                   <th className="text-right px-3">Paid</th>
@@ -2276,11 +2287,15 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                               <table className="w-full text-xs sm:text-sm min-w-[560px]">
                                 <thead className="bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-300">
                                   <tr>
-                                    <th className="py-3 px-3 text-left">Fee Type</th>
+                                    <th className="py-3 px-3 text-left">
+                                      Fee Type
+                                    </th>
                                     <th className="text-left px-3">Date</th>
                                     <th className="text-right px-3">Amount</th>
                                     <th className="text-left px-3">Method</th>
-                                    <th className="text-left px-3">Reference</th>
+                                    <th className="text-left px-3">
+                                      Reference
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y dark:divide-slate-700">
@@ -2306,7 +2321,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                                           {p.transaction_reference || "-"}
                                         </td>
                                       </tr>
-                                    ))
+                                    )),
                                   )}
                                 </tbody>
                               </table>
@@ -2651,7 +2666,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                             <h4
                               className={`inline-block mt-1 px-2 py-1 text-xs sm:text-sm rounded-full ${
                                 hostelAttendance?.today
-                                  ? statusBadgeClass(hostelAttendance.today.status)
+                                  ? statusBadgeClass(
+                                      hostelAttendance.today.status,
+                                    )
                                   : "bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-gray-400"
                               }`}
                             >
@@ -2762,7 +2779,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                           </label>
                           <select
                             value={complaintCategory}
-                            onChange={(e) => setComplaintCategory(e.target.value)}
+                            onChange={(e) =>
+                              setComplaintCategory(e.target.value)
+                            }
                             className="w-full mt-1 border rounded-lg p-2 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                           >
                             <option value="Electrical">Electrical</option>
@@ -2780,7 +2799,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                           </label>
                           <select
                             value={complaintPriority}
-                            onChange={(e) => setComplaintPriority(e.target.value)}
+                            onChange={(e) =>
+                              setComplaintPriority(e.target.value)
+                            }
                             className="w-full mt-1 border rounded-lg p-2 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                           >
                             <option value="Low">Low</option>
@@ -2851,13 +2872,18 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         <select
                           value={hostelLeaveForm.leave_type}
                           onChange={(e) =>
-                            setHostelLeaveForm((prev) => ({ ...prev, leave_type: e.target.value }))
+                            setHostelLeaveForm((prev) => ({
+                              ...prev,
+                              leave_type: e.target.value,
+                            }))
                           }
                           className="w-full mt-1 border rounded-lg p-2 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                         >
                           <option value="Weekend Leave">Weekend Leave</option>
                           <option value="Medical Leave">Medical Leave</option>
-                          <option value="Emergency Leave">Emergency Leave</option>
+                          <option value="Emergency Leave">
+                            Emergency Leave
+                          </option>
                           <option value="Other">Other</option>
                         </select>
                       </div>
@@ -2871,7 +2897,10 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                             type="date"
                             value={hostelLeaveForm.from_date}
                             onChange={(e) =>
-                              setHostelLeaveForm((prev) => ({ ...prev, from_date: e.target.value }))
+                              setHostelLeaveForm((prev) => ({
+                                ...prev,
+                                from_date: e.target.value,
+                              }))
                             }
                             className="w-full mt-1 border rounded-lg p-2 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                           />
@@ -2884,7 +2913,10 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                             type="date"
                             value={hostelLeaveForm.to_date}
                             onChange={(e) =>
-                              setHostelLeaveForm((prev) => ({ ...prev, to_date: e.target.value }))
+                              setHostelLeaveForm((prev) => ({
+                                ...prev,
+                                to_date: e.target.value,
+                              }))
                             }
                             className="w-full mt-1 border rounded-lg p-2 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                           />
@@ -2896,7 +2928,10 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         placeholder="Reason for leave..."
                         value={hostelLeaveForm.reason}
                         onChange={(e) =>
-                          setHostelLeaveForm((prev) => ({ ...prev, reason: e.target.value }))
+                          setHostelLeaveForm((prev) => ({
+                            ...prev,
+                            reason: e.target.value,
+                          }))
                         }
                         className="w-full border rounded-lg p-3 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
                       />
@@ -2991,7 +3026,10 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                           <select
                             value={visitorForm.relation}
                             onChange={(e) =>
-                              setVisitorForm((prev) => ({ ...prev, relation: e.target.value }))
+                              setVisitorForm((prev) => ({
+                                ...prev,
+                                relation: e.target.value,
+                              }))
                             }
                             className="w-full mt-1 border rounded-lg p-2 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                           >
@@ -3009,7 +3047,10 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         placeholder="Purpose of visit..."
                         value={visitorForm.purpose}
                         onChange={(e) =>
-                          setVisitorForm((prev) => ({ ...prev, purpose: e.target.value }))
+                          setVisitorForm((prev) => ({
+                            ...prev,
+                            purpose: e.target.value,
+                          }))
                         }
                         className="w-full border rounded-lg p-3 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
                       />
@@ -3032,7 +3073,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                           }}
                           className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg disabled:opacity-60"
                         >
-                          {visitorSubmitting ? "Submitting..." : "Submit Request"}
+                          {visitorSubmitting
+                            ? "Submitting..."
+                            : "Submit Request"}
                         </button>
                       </div>
                     </div>
@@ -3074,7 +3117,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                     >
                       <i
                         className={`bi bi-arrow-clockwise mr-1 ${
-                          studentLibraryLoading ? "inline-block animate-spin" : ""
+                          studentLibraryLoading
+                            ? "inline-block animate-spin"
+                            : ""
                         }`}
                       ></i>
                       Refresh
@@ -3202,8 +3247,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                           You have overdue library books
                         </p>
                         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                          Please return overdue books to avoid additional
-                          fines.
+                          Please return overdue books to avoid additional fines.
                         </p>
                       </div>
                     </div>
@@ -3290,7 +3334,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         </div>
                         <select
                           value={libraryStatusFilter}
-                          onChange={(e) => setLibraryStatusFilter(e.target.value)}
+                          onChange={(e) =>
+                            setLibraryStatusFilter(e.target.value)
+                          }
                           className="border rounded-lg px-3 py-2 text-xs sm:text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                         >
                           <option value="">All Status</option>
@@ -3423,7 +3469,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         </div>
                         <select
                           value={libraryStatusFilter}
-                          onChange={(e) => setLibraryStatusFilter(e.target.value)}
+                          onChange={(e) =>
+                            setLibraryStatusFilter(e.target.value)
+                          }
                           className="border rounded-lg px-3 py-2 text-xs sm:text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                         >
                           <option value="">All Status</option>
@@ -3773,7 +3821,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
                         <select
                           value={catalogStatusFilter}
-                          onChange={(e) => setCatalogStatusFilter(e.target.value)}
+                          onChange={(e) =>
+                            setCatalogStatusFilter(e.target.value)
+                          }
                           className="border rounded-lg px-3 py-2 text-xs sm:text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-slate-600"
                         >
                           <option value="">Any Availability</option>
@@ -3823,7 +3873,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
                               <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-gray-600 dark:text-gray-300">
                                 <p>
-                                  <span className="text-gray-400">Category: </span>
+                                  <span className="text-gray-400">
+                                    Category:{" "}
+                                  </span>
                                   {book.category_name || "-"}
                                 </p>
                                 <p>
@@ -3835,7 +3887,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                                   {book.isbn || "-"}
                                 </p>
                                 <p>
-                                  <span className="text-gray-400">Copies: </span>
+                                  <span className="text-gray-400">
+                                    Copies:{" "}
+                                  </span>
                                   {book.available_copies}/{book.total_copies}
                                 </p>
                               </div>

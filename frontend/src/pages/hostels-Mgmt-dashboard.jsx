@@ -771,8 +771,7 @@ function AdminDashboard() {
     },
     Complaint: {
       icon: "bi-megaphone",
-      classes:
-        "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+      classes: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300",
     },
     Maintenance: {
       icon: "bi-tools",
@@ -781,11 +780,13 @@ function AdminDashboard() {
     },
     Leave: {
       icon: "bi-calendar2-x",
-      classes: "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
+      classes:
+        "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
     },
     Staff: {
       icon: "bi-person-badge",
-      classes: "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
+      classes:
+        "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
     },
     Visitor: {
       icon: "bi-person-plus",
@@ -794,7 +795,8 @@ function AdminDashboard() {
     },
     Structure: {
       icon: "bi-diagram-3",
-      classes: "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300",
+      classes:
+        "bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300",
     },
   };
 
@@ -969,16 +971,16 @@ function AdminDashboard() {
               {section.items.map(([key, icon, label]) => {
                 const isActive = activeSection === key;
 
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      title={!sidebarExpanded ? label : ""}
-                      onClick={() => {
-                        setActiveSection(key);
-                        closeSidebarOnMobile();
-                      }}
-                      className={`relative flex w-full items-center rounded-xl py-3
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    title={!sidebarExpanded ? label : ""}
+                    onClick={() => {
+                      setActiveSection(key);
+                      closeSidebarOnMobile();
+                    }}
+                    className={`relative flex w-full items-center rounded-xl py-3
                 transition-all duration-300 ease-in-out
                 ${
                   sidebarExpanded
@@ -990,26 +992,26 @@ function AdminDashboard() {
                     ? "bg-gradient-to-r from-purple-100 to-indigo-100 dark:from-purple-500/20 dark:to-indigo-500/20 text-purple-700 dark:text-purple-300 font-semibold shadow"
                     : "text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white"
                 }`}
-                    >
-                      {isActive && (
-                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-purple-600 rounded-r-full" />
-                      )}
+                  >
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-purple-600 rounded-r-full" />
+                    )}
 
-                      <i className={`bi ${icon} text-base shrink-0`} />
+                    <i className={`bi ${icon} text-base shrink-0`} />
 
-                      <span
-                        className={`whitespace-nowrap truncate overflow-hidden transition-all duration-300 ease-in-out
+                    <span
+                      className={`whitespace-nowrap truncate overflow-hidden transition-all duration-300 ease-in-out
                   ${
                     sidebarExpanded
                       ? "opacity-100 max-w-[190px]"
                       : "opacity-0 max-w-0"
                   }`}
-                      >
-                        {label}
-                      </span>
-                    </button>
-                  );
-                })}
+                    >
+                      {label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           ))}
 
@@ -1735,7 +1737,9 @@ function AdminDashboard() {
                         ₹
                         {reportLoading
                           ? "…"
-                          : (report?.fees?.total_invoiced ?? 0).toLocaleString()}
+                          : (
+                              report?.fees?.total_invoiced ?? 0
+                            ).toLocaleString()}
                       </p>
                     </div>
 
@@ -1747,7 +1751,9 @@ function AdminDashboard() {
                         ₹
                         {reportLoading
                           ? "…"
-                          : (report?.fees?.total_collected ?? 0).toLocaleString()}
+                          : (
+                              report?.fees?.total_collected ?? 0
+                            ).toLocaleString()}
                       </p>
                     </div>
 
@@ -1802,9 +1808,12 @@ function AdminDashboard() {
                             </div>
 
                             <span className="text-[10px] text-gray-400">
-                              {new Date(day.date).toLocaleDateString(undefined, {
-                                weekday: "narrow",
-                              })}
+                              {new Date(day.date).toLocaleDateString(
+                                undefined,
+                                {
+                                  weekday: "narrow",
+                                },
+                              )}
                             </span>
                           </div>
                         );
@@ -1850,12 +1859,13 @@ function AdminDashboard() {
                   ) : (
                     <ul className="divide-y dark:divide-slate-700">
                       {logs.slice(0, 6).map((log) => {
-                        const style =
-                          ACTIVITY_CATEGORY_STYLES[log.category] || {
-                            icon: "bi-info-circle",
-                            classes:
-                              "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300",
-                          };
+                        const style = ACTIVITY_CATEGORY_STYLES[
+                          log.category
+                        ] || {
+                          icon: "bi-info-circle",
+                          classes:
+                            "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300",
+                        };
 
                         return (
                           <li
@@ -1909,7 +1919,8 @@ function AdminDashboard() {
                     {
                       label: "Wardens & security",
                       value:
-                        (staffStats?.wardens ?? 0) + (staffStats?.security ?? 0),
+                        (staffStats?.wardens ?? 0) +
+                        (staffStats?.security ?? 0),
                       loading: staffLoading,
                       icon: "bi-shield-check",
                     },
@@ -3003,8 +3014,7 @@ function AdminDashboard() {
 
                         <div className="mb-1 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                           <span>
-                            {room.occupied_count}/{room.capacity} beds
-                            occupied
+                            {room.occupied_count}/{room.capacity} beds occupied
                           </span>
                           <span>{occupancyPct}%</span>
                         </div>
@@ -3489,7 +3499,9 @@ function AdminDashboard() {
                       key={bed.id}
                       className="overflow-hidden rounded-2xl border border-gray-100 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700"
                     >
-                      <div className={`h-1.5 w-full bg-gradient-to-r ${statusAccent}`} />
+                      <div
+                        className={`h-1.5 w-full bg-gradient-to-r ${statusAccent}`}
+                      />
 
                       <div className="bg-white p-4 dark:bg-slate-800">
                         <div className="mb-2 flex items-start justify-between gap-2">
@@ -10298,10 +10310,7 @@ function AdminDashboard() {
                 },
                 {
                   label: "Read",
-                  value: Math.max(
-                    notifications.length - notificationUnread,
-                    0,
-                  ),
+                  value: Math.max(notifications.length - notificationUnread, 0),
                   icon: "bi-envelope-open",
                   classes:
                     "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300",
@@ -10805,10 +10814,7 @@ function AdminDashboard() {
                       const result =
                         noticeModalMode === "create"
                           ? await createNotice(payload)
-                          : await updateNotice(
-                              noticeBeingEdited.id,
-                              payload,
-                            );
+                          : await updateNotice(noticeBeingEdited.id, payload);
 
                       if (result?.success) {
                         closeNoticeModal();
