@@ -1,199 +1,337 @@
 import { useEffect, useState, useRef } from "react";
-import { BASE_URL } from "../../config/appConfig";
+import Chart from "chart.js/auto";
+import { useNavigate } from "react-router-dom";
+import { BASE_URL } from "../config/appConfig";
 
-export function useTeacherProfile({ fetchWithAuth }) {
-    // 👤 Profile
-    const [teacher, setTeacher] = useState({});
-    const [formData, setFormData] = useState({});
-    const [loading, setLoading] = useState(false);
-    const [editMode, setEditMode] = useState(false);
+export function useTeacherDashboard(activeSection, setActiveSection) {
+  const navigate = useNavigate();
 
-    // 🔐 Password
-    const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-    const [passwordLoading, setPasswordLoading] = useState(false);
-    const [passwordData, setPasswordData] = useState({
-        current_password: "",
-        new_password: "",
-        confirm_password: "",
+  // 🔄 Loading States
+  const [loading, setLoading] = useState(true);
+  const [noticeLoading, setNoticeLoading] = useState(false);
+
+  // 🔔 Notifications (NEW)
+  const [notifications, setNotifications] = useState([]);
+  const [notificationUnread, setNotificationUnread] = useState(0);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+
+  // 🔔 Notices
+  const [announcements, setNotices] = useState([]);
+
+  //  🔥 COMBINED NOTIFICATIONS 
+  const combinedNotifications = [
+    ...(notifications || []).map(n => ({
+      ...n,
+      source: "leave",
+      time: n.time || n.created_at || new Date().toISOString()
+    })),
+    ...(announcements || []).map(n => ({
+      ...n,
+      source: "notice",
+      time: n.date || n.created_at || new Date().toISOString()
+    }))
+  ];
+
+  const sortedNotifications = [...combinedNotifications].sort((a, b) => {
+    if (a.is_read !== b.is_read) return a.is_read ? 1 : -1;
+    return new Date(b.time || b.date) - new Date(a.time || a.date);
+  });
+
+  const [unreadCount, setUnreadCount] = useState(0);
+  const totalUnread =
+    (announcements?.filter(n => !n.is_read).length || 0) +
+    (notifications?.filter(n => !n.is_read).length || 0);
+
+  const [noticeStats, setNoticeStats] = useState({
+    total: 0,
+    important: 0,
+    thisWeek: 0,
+  });
+
+  // 🔐 Password
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  });
+
+  // 🍞 Toast
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
+
+  // 🔐 AUTH HELPERS
+  const getAuth = () => {
+    try {
+      return {
+        user: JSON.parse(localStorage.getItem("user")),
+        token: localStorage.getItem("token"),
+      };
+    } catch {
+      return { user: null, token: null };
+    }
+  };
+
+  const logoutUser = () => {
+    localStorage.clear();
+    window.location.href = "/";
+  };
+
+  // 🍞  UI HELPERS
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: "", type });
+    }, 3000);
+  };
+
+  // 🌐  API HELPER (COMMON FETCH)
+  const fetchWithAuth = async (url, options = {}) => {
+    const { token } = getAuth();
+
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${token}`,
+      },
     });
 
-    // 🍞 Toast
-    const [toast, setToast] = useState({
-        show: false,
-        message: "",
+    if (res.status === 401) {
+      logoutUser();
+      throw new Error("Unauthorized");
+    }
+
+    return res;
+  };
+
+  // ===================== Notifications  ===================
+  const fetchNotifications = async () => {
+    try {
+      setNotificationLoading(true);
+
+      const res = await fetchWithAuth(`${BASE_URL}/notifications`);
+      const data = await res.json();
+
+      const sorted = (data || []).sort((a, b) => {
+        if (a.is_read === b.is_read) return 0;
+        return a.is_read ? 1 : -1;
+      });
+
+      setNotifications(sorted);
+
+      const unread = sorted.filter(n => !n.is_read).length;
+      setNotificationUnread(unread);
+
+    } catch (err) {
+      console.error("Notification fetch error:", err);
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+
+  // AUTO FETCH
+  useEffect(() => {
+    fetchNotifications();
+
+    const interval = setInterval(fetchNotifications, 15000); // refresh every 15 sec
+    return () => clearInterval(interval);
+  }, []);
+
+  // MARK AS READ FUNCTION
+  const markNotificationRead = async (id) => {
+    try {
+      await fetchWithAuth(`${BASE_URL}/notifications/read/${id}`, {
+        method: "POST"
+      });
+
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === id ? { ...n, is_read: true } : n
+        )
+      );
+
+      setNotificationUnread(prev => Math.max(prev - 1, 0));
+
+    } catch (err) {
+      console.error("Mark read error:", err);
+    }
+  };
+
+  const lastNotificationRef = useRef(null);
+
+  useEffect(() => {
+    if (!notifications.length) return;
+
+    const latest = notifications[0];
+
+    if (lastNotificationRef.current === latest.id) return;
+
+    if (!latest.is_read) {
+      setToast({
+        show: true,
+        message: `📩 ${latest.title} - ${latest.message || ""}`,
         type: "success",
-    });
+      });
 
-    // 🛑 Prevent duplicate API calls (IMPORTANT)
-    const fetchedRef = useRef(false);
+      lastNotificationRef.current = latest.id;
 
-    // ================= TOAST =================
-    const showToast = (message, type = "success") => {
-        setToast({ show: true, message, type });
+      setTimeout(() => {
+        setToast(prev => ({ ...prev, show: false }));
+      }, 4000);
+    }
+  }, [notifications]);
 
-        setTimeout(() => {
-            setToast({ show: false, message: "", type });
-        }, 3000);
-    };
+  //  🔥 CLICK HANDLER 
+  const handleNotificationClick = async (n) => {
+    try {
+      if (n.source === "notice") {
+        await markNoticeAsRead(n.id);
+        setActiveSection("announcements"); // ✅ correct
+      } else {
+        await markNotificationRead(n.id);
+        setActiveSection("studentLeave"); // ✅ correct
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-    // ================= AUTH =================
-    const getAuth = () => {
-        try {
-            return {
-                user: JSON.parse(localStorage.getItem("user")),
-                token: localStorage.getItem("token"),
-            };
-        } catch {
-            return { user: null, token: null };
-        }
-    };
+  // =================  NOTICES START =================
+  useEffect(() => {
+    const { user } = getAuth();
+    if (!user) return;
 
-    // ================= LOGOUT =================
-    const logoutUser = () => {
-        localStorage.clear();
-        window.location.href = "/";
-    };
+    const fetchNotices = async () => {
+      try {
+        setNoticeLoading(true);
+        const res = await fetchWithAuth(
+          `${BASE_URL}/announcements/teacher/${user.id}?page=1&limit=20`
+        );
 
-    // ================= PROFILE FETCH =================
-    useEffect(() => {
-        const { user } = getAuth();
+        const json = await res.json();
+        const data = json.data || [];
 
-        // ❌ guard: no user or no fetch function
-        if (!user || !fetchWithAuth) return;
-
-        // ❌ prevent duplicate calls (React StrictMode safe)
-        if (fetchedRef.current) return;
-        fetchedRef.current = true;
-
-        const fetchTeacher = async () => {
-            try {
-                setLoading(true);
-
-                const res = await fetchWithAuth(
-                    `${BASE_URL}/${user.id}/teacher`
-                );
-
-                const data = await res.json();
-
-                setTeacher(data || {});
-                setFormData(data || {});
-            } catch (err) {
-                console.error(err);
-                showToast("Failed to load profile", "error");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchTeacher();
-    }, [fetchWithAuth]);
-
-    // ================= PROFILE UPDATE =================
-    const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
+        // sort unread first
+        const sorted = [...data].sort((a, b) => {
+          if (a.is_read === b.is_read) return 0;
+          return a.is_read ? 1 : -1;
         });
+
+        setNotices(sorted);
+
+        const unread = sorted.filter((n) => !n.is_read).length;
+        setUnreadCount(unread);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setNoticeLoading(false);
+      }
     };
 
-    const handleSave = async () => {
-        try {
-            const res = await fetchWithAuth(
-                `${BASE_URL}/${teacher.id}/teacher/update`,
-                {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(formData),
-                }
-            );
+    fetchNotices();
 
-            const data = await res.json();
+    const interval = setInterval(fetchNotices, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-            if (res.ok) {
-                setTeacher(formData);
-                setEditMode(false);
-                showToast("Profile updated");
-            } else {
-                showToast(data.error || "Update failed", "error");
-            }
-        } catch (err) {
-            console.error(err);
-            showToast("Update failed", "error");
-        }
-    };
+  //  NOTICE STATS 
+  useEffect(() => {
+    if (activeSection !== "announcements") return;
 
-    // ================= PASSWORD =================
-    const handlePasswordChange = (e) => {
-        const { name, value } = e.target;
+    const total = announcements.length;
 
-        setPasswordData((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
+    const important = announcements.filter(
+      (n) => n.priority === "High"
+    ).length;
 
-    const handleChangePassword = async () => {
-        const { user } = getAuth();
-        if (!user) return;
+    const thisWeek = announcements.filter((n) => {
+      const d = new Date(n.date);
+      const now = new Date();
+      const diff = (now - d) / (1000 * 60 * 60 * 24);
+      return diff <= 7;
+    }).length; setNoticeStats({ total, important, thisWeek });
+  }, [activeSection, announcements]);
 
-        setPasswordLoading(true);
+  // MARK READ
+  const markNoticeAsRead = async (noticeId) => {
+    const { user } = getAuth();
 
-        try {
-            const res = await fetchWithAuth(
-                `${BASE_URL}/teacher/${user.id}/change-password`,
-                {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(passwordData),
-                }
-            );
+    try {
+      await fetchWithAuth(
+        `${BASE_URL}/announcements/read/${noticeId}/${user.id}`,
+        { method: "POST" }
+      );
 
-            const data = await res.json();
+      setNotices((prev) =>
+        prev.map((n) =>
+          n.id === noticeId ? { ...n, is_read: true } : n
+        )
+      );
 
-            if (res.ok) {
-                showToast("Password updated successfully ✅");
+      setUnreadCount((prev) => Math.max(prev - 1, 0));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-                setPasswordModalOpen(false);
-                setPasswordData({
-                    current_password: "",
-                    new_password: "",
-                    confirm_password: "",
-                });
-            } else {
-                showToast(data.error || "Password update failed", "error");
-            }
-        } catch (err) {
-            console.error(err);
-            showToast("Something went wrong", "error");
-        } finally {
-            setPasswordLoading(false);
-        }
-    };
+  const lastNoticeRef = useRef(null);
 
-    // ================= RETURN =================
-    return {
-        // profile
-        teacher,
-        formData,
-        loading,
-        editMode,
-        setEditMode,
-        handleChange,
-        handleSave,
+  useEffect(() => {
+    if (!announcements.length) return;
 
-        // password
-        passwordModalOpen,
-        setPasswordModalOpen,
-        passwordData,
-        passwordLoading,
-        handlePasswordChange,
-        handleChangePassword,
+    const latest = announcements[0];
 
-        // logout
-        handleLogout: logoutUser,
+    if (lastNoticeRef.current === latest.id) return;
 
-        // toast
-        toast,
-        showToast,
-    };
+    if (!latest.is_read) {
+      setToast({
+        show: true,
+        message: `📢 ${latest.title}`,
+        type: "success",
+      });
+
+      lastNoticeRef.current = latest.id;
+
+      setTimeout(() => {
+        setToast(prev => ({ ...prev, show: false }));
+      }, 4000);
+    }
+  }, [announcements]);
+
+  
+  // ================= LOGOUT =================
+  const handleLogout = logoutUser;
+
+  return {
+    // shared helpers
+    fetchWithAuth,
+    showToast,
+
+    // 🔄 LOADING STATES
+    loading,
+    noticeLoading,
+    unreadCount,
+    announcements,
+    noticeStats,
+
+    // 🔔 NOTICES
+    markNoticeAsRead,
+
+    // 🍞 TOAST
+    toast,
+    notifications,
+    notificationUnread,
+    notificationLoading,
+    markNotificationRead,
+
+    combinedNotifications,
+    sortedNotifications,
+    totalUnread,
+    handleNotificationClick,
+  };
 }

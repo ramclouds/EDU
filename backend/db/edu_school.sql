@@ -376,6 +376,7 @@ CREATE TABLE IF NOT EXISTS `batches` (
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `is_current` tinyint(1) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `batch_name` (`batch_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -1289,6 +1290,8 @@ CREATE TABLE IF NOT EXISTS `subjects` (
   `subject_code` varchar(20) DEFAULT NULL,
   `subject_name` varchar(100) NOT NULL,
   `created_at` datetime DEFAULT (now()),
+  `subject_type` varchar(20) NOT NULL DEFAULT 'Core',
+  `status` varchar(20) NOT NULL DEFAULT 'Active',
   PRIMARY KEY (`id`),
   UNIQUE KEY `subject_name` (`subject_name`),
   UNIQUE KEY `subject_code` (`subject_code`)

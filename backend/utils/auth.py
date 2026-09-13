@@ -441,11 +441,6 @@ class Login(MethodView):
                 logger.exception("Unable to load RBAC access during login")
 
             # ================= DASHBOARD ACCESS GATE =================
-            # If the account's own dashboard has not been granted to it
-            # (e.g. a Library Admin whose "library" module access was
-            # revoked, or never assigned), stop the login here and tell
-            # the user clearly instead of dropping them on a page they
-            # can't use.
             if isinstance(user, Admin) and dashboard_entry is not None:
                 if not dashboard_rights.get("can_view"):
                     return (
@@ -493,6 +488,9 @@ class Login(MethodView):
 
             elif getattr(user, "admin_type", None) == "Accounts Admin":
                 dashboard = "/accounts-admin-dashboard"
+                
+            elif getattr(user, "admin_type", None) == "Academic Admin":
+                dashboard = "/academic-admin-dashboard"                
 
             elif getattr(user, "admin_type", None) == "HR Admin":
                 dashboard = "/hr-admin-dashboard"

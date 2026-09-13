@@ -85,6 +85,12 @@ DEFAULT_MODULES = [
         "sort_order": 100,
     },
     {
+        "code": "academic",
+        "name": "Academic Administration",
+        "category": "Academics",
+        "sort_order": 15,
+    },
+    {
         "code": "hostel",
         "name": "Hostel",
         "category": "Administration",
@@ -247,21 +253,6 @@ DEFAULT_ROLES = [
     },
 ]
 
-
-# =====================================================================
-# DASHBOARD REGISTRY
-#
-# Single source of truth for "which dashboard page maps to which RBAC
-# module". Access to an entire dashboard page is gated by the "view"
-# permission on `module_code`; the ability to perform actions inside
-# that page ("write" access) is gated by having create/edit/delete on
-# the same module. This gives page-level (not section-level) access
-# control, exactly like a light on/off switch per dashboard.
-#
-# To add a new dashboard in the future: add one entry here (and, if it
-# needs its own RBAC module, add a matching entry to DEFAULT_MODULES
-# above / create an RBACModule row) - nothing else needs to change.
-# =====================================================================
 DASHBOARD_REGISTRY = [
     {
         "key": "super-admin-dashboard",
@@ -277,6 +268,13 @@ DASHBOARD_REGISTRY = [
         "route": "/library-admin-dashboard",
         "module_code": "library",
         "owner_admin_type": "Library Admin",
+    },
+    {
+        "key": "academic-admin-dashboard",
+        "label": "Academic Dashboard",
+        "route": "/academic-admin-dashboard",
+        "module_code": "academic",
+        "owner_admin_type": "Academic Admin",
     },
     {
         "key": "accounts-admin-dashboard",
@@ -386,6 +384,21 @@ def get_user_dashboard_access(user, dashboard_entry):
 
     if not access:
         return {"can_view": False, "can_write": False}
+
+    # BUG FIX: a brand-new admin has no RBACUserRole row yet (nobody has
+    # opened Role & Permission Management for them). Previously this was
+    # indistinguishable from "explicitly assigned a role with zero
+    # permissions", so a legitimate admin_type owner (e.g. Academic Admin)
+    # could never log in to their own dashboard until a Super Admin
+    # manually assigned them a role - see the DASHBOARD_ACCESS_DENIED
+    # gate in Login.post(). If there's no role assignment at all AND
+    # this admin_type owns this dashboard, grant baseline access instead
+    # of locking the account out of its own dashboard.
+    if (
+        access["role"] is None
+        and dashboard_entry.get("owner_admin_type") == getattr(user, "admin_type", None)
+    ):
+        return {"can_view": True, "can_write": True}
 
     return _dashboard_rights_from_actions(
         access["effective_permissions"].get(module_code)

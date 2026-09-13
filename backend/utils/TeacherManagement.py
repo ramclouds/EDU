@@ -1,5 +1,3 @@
-# utils/TeacherManagement.py
-
 import logging
 from datetime import datetime
 from flask import jsonify, request
@@ -9,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from utils.auth import db, bcrypt, Teacher
 from utils.auth_middleware import login_required
+from utils.rolePermissionManagement import permission_required
 from utils.teacherDetails import TeacherClass
 from utils.studentDetails import AcademicClass, Batch, Division, Section
 from utils.subjects import Subject
@@ -132,7 +131,7 @@ def replace_teacher_assignments(teacher_id, assignments):
 
 
 class AdminTeacherOptionsAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             academic_classes = []
@@ -141,40 +140,53 @@ class AdminTeacherOptionsAPI(MethodView):
                 division = Division.query.get(ac.division_id)
                 section = Section.query.get(ac.section_id)
 
-                academic_classes.append({
-                    "id": ac.id,
-                    "batch_id": ac.batch_id,
-                    "division_id": ac.division_id,
-                    "section_id": ac.section_id,
-                    "batch_name": batch.batch_name if batch else None,
-                    "division_name": division.division_name if division else None,
-                    "section_name": section.section_name if section else None,
-                    "display_name": (
-                        f"{division.division_name}-{section.section_name}"
-                        if division and section
-                        else f"Class {ac.id}"
-                    ),
-                })
+                academic_classes.append(
+                    {
+                        "id": ac.id,
+                        "batch_id": ac.batch_id,
+                        "division_id": ac.division_id,
+                        "section_id": ac.section_id,
+                        "batch_name": batch.batch_name if batch else None,
+                        "division_name": division.division_name if division else None,
+                        "section_name": section.section_name if section else None,
+                        "display_name": (
+                            f"{division.division_name}-{section.section_name}"
+                            if division and section
+                            else f"Class {ac.id}"
+                        ),
+                    }
+                )
 
-            return jsonify({
-                "academic_classes": academic_classes,
-                "subjects": [
-                    {"id": s.id, "subject_name": s.subject_name}
-                    for s in Subject.query.order_by(Subject.subject_name.asc()).all()
-                ],
-                "batches": [
-                    {"id": b.id, "batch_name": b.batch_name}
-                    for b in Batch.query.order_by(Batch.batch_name.asc()).all()
-                ],
-                "divisions": [
-                    {"id": d.id, "division_name": d.division_name}
-                    for d in Division.query.order_by(Division.division_name.asc()).all()
-                ],
-                "sections": [
-                    {"id": s.id, "section_name": s.section_name}
-                    for s in Section.query.order_by(Section.section_name.asc()).all()
-                ],
-            }), 200
+            return (
+                jsonify(
+                    {
+                        "academic_classes": academic_classes,
+                        "subjects": [
+                            {"id": s.id, "subject_name": s.subject_name}
+                            for s in Subject.query.order_by(
+                                Subject.subject_name.asc()
+                            ).all()
+                        ],
+                        "batches": [
+                            {"id": b.id, "batch_name": b.batch_name}
+                            for b in Batch.query.order_by(Batch.batch_name.asc()).all()
+                        ],
+                        "divisions": [
+                            {"id": d.id, "division_name": d.division_name}
+                            for d in Division.query.order_by(
+                                Division.division_name.asc()
+                            ).all()
+                        ],
+                        "sections": [
+                            {"id": s.id, "section_name": s.section_name}
+                            for s in Section.query.order_by(
+                                Section.section_name.asc()
+                            ).all()
+                        ],
+                    }
+                ),
+                200,
+            )
 
         except Exception as e:
             logger.exception(e)
@@ -182,7 +194,7 @@ class AdminTeacherOptionsAPI(MethodView):
 
 
 class AdminTeachersAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             q = request.args.get("q", "").strip()
@@ -209,16 +221,30 @@ class AdminTeachersAPI(MethodView):
 
             teachers = query.order_by(Teacher.id.desc()).all()
 
-            return jsonify({
-                "teachers": [serialize_teacher(t) for t in teachers],
-                "total": len(teachers),
-            }), 200
+            return (
+                jsonify(
+                    {
+                        "teachers": [serialize_teacher(t) for t in teachers],
+                        "total": len(teachers),
+                        "stats": {
+                            "total": Teacher.query.count(),
+                            "active": Teacher.query.filter(
+                                Teacher.status == "Active"
+                            ).count(),
+                            "inactive": Teacher.query.filter(
+                                Teacher.status != "Active"
+                            ).count(),
+                        },
+                    }
+                ),
+                200,
+            )
 
         except Exception as e:
             logger.exception(e)
             return jsonify({"error": "Failed to load teachers"}), 500
 
-    @login_required
+    @permission_required("academic", "create")
     def post(self):
         try:
             data = request.get_json() or {}
@@ -232,7 +258,10 @@ class AdminTeachersAPI(MethodView):
             if Teacher.query.filter_by(email=data["email"]).first():
                 return jsonify({"error": "Email already exists"}), 400
 
-            if data.get("mobile") and Teacher.query.filter_by(mobile=data["mobile"]).first():
+            if (
+                data.get("mobile")
+                and Teacher.query.filter_by(mobile=data["mobile"]).first()
+            ):
                 return jsonify({"error": "Mobile already exists"}), 400
 
             teacher_id = data.get("teacher_id") or next_teacher_id()
@@ -283,11 +312,18 @@ class AdminTeachersAPI(MethodView):
 
             db.session.commit()
 
-            return jsonify({
-                "message": "Teacher created successfully",
-                "teacher": serialize_teacher(teacher),
-                "default_password": password if not data.get("password") else None,
-            }), 201
+            return (
+                jsonify(
+                    {
+                        "message": "Teacher created successfully",
+                        "teacher": serialize_teacher(teacher),
+                        "default_password": (
+                            password if not data.get("password") else None
+                        ),
+                    }
+                ),
+                201,
+            )
 
         except ValueError as e:
             db.session.rollback()
@@ -305,14 +341,14 @@ class AdminTeachersAPI(MethodView):
 
 
 class AdminTeacherDetailAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self, teacher_id):
         teacher = Teacher.query.get(teacher_id)
         if not teacher:
             return jsonify({"error": "Teacher not found"}), 404
         return jsonify({"teacher": serialize_teacher(teacher)}), 200
 
-    @login_required
+    @permission_required("academic", "edit")
     def put(self, teacher_id):
         try:
             teacher = Teacher.query.get(teacher_id)
@@ -326,26 +362,51 @@ class AdminTeacherDetailAPI(MethodView):
             new_username = data.get("username")
 
             if new_email:
-                exists = Teacher.query.filter(Teacher.id != teacher_id, Teacher.email == new_email).first()
+                exists = Teacher.query.filter(
+                    Teacher.id != teacher_id, Teacher.email == new_email
+                ).first()
                 if exists:
                     return jsonify({"error": "Email already exists"}), 400
 
             if new_mobile:
-                exists = Teacher.query.filter(Teacher.id != teacher_id, Teacher.mobile == new_mobile).first()
+                exists = Teacher.query.filter(
+                    Teacher.id != teacher_id, Teacher.mobile == new_mobile
+                ).first()
                 if exists:
                     return jsonify({"error": "Mobile already exists"}), 400
 
             if new_username:
-                exists = Teacher.query.filter(Teacher.id != teacher_id, Teacher.username == new_username).first()
+                exists = Teacher.query.filter(
+                    Teacher.id != teacher_id, Teacher.username == new_username
+                ).first()
                 if exists:
                     return jsonify({"error": "Username already exists"}), 400
 
             for field in [
-                "first_name", "middle_name", "last_name", "email", "mobile",
-                "username", "gender", "blood_group", "address", "city", "state",
-                "pincode", "designation", "degree", "university", "experience_years",
-                "specialization", "employment_type", "shift", "medical_condition",
-                "emergency_name", "emergency_relation", "emergency_phone", "status",
+                "first_name",
+                "middle_name",
+                "last_name",
+                "email",
+                "mobile",
+                "username",
+                "gender",
+                "blood_group",
+                "address",
+                "city",
+                "state",
+                "pincode",
+                "designation",
+                "degree",
+                "university",
+                "experience_years",
+                "specialization",
+                "employment_type",
+                "shift",
+                "medical_condition",
+                "emergency_name",
+                "emergency_relation",
+                "emergency_phone",
+                "status",
             ]:
                 if field in data:
                     setattr(teacher, field, data.get(field))
@@ -357,17 +418,24 @@ class AdminTeacherDetailAPI(MethodView):
                 teacher.joining_date = parse_date(data.get("joining_date"))
 
             if "password" in data and data.get("password"):
-                teacher.password = bcrypt.generate_password_hash(data["password"]).decode("utf-8")
+                teacher.password = bcrypt.generate_password_hash(
+                    data["password"]
+                ).decode("utf-8")
 
             if "assignments" in data:
                 replace_teacher_assignments(teacher.id, data.get("assignments", []))
 
             db.session.commit()
 
-            return jsonify({
-                "message": "Teacher updated successfully",
-                "teacher": serialize_teacher(teacher),
-            }), 200
+            return (
+                jsonify(
+                    {
+                        "message": "Teacher updated successfully",
+                        "teacher": serialize_teacher(teacher),
+                    }
+                ),
+                200,
+            )
 
         except ValueError as e:
             db.session.rollback()
@@ -383,7 +451,7 @@ class AdminTeacherDetailAPI(MethodView):
             db.session.rollback()
             return jsonify({"error": "Failed to update teacher"}), 500
 
-    @login_required
+    @permission_required("academic", "delete")
     def delete(self, teacher_id):
         try:
             teacher = Teacher.query.get(teacher_id)
@@ -403,7 +471,7 @@ class AdminTeacherDetailAPI(MethodView):
 
 
 class AdminTeacherAssignmentsAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def put(self, teacher_id):
         try:
             teacher = Teacher.query.get(teacher_id)
@@ -414,10 +482,15 @@ class AdminTeacherAssignmentsAPI(MethodView):
             replace_teacher_assignments(teacher_id, data.get("assignments", []))
             db.session.commit()
 
-            return jsonify({
-                "message": "Teacher assignments updated successfully",
-                "teacher": serialize_teacher(teacher),
-            }), 200
+            return (
+                jsonify(
+                    {
+                        "message": "Teacher assignments updated successfully",
+                        "teacher": serialize_teacher(teacher),
+                    }
+                ),
+                200,
+            )
 
         except ValueError as e:
             db.session.rollback()
@@ -430,7 +503,7 @@ class AdminTeacherAssignmentsAPI(MethodView):
 
 
 class AdminTeacherPasswordAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def put(self, teacher_id):
         try:
             teacher = Teacher.query.get(teacher_id)
@@ -455,7 +528,7 @@ class AdminTeacherPasswordAPI(MethodView):
 
 
 class AdminTeacherStatusAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def put(self, teacher_id):
         try:
             teacher = Teacher.query.get(teacher_id)
@@ -471,10 +544,15 @@ class AdminTeacherStatusAPI(MethodView):
             teacher.status = status
             db.session.commit()
 
-            return jsonify({
-                "message": "Teacher status updated successfully",
-                "teacher": serialize_teacher(teacher),
-            }), 200
+            return (
+                jsonify(
+                    {
+                        "message": "Teacher status updated successfully",
+                        "teacher": serialize_teacher(teacher),
+                    }
+                ),
+                200,
+            )
 
         except Exception as e:
             logger.exception(e)

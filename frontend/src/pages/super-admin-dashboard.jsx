@@ -18,7 +18,6 @@ import { useTimeTableManagement } from "../controllers/TimeTable/useTimetableMan
 import { useStudentEnrollment } from "../controllers/Enrollments/useStudentEnrollment";
 import { useMyClasses } from "../controllers/MyClasses/useMyClass";
 import { useTeacherManagement } from "../controllers/MyClasses/useTeachersManagement";
-import { useSubjectManagements } from "../controllers/Subjects/useSubjectManagements";
 import { useExamResultManagement } from "../controllers/Academic/useExamResultManagement";
 import { useRolePermissionManagement } from "../controllers/Auth/useRolePermissionManagement";
 import { useLibraryOverview } from "../controllers/Library/useLibraryOverview";
@@ -192,34 +191,6 @@ function AdminDashboard() {
     loadStudentReportRows,
     downloadStudentReportCSV,
   } = useStudentEnrollment({
-    fetchWithAuth,
-    showToast,
-  });
-
-  // ================= SUBJECTS HOOK =================
-  const {
-    subjects,
-    subjectsLoading,
-    subjectSaving,
-    subjectForm,
-    handleSubjectChange,
-    isSubjectModalOpen,
-    openSubjectModal,
-    closeSubjectModal,
-    subjectSearch,
-    setSubjectSearch,
-    subjectTypeFilter,
-    setSubjectTypeFilter,
-    subjectStatusFilter,
-    setSubjectStatusFilter,
-    resetSubjectFilters,
-    loadSubjects,
-    saveSubject,
-    deleteSubject,
-    subjectTypeOptions,
-    subjectStats,
-  } = useSubjectManagements({
-    activeSection,
     fetchWithAuth,
     showToast,
   });
@@ -569,6 +540,15 @@ function AdminDashboard() {
     }
   }, []);
 
+  // Enrolling new students now happens from the Academic Dashboard - if
+  // this tab is ever selected (e.g. a stale default from the hook),
+  // land on Promote instead of showing a blank tab.
+  useEffect(() => {
+    if (enrollmentActiveTab === "enroll") {
+      setEnrollmentActiveTab("promote");
+    }
+  }, [enrollmentActiveTab, setEnrollmentActiveTab]);
+
   return (
     <div className="flex">
       {/* MOBILE OVERLAY */}
@@ -636,7 +616,6 @@ function AdminDashboard() {
             {
               title: "ACADEMIC",
               items: [
-                ["subjects", "bi-book", "Subjects"],
                 ["timetable", "bi-clock", "Timetable"],
                 ["attendance", "bi-calendar-check", "Attendance"],
                 ["exams", "bi-award", "Exams & Results"],
@@ -1187,8 +1166,8 @@ function AdminDashboard() {
               </h1>
 
               <p className="mt-1 text-sm text-slate-500">
-                Here&apos;s a real-time snapshot of what&apos;s happening
-                across the school.
+                Here&apos;s a real-time snapshot of what&apos;s happening across
+                the school.
               </p>
             </div>
 
@@ -1364,7 +1343,7 @@ function AdminDashboard() {
                                 style={{
                                   width: `${Math.min(
                                     libraryOccupancyRate,
-                                    100
+                                    100,
                                   )}%`,
                                 }}
                               />
@@ -1382,7 +1361,10 @@ function AdminDashboard() {
                           </p>
 
                           <p className="mt-2 text-lg font-bold text-emerald-700">
-                            &#8377;{Number(libraryStats.fine_collected || 0).toFixed(2)}
+                            &#8377;
+                            {Number(libraryStats.fine_collected || 0).toFixed(
+                              2,
+                            )}
                           </p>
                         </div>
 
@@ -1392,7 +1374,8 @@ function AdminDashboard() {
                           </p>
 
                           <p className="mt-2 text-lg font-bold text-rose-700">
-                            &#8377;{Number(libraryStats.fine_pending || 0).toFixed(2)}
+                            &#8377;
+                            {Number(libraryStats.fine_pending || 0).toFixed(2)}
                           </p>
                         </div>
 
@@ -1402,7 +1385,8 @@ function AdminDashboard() {
                           </p>
 
                           <p className="mt-2 text-lg font-bold text-slate-700">
-                            &#8377;{Number(libraryStats.fine_waived || 0).toFixed(2)}
+                            &#8377;
+                            {Number(libraryStats.fine_waived || 0).toFixed(2)}
                           </p>
                         </div>
                       </div>
@@ -1435,10 +1419,10 @@ function AdminDashboard() {
                                         activity.type === "issue"
                                           ? "fas fa-arrow-up text-amber-600"
                                           : activity.type === "return"
-                                          ? "fas fa-arrow-down text-emerald-600"
-                                          : activity.type === "payment"
-                                          ? "fas fa-indian-rupee-sign text-emerald-600"
-                                          : "fas fa-hand-holding-dollar text-slate-500"
+                                            ? "fas fa-arrow-down text-emerald-600"
+                                            : activity.type === "payment"
+                                              ? "fas fa-indian-rupee-sign text-emerald-600"
+                                              : "fas fa-hand-holding-dollar text-slate-500"
                                       }`}
                                     />
                                   </div>
@@ -1451,7 +1435,7 @@ function AdminDashboard() {
                                     {activity.date && (
                                       <p className="text-xs text-slate-400">
                                         {new Date(
-                                          activity.date
+                                          activity.date,
                                         ).toLocaleString()}
                                       </p>
                                     )}
@@ -1548,7 +1532,6 @@ function AdminDashboard() {
             )}
           </section>
         )}
-
 
         {activeSection === "roles" && (
           <section className="space-y-6">
@@ -4019,14 +4002,19 @@ function AdminDashboard() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setActiveSection("admissions");
-                    // setEnrollmentActiveTab("enrollment"); // optional
-                  }}
+                  onClick={() =>
+                    navigate("/academic-admin-dashboard", {
+                      state: {
+                        from: "super-admin-dashboard",
+                        accessBy: "super_admin",
+                        activeSection: "students",
+                      },
+                    })
+                  }
                   className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-indigo-50 transition-all duration-200"
                 >
                   <i className="bi bi-person-plus-fill me-2"></i>
-                  Add Student
+                  Enroll Student
                 </button>
               </div>
             </div>
@@ -4460,13 +4448,14 @@ function AdminDashboard() {
                 Student Admissions
               </h2>
               <p className="text-xs sm:text-sm opacity-90">
-                Manage students, promotions & reports
+                Promote students and download reports. Enrolling new students
+                now happens from the Academic Dashboard.
               </p>
             </div>
 
             {/* TABS */}
             <div className="flex flex-wrap gap-2 bg-white p-2 rounded-xl shadow text-sm">
-              {["enroll", "promote", "report"].map((tab) => (
+              {["promote", "report"].map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -4477,573 +4466,11 @@ function AdminDashboard() {
                       : "hover:bg-gray-100 text-gray-700"
                   }`}
                 >
-                  {tab === "enroll" && "Enroll Student"}
                   {tab === "promote" && "Promote Students"}
                   {tab === "report" && "Download Reports"}
                 </button>
               ))}
             </div>
-
-            {/* ENROLL TAB */}
-            {enrollmentActiveTab === "enroll" && (
-              <div className="rounded-3xl bg-white dark:bg-slate-900 shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in duration-300">
-                <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-5 sm:p-7 text-white">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-widest text-indigo-100">
-                        Student Application
-                      </p>
-                      <h2 className="text-2xl sm:text-3xl font-bold mt-1">
-                        New Student Enrollment
-                      </h2>
-                      <p className="text-sm text-indigo-100 mt-2 max-w-2xl">
-                        Add student personal details, parent information,
-                        academic assignment and login credentials.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
-                      <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3">
-                        <p className="text-[11px] text-indigo-100">
-                          Student ID
-                        </p>
-                        <h4 className="font-bold text-sm">
-                          {studentEnrollmentForm.studentID || "Auto"}
-                        </h4>
-                      </div>
-
-                      <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3">
-                        <p className="text-[11px] text-indigo-100">User ID</p>
-                        <h4 className="font-bold text-sm">
-                          {studentEnrollmentForm.userID || "Auto"}
-                        </h4>
-                      </div>
-
-                      <div className="rounded-2xl bg-white/15 backdrop-blur px-4 py-3 col-span-2 sm:col-span-1">
-                        <p className="text-[11px] text-indigo-100">Roll No</p>
-                        <h4 className="font-bold text-sm">
-                          {studentEnrollmentForm.rollNumber || "Auto"}
-                        </h4>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <form
-                  className="p-4 sm:p-6 lg:p-8 space-y-8"
-                  onSubmit={submitStudentEnrollment}
-                >
-                  {/* BASIC INFORMATION */}
-                  <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/70 p-4 sm:p-6">
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="h-10 w-10 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                        <i className="bi bi-person-fill"></i>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white">
-                          Basic Information
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Student identity and contact details
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          First Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          id="firstName"
-                          value={studentEnrollmentForm.firstName}
-                          onChange={handleStudentEnrollmentChange}
-                          type="text"
-                          placeholder="Enter first name"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Middle Name
-                        </label>
-                        <input
-                          id="middleName"
-                          value={studentEnrollmentForm.middleName}
-                          onChange={handleStudentEnrollmentChange}
-                          type="text"
-                          placeholder="Enter middle name"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Last Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          id="lastName"
-                          value={studentEnrollmentForm.lastName}
-                          onChange={handleStudentEnrollmentChange}
-                          type="text"
-                          placeholder="Enter last name"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Email Address
-                        </label>
-                        <input
-                          id="studentEmail"
-                          value={studentEnrollmentForm.studentEmail}
-                          onChange={handleStudentEnrollmentChange}
-                          type="email"
-                          placeholder="student@example.com"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Mobile Number <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          id="studentMobile"
-                          value={studentEnrollmentForm.studentMobile}
-                          onChange={handleStudentEnrollmentChange}
-                          type="text"
-                          placeholder="Enter mobile number"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Gender
-                        </label>
-                        <select
-                          id="gender"
-                          value={studentEnrollmentForm.gender}
-                          onChange={handleStudentEnrollmentChange}
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="">Select gender</option>
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Date of Birth
-                        </label>
-                        <input
-                          id="dob"
-                          value={studentEnrollmentForm.dob}
-                          onChange={handleStudentEnrollmentChange}
-                          type="date"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Blood Group
-                        </label>
-                        <select
-                          id="bloodGroup"
-                          value={studentEnrollmentForm.bloodGroup}
-                          onChange={handleStudentEnrollmentChange}
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="">Select blood group</option>
-                          {[
-                            "A+",
-                            "A-",
-                            "B+",
-                            "B-",
-                            "AB+",
-                            "AB-",
-                            "O+",
-                            "O-",
-                          ].map((group) => (
-                            <option key={group} value={group}>
-                              {group}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* PARENT DETAILS */}
-                  <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-6">
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="h-10 w-10 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center">
-                        <i className="bi bi-people-fill"></i>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white">
-                          Parent Details
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Father and mother contact information
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {[
-                        [
-                          "fatherName",
-                          "Father Name",
-                          "Enter father name",
-                          "text",
-                        ],
-                        [
-                          "fatherMobile",
-                          "Father Mobile",
-                          "Enter father mobile",
-                          "text",
-                        ],
-                        [
-                          "fatherEmail",
-                          "Father Email",
-                          "father@example.com",
-                          "email",
-                        ],
-                        [
-                          "motherName",
-                          "Mother Name",
-                          "Enter mother name",
-                          "text",
-                        ],
-                        [
-                          "motherMobile",
-                          "Mother Mobile",
-                          "Enter mother mobile",
-                          "text",
-                        ],
-                        [
-                          "motherEmail",
-                          "Mother Email",
-                          "mother@example.com",
-                          "email",
-                        ],
-                      ].map(([id, label, placeholder, type]) => (
-                        <div key={id}>
-                          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                            {label}
-                          </label>
-                          <input
-                            id={id}
-                            value={studentEnrollmentForm[id]}
-                            onChange={handleStudentEnrollmentChange}
-                            type={type}
-                            placeholder={placeholder}
-                            className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-purple-500"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ACADEMIC ASSIGNMENT */}
-                  <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/70 p-4 sm:p-6">
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="h-10 w-10 rounded-2xl bg-pink-100 text-pink-600 flex items-center justify-center">
-                        <i className="bi bi-mortarboard-fill"></i>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white">
-                          Academic Assignment
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Select batch, division and section. Roll number is
-                          auto assigned.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Batch <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          id="enrollBatch"
-                          value={studentEnrollmentForm.enrollBatch}
-                          onChange={handleStudentEnrollmentChange}
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-pink-500"
-                          required
-                        >
-                          <option value="">Select batch</option>
-                          {enrollmentBatches.map((batch) => (
-                            <option key={batch} value={batch}>
-                              {batch}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Division / Class{" "}
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          id="enrollDivision"
-                          value={studentEnrollmentForm.enrollDivision}
-                          onChange={handleStudentEnrollmentChange}
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-pink-500"
-                          required
-                        >
-                          <option value="">Select division</option>
-                          {enrollmentDivisions.map((division) => (
-                            <option key={division} value={division}>
-                              {division}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Section <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          id="enrollSection"
-                          value={studentEnrollmentForm.enrollSection}
-                          onChange={handleStudentEnrollmentChange}
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-pink-500"
-                          required
-                        >
-                          <option value="">Select section</option>
-                          {enrollmentSections.map((section) => (
-                            <option key={section} value={section}>
-                              {section}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Roll Number
-                        </label>
-                        <input
-                          id="rollNumber"
-                          value={studentEnrollmentForm.rollNumber}
-                          readOnly
-                          type="number"
-                          placeholder="Auto roll number"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 px-4 py-3 text-sm outline-none text-slate-500 cursor-not-allowed"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ADDITIONAL INFO */}
-                  <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-6">
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="h-10 w-10 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                        <i className="bi bi-file-earmark-text-fill"></i>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white">
-                          Additional Information
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Admission, address and medical details
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Admission Date
-                        </label>
-                        <input
-                          id="admissionDate"
-                          value={studentEnrollmentForm.admissionDate}
-                          onChange={handleStudentEnrollmentChange}
-                          type="date"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Previous School
-                        </label>
-                        <input
-                          id="prevSchool"
-                          value={studentEnrollmentForm.prevSchool}
-                          onChange={handleStudentEnrollmentChange}
-                          type="text"
-                          placeholder="Enter previous school"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Residential Address
-                        </label>
-                        <textarea
-                          id="address"
-                          value={studentEnrollmentForm.address}
-                          onChange={handleStudentEnrollmentChange}
-                          placeholder="Enter full residential address"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500 min-h-[110px] resize-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Medical Conditions / Allergies
-                        </label>
-                        <textarea
-                          id="medical"
-                          value={studentEnrollmentForm.medical}
-                          onChange={handleStudentEnrollmentChange}
-                          placeholder="Enter medical conditions, allergies or notes"
-                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500 min-h-[110px] resize-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SYSTEM CREDENTIALS */}
-                  <div className="rounded-3xl border border-indigo-100 dark:border-slate-700 bg-indigo-50/70 dark:bg-slate-800 p-4 sm:p-6">
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center">
-                        <i className="bi bi-shield-lock-fill"></i>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white">
-                          System Credentials
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Student ID and User ID are generated automatically
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Student ID
-                        </label>
-                        <input
-                          id="studentID"
-                          value={studentEnrollmentForm.studentID}
-                          readOnly
-                          type="text"
-                          placeholder="Auto student ID"
-                          className="w-full rounded-xl border border-indigo-100 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none text-slate-500 cursor-not-allowed"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          User ID / Username
-                        </label>
-                        <input
-                          id="userID"
-                          value={studentEnrollmentForm.userID}
-                          readOnly
-                          type="text"
-                          placeholder="Auto username"
-                          className="w-full rounded-xl border border-indigo-100 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none text-slate-500 cursor-not-allowed"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Password
-                        </label>
-                        <input
-                          id="password"
-                          value={studentEnrollmentForm.password}
-                          onChange={handleStudentEnrollmentChange}
-                          type="password"
-                          placeholder="Enter password"
-                          className="w-full rounded-xl border border-indigo-100 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                          Account Status
-                        </label>
-                        <select
-                          id="status"
-                          value={studentEnrollmentForm.status}
-                          onChange={handleStudentEnrollmentChange}
-                          className="w-full rounded-xl border border-indigo-100 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {latestEnrolledStudent && (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 p-4 text-sm flex items-start gap-3">
-                      <i className="bi bi-check-circle-fill text-lg"></i>
-                      <div>
-                        <p className="font-semibold">
-                          Student enrolled successfully
-                        </p>
-                        <p className="mt-1">
-                          Student ID: <b>{latestEnrolledStudent.student_id}</b>
-                          {latestEnrolledStudent.password && (
-                            <>
-                              {" "}
-                              | Password:{" "}
-                              <b>{latestEnrolledStudent.password}</b>
-                            </>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ACTION BUTTONS */}
-                  <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:-mx-8 -mb-4 sm:-mb-6 lg:-mb-8 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 p-4 sm:p-6">
-                    <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={resetStudentEnrollmentForm}
-                        className="w-full sm:w-auto px-6 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition"
-                      >
-                        Reset Form
-                      </button>
-
-                      <button
-                        disabled={studentEnrollmentLoading}
-                        type="submit"
-                        className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl shadow-lg font-bold transition"
-                      >
-                        {studentEnrollmentLoading
-                          ? "Enrolling..."
-                          : "Enroll Student"}
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            )}
 
             {/* PROMOTE TAB */}
             {enrollmentActiveTab === "promote" && (
@@ -5265,334 +4692,6 @@ function AdminDashboard() {
         )}
         {/* ================== ENROLLMENT SECTION END ================= */}
 
-        {/* ============================= SUBJECT MANAGEMENT SECTION START ============================= */}
-        {activeSection === "subjects" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="md:col-span-4 bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 rounded-2xl p-6 text-white shadow-lg flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
-                <div>
-                  <h2 className="text-2xl font-bold">Subject Management</h2>
-                  <p className="text-sm opacity-90">
-                    Create, update and manage academic subjects
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => openSubjectModal()}
-                  className="bg-white text-indigo-700 px-5 py-3 rounded-xl font-black shadow hover:bg-indigo-50 transition"
-                >
-                  + Add Subject
-                </button>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-indigo-500">
-                <p className="text-xs text-gray-500 font-bold uppercase">
-                  Total Subjects
-                </p>
-                <p className="text-xl font-bold text-gray-800">
-                  {subjectStats.total}
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-emerald-500">
-                <p className="text-xs text-gray-500 font-bold uppercase">
-                  Active Subjects
-                </p>
-                <p className="text-xl font-bold text-gray-800">
-                  {subjectStats.active}
-                </p>
-              </div>
-
-              <div className="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-red-500">
-                <p className="text-xs text-gray-500 font-bold uppercase">
-                  Inactive Subjects
-                </p>
-                <p className="text-xl font-bold text-gray-800">
-                  {subjectStats.inactive}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-end">
-              <div className="flex-1 min-w-[220px]">
-                <label className="text-xs font-bold text-gray-500 uppercase ml-1">
-                  Search Subject
-                </label>
-                <input
-                  type="text"
-                  value={subjectSearch}
-                  onChange={(e) => setSubjectSearch(e.target.value)}
-                  placeholder="Search by subject name or code"
-                  className="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              <div className="flex-1 min-w-[200px]">
-                <label className="text-xs font-bold text-gray-500 uppercase ml-1">
-                  Subject Type
-                </label>
-                <select
-                  value={subjectTypeFilter}
-                  onChange={(e) => setSubjectTypeFilter(e.target.value)}
-                  className="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Types</option>
-                  {subjectTypeOptions.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex-1 min-w-[200px]">
-                <label className="text-xs font-bold text-gray-500 uppercase ml-1">
-                  Status
-                </label>
-                <select
-                  value={subjectStatusFilter}
-                  onChange={(e) => setSubjectStatusFilter(e.target.value)}
-                  className="w-full mt-1 border border-gray-200 p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Status</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-
-              <button
-                type="button"
-                onClick={loadSubjects}
-                className="bg-gray-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-black transition"
-              >
-                Filter
-              </button>
-
-              <button
-                type="button"
-                onClick={resetSubjectFilters}
-                className="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-xl font-bold hover:bg-gray-200 transition"
-              >
-                Reset
-              </button>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-                <div>
-                  <h3 className="font-black text-gray-800">Subject List</h3>
-                  <p className="text-xs text-gray-500">
-                    Manage all subjects from one place
-                  </p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="p-4">Subject</th>
-                      <th className="p-4">Code</th>
-                      <th className="p-4">Type</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-gray-50">
-                    {subjectsLoading ? (
-                      <tr>
-                        <td
-                          colSpan="5"
-                          className="p-6 text-center text-gray-500"
-                        >
-                          Loading subjects...
-                        </td>
-                      </tr>
-                    ) : subjects.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan="5"
-                          className="p-6 text-center text-gray-500"
-                        >
-                          No subjects found
-                        </td>
-                      </tr>
-                    ) : (
-                      subjects.map((subject) => (
-                        <tr
-                          key={subject.id}
-                          className="hover:bg-gray-50 transition"
-                        >
-                          <td className="p-4">
-                            <p className="font-black text-gray-800">
-                              {subject.subject_name}
-                            </p>
-                          </td>
-
-                          <td className="p-4">
-                            <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-bold text-xs">
-                              {subject.subject_code}
-                            </span>
-                          </td>
-
-                          <td className="p-4 text-gray-700">
-                            {subject.subject_type || "Core"}
-                          </td>
-
-                          <td className="p-4">
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                subject.status === "Inactive"
-                                  ? "bg-red-50 text-red-700"
-                                  : "bg-emerald-50 text-emerald-700"
-                              }`}
-                            >
-                              {subject.status || "Active"}
-                            </span>
-                          </td>
-
-                          <td className="p-4">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openSubjectModal(subject)}
-                                className="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100"
-                              >
-                                Edit
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => deleteSubject(subject.id)}
-                                className="px-3 py-2 rounded-lg bg-red-50 text-red-700 font-bold hover:bg-red-100"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {isSubjectModalOpen && (
-              <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden">
-                  <div className="p-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex justify-between items-center">
-                    <div>
-                      <h3 className="text-xl font-black">
-                        {subjectForm.id ? "Update Subject" : "Add Subject"}
-                      </h3>
-                      <p className="text-sm opacity-90">
-                        Enter subject details carefully
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={closeSubjectModal}
-                      className="text-white text-2xl font-black"
-                    >
-                      &times;
-                    </button>
-                  </div>
-
-                  <form
-                    onSubmit={saveSubject}
-                    className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4"
-                  >
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Subject Name
-                      </label>
-                      <input
-                        name="subject_name"
-                        value={subjectForm.subject_name}
-                        onChange={handleSubjectChange}
-                        required
-                        placeholder="Example: Mathematics"
-                        className="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Subject Code
-                      </label>
-                      <input
-                        name="subject_code"
-                        value={subjectForm.subject_code}
-                        onChange={handleSubjectChange}
-                        required
-                        placeholder="Example: MATH101"
-                        className="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Subject Type
-                      </label>
-                      <select
-                        name="subject_type"
-                        value={subjectForm.subject_type}
-                        onChange={handleSubjectChange}
-                        className="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="Core">Core</option>
-                        <option value="Optional">Optional</option>
-                        <option value="Practical">Practical</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase">
-                        Status
-                      </label>
-                      <select
-                        name="status"
-                        value={subjectForm.status}
-                        onChange={handleSubjectChange}
-                        className="w-full mt-1 border border-gray-200 p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                      </select>
-                    </div>
-
-                    <div className="sm:col-span-2 flex justify-end gap-3 pt-4">
-                      <button
-                        type="button"
-                        onClick={closeSubjectModal}
-                        className="px-6 py-3 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200"
-                      >
-                        Cancel
-                      </button>
-
-                      <button
-                        type="submit"
-                        disabled={subjectSaving}
-                        className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {subjectSaving
-                          ? "Saving..."
-                          : subjectForm.id
-                            ? "Update Subject"
-                            : "Save Subject"}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-        {/* ============================= SUBJECT MANAGEMENT SECTION END ============================= */}
         {/* =========================== PREMIUM TIMETABLE SECTION ============================ */}
         {activeSection === "timetable" && (
           <section className="space-y-6 animate-in fade-in duration-500">

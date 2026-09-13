@@ -10,10 +10,11 @@ from reportlab.lib.enums import TA_CENTER
 import logging
 from datetime import datetime
 from sqlalchemy import func
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from flask import request
 from utils.auth import db, Teacher
 from utils.auth_middleware import login_required
+from utils.rolePermissionManagement import permission_required
 from utils.subjects import Subject
 from utils.studentDetails import (
     StudentAcademicRecord,
@@ -3723,3 +3724,1282 @@ class AdminExamReportCardsPDFAPI(MethodView):
         except Exception as e:
             logger.exception(e)
             return jsonify({"error": "Failed to generate report cards"}), 500
+
+
+# ============================================================
+# ACADEMIC SETUP APIs
+# Classes, Divisions, Sections and Batches - the building blocks
+# every other academic module (subjects, timetable, attendance,
+# exams) is linked to via AcademicClass. Batch + Division + Section
+# are simple lookup tables; AcademicClass is the combination of the
+# three that students/teachers actually get assigned to.
+# ============================================================
+
+
+def _clean_text(value):
+    return str(value or "").strip()
+
+
+def _batch_status(batch):
+    """Computed label - not stored. 'Current' wins over date comparison."""
+    if batch.is_current:
+        return "Current"
+
+    today = datetime.utcnow().date()
+
+    if batch.start_date and batch.start_date > today:
+        return "Upcoming"
+
+    if batch.end_date and batch.end_date < today:
+        return "Completed"
+
+    return "Active"
+
+
+def batch_to_dict(batch, class_count=0, student_count=0):
+    return {
+        "id": batch.id,
+        "batch_name": batch.batch_name,
+        "start_date": batch.start_date.isoformat() if batch.start_date else None,
+        "end_date": batch.end_date.isoformat() if batch.end_date else None,
+        "is_current": bool(batch.is_current),
+        "academic_status": _batch_status(batch),
+        "class_count": class_count,
+        "student_count": student_count,
+        "created_at": batch.created_at.isoformat() if batch.created_at else None,
+    }
+
+
+def division_to_dict(division, class_count=0):
+    return {
+        "id": division.id,
+        "division_name": division.division_name,
+        "class_count": class_count,
+    }
+
+
+def section_to_dict(section, class_count=0):
+    return {
+        "id": section.id,
+        "section_name": section.section_name,
+        "class_count": class_count,
+    }
+
+
+def academic_class_to_dict(
+    academic, division=None, section=None, batch=None, student_count=0
+):
+    return {
+        "id": academic.id,
+        "batch_id": academic.batch_id,
+        "batch_name": getattr(batch, "batch_name", None),
+        "division_id": academic.division_id,
+        "division_name": getattr(division, "division_name", None),
+        "section_id": academic.section_id,
+        "section_name": getattr(section, "section_name", None),
+        "display_name": (
+            _class_label(division, section, batch) if division and section else None
+        ),
+        "student_count": student_count,
+    }
+
+
+# ========================= BATCHES =========================
+class AdminBatchesAPI(MethodView):
+    @permission_required("academic", "view")
+    def get(self):
+        try:
+            search = _clean_text(request.args.get("search"))
+
+            query = Batch.query
+            if search:
+                query = query.filter(Batch.batch_name.ilike(f"%{search}%"))
+
+            batches = query.order_by(
+                Batch.is_current.desc(), Batch.batch_name.desc()
+            ).all()
+
+            counts = dict(
+                db.session.query(AcademicClass.batch_id, func.count(AcademicClass.id))
+                .group_by(AcademicClass.batch_id)
+                .all()
+            )
+
+            student_counts_raw = dict(
+                db.session.query(
+                    AcademicClass.batch_id,
+                    func.count(StudentAcademicRecord.id),
+                )
+                .join(
+                    StudentAcademicRecord,
+                    StudentAcademicRecord.academic_class_id == AcademicClass.id,
+                )
+                .filter(StudentAcademicRecord.is_current == True)
+                .group_by(AcademicClass.batch_id)
+                .all()
+            )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "batches": [
+                            batch_to_dict(
+                                b,
+                                counts.get(b.id, 0),
+                                student_counts_raw.get(b.id, 0),
+                            )
+                            for b in batches
+                        ],
+                        "stats": {
+                            "total": Batch.query.count(),
+                            "in_use": len(counts),
+                            "current_batch": next(
+                                (b.batch_name for b in batches if b.is_current), None
+                            ),
+                        },
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to load batches"}), 500
+
+    @permission_required("academic", "create")
+    def post(self):
+        try:
+            data = request.get_json(silent=True) or {}
+            name = _clean_text(data.get("batch_name"))
+
+            if not name:
+                return (
+                    jsonify({"success": False, "error": "Batch name is required"}),
+                    400,
+                )
+
+            duplicate = Batch.query.filter(
+                func.lower(Batch.batch_name) == name.lower()
+            ).first()
+            if duplicate:
+                return (
+                    jsonify({"success": False, "error": "Batch already exists"}),
+                    409,
+                )
+
+            start_date = _parse_date_value(data.get("start_date"))
+            end_date = _parse_date_value(data.get("end_date"))
+
+            if start_date and end_date and start_date > end_date:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "start_date cannot be after end_date",
+                        }
+                    ),
+                    400,
+                )
+
+            make_current = bool(data.get("is_current"))
+
+            if make_current:
+                Batch.query.update({Batch.is_current: False})
+
+            batch = Batch(
+                batch_name=name,
+                start_date=start_date,
+                end_date=end_date,
+                is_current=make_current,
+            )
+            db.session.add(batch)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Batch created successfully",
+                        "batch": batch_to_dict(batch, 0, 0),
+                    }
+                ),
+                201,
+            )
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"success": False, "error": "Batch already exists"}), 409
+        except SQLAlchemyError:
+            db.session.rollback()
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error while creating batch"}
+                ),
+                500,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to create batch"}), 500
+
+
+class AdminBatchDetailAPI(MethodView):
+    @permission_required("academic", "edit")
+    def put(self, batch_id):
+        try:
+            batch = Batch.query.get(batch_id)
+            if not batch:
+                return jsonify({"success": False, "error": "Batch not found"}), 404
+
+            data = request.get_json(silent=True) or {}
+            name = _clean_text(data.get("batch_name"))
+
+            if not name:
+                return (
+                    jsonify({"success": False, "error": "Batch name is required"}),
+                    400,
+                )
+
+            duplicate = Batch.query.filter(
+                Batch.id != batch_id,
+                func.lower(Batch.batch_name) == name.lower(),
+            ).first()
+            if duplicate:
+                return (
+                    jsonify({"success": False, "error": "Batch already exists"}),
+                    409,
+                )
+
+            start_date = _parse_date_value(data.get("start_date"))
+            end_date = _parse_date_value(data.get("end_date"))
+
+            if start_date and end_date and start_date > end_date:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "start_date cannot be after end_date",
+                        }
+                    ),
+                    400,
+                )
+
+            batch.batch_name = name
+            batch.start_date = start_date
+            batch.end_date = end_date
+
+            if "is_current" in data:
+                make_current = bool(data.get("is_current"))
+                if make_current:
+                    Batch.query.filter(Batch.id != batch_id).update(
+                        {Batch.is_current: False}
+                    )
+                batch.is_current = make_current
+
+            db.session.commit()
+
+            class_count = AcademicClass.query.filter_by(batch_id=batch_id).count()
+            student_count = (
+                db.session.query(func.count(StudentAcademicRecord.id))
+                .join(
+                    AcademicClass,
+                    AcademicClass.id == StudentAcademicRecord.academic_class_id,
+                )
+                .filter(
+                    AcademicClass.batch_id == batch_id,
+                    StudentAcademicRecord.is_current == True,
+                )
+                .scalar()
+                or 0
+            )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Batch updated successfully",
+                        "batch": batch_to_dict(batch, class_count, student_count),
+                    }
+                ),
+                200,
+            )
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"success": False, "error": "Batch already exists"}), 409
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to update batch"}), 500
+
+    @permission_required("academic", "delete")
+    def delete(self, batch_id):
+        try:
+            batch = Batch.query.get(batch_id)
+            if not batch:
+                return jsonify({"success": False, "error": "Batch not found"}), 404
+
+            in_use = AcademicClass.query.filter_by(batch_id=batch_id).count()
+            if in_use > 0:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": f"This batch is used in {in_use} class(es). Remove or reassign those classes first.",
+                        }
+                    ),
+                    409,
+                )
+
+            db.session.delete(batch)
+            db.session.commit()
+
+            return (
+                jsonify({"success": True, "message": "Batch deleted successfully"}),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to delete batch"}), 500
+
+
+# ---- Set a batch as the current academic year ----
+class AdminBatchSetCurrentAPI(MethodView):
+    @permission_required("academic", "edit")
+    def put(self, batch_id):
+        try:
+            batch = Batch.query.get(batch_id)
+            if not batch:
+                return jsonify({"success": False, "error": "Batch not found"}), 404
+
+            Batch.query.filter(Batch.id != batch_id).update({Batch.is_current: False})
+            batch.is_current = True
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": f"{batch.batch_name} is now the current academic year",
+                        "batch": batch_to_dict(batch),
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return (
+                jsonify({"success": False, "error": "Failed to set current batch"}),
+                500,
+            )
+
+
+# ---- Drill-down: everything happening inside one academic year ----
+# This is what powers "check old batch academic data" - grade-by-grade
+# breakdown, student counts, and totals for any batch, past or present.
+class AdminBatchOverviewAPI(MethodView):
+    @permission_required("academic", "view")
+    def get(self, batch_id):
+        try:
+            batch = Batch.query.get(batch_id)
+            if not batch:
+                return jsonify({"success": False, "error": "Batch not found"}), 404
+
+            rows = (
+                db.session.query(AcademicClass, Division, Section)
+                .join(Division, Division.id == AcademicClass.division_id)
+                .join(Section, Section.id == AcademicClass.section_id)
+                .filter(AcademicClass.batch_id == batch_id)
+                .order_by(Division.division_name.asc(), Section.section_name.asc())
+                .all()
+            )
+
+            class_ids = [academic.id for academic, _, _ in rows]
+
+            student_counts = (
+                dict(
+                    db.session.query(
+                        StudentAcademicRecord.academic_class_id,
+                        func.count(StudentAcademicRecord.id),
+                    )
+                    .filter(
+                        StudentAcademicRecord.academic_class_id.in_(class_ids),
+                        StudentAcademicRecord.is_current == True,
+                    )
+                    .group_by(StudentAcademicRecord.academic_class_id)
+                    .all()
+                )
+                if class_ids
+                else {}
+            )
+
+            classes = []
+            for academic, division, section in rows:
+                count = student_counts.get(academic.id, 0)
+                classes.append(
+                    {
+                        "id": academic.id,
+                        "division_name": division.division_name,
+                        "section_name": section.section_name,
+                        "display_name": _class_label(division, section, batch),
+                        "student_count": count,
+                    }
+                )
+
+            total_students = sum(student_counts.values())
+            fullest_class = max(classes, key=lambda c: c["student_count"], default=None)
+            emptiest_class = min(
+                classes, key=lambda c: c["student_count"], default=None
+            )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "batch": batch_to_dict(batch, len(classes), total_students),
+                        "classes": classes,
+                        "summary": {
+                            "total_classes": len(classes),
+                            "total_students": total_students,
+                            "average_class_size": (
+                                round(total_students / len(classes), 1)
+                                if classes
+                                else 0
+                            ),
+                            "fullest_class": fullest_class,
+                            "emptiest_class": emptiest_class,
+                        },
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return (
+                jsonify({"success": False, "error": "Failed to load batch overview"}),
+                500,
+            )
+
+
+# ---- Rollover: copy last year's grade/section structure into a new
+# academic year, so admins don't have to recreate "Class 10 - A", "Class
+# 10 - B" etc. by hand every year. Only copies the Division+Section
+# combinations - never touches students, so it's always a safe, additive
+# action (existing classes in the target batch are left untouched and
+# duplicates are silently skipped).
+class AdminBatchRolloverAPI(MethodView):
+    @permission_required("academic", "create")
+    def post(self, batch_id):
+        try:
+            source_batch = Batch.query.get(batch_id)
+            if not source_batch:
+                return (
+                    jsonify({"success": False, "error": "Source batch not found"}),
+                    404,
+                )
+
+            data = request.get_json(silent=True) or {}
+            target_batch_id = _parse_int(data.get("target_batch_id"))
+
+            if not target_batch_id:
+                return (
+                    jsonify({"success": False, "error": "target_batch_id is required"}),
+                    400,
+                )
+
+            target_batch = Batch.query.get(target_batch_id)
+            if not target_batch:
+                return (
+                    jsonify({"success": False, "error": "Target batch not found"}),
+                    404,
+                )
+
+            if target_batch_id == batch_id:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Source and target batch must be different",
+                        }
+                    ),
+                    400,
+                )
+
+            source_classes = AcademicClass.query.filter_by(batch_id=batch_id).all()
+
+            if not source_classes:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "The source batch has no classes to copy",
+                        }
+                    ),
+                    409,
+                )
+
+            existing_combos = {
+                (c.division_id, c.section_id)
+                for c in AcademicClass.query.filter_by(batch_id=target_batch_id).all()
+            }
+
+            created = 0
+            skipped = 0
+
+            for source_class in source_classes:
+                combo = (source_class.division_id, source_class.section_id)
+                if combo in existing_combos:
+                    skipped += 1
+                    continue
+
+                db.session.add(
+                    AcademicClass(
+                        batch_id=target_batch_id,
+                        division_id=source_class.division_id,
+                        section_id=source_class.section_id,
+                    )
+                )
+                existing_combos.add(combo)
+                created += 1
+
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": (
+                            f"Copied {created} class(es) into {target_batch.batch_name}"
+                            + (
+                                f", skipped {skipped} already existing"
+                                if skipped
+                                else ""
+                            )
+                        ),
+                        "created": created,
+                        "skipped": skipped,
+                    }
+                ),
+                200,
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            return (
+                jsonify({"success": False, "error": "Database error during rollover"}),
+                500,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return (
+                jsonify({"success": False, "error": "Failed to roll over batch"}),
+                500,
+            )
+
+
+# ========================= DIVISIONS =========================
+class AdminDivisionsAPI(MethodView):
+    @permission_required("academic", "view")
+    def get(self):
+        try:
+            search = _clean_text(request.args.get("search"))
+
+            query = Division.query
+            if search:
+                query = query.filter(Division.division_name.ilike(f"%{search}%"))
+
+            divisions = query.order_by(Division.division_name.asc()).all()
+
+            counts = dict(
+                db.session.query(
+                    AcademicClass.division_id, func.count(AcademicClass.id)
+                )
+                .group_by(AcademicClass.division_id)
+                .all()
+            )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "divisions": [
+                            division_to_dict(d, counts.get(d.id, 0)) for d in divisions
+                        ],
+                        "stats": {
+                            "total": Division.query.count(),
+                            "in_use": len(counts),
+                        },
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return (
+                jsonify({"success": False, "error": "Failed to load divisions"}),
+                500,
+            )
+
+    @permission_required("academic", "create")
+    def post(self):
+        try:
+            data = request.get_json(silent=True) or {}
+            name = _clean_text(data.get("division_name"))
+
+            if not name:
+                return (
+                    jsonify({"success": False, "error": "Division name is required"}),
+                    400,
+                )
+
+            duplicate = Division.query.filter(
+                func.lower(Division.division_name) == name.lower()
+            ).first()
+            if duplicate:
+                return (
+                    jsonify({"success": False, "error": "Division already exists"}),
+                    409,
+                )
+
+            division = Division(division_name=name)
+            db.session.add(division)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Division created successfully",
+                        "division": division_to_dict(division, 0),
+                    }
+                ),
+                201,
+            )
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"success": False, "error": "Division already exists"}), 409
+        except SQLAlchemyError:
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Database error while creating division",
+                    }
+                ),
+                500,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return (
+                jsonify({"success": False, "error": "Failed to create division"}),
+                500,
+            )
+
+
+class AdminDivisionDetailAPI(MethodView):
+    @permission_required("academic", "edit")
+    def put(self, division_id):
+        try:
+            division = Division.query.get(division_id)
+            if not division:
+                return jsonify({"success": False, "error": "Division not found"}), 404
+
+            data = request.get_json(silent=True) or {}
+            name = _clean_text(data.get("division_name"))
+
+            if not name:
+                return (
+                    jsonify({"success": False, "error": "Division name is required"}),
+                    400,
+                )
+
+            duplicate = Division.query.filter(
+                Division.id != division_id,
+                func.lower(Division.division_name) == name.lower(),
+            ).first()
+            if duplicate:
+                return (
+                    jsonify({"success": False, "error": "Division already exists"}),
+                    409,
+                )
+
+            division.division_name = name
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Division updated successfully",
+                        "division": division_to_dict(division, 0),
+                    }
+                ),
+                200,
+            )
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"success": False, "error": "Division already exists"}), 409
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return (
+                jsonify({"success": False, "error": "Failed to update division"}),
+                500,
+            )
+
+    @permission_required("academic", "delete")
+    def delete(self, division_id):
+        try:
+            division = Division.query.get(division_id)
+            if not division:
+                return jsonify({"success": False, "error": "Division not found"}), 404
+
+            in_use = AcademicClass.query.filter_by(division_id=division_id).count()
+            if in_use > 0:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": f"This division is used in {in_use} class(es). Remove or reassign those classes first.",
+                        }
+                    ),
+                    409,
+                )
+
+            db.session.delete(division)
+            db.session.commit()
+
+            return (
+                jsonify({"success": True, "message": "Division deleted successfully"}),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return (
+                jsonify({"success": False, "error": "Failed to delete division"}),
+                500,
+            )
+
+
+# ========================= SECTIONS =========================
+class AdminSectionsAPI(MethodView):
+    @permission_required("academic", "view")
+    def get(self):
+        try:
+            search = _clean_text(request.args.get("search"))
+
+            query = Section.query
+            if search:
+                query = query.filter(Section.section_name.ilike(f"%{search}%"))
+
+            sections = query.order_by(Section.section_name.asc()).all()
+
+            counts = dict(
+                db.session.query(AcademicClass.section_id, func.count(AcademicClass.id))
+                .group_by(AcademicClass.section_id)
+                .all()
+            )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "sections": [
+                            section_to_dict(s, counts.get(s.id, 0)) for s in sections
+                        ],
+                        "stats": {
+                            "total": Section.query.count(),
+                            "in_use": len(counts),
+                        },
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to load sections"}), 500
+
+    @permission_required("academic", "create")
+    def post(self):
+        try:
+            data = request.get_json(silent=True) or {}
+            name = _clean_text(data.get("section_name"))
+
+            if not name:
+                return (
+                    jsonify({"success": False, "error": "Section name is required"}),
+                    400,
+                )
+
+            duplicate = Section.query.filter(
+                func.lower(Section.section_name) == name.lower()
+            ).first()
+            if duplicate:
+                return (
+                    jsonify({"success": False, "error": "Section already exists"}),
+                    409,
+                )
+
+            section = Section(section_name=name)
+            db.session.add(section)
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Section created successfully",
+                        "section": section_to_dict(section, 0),
+                    }
+                ),
+                201,
+            )
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"success": False, "error": "Section already exists"}), 409
+        except SQLAlchemyError:
+            db.session.rollback()
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error while creating section"}
+                ),
+                500,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to create section"}), 500
+
+
+class AdminSectionDetailAPI(MethodView):
+    @permission_required("academic", "edit")
+    def put(self, section_id):
+        try:
+            section = Section.query.get(section_id)
+            if not section:
+                return jsonify({"success": False, "error": "Section not found"}), 404
+
+            data = request.get_json(silent=True) or {}
+            name = _clean_text(data.get("section_name"))
+
+            if not name:
+                return (
+                    jsonify({"success": False, "error": "Section name is required"}),
+                    400,
+                )
+
+            duplicate = Section.query.filter(
+                Section.id != section_id,
+                func.lower(Section.section_name) == name.lower(),
+            ).first()
+            if duplicate:
+                return (
+                    jsonify({"success": False, "error": "Section already exists"}),
+                    409,
+                )
+
+            section.section_name = name
+            db.session.commit()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Section updated successfully",
+                        "section": section_to_dict(section, 0),
+                    }
+                ),
+                200,
+            )
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"success": False, "error": "Section already exists"}), 409
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to update section"}), 500
+
+    @permission_required("academic", "delete")
+    def delete(self, section_id):
+        try:
+            section = Section.query.get(section_id)
+            if not section:
+                return jsonify({"success": False, "error": "Section not found"}), 404
+
+            in_use = AcademicClass.query.filter_by(section_id=section_id).count()
+            if in_use > 0:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": f"This section is used in {in_use} class(es). Remove or reassign those classes first.",
+                        }
+                    ),
+                    409,
+                )
+
+            db.session.delete(section)
+            db.session.commit()
+
+            return (
+                jsonify({"success": True, "message": "Section deleted successfully"}),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to delete section"}), 500
+
+
+# ========================= CLASSES =========================
+# A "Class" (AcademicClass) is the link between a Batch, a Division
+# and a Section - e.g. Batch "2025-26" + Division "Class 10" +
+# Section "A". This is what students/teachers/exams/timetable
+# actually attach to.
+class AdminAcademicClassesAPI(MethodView):
+    @permission_required("academic", "view")
+    def get(self):
+        try:
+            search = _clean_text(request.args.get("search"))
+            batch_id = _parse_int(request.args.get("batch_id"))
+
+            rows_query = (
+                db.session.query(AcademicClass, Division, Section, Batch)
+                .join(Division, Division.id == AcademicClass.division_id)
+                .join(Section, Section.id == AcademicClass.section_id)
+                .join(Batch, Batch.id == AcademicClass.batch_id)
+            )
+
+            if batch_id:
+                rows_query = rows_query.filter(AcademicClass.batch_id == batch_id)
+
+            rows = rows_query.order_by(
+                Batch.batch_name.desc(),
+                Division.division_name.asc(),
+                Section.section_name.asc(),
+            ).all()
+
+            class_ids = [academic.id for academic, _, _, _ in rows]
+
+            student_counts = (
+                dict(
+                    db.session.query(
+                        StudentAcademicRecord.academic_class_id,
+                        func.count(StudentAcademicRecord.id),
+                    )
+                    .filter(
+                        StudentAcademicRecord.academic_class_id.in_(class_ids),
+                        StudentAcademicRecord.is_current == True,
+                    )
+                    .group_by(StudentAcademicRecord.academic_class_id)
+                    .all()
+                )
+                if class_ids
+                else {}
+            )
+
+            classes = []
+            for academic, division, section, batch in rows:
+                label = _class_label(division, section, batch)
+                if search and search.lower() not in label.lower():
+                    continue
+                classes.append(
+                    academic_class_to_dict(
+                        academic,
+                        division,
+                        section,
+                        batch,
+                        student_counts.get(academic.id, 0),
+                    )
+                )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "classes": classes,
+                        "stats": {
+                            "total": AcademicClass.query.count(),
+                            "total_students_assigned": sum(student_counts.values()),
+                        },
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to load classes"}), 500
+
+    @permission_required("academic", "create")
+    def post(self):
+        try:
+            data = request.get_json(silent=True) or {}
+            batch_id = _parse_int(data.get("batch_id"))
+            division_id = _parse_int(data.get("division_id"))
+            section_id = _parse_int(data.get("section_id"))
+
+            if not batch_id or not division_id or not section_id:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Batch, division and section are all required",
+                        }
+                    ),
+                    400,
+                )
+
+            if not Batch.query.get(batch_id):
+                return (
+                    jsonify({"success": False, "error": "Selected batch not found"}),
+                    404,
+                )
+            if not Division.query.get(division_id):
+                return (
+                    jsonify({"success": False, "error": "Selected division not found"}),
+                    404,
+                )
+            if not Section.query.get(section_id):
+                return (
+                    jsonify({"success": False, "error": "Selected section not found"}),
+                    404,
+                )
+
+            duplicate = AcademicClass.query.filter_by(
+                batch_id=batch_id, division_id=division_id, section_id=section_id
+            ).first()
+            if duplicate:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "This class already exists for the selected batch",
+                        }
+                    ),
+                    409,
+                )
+
+            academic = AcademicClass(
+                batch_id=batch_id, division_id=division_id, section_id=section_id
+            )
+            db.session.add(academic)
+            db.session.commit()
+
+            division = Division.query.get(division_id)
+            section = Section.query.get(section_id)
+            batch = Batch.query.get(batch_id)
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Class created successfully",
+                        "class": academic_class_to_dict(
+                            academic, division, section, batch, 0
+                        ),
+                    }
+                ),
+                201,
+            )
+        except IntegrityError:
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "This class already exists for the selected batch",
+                    }
+                ),
+                409,
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            return (
+                jsonify(
+                    {"success": False, "error": "Database error while creating class"}
+                ),
+                500,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to create class"}), 500
+
+
+class AdminAcademicClassDetailAPI(MethodView):
+    @permission_required("academic", "view")
+    def get(self, class_id):
+        try:
+            academic = AcademicClass.query.get(class_id)
+            if not academic:
+                return jsonify({"success": False, "error": "Class not found"}), 404
+
+            division = Division.query.get(academic.division_id)
+            section = Section.query.get(academic.section_id)
+            batch = Batch.query.get(academic.batch_id)
+            student_count = StudentAcademicRecord.query.filter_by(
+                academic_class_id=class_id, is_current=True
+            ).count()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "class": academic_class_to_dict(
+                            academic, division, section, batch, student_count
+                        ),
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to load class"}), 500
+
+    @permission_required("academic", "edit")
+    def put(self, class_id):
+        try:
+            academic = AcademicClass.query.get(class_id)
+            if not academic:
+                return jsonify({"success": False, "error": "Class not found"}), 404
+
+            data = request.get_json(silent=True) or {}
+            batch_id = _parse_int(data.get("batch_id"), academic.batch_id)
+            division_id = _parse_int(data.get("division_id"), academic.division_id)
+            section_id = _parse_int(data.get("section_id"), academic.section_id)
+
+            if not Batch.query.get(batch_id):
+                return (
+                    jsonify({"success": False, "error": "Selected batch not found"}),
+                    404,
+                )
+            if not Division.query.get(division_id):
+                return (
+                    jsonify({"success": False, "error": "Selected division not found"}),
+                    404,
+                )
+            if not Section.query.get(section_id):
+                return (
+                    jsonify({"success": False, "error": "Selected section not found"}),
+                    404,
+                )
+
+            duplicate = AcademicClass.query.filter(
+                AcademicClass.id != class_id,
+                AcademicClass.batch_id == batch_id,
+                AcademicClass.division_id == division_id,
+                AcademicClass.section_id == section_id,
+            ).first()
+            if duplicate:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "This class already exists for the selected batch",
+                        }
+                    ),
+                    409,
+                )
+
+            academic.batch_id = batch_id
+            academic.division_id = division_id
+            academic.section_id = section_id
+            db.session.commit()
+
+            division = Division.query.get(division_id)
+            section = Section.query.get(section_id)
+            batch = Batch.query.get(batch_id)
+            student_count = StudentAcademicRecord.query.filter_by(
+                academic_class_id=class_id, is_current=True
+            ).count()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Class updated successfully",
+                        "class": academic_class_to_dict(
+                            academic, division, section, batch, student_count
+                        ),
+                    }
+                ),
+                200,
+            )
+        except IntegrityError:
+            db.session.rollback()
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "This class already exists for the selected batch",
+                    }
+                ),
+                409,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to update class"}), 500
+
+    @permission_required("academic", "delete")
+    def delete(self, class_id):
+        try:
+            academic = AcademicClass.query.get(class_id)
+            if not academic:
+                return jsonify({"success": False, "error": "Class not found"}), 404
+
+            student_count = StudentAcademicRecord.query.filter_by(
+                academic_class_id=class_id, is_current=True
+            ).count()
+            if student_count > 0:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": f"This class has {student_count} student(s) currently enrolled. Reassign them before deleting.",
+                        }
+                    ),
+                    409,
+                )
+
+            db.session.delete(academic)
+            db.session.commit()
+
+            return (
+                jsonify({"success": True, "message": "Class deleted successfully"}),
+                200,
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to delete class"}), 500
+
+
+# ========================= COMBINED OPTIONS =========================
+# Feeds the Batch/Division/Section dropdowns on the "Add Class" form
+# and any other academic-setup UI in one round trip.
+class AdminAcademicSetupOptionsAPI(MethodView):
+    @permission_required("academic", "view")
+    def get(self):
+        try:
+            batches = Batch.query.order_by(Batch.batch_name.desc()).all()
+            divisions = Division.query.order_by(Division.division_name.asc()).all()
+            sections = Section.query.order_by(Section.section_name.asc()).all()
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "batches": [batch_to_dict(b) for b in batches],
+                        "divisions": [division_to_dict(d) for d in divisions],
+                        "sections": [section_to_dict(s) for s in sections],
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            logger.exception(e)
+            return jsonify({"success": False, "error": "Failed to load options"}), 500

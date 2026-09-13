@@ -5,13 +5,6 @@ import { DASHBOARD_BY_KEY, DASHBOARD_BY_ROUTE } from "./dashboardRegistry";
 
 const STORAGE_KEY = "dashboard_access";
 
-/* =========================================================
-   LOCALSTORAGE HELPERS
-   (also used directly by useLogin.js and App.jsx so the very
-   first render after login already has the right data, before
-   any network round trip finishes)
-========================================================= */
-
 export function readStoredDashboardAccess() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");

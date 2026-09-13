@@ -10,7 +10,7 @@ import { useTeacherTimetable } from "../controllers/TimeTable/useTeacherTimetabl
 import { useTeacherProfile } from "../controllers/Profiles/useTeacherProfile";
 import { useTeacherAttendance } from "../controllers/Attendance/useTeacherAttendance";
 import { useMyClasses } from "../controllers/MyClasses/useMyClass";
-import { useTeacherExamResult } from "../controllers/ExamResult/useTeacherExamResult";
+import { useTeacherExamResult } from "../controllers/Academic/useTeacherExamResult";
 import { useAnalytics } from "../controllers/Analytics/useAnalytics";
 import { BASE_URL, FILE_BASE_URL } from "../config/appConfig";
 

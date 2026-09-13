@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { APP_NAME, APP_FAVICON } from "./config/appConfig"
+import { APP_NAME, APP_FAVICON } from "./config/appConfig";
 
 // TITLE
 document.title = APP_NAME;
@@ -27,5 +27,5 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <App />
     </BrowserRouter>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

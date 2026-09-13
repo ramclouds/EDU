@@ -6,6 +6,7 @@ from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
 from utils.auth import db, Student
 from utils.auth_middleware import login_required
+from utils.rolePermissionManagement import permission_required
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,12 @@ class Batch(db.Model):
     batch_name = db.Column(db.String(20), nullable=False, unique=True)
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
+    # Marks the school's active academic year. Only one Batch should have
+    # this set to True at a time - enforced in application code (see
+    # AdminBatchSetCurrentAPI in utils/academic.py), not at the DB level.
+    # Migration for the existing `batches` table:
+    #   ALTER TABLE batches ADD COLUMN is_current BOOLEAN NOT NULL DEFAULT FALSE;
+    is_current = db.Column(db.Boolean, nullable=False, server_default="0")
     created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
 
 
@@ -351,3 +358,169 @@ class ChangePassword(MethodView):
         except Exception as e:
             logger.exception(f"ChangePassword error: {e}")
             return jsonify({"error": "Something went wrong"}), 500
+
+
+# ============================================================
+# STUDENT ROSTER (Academic Admin's Students section)
+# ============================================================
+def _student_summary(
+    student, record=None, academic=None, division=None, section=None, batch=None
+):
+    return {
+        "id": student.id,
+        "student_id": student.student_id,
+        "first_name": student.first_name,
+        "middle_name": student.middle_name,
+        "last_name": student.last_name,
+        "email": student.email,
+        "mobile": student.mobile,
+        "gender": student.gender,
+        "status": student.status,
+        "admission_date": (
+            student.admission_date.isoformat() if student.admission_date else None
+        ),
+        "academic_class_id": academic.id if academic else None,
+        "batch_name": batch.batch_name if batch else None,
+        "division_name": division.division_name if division else None,
+        "section_name": section.section_name if section else None,
+        "roll_number": record.roll_number if record else None,
+    }
+
+
+class AdminStudentsListAPI(MethodView):
+    """
+    Roster for the Academic Admin's Students section. Lists every
+    student together with their current class (if assigned), and
+    supports searching by name/student ID/mobile plus filtering by
+    class or "unassigned" (enrolled account but no current class
+    record - shouldn't normally happen, but worth surfacing rather
+    than silently hiding).
+    """
+
+    @permission_required("academic", "view")
+    def get(self):
+        try:
+            search = str(request.args.get("search") or "").strip()
+            academic_class_id = request.args.get("academic_class_id", type=int)
+            status = str(request.args.get("status") or "").strip()
+            unassigned_only = (
+                str(request.args.get("unassigned") or "").lower() == "true"
+            )
+
+            query = Student.query
+
+            if search:
+                like = f"%{search}%"
+                query = query.filter(
+                    or_(
+                        Student.first_name.ilike(like),
+                        Student.last_name.ilike(like),
+                        Student.student_id.ilike(like),
+                        Student.mobile.ilike(like),
+                        Student.email.ilike(like),
+                    )
+                )
+
+            if status and status.lower() != "all":
+                query = query.filter(Student.status == status)
+
+            students = query.order_by(Student.first_name.asc()).all()
+
+            student_ids = [s.id for s in students]
+
+            records = (
+                StudentAcademicRecord.query.filter(
+                    StudentAcademicRecord.student_id.in_(student_ids),
+                    StudentAcademicRecord.is_current == True,
+                ).all()
+                if student_ids
+                else []
+            )
+            record_by_student = {r.student_id: r for r in records}
+
+            class_ids = list({r.academic_class_id for r in records})
+            academics = (
+                AcademicClass.query.filter(AcademicClass.id.in_(class_ids)).all()
+                if class_ids
+                else []
+            )
+            academic_by_id = {a.id: a for a in academics}
+
+            division_ids = list({a.division_id for a in academics})
+            section_ids = list({a.section_id for a in academics})
+            batch_ids = list({a.batch_id for a in academics})
+
+            divisions_by_id = (
+                {
+                    d.id: d
+                    for d in Division.query.filter(Division.id.in_(division_ids)).all()
+                }
+                if division_ids
+                else {}
+            )
+            sections_by_id = (
+                {
+                    s.id: s
+                    for s in Section.query.filter(Section.id.in_(section_ids)).all()
+                }
+                if section_ids
+                else {}
+            )
+            batches_by_id = (
+                {b.id: b for b in Batch.query.filter(Batch.id.in_(batch_ids)).all()}
+                if batch_ids
+                else {}
+            )
+
+            rows = []
+            unassigned_count = 0
+
+            for student in students:
+                record = record_by_student.get(student.id)
+                academic = (
+                    academic_by_id.get(record.academic_class_id) if record else None
+                )
+                division = (
+                    divisions_by_id.get(academic.division_id) if academic else None
+                )
+                section = sections_by_id.get(academic.section_id) if academic else None
+                batch = batches_by_id.get(academic.batch_id) if academic else None
+
+                if not academic:
+                    unassigned_count += 1
+
+                if academic_class_id and (
+                    not academic or academic.id != academic_class_id
+                ):
+                    continue
+
+                if unassigned_only and academic:
+                    continue
+
+                rows.append(
+                    _student_summary(
+                        student, record, academic, division, section, batch
+                    )
+                )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "students": rows,
+                        "stats": {
+                            "total": len(students),
+                            "active": sum(1 for s in students if s.status == "Active"),
+                            "inactive": sum(
+                                1 for s in students if s.status != "Active"
+                            ),
+                            "unassigned": unassigned_count,
+                        },
+                    }
+                ),
+                200,
+            )
+
+        except Exception as e:
+            logger.exception(f"AdminStudentsListAPI error: {e}")
+            return jsonify({"success": False, "error": "Failed to load students"}), 500
