@@ -6,6 +6,7 @@ from math import ceil
 from sqlalchemy.orm import joinedload
 from utils.auth import db, Student
 from utils.auth_middleware import login_required, get_current_user
+from utils.rolePermissionManagement import permission_required
 from utils.studentDetails import StudentAcademicRecord, AcademicClass, Division, Section
 from utils.teacherDetails import TeacherClass
 from datetime import datetime
@@ -837,7 +838,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
 # =========================================================
 class AttendanceFilterOptionsAPI(MethodView):
 
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
 
         try:
@@ -900,7 +901,7 @@ class AttendanceFilterOptionsAPI(MethodView):
 # =========================================================
 class AdminAttendanceStatsAPI(MethodView):
 
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
 
         try:
@@ -993,7 +994,7 @@ class AdminAttendanceStatsAPI(MethodView):
 # =========================================================
 class AdminAttendanceListAPI(MethodView):
 
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
 
         try:
@@ -1243,7 +1244,7 @@ class AdminAttendanceListAPI(MethodView):
 # =========================================================
 class UpdateAttendanceStatusAPI(MethodView):
 
-    @login_required
+    @permission_required("academic", "edit")
     def put(self):
 
         try:
@@ -1412,17 +1413,40 @@ class UpdateAttendanceStatusAPI(MethodView):
 # =========================================================
 # MARK ALL ATTENDANCE API
 # =========================================================
+# =========================================================
+# MARK ALL ATTENDANCE API
+# =========================================================
 class MarkAllAttendanceAPI(MethodView):
+    """
+    BUG FIX: this previously required the caller to already know an
+    AttendanceSession's numeric id (`session_id` in the request body)
+    and 404'd with "Session not found" otherwise - but no session
+    exists yet the first time attendance is marked for a class on a
+    given day, and the frontend never had a session id to send in the
+    first place (it only knows academic_class_id + date). Every
+    "Mark All" click was therefore guaranteed to fail with a
+    session-related error, regardless of what class was selected.
 
-    @login_required
+    Now mirrors the same get-or-create session pattern already used
+    by UpdateAttendanceStatusAPI (single-record marking), and marks
+    every student currently enrolled in the class - not just students
+    who already happened to have an attendance row.
+    """
+
+    @permission_required("academic", "edit")
     def post(self):
 
         try:
+            current_user = get_current_user()
 
-            data = request.get_json()
+            if not current_user:
+                return jsonify({"error": "Unauthorized"}), 401
 
-            session_id = data.get("session_id")
+            data = request.get_json() or {}
+
+            role = data.get("role", "students")
             status = data.get("status")
+            date = data.get("date")
 
             VALID_STATUS = [
                 "Present",
@@ -1431,24 +1455,164 @@ class MarkAllAttendanceAPI(MethodView):
             ]
 
             if status not in VALID_STATUS:
-
                 return jsonify({"error": "Invalid status"}), 400
 
-            session = AttendanceSession.query.get(session_id)
+            if not date:
+                return jsonify({"error": "date is required"}), 400
 
-            if not session:
+            try:
+                attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
+            except ValueError:
+                return (
+                    jsonify(
+                        {"error": "Invalid date format, expected YYYY-MM-DD"}
+                    ),
+                    400,
+                )
 
-                return jsonify({"error": "Session not found"}), 404
+            # =====================================================
+            # STUDENTS
+            # =====================================================
+            if role == "students":
 
-            records = AttendanceRecord.query.filter_by(session_id=session_id).all()
+                academic_class_id = data.get("academic_class_id") or data.get(
+                    "class_id"
+                )
 
-            for record in records:
+                if not academic_class_id:
+                    return (
+                        jsonify({"error": "academic_class_id is required"}),
+                        400,
+                    )
 
-                record.status = status
+                if not AcademicClass.query.get(academic_class_id):
+                    return jsonify({"error": "Class not found"}), 404
+
+                session = AttendanceSession.query.filter(
+                    AttendanceSession.academic_class_id == academic_class_id,
+                    AttendanceSession.session_date == attendance_date,
+                ).first()
+
+                if not session:
+                    session = AttendanceSession(
+                        academic_class_id=academic_class_id,
+                        session_date=attendance_date,
+                        teacher_id=None,
+                        marked_by_role="Admin",
+                        marked_by_user_id=current_user.id,
+                    )
+                    db.session.add(session)
+                    db.session.flush()
+
+                student_ids = [
+                    row.student_id
+                    for row in StudentAcademicRecord.query.filter_by(
+                        academic_class_id=academic_class_id,
+                        is_current=True,
+                    ).all()
+                ]
+
+                if not student_ids:
+                    return (
+                        jsonify({"error": "No students found in this class"}),
+                        404,
+                    )
+
+                existing_records = {
+                    r.student_id: r
+                    for r in AttendanceRecord.query.filter_by(
+                        session_id=session.id
+                    ).all()
+                }
+
+                marked_count = 0
+
+                for student_id in student_ids:
+                    record = existing_records.get(student_id)
+
+                    if record:
+                        record.status = status
+                        record.marked_by_role = "Admin"
+                        record.marked_by_user_id = current_user.id
+                    else:
+                        db.session.add(
+                            AttendanceRecord(
+                                session_id=session.id,
+                                student_id=student_id,
+                                status=status,
+                                marked_by_role="Admin",
+                                marked_by_user_id=current_user.id,
+                            )
+                        )
+
+                    marked_count += 1
+
+                db.session.commit()
+
+                return (
+                    jsonify(
+                        {
+                            "message": f"Marked {marked_count} student(s) {status}",
+                            "session_id": session.id,
+                            "marked_count": marked_count,
+                        }
+                    ),
+                    200,
+                )
+
+            # =====================================================
+            # TEACHERS
+            # =====================================================
+            teachers = Teacher.query.filter_by(status="Active").all()
+
+            if not teachers:
+                return jsonify({"error": "No active teachers found"}), 404
+
+            existing_records = {
+                r.teacher_id: r
+                for r in TeacherAttendance.query.filter_by(
+                    attendance_date=attendance_date
+                ).all()
+            }
+
+            marked_count = 0
+
+            for teacher in teachers:
+                record = existing_records.get(teacher.id)
+
+                if record:
+                    record.status = status
+                    record.marked_by_role = "Admin"
+                    record.marked_by_user_id = current_user.id
+                else:
+                    db.session.add(
+                        TeacherAttendance(
+                            teacher_id=teacher.id,
+                            attendance_date=attendance_date,
+                            status=status,
+                            marked_by_role="Admin",
+                            marked_by_user_id=current_user.id,
+                        )
+                    )
+
+                marked_count += 1
 
             db.session.commit()
 
-            return jsonify({"message": f"All marked {status}"}), 200
+            return (
+                jsonify(
+                    {
+                        "message": f"Marked {marked_count} teacher(s) {status}",
+                        "marked_count": marked_count,
+                    }
+                ),
+                200,
+            )
+
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            logger.exception(e)
+            return jsonify({"error": "Database error"}), 500
 
         except Exception as e:
 

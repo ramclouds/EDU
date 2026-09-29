@@ -4,6 +4,7 @@ from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
 from utils.auth import db, Teacher
 from utils.auth_middleware import login_required
+from utils.rolePermissionManagement import permission_required
 from utils.studentDetails import StudentAcademicRecord, AcademicClass, Division, Section
 from utils.subjects import Subject
 
@@ -71,7 +72,7 @@ class Timetable(db.Model):
 
 
 class TimetableOptionsAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             teachers = Teacher.query.all()
@@ -163,7 +164,7 @@ class TimetableOptionsAPI(MethodView):
 # Create Lecture API
 class TimetableLectureAPI(MethodView):
 
-    @login_required
+    @permission_required("academic", "create")
     def post(self):
 
         data = request.get_json()
@@ -206,7 +207,7 @@ class TimetableLectureAPI(MethodView):
 
         return jsonify({"message": "Lecture created successfully"}), 201
 
-    @login_required
+    @permission_required("academic", "delete")
     def delete(self, lecture_id):
 
         lecture = TimetableLecture.query.get(lecture_id)
@@ -225,7 +226,7 @@ class TimetableLectureAPI(MethodView):
             db.session.rollback()
             return jsonify({"error": str(e)}), 500
 
-    @login_required
+    @permission_required("academic", "edit")
     def put(self, lecture_id):
 
         lecture = TimetableLecture.query.get(lecture_id)
@@ -259,51 +260,9 @@ class TimetableLectureAPI(MethodView):
         return jsonify({"message": "Lecture updated"})
 
 
-class CopyTimetableAPI(MethodView):
-
-    @login_required
-    def post(self):
-
-        data = request.json
-        source = data["source_day"]
-        target = data["target_day"]
-        class_id = data["academic_class_id"]
-
-        lectures = TimetableLecture.query.filter_by(
-            academic_class_id=class_id, day=source
-        ).all()
-
-        for lecture in lectures:
-
-            exists = TimetableLecture.query.filter_by(
-                academic_class_id=class_id, day=target, period_no=lecture.period_no
-            ).first()
-
-            if exists:
-                continue
-
-            db.session.add(
-                TimetableLecture(
-                    academic_class_id=lecture.academic_class_id,
-                    teacher_id=lecture.teacher_id,
-                    subject_id=lecture.subject_id,
-                    day=target,
-                    period_no=lecture.period_no,
-                    start_time=lecture.start_time,
-                    end_time=lecture.end_time,
-                    room_no=lecture.room_no,
-                    lecture_type=lecture.lecture_type,
-                    remarks=lecture.remarks,
-                )
-            )
-
-        db.session.commit()
-        return jsonify({"message": "Copied successfully"})
-
-
 class AdminTimetablePDFAPI(MethodView):
 
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
 
         class_id = request.args.get("academic_class_id")
@@ -315,7 +274,7 @@ class AdminTimetablePDFAPI(MethodView):
 # Load Timetable API
 class AdminTimetableAPI(MethodView):
 
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
 
         academic_class_id = request.args.get("academic_class_id")

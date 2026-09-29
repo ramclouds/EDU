@@ -8,8 +8,8 @@ import {
 } from "../config/appConfig";
 import "../css/dashboard.css";
 import { useDashboardUI } from "../controllers/useDashboardUI";
-import { useAdminDashboard } from "../controllers/adminDashboard";
-import { useAdminProfile } from "../controllers/Profiles/useAdminProfile";
+import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
+import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
 import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import { useHostelPermission } from "../controllers/Hostel/useHostelPermission";
 import { useHostelBlocksFloors } from "../controllers/Hostel/useHostelBlocksFloors";

@@ -8,9 +8,37 @@ import bcrypt
 from utils.studentDetails import AcademicClass, Batch, Division, Section
 from utils.subjects import Subject
 from utils.auth import db, Teacher
-from utils.auth_middleware import login_required
+from utils.auth_middleware import (
+    login_required,
+    get_current_user,
+    get_current_user_type,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _can_access_teacher(teacher_id):
+    """
+    BUG FIX: these endpoints previously had no ownership check at all -
+    any logged-in account (another teacher, a student) could view or
+    edit any teacher's profile, including changing their password,
+    just by guessing an id in the URL. Now: a teacher may only access
+    their own record; any admin may access any teacher (Academic
+    Admin oversight, Super Admin, etc).
+    """
+    current_user = get_current_user()
+    current_user_type = get_current_user_type()
+
+    if current_user_type == "admin":
+        return True
+
+    if (
+        current_user_type == "teacher"
+        and getattr(current_user, "id", None) == teacher_id
+    ):
+        return True
+
+    return False
 
 
 # ================= TEACHER CLASS MAPPING =================
@@ -54,6 +82,9 @@ class TeacherDetails(MethodView):
             id = int(id)
             if id <= 0:
                 return jsonify({"error": "Invalid teacher id"}), 400
+
+            if not _can_access_teacher(id):
+                return jsonify({"error": "Unauthorized"}), 403
 
             teacher = Teacher.query.get(id)
             if not teacher:
@@ -169,6 +200,9 @@ class UpdateTeacherProfile(MethodView):
             if id <= 0:
                 return jsonify({"error": "Invalid teacher id"}), 400
 
+            if not _can_access_teacher(id):
+                return jsonify({"error": "Unauthorized"}), 403
+
             teacher = Teacher.query.get(id)
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
@@ -280,6 +314,19 @@ class ChangeTeacherPassword(MethodView):
     def put(self, id):
         try:
             id = int(id)
+
+            # This endpoint requires knowing the current password, so
+            # it's self-service only - a teacher changing their own
+            # password. Admin-initiated password resets go through
+            # AdminTeacherPasswordAPI (utils/TeacherManagement.py),
+            # which doesn't require the old password.
+            current_user = get_current_user()
+            current_user_type = get_current_user_type()
+            if not (
+                current_user_type == "teacher"
+                and getattr(current_user, "id", None) == id
+            ):
+                return jsonify({"error": "Unauthorized"}), 403
 
             teacher = Teacher.query.get(id)
             if not teacher:

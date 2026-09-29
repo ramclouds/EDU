@@ -1,18 +1,22 @@
 import { useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { APP_NAME, APP_YEAR } from "../config/appConfig";
+import { APP_NAME, APP_YEAR, BASE_URL } from "../config/appConfig";
 import "../css/dashboard.css";
 import { useDashboardUI } from "../controllers/useDashboardUI";
-import { useAdminDashboard } from "../controllers/adminDashboard";
-import { useAdminProfile } from "../controllers/Profiles/useAdminProfile";
+import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
+import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
 import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import { useAcademicPermission } from "../controllers/Academic/useAcademicPermission";
 import { useDivisionsSections } from "../controllers/Academic/useDivisionsSections";
 import { useAcademicClasses } from "../controllers/Academic/useAcademicClasses";
-import { useSubjectManagements } from "../controllers/Subjects/useSubjectManagements";
+import { useSubjectManagements } from "../controllers/Academic/useSubjectManagements";
 import { useBatches } from "../controllers/Academic/useBatches";
 import { useStudents } from "../controllers/Academic/useStudents";
-import { useTeachers } from "../controllers/Academic/useTeachers";
+import { useMyClasses } from "../controllers/Academic/useMyClass";
+import { useTeacherManagement } from "../controllers/Academic/useTeachersManagement";
+import { useExamResultManagement } from "../controllers/Academic/useExamResultManagement";
+import { useTimeTableManagement } from "../controllers/Academic/useTimetableManagement";
+import { useAttendanceManagement } from "../controllers/Academic/useAttendanceManagement";
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -87,6 +91,55 @@ function AdminDashboard() {
     toast,
   } = useAdminDashboard(activeSection);
 
+  // ================== Exam And Result Hook =================
+  const {
+    updateAdminResultMarks,
+    updateMarksEntryPermission,
+    examManagementOptions,
+    examManagementStats,
+    examManagementClasses,
+    examManagementTerms,
+    examManagementFilteredResults,
+
+    examManagementForm,
+    examManagementPublishForm,
+    examManagementSelectedDetails,
+
+    examManagementModalOpen,
+    examManagementDetailsModalOpen,
+    examManagementLoading,
+    examManagementSaving,
+    examManagementActionLoading,
+
+    examManagementFilters,
+    updateExamManagementFilter,
+    resetExamManagementFilters,
+    refreshExamManagement,
+
+    updateExamManagementForm,
+    toggleExamManagementFormArrayValue,
+    openExamManagementModal,
+    closeExamManagementModal,
+    saveExamManagementExam,
+
+    openExamManagementDetails,
+    closeExamManagementDetails,
+    verifyExamManagementExam,
+    publishExamManagementExam,
+
+    openExamManagementPublishModal,
+    closeExamManagementPublishModal,
+    updateExamManagementPublishForm,
+    scheduleExamManagementPublish,
+
+    exportExamManagementReportsPDF,
+    exportExamManagementReportCardsPDF,
+  } = useExamResultManagement({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
   // ================= ACADEMIC SETUP (Classes / Divisions & Sections / Subjects) =================
   const divisionsSections = useDivisionsSections();
   const academicClasses = useAcademicClasses();
@@ -97,7 +150,365 @@ function AdminDashboard() {
   });
   const batchManagement = useBatches();
   const studentManagement = useStudents();
-  const teacherManagement = useTeachers();
+
+  // ================= STUDENTS ("My Classes" browse UI) HOOK =================
+  const {
+    myclasses,
+    classesLoading,
+    selectedMyClass,
+    selectedStudent,
+    myClassStudentSearch,
+    setMyClassStudentSearch,
+    isClassDetailOpen,
+    isStudentProfileOpen,
+    openClassDetail,
+    closeClassDetail,
+    openStudentProfile,
+    closeStudentProfile,
+    filteredStudents,
+    divisionOptions,
+    sectionOptions,
+    classSearch,
+    setClassSearch,
+    divisionFilter,
+    setDivisionFilter,
+    sectionFilter,
+    setSectionFilter,
+    resetClassFilters,
+    allClasses,
+    loadMyClasses,
+  } = useMyClasses({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
+  // Refresh the class roster after a successful enrollment, so a newly
+  // enrolled student shows up in "My Classes" without a manual reload.
+  useEffect(() => {
+    if (studentManagement.enrollResult) {
+      loadMyClasses();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentManagement.enrollResult]);
+
+  // ================= STUDENT PROFILE TABS (attendance + leaves) =================
+  const [studentProfileTab, setStudentProfileTab] = useState("overview");
+  const [studentProfileAttendance, setStudentProfileAttendance] =
+    useState(null);
+  const [studentProfileAttendanceLoading, setStudentProfileAttendanceLoading] =
+    useState(false);
+  const [studentProfileLeaves, setStudentProfileLeaves] = useState([]);
+  const [studentProfileLeavesLoading, setStudentProfileLeavesLoading] =
+    useState(false);
+
+  useEffect(() => {
+    if (!isStudentProfileOpen || !selectedStudent) return;
+
+    setStudentProfileTab("overview");
+
+    const studentDbId = selectedStudent.id;
+
+    const loadAttendance = async () => {
+      if (!studentDbId) return;
+      setStudentProfileAttendanceLoading(true);
+      try {
+        const res = await fetchWithAuth(
+          `${BASE_URL}/student/attendance/${studentDbId}`,
+        );
+        const data = await res.json().catch(() => null);
+        setStudentProfileAttendance(data || null);
+      } catch (err) {
+        console.error("Failed to load student attendance:", err);
+        setStudentProfileAttendance(null);
+      } finally {
+        setStudentProfileAttendanceLoading(false);
+      }
+    };
+
+    const loadLeaves = async () => {
+      setStudentProfileLeavesLoading(true);
+      try {
+        const res = await fetchWithAuth(`${BASE_URL}/admin/student/leaves`);
+        const data = await res.json().catch(() => []);
+        const all = Array.isArray(data) ? data : [];
+        const mine = studentDbId
+          ? all.filter((l) => l.student_id === studentDbId)
+          : all.filter(
+              (l) =>
+                l.student_name &&
+                selectedStudent.full_name &&
+                l.student_name === selectedStudent.full_name,
+            );
+        setStudentProfileLeaves(mine);
+      } catch (err) {
+        console.error("Failed to load student leaves:", err);
+        setStudentProfileLeaves([]);
+      } finally {
+        setStudentProfileLeavesLoading(false);
+      }
+    };
+
+    loadAttendance();
+    loadLeaves();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStudentProfileOpen, selectedStudent]);
+
+  // ================= TEACHER MANAGEMENT HOOK =================
+  const {
+    teacherManagementTeachers,
+    teacherManagementOptions,
+    teacherManagementForm,
+    teacherManagementSelectedTeacher,
+
+    teacherManagementModalOpen,
+    teacherManagementViewModalOpen,
+
+    teacherManagementLoading,
+    teacherManagementSaving,
+
+    teacherManagementFilters,
+
+    teacherManagementStats,
+
+    updateTeacherManagementFilter,
+    resetTeacherManagementFilter,
+
+    loadTeacherManagementTeachers,
+    loadTeacherManagementOptions,
+
+    updateTeacherManagementForm,
+    BLOOD_GROUPS,
+
+    openTeacherManagementAddModal,
+    openTeacherManagementEditModal,
+    closeTeacherManagementModal,
+
+    openTeacherManagementViewModal,
+    closeTeacherManagementViewModal,
+
+    addTeacherManagementAssignment,
+    updateTeacherManagementAssignment,
+    removeTeacherManagementAssignment,
+
+    saveTeacherManagementTeacher,
+    deleteTeacherManagementTeacher,
+    updateTeacherManagementStatus,
+  } = useTeacherManagement({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
+  // ================= TEACHER PROFILE TABS (assigned classes + attendance + leaves) =================
+  const [teacherProfileTab, setTeacherProfileTab] = useState("overview");
+  const [teacherProfileAttendance, setTeacherProfileAttendance] = useState([]);
+  const [teacherProfileAttendanceLoading, setTeacherProfileAttendanceLoading] =
+    useState(false);
+  const [teacherProfileLeaves, setTeacherProfileLeaves] = useState([]);
+  const [teacherProfileLeavesLoading, setTeacherProfileLeavesLoading] =
+    useState(false);
+
+  useEffect(() => {
+    if (!teacherManagementViewModalOpen || !teacherManagementSelectedTeacher)
+      return;
+
+    setTeacherProfileTab("overview");
+
+    const teacherDbId = teacherManagementSelectedTeacher.id;
+
+    const loadTeacherAttendance = async () => {
+      setTeacherProfileAttendanceLoading(true);
+      try {
+        const params = new URLSearchParams({
+          role: "teachers",
+          search: teacherManagementSelectedTeacher.teacher_id || "",
+          limit: 15,
+        });
+        const res = await fetchWithAuth(
+          `${BASE_URL}/admin/attendance/list?${params.toString()}`,
+        );
+        const data = await res.json().catch(() => null);
+        setTeacherProfileAttendance(data?.items || []);
+      } catch (err) {
+        console.error("Failed to load teacher attendance:", err);
+        setTeacherProfileAttendance([]);
+      } finally {
+        setTeacherProfileAttendanceLoading(false);
+      }
+    };
+
+    const loadTeacherLeaves = async () => {
+      setTeacherProfileLeavesLoading(true);
+      try {
+        const res = await fetchWithAuth(`${BASE_URL}/admin/teacher/leaves`);
+        const data = await res.json().catch(() => []);
+        const all = Array.isArray(data) ? data : [];
+        const mine = teacherDbId
+          ? all.filter((l) => l.teacher_id === teacherDbId)
+          : all.filter(
+              (l) =>
+                l.teacher_name &&
+                l.teacher_name === teacherManagementSelectedTeacher.full_name,
+            );
+        setTeacherProfileLeaves(mine);
+      } catch (err) {
+        console.error("Failed to load teacher leaves:", err);
+        setTeacherProfileLeaves([]);
+      } finally {
+        setTeacherProfileLeavesLoading(false);
+      }
+    };
+
+    loadTeacherAttendance();
+    loadTeacherLeaves();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherManagementViewModalOpen, teacherManagementSelectedTeacher]);
+
+  // ================= TIME TABLE HOOK =================
+  const {
+    loadingTimeTable,
+    lectureModalOpen,
+    loadTimetable,
+    lectureForm,
+    updateLectureForm,
+
+    periods: TTperiods,
+    classes: TTClasses,
+    divisions: TTDivisions,
+    sections: TTsections,
+
+    subjects: TTSubjects,
+    teachers,
+    rooms,
+
+    filters,
+    updateFilter,
+
+    lectures,
+    getLecturesForSlot,
+
+    stats,
+    days,
+    timeSlots,
+
+    openLectureModal,
+    closeLectureModal,
+    saveLecture,
+    deleteLecture,
+    refreshTimetable,
+    exportTimetablePDF,
+  } = useTimeTableManagement({
+    activeSection,
+    showToast,
+    fetchWithAuth,
+  });
+
+  // ================= ATTENDANCE HOOK =================
+  const {
+    role,
+    setRole,
+    selectedClass,
+    setSelectedClass,
+    selectedDivision,
+    classes,
+    divisions,
+    setSelectedDivision,
+    selectedStatus,
+    setSelectedStatus,
+    selectedDate,
+    setSelectedDate,
+    search: searchAttendance,
+    setSearch: setSearchAttendance,
+    attendanceStats,
+    attendanceList,
+    page,
+    setPage,
+    limit,
+    setLimit,
+    pagination,
+    loading: loadingAttendance,
+    statsLoading,
+    refreshAttendance,
+    fetchAttendanceList,
+    fetchAttendanceStats,
+    updateAttendanceStatus,
+    markAllAttendance,
+  } = useAttendanceManagement({
+    activeSection,
+    fetchWithAuth,
+    showToast,
+  });
+
+  // ================= ON LEAVE TODAY (cross-referenced with Attendance) =================
+  // Lets an Academic Admin see, right alongside the attendance list,
+  // who is marked absent because they're on an approved leave rather
+  // than an unexplained absence.
+  const [onLeaveToday, setOnLeaveToday] = useState([]);
+  const [onLeaveLoading, setOnLeaveLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeSection !== "attendance") return;
+
+    const loadOnLeaveToday = async () => {
+      setOnLeaveLoading(true);
+      try {
+        const checkDate =
+          selectedDate || new Date().toISOString().split("T")[0];
+
+        const [studentRes, teacherRes] = await Promise.all([
+          fetchWithAuth(`${BASE_URL}/admin/student/leaves`),
+          fetchWithAuth(`${BASE_URL}/admin/teacher/leaves`),
+        ]);
+
+        const studentLeaves = await studentRes.json().catch(() => []);
+        const teacherLeaves = await teacherRes.json().catch(() => []);
+
+        const isCoveringDate = (leave) => {
+          if (leave.status !== "Approved") return false;
+          const from = leave.from_date || leave.from;
+          const to = leave.to_date || leave.to;
+          if (!from || !to) return false;
+          return checkDate >= from && checkDate <= to;
+        };
+
+        const students = (Array.isArray(studentLeaves) ? studentLeaves : [])
+          .filter(isCoveringDate)
+          .map((l) => ({
+            id: `student-${l.id}`,
+            name: l.student_name,
+            role: "Student",
+            reason: l.reason,
+            leave_type: l.leave_type,
+          }));
+
+        const teachersOnLeave = (
+          Array.isArray(teacherLeaves) ? teacherLeaves : []
+        )
+          .filter(isCoveringDate)
+          .map((l) => ({
+            id: `teacher-${l.id}`,
+            name: l.teacher_name,
+            role: "Teacher",
+            reason: l.reason,
+            leave_type: l.leave_type,
+          }));
+
+        setOnLeaveToday([...teachersOnLeave, ...students]);
+      } catch (err) {
+        console.error("Failed to load leave cross-reference:", err);
+        setOnLeaveToday([]);
+      } finally {
+        setOnLeaveLoading(false);
+      }
+    };
+
+    loadOnLeaveToday();
+    // fetchWithAuth is recreated on every render (not memoized in
+    // useAdminDashboard) - including it here caused an infinite
+    // fetch loop. Only re-run when the section or date actually change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, selectedDate]);
 
   // ================= PROFILE HOOK =================
   const {
@@ -728,2043 +1139,2475 @@ function AdminDashboard() {
           </section>
         )}
 
-        {/* ================= STUDENTS ================= */}
-        {activeSection === "students" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
-            {/* HEADER */}
-            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-lg sm:text-xl font-semibold">
-                    Students
-                  </h2>
-
-                  <p className="text-xs sm:text-sm opacity-90">
-                    Every enrolled student and which class they belong to.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => studentManagement.loadStudents()}
-                    disabled={studentManagement.studentsLoading}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <i
-                      className={`bi bi-arrow-clockwise ${
-                        studentManagement.studentsLoading ? "animate-spin" : ""
-                      }`}
-                    />
-                    Refresh
-                  </button>
-
-                  {canWriteAcademic && (
-                    <button
-                      type="button"
-                      onClick={studentManagement.openEnrollModal}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
-                    >
-                      <i className="bi bi-person-plus" />
-                      Enroll Student
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* STATISTICS */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {[
-                {
-                  label: "Total Students",
-                  value: studentManagement.studentStats.total,
-                  icon: "bi-mortarboard",
-                  classes:
-                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
-                },
-                {
-                  label: "Active",
-                  value: studentManagement.studentStats.active,
-                  icon: "bi-check-circle",
-                  classes:
-                    "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
-                },
-                {
-                  label: "Inactive",
-                  value: studentManagement.studentStats.inactive,
-                  icon: "bi-pause-circle",
-                  classes:
-                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
-                },
-                {
-                  label: "Unassigned",
-                  value: studentManagement.studentStats.unassigned,
-                  icon: "bi-exclamation-triangle",
-                  classes:
-                    "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
-                },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        {stat.label}
-                      </p>
-
-                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                        {Number(stat.value || 0)}
-                      </p>
-                    </div>
-
-                    <span
-                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
-                    >
-                      <i className={`bi ${stat.icon} text-lg`} />
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* FILTERS */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <div className="relative md:col-span-2">
-                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-
-                  <input
-                    type="search"
-                    value={studentManagement.studentSearch}
-                    onChange={(event) => {
-                      studentManagement.setStudentSearch(event.target.value);
-                      studentManagement.loadStudents({
-                        search: event.target.value,
-                      });
-                    }}
-                    placeholder="Search by name, student ID, mobile..."
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <select
-                  value={studentManagement.studentClassFilter}
-                  onChange={(event) => {
-                    studentManagement.setStudentClassFilter(event.target.value);
-                    studentManagement.loadStudents({
-                      classId: event.target.value,
-                    });
-                  }}
-                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                >
-                  <option value="">All Classes</option>
-                  {studentManagement.enrollOptions.academic_classes.map((cls) => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.display_name}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={studentManagement.studentStatusFilter}
-                  onChange={(event) => {
-                    studentManagement.setStudentStatusFilter(event.target.value);
-                    studentManagement.loadStudents({
-                      status: event.target.value,
-                    });
-                  }}
-                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                >
-                  <option value="all">All Status</option>
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-
-              <label className="mt-3 flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={studentManagement.showUnassignedOnly}
-                  onChange={(event) => {
-                    studentManagement.setShowUnassignedOnly(
-                      event.target.checked,
-                    );
-                    studentManagement.loadStudents({
-                      unassigned: event.target.checked,
-                    });
-                  }}
-                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                Show only students without a class
-              </label>
-            </div>
-
-            {/* ROSTER TABLE */}
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-              <div className="border-b border-gray-100 px-5 py-4 dark:border-slate-700">
-                <h2 className="font-semibold text-gray-900 dark:text-white">
-                  Student Roster
-                </h2>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {studentManagement.students.length} student(s) found
-                </p>
-              </div>
-
-              <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/70 dark:text-gray-400">
-                    <tr>
-                      <th className="px-5 py-3">Student</th>
-                      <th className="px-5 py-3">Class</th>
-                      <th className="px-5 py-3">Roll No.</th>
-                      <th className="px-5 py-3">Mobile</th>
-                      <th className="px-5 py-3">Status</th>
-                      <th className="px-5 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                    {studentManagement.studentsLoading ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-16 text-center">
-                          <div className="flex flex-col items-center gap-3 text-gray-500">
-                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
-                            Loading students...
-                          </div>
-                        </td>
-                      </tr>
-                    ) : studentManagement.students.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-16 text-center">
-                          <div className="mx-auto max-w-sm">
-                            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-                              <i className="bi bi-mortarboard text-2xl" />
-                            </span>
-
-                            <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
-                              No students found
-                            </h3>
-
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                              Enroll your first student or adjust the
-                              current filters.
-                            </p>
-
-                            {canWriteAcademic && (
-                              <button
-                                type="button"
-                                onClick={studentManagement.openEnrollModal}
-                                className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                              >
-                                Enroll Student
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      studentManagement.students.map((student) => (
-                        <tr
-                          key={student.id}
-                          className="cursor-pointer transition hover:bg-gray-50/80 dark:hover:bg-slate-700/40"
-                          onClick={() =>
-                            studentManagement.openStudentDetail(student)
-                          }
-                        >
-                          <td className="min-w-[200px] px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-                                <i className="bi bi-person" />
-                              </span>
-
-                              <div>
-                                <p className="font-semibold text-gray-900 dark:text-white">
-                                  {student.first_name} {student.last_name}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  {student.student_id}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="whitespace-nowrap px-5 py-4 text-gray-600 dark:text-gray-300">
-                            {student.division_name ? (
-                              <>
-                                {student.division_name}{" "}
-                                {student.section_name}
-                                <span className="ml-1 text-xs text-gray-400">
-                                  ({student.batch_name})
-                                </span>
-                              </>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                                <i className="bi bi-exclamation-triangle" />
-                                Unassigned
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="whitespace-nowrap px-5 py-4 text-gray-600 dark:text-gray-300">
-                            {student.roll_number ?? "—"}
-                          </td>
-
-                          <td className="whitespace-nowrap px-5 py-4 text-gray-600 dark:text-gray-300">
-                            {student.mobile || "—"}
-                          </td>
-
-                          <td className="whitespace-nowrap px-5 py-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                student.status === "Active"
-                                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
-                                  : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
-                              }`}
-                            >
-                              {student.status || "Active"}
-                            </span>
-                          </td>
-
-                          <td
-                            className="whitespace-nowrap px-5 py-4 text-right"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                studentManagement.openStudentDetail(student)
-                              }
-                              title="View student"
-                              className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 text-indigo-600 transition hover:bg-indigo-50 dark:border-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
-                            >
-                              <i className="bi bi-eye" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* ============ ENROLL STUDENT MODAL ============ */}
-            {studentManagement.enrollModalOpen && (
-              <div
-                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget) {
-                    studentManagement.closeEnrollModal();
-                  }
-                }}
-              >
-                <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-slate-800">
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-800">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                      {studentManagement.enrollResult
-                        ? "Student Enrolled"
-                        : "Enroll Student"}
-                    </h2>
-
-                    <button
-                      type="button"
-                      onClick={studentManagement.closeEnrollModal}
-                      disabled={studentManagement.enrollSaving}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
-                    >
-                      <i className="bi bi-x-lg" />
-                    </button>
-                  </div>
-
-                  {studentManagement.enrollResult ? (
-                    <div className="space-y-4 px-6 py-6">
-                      <div className="flex flex-col items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                        <i className="bi bi-check-circle text-3xl text-emerald-600 dark:text-emerald-300" />
-                        <p className="font-semibold text-emerald-800 dark:text-emerald-200">
-                          {studentManagement.enrollForm.first_name} was
-                          enrolled successfully
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-600">
-                        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                          Login Credentials - share these with the student
-                        </p>
-
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <div>
-                            <p className="text-xs text-gray-400">
-                              Student ID
-                            </p>
-                            <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                              {studentManagement.enrollResult.student_id}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">User ID</p>
-                            <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                              {studentManagement.enrollResult.user_id}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">
-                              Temporary Password
-                            </p>
-                            <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                              {studentManagement.enrollResult.password}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-                        <button
-                          type="button"
-                          onClick={studentManagement.closeEnrollModal}
-                          className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
-                        >
-                          Close
-                        </button>
-                        <button
-                          type="button"
-                          onClick={studentManagement.enrollAnother}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700"
-                        >
-                          <i className="bi bi-person-plus" />
-                          Enroll Another
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <form
-                      onSubmit={studentManagement.submitEnrollment}
-                      className="space-y-6 px-6 py-6"
-                    >
-                      {studentManagement.enrollOptions.academic_classes
-                        .length === 0 &&
-                        !studentManagement.enrollOptionsLoading && (
-                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                            <i className="bi bi-exclamation-triangle mr-1.5" />
-                            No classes have been set up yet. Go to{" "}
-                            <span className="font-semibold">
-                              Grades &amp; Sections
-                            </span>{" "}
-                            and{" "}
-                            <span className="font-semibold">Classes</span>{" "}
-                            first, then come back to enroll students.
-                          </div>
-                        )}
-
-                      {studentManagement.enrollErrors.form && (
-                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-                          {studentManagement.enrollErrors.form}
-                        </div>
-                      )}
-
-                      {/* CLASS */}
-                      <div>
-                        <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                          Class <span className="text-red-500">*</span>
-                        </label>
-
-                        <select
-                          value={studentManagement.enrollForm.academic_class_id}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "academic_class_id",
-                              event.target.value,
-                            )
-                          }
-                          className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition dark:bg-slate-900 dark:text-white ${
-                            studentManagement.enrollErrors.academic_class_id
-                              ? "border-red-500"
-                              : "border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600"
-                          }`}
-                        >
-                          <option value="">Select class</option>
-                          {studentManagement.enrollOptions.academic_classes.map(
-                            (cls) => (
-                              <option key={cls.id} value={cls.id}>
-                                {cls.display_name}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </div>
-
-                      {/* AUTO PREVIEW */}
-                      {studentManagement.enrollForm.academic_class_id && (
-                        <div className="grid grid-cols-1 gap-3 rounded-xl bg-gray-50 p-4 dark:bg-slate-900/50 sm:grid-cols-3">
-                          <div>
-                            <p className="text-xs text-gray-400">
-                              Student ID (auto)
-                            </p>
-                            <p className="font-mono text-sm font-semibold text-gray-800 dark:text-gray-200">
-                              {studentManagement.enrollPreviewLoading
-                                ? "..."
-                                : studentManagement.enrollPreview.student_id}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">
-                              User ID (auto)
-                            </p>
-                            <p className="font-mono text-sm font-semibold text-gray-800 dark:text-gray-200">
-                              {studentManagement.enrollPreviewLoading
-                                ? "..."
-                                : studentManagement.enrollPreview.user_id}
-                            </p>
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-400">
-                              Roll Number
-                            </label>
-                            <input
-                              type="number"
-                              value={
-                                studentManagement.enrollForm.roll_number ||
-                                studentManagement.enrollPreview.roll_number ||
-                                ""
-                              }
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "roll_number",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm font-semibold text-gray-800 outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* BASIC INFO */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                          Basic Information
-                        </h3>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              First Name{" "}
-                              <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={studentManagement.enrollForm.first_name}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "first_name",
-                                  event.target.value,
-                                )
-                              }
-                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                                studentManagement.enrollErrors.first_name
-                                  ? "border-red-500"
-                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                              }`}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Middle Name
-                            </label>
-                            <input
-                              type="text"
-                              value={studentManagement.enrollForm.middle_name}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "middle_name",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Last Name{" "}
-                              <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={studentManagement.enrollForm.last_name}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "last_name",
-                                  event.target.value,
-                                )
-                              }
-                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                                studentManagement.enrollErrors.last_name
-                                  ? "border-red-500"
-                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                              }`}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Mobile <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={studentManagement.enrollForm.mobile}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "mobile",
-                                  event.target.value,
-                                )
-                              }
-                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                                studentManagement.enrollErrors.mobile
-                                  ? "border-red-500"
-                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                              }`}
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Email
-                            </label>
-                            <input
-                              type="email"
-                              value={studentManagement.enrollForm.email}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "email",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Gender
-                            </label>
-                            <select
-                              value={studentManagement.enrollForm.gender}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "gender",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            >
-                              <option value="">Select</option>
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
-                              <option value="Other">Other</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Date of Birth
-                            </label>
-                            <input
-                              type="date"
-                              value={studentManagement.enrollForm.date_of_birth}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "date_of_birth",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Blood Group
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="e.g. O+"
-                              value={studentManagement.enrollForm.blood_group}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "blood_group",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            />
-                          </div>
-
-                          <div className="sm:col-span-3">
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Address
-                            </label>
-                            <input
-                              type="text"
-                              value={studentManagement.enrollForm.address}
-                              onChange={(event) =>
-                                studentManagement.updateEnrollForm(
-                                  "address",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* PARENT / GUARDIAN */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                          Parent / Guardian
-                        </h3>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <input
-                            type="text"
-                            placeholder="Father's name"
-                            value={studentManagement.enrollForm.father_name}
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "father_name",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Father's mobile"
-                            value={studentManagement.enrollForm.father_mobile}
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "father_mobile",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Mother's name"
-                            value={studentManagement.enrollForm.mother_name}
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "mother_name",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Mother's mobile"
-                            value={studentManagement.enrollForm.mother_mobile}
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "mother_mobile",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                        </div>
-                      </div>
-
-                      {/* EMERGENCY + OTHER */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                          Emergency Contact
-                        </h3>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                          <input
-                            type="text"
-                            placeholder="Contact name"
-                            value={
-                              studentManagement.enrollForm
-                                .emergency_contact_name
-                            }
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "emergency_contact_name",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Contact number"
-                            value={
-                              studentManagement.enrollForm
-                                .emergency_contact_number
-                            }
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "emergency_contact_number",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Relation"
-                            value={
-                              studentManagement.enrollForm
-                                .emergency_contact_relation
-                            }
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "emergency_contact_relation",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                        </div>
-
-                        <input
-                          type="text"
-                          placeholder="Previous school (optional)"
-                          value={studentManagement.enrollForm.previous_school}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "previous_school",
-                              event.target.value,
-                            )
-                          }
-                          className="mt-4 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end">
-                        <button
-                          type="button"
-                          onClick={studentManagement.closeEnrollModal}
-                          disabled={studentManagement.enrollSaving}
-                          className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-white disabled:opacity-60 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
-                        >
-                          Cancel
-                        </button>
-
-                        <button
-                          type="submit"
-                          disabled={
-                            studentManagement.enrollSaving ||
-                            studentManagement.enrollOptions.academic_classes
-                              .length === 0
-                          }
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {studentManagement.enrollSaving ? (
-                            <>
-                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                              Enrolling...
-                            </>
-                          ) : (
-                            "Enroll Student"
-                          )}
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ============ VIEW STUDENT DETAIL MODAL ============ */}
-            {studentManagement.detailModal.open && (
-              <div
-                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget) {
-                    studentManagement.closeStudentDetail();
-                  }
-                }}
-              >
-                <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-slate-800">
-                  <div className="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-800">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                      Student Profile
-                    </h2>
-
-                    <button
-                      type="button"
-                      onClick={studentManagement.closeStudentDetail}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
-                    >
-                      <i className="bi bi-x-lg" />
-                    </button>
-                  </div>
-
-                  <div className="px-6 py-5">
-                    {studentManagement.detailLoading ? (
-                      <div className="flex flex-col items-center gap-3 py-16 text-gray-500">
-                        <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
-                        Loading student...
-                      </div>
-                    ) : studentManagement.detailError ? (
-                      <p className="py-10 text-center text-sm text-red-600">
-                        {studentManagement.detailError}
-                      </p>
-                    ) : studentManagement.detailData ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-4">
-                          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-xl font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                            {studentManagement.detailData.first_name?.[0]}
-                            {studentManagement.detailData.last_name?.[0]}
-                          </span>
-                          <div>
-                            <p className="text-lg font-bold text-gray-900 dark:text-white">
-                              {studentManagement.detailData.first_name}{" "}
-                              {studentManagement.detailData.last_name}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {studentManagement.detailData.student_id}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-4 text-sm dark:bg-slate-900/50">
-                          <div>
-                            <p className="text-xs text-gray-400">Class</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {studentManagement.detailData.division_name
-                                ? `${studentManagement.detailData.division_name} ${studentManagement.detailData.section_name}`
-                                : "Unassigned"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">Roll No.</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {studentManagement.detailData.roll_number ?? "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">Mobile</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {studentManagement.detailData.mobile || "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">Email</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {studentManagement.detailData.email || "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">
-                              Father&apos;s Name
-                            </p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {studentManagement.detailData.father_name ||
-                                "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">
-                              Mother&apos;s Name
-                            </p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {studentManagement.detailData.mother_name ||
-                                "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">
-                              Admission Date
-                            </p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {studentManagement.detailData.admission_date ||
-                                "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">Status</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {studentManagement.detailData.status || "—"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* ================= TEACHERS ================= */}
+        {/* =========================== TEACHERS SECTION START ============================ */}
         {activeSection === "teachers" && (
           <section className="section active p-4 sm:p-6 space-y-6">
-            {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <h2 className="text-lg sm:text-xl font-semibold">
-                    Teachers
+                    Teachers Management
                   </h2>
                   <p className="text-xs sm:text-sm opacity-90">
-                    Every teacher on staff and what they&apos;re currently
-                    teaching.
+                    Add, update, delete and assign teachers to classes and
+                    subjects
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => teacherManagement.loadTeachers()}
-                    disabled={teacherManagement.teachersLoading}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/30 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <i
-                      className={`bi bi-arrow-clockwise ${
-                        teacherManagement.teachersLoading ? "animate-spin" : ""
-                      }`}
-                    />
-                    Refresh
-                  </button>
-
-                  {canWriteAcademic && (
-                    <button
-                      type="button"
-                      onClick={teacherManagement.openCreateTeacherModal}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
-                    >
-                      <i className="bi bi-person-plus" />
-                      Add Teacher
-                    </button>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={openTeacherManagementAddModal}
+                  className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow"
+                >
+                  + Add Teacher
+                </button>
               </div>
             </div>
 
-            {/* STATISTICS */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {[
-                {
-                  label: "Total Teachers",
-                  value: teacherManagement.teacherStats.total,
-                  icon: "bi-person-badge",
-                  classes:
-                    "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
-                },
-                {
-                  label: "Active",
-                  value: teacherManagement.teacherStats.active,
-                  icon: "bi-check-circle",
-                  classes:
-                    "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
-                },
-                {
-                  label: "Inactive",
-                  value: teacherManagement.teacherStats.inactive,
-                  icon: "bi-pause-circle",
-                  classes:
-                    "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
-                },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        {stat.label}
-                      </p>
-                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
-                        {Number(stat.value || 0)}
-                      </p>
-                    </div>
-                    <span
-                      className={`flex h-11 w-11 items-center justify-center rounded-xl ${stat.classes}`}
-                    >
-                      <i className={`bi ${stat.icon} text-lg`} />
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-xl shadow text-center">
+                <p className="text-xs text-gray-500">Total Teachers</p>
+                <h2 className="font-bold text-lg">
+                  {teacherManagementStats.total}
+                </h2>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl shadow text-center">
+                <p className="text-xs text-gray-500">Active</p>
+                <h2 className="font-bold text-green-600 text-lg">
+                  {teacherManagementStats.active}
+                </h2>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl shadow text-center">
+                <p className="text-xs text-gray-500">Inactive</p>
+                <h2 className="font-bold text-red-500 text-lg">
+                  {teacherManagementStats.inactive}
+                </h2>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl shadow text-center">
+                <p className="text-xs text-gray-500">Suspended</p>
+                <h2 className="font-bold text-indigo-600 text-lg">
+                  {teacherManagementStats.suspended}
+                </h2>
+              </div>
             </div>
 
-            {/* FILTERS */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:p-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="relative md:col-span-2">
-                  <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="search"
-                    value={teacherManagement.teacherSearch}
-                    onChange={(event) => {
-                      teacherManagement.setTeacherSearch(event.target.value);
-                      teacherManagement.loadTeachers({
-                        search: event.target.value,
-                      });
-                    }}
-                    placeholder="Search by name, email, mobile, teacher ID..."
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                  />
-                </div>
+            <div className="bg-white p-4 rounded-2xl shadow flex flex-col sm:flex-row sm:items-end gap-4">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500">Search Teacher</label>
+                <input
+                  type="text"
+                  value={teacherManagementFilters.q}
+                  onChange={(e) =>
+                    updateTeacherManagementFilter("q", e.target.value)
+                  }
+                  placeholder="Search name, email, mobile, username..."
+                  className="input mt-1 w-full"
+                />
+              </div>
 
+              <div className="w-full sm:w-48">
+                <label className="text-xs text-gray-500">Status</label>
                 <select
-                  value={teacherManagement.teacherStatusFilter}
-                  onChange={(event) => {
-                    teacherManagement.setTeacherStatusFilter(
-                      event.target.value,
-                    );
-                    teacherManagement.loadTeachers({
-                      status: event.target.value,
-                    });
-                  }}
-                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  value={teacherManagementFilters.status}
+                  onChange={(e) =>
+                    updateTeacherManagementFilter("status", e.target.value)
+                  }
+                  className="input mt-1 w-full"
                 >
-                  <option value="">All Status</option>
+                  <option value="">All</option>
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                   <option value="Suspended">Suspended</option>
                 </select>
               </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={loadTeacherManagementTeachers}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700"
+                >
+                  Apply
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetTeacherManagementFilter}
+                  className="border px-4 py-2 rounded-lg text-sm hover:bg-gray-100"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
 
-            {/* ROSTER TABLE */}
-            <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-              <div className="border-b border-gray-100 px-5 py-4 dark:border-slate-700">
-                <h2 className="font-semibold text-gray-900 dark:text-white">
-                  Teacher Directory
-                </h2>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {teacherManagement.teachers.length} teacher(s) found
-                </p>
+            <div className="bg-white rounded-xl shadow p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">Teacher List</h3>
+
+                {teacherManagementLoading && (
+                  <span className="text-xs text-gray-500">Loading...</span>
+                )}
               </div>
 
-              <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/70 dark:text-gray-400">
-                    <tr>
-                      <th className="px-5 py-3">Teacher</th>
-                      <th className="px-5 py-3">Designation</th>
-                      <th className="px-5 py-3">Contact</th>
-                      <th className="px-5 py-3">Teaching Load</th>
-                      <th className="px-5 py-3">Status</th>
-                      <th className="px-5 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
+              <div className="space-y-3">
+                {!teacherManagementLoading &&
+                  teacherManagementTeachers.length === 0 && (
+                    <div className="text-center py-10 text-sm text-gray-500">
+                      No teachers found
+                    </div>
+                  )}
 
-                  <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                    {teacherManagement.teachersLoading ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-16 text-center">
-                          <div className="flex flex-col items-center gap-3 text-gray-500">
-                            <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
-                            Loading teachers...
-                          </div>
-                        </td>
-                      </tr>
-                    ) : teacherManagement.teachers.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-16 text-center">
-                          <div className="mx-auto max-w-sm">
-                            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-                              <i className="bi bi-person-badge text-2xl" />
+                {teacherManagementTeachers.map((teacher) => (
+                  <div
+                    key={teacher.id}
+                    className="border rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+                  >
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-gray-800">
+                        {teacher.full_name ||
+                          `${teacher.first_name || ""} ${teacher.last_name || ""}`}
+                      </h4>
+
+                      <p className="text-xs text-gray-500">
+                        {teacher.teacher_id} • {teacher.email || "No email"} •{" "}
+                        {teacher.mobile || "No mobile"}
+                      </p>
+
+                      <p className="text-xs text-gray-500">
+                        {teacher.designation || "Teacher"} •{" "}
+                        {teacher.specialization || "No specialization"}
+                      </p>
+
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {(teacher.assignments || []).length === 0 ? (
+                          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">
+                            No class assigned
+                          </span>
+                        ) : (
+                          teacher.assignments.map((a) => (
+                            <span
+                              key={
+                                a.id || `${a.academic_class_id}-${a.subject_id}`
+                              }
+                              className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded"
+                            >
+                              {a.class_name || "Class"} •{" "}
+                              {a.subject_name || "Subject"}
                             </span>
-                            <h3 className="mt-4 font-semibold text-gray-900 dark:text-white">
-                              No teachers found
-                            </h3>
-                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                              Add your first teacher or adjust the current
-                              filters.
-                            </p>
-                            {canWriteAcademic && (
-                              <button
-                                type="button"
-                                onClick={teacherManagement.openCreateTeacherModal}
-                                className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                              >
-                                Add Teacher
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      teacherManagement.teachers.map((teacher) => (
-                        <tr
-                          key={teacher.id}
-                          className="cursor-pointer transition hover:bg-gray-50/80 dark:hover:bg-slate-700/40"
-                          onClick={() =>
-                            teacherManagement.openTeacherDetail(teacher)
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={teacher.status || "Active"}
+                        onChange={(e) =>
+                          updateTeacherManagementStatus(
+                            teacher.id,
+                            e.target.value,
+                          )
+                        }
+                        className="input text-xs"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Suspended">Suspended</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => openTeacherManagementViewModal(teacher)}
+                        className="px-3 py-2 rounded-lg border text-xs hover:bg-gray-100"
+                      >
+                        View
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => openTeacherManagementEditModal(teacher)}
+                        className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          deleteTeacherManagementTeacher(teacher.id)
+                        }
+                        className="px-3 py-2 rounded-lg bg-red-600 text-white text-xs hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ADD / EDIT TEACHER MODAL */}
+        {teacherManagementModalOpen && (
+          <div className="fixed inset-0 md:pl-64 z-50 bg-slate-950/60 backdrop-blur-md p-2 sm:p-4">
+            <div className="h-full w-full flex items-center justify-center">
+              <div className="w-full max-w-7xl max-h-[95vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-white/20 dark:border-slate-700">
+                {/* HEADER */}
+                <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+                        Teacher Management
+                      </p>
+                      <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                        {teacherManagementForm.id
+                          ? "Update Teacher"
+                          : "Add New Teacher"}
+                      </h2>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Fill teacher profile, employment details and assign
+                        classes with subjects.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closeTeacherManagementModal}
+                      className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto max-h-[calc(95vh-84px)] p-4 sm:p-6 space-y-6">
+                  {/* NAME HERO */}
+                  <div className="rounded-3xl p-4 sm:p-6 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">
+                          First Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.first_name || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "first_name",
+                              e.target.value,
+                            )
                           }
+                          className="w-full rounded-xl border-0 bg-white/95 px-4 py-2.5 text-slate-900 text-sm outline-none focus:ring-2 focus:ring-white"
+                          placeholder="Enter first name"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">
+                          Middle Name
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.middle_name || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "middle_name",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border-0 bg-white/95 px-4 py-2.5 text-slate-900 text-sm outline-none focus:ring-2 focus:ring-white"
+                          placeholder="Enter middle name"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">
+                          Last Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.last_name || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "last_name",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border-0 bg-white/95 px-4 py-2.5 text-slate-900 text-sm outline-none focus:ring-2 focus:ring-white"
+                          placeholder="Enter last name"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FORM GRID */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+                    {/* Personal */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        👤 Personal Info
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Date of Birth
+                        </label>
+                        <input
+                          type="date"
+                          value={teacherManagementForm.date_of_birth || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "date_of_birth",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Gender
+                        </label>
+                        <select
+                          value={teacherManagementForm.gender || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "gender",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
                         >
-                          <td className="min-w-[200px] px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-                                <i className="bi bi-person" />
-                              </span>
-                              <div>
-                                <p className="font-semibold text-gray-900 dark:text-white">
-                                  {teacher.full_name ||
-                                    `${teacher.first_name} ${teacher.last_name}`}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  {teacher.teacher_id}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
 
-                          <td className="whitespace-nowrap px-5 py-4 text-gray-600 dark:text-gray-300">
-                            {teacher.designation || "—"}
-                          </td>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Mobile Number
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.mobile || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "mobile",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="Enter mobile number"
+                        />
+                      </div>
 
-                          <td className="whitespace-nowrap px-5 py-4 text-gray-600 dark:text-gray-300">
-                            <p>{teacher.mobile || "—"}</p>
-                            <p className="text-xs text-gray-400">
-                              {teacher.email}
-                            </p>
-                          </td>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          value={teacherManagementForm.email || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm("email", e.target.value)
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="teacher@example.com"
+                        />
+                      </div>
+                    </div>
 
-                          <td className="whitespace-nowrap px-5 py-4">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
-                              <i className="bi bi-journal-bookmark" />
-                              {(teacher.assignments || []).length} class
-                              {(teacher.assignments || []).length === 1
-                                ? ""
-                                : "es"}
-                            </span>
-                          </td>
+                    {/* Professional */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        💼 Professional
+                      </h3>
 
-                          <td
-                            className="whitespace-nowrap px-5 py-4"
-                            onClick={(event) => event.stopPropagation()}
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Teacher ID
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.teacher_id || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "teacher_id",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="Auto generated if empty"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Designation
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.designation || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "designation",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="Math Teacher"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Specialization
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.specialization || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "specialization",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder="Mathematics"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Status
+                        </label>
+                        <select
+                          value={teacherManagementForm.status || "Active"}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "status",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                          <option value="Suspended">Suspended</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Academic */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        🎓 Academic
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Highest Degree
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.degree || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "degree",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          University
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.university || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "university",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Experience Years
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={teacherManagementForm.experience_years || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "experience_years",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <select
+                        value={teacherManagementForm.blood_group || ""}
+                        onChange={(e) =>
+                          updateTeacherManagementForm(
+                            "blood_group",
+                            e.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                      >
+                        <option value="">Select Blood Group</option>
+
+                        {BLOOD_GROUPS.map((group) => (
+                          <option key={group} value={group}>
+                            {group}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Employment */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        🏢 Employment
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Joining Date
+                        </label>
+                        <input
+                          type="date"
+                          value={teacherManagementForm.joining_date || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "joining_date",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Employment Type
+                        </label>
+                        <select
+                          value={
+                            teacherManagementForm.employment_type || "Full Time"
+                          }
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "employment_type",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        >
+                          <option value="Full Time">Full Time</option>
+                          <option value="Part Time">Part Time</option>
+                          <option value="Contract">Contract</option>
+                          <option value="Temporary">Temporary</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Shift
+                        </label>
+                        <select
+                          value={teacherManagementForm.shift || "Morning"}
+                          onChange={(e) =>
+                            updateTeacherManagementForm("shift", e.target.value)
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        >
+                          <option value="Morning">Morning</option>
+                          <option value="Evening">Evening</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        📍 Address
+                      </h3>
+
+                      {["address", "city", "state", "pincode"].map((field) => (
+                        <div key={field}>
+                          <label className="block text-xs font-medium text-slate-500 mb-1 capitalize">
+                            {field === "pincode" ? "Pincode" : field}
+                          </label>
+                          <input
+                            type="text"
+                            value={teacherManagementForm[field] || ""}
+                            onChange={(e) =>
+                              updateTeacherManagementForm(field, e.target.value)
+                            }
+                            className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Health + Emergency + System */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        🆘 Health & System
+                      </h3>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Medical Conditions
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.medical_condition || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "medical_condition",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Emergency Name
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.emergency_name || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "emergency_name",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Emergency Relation
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.emergency_relation || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "emergency_relation",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Emergency Phone
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.emergency_phone || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "emergency_phone",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          value={teacherManagementForm.username || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "username",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">
+                          Password
+                        </label>
+                        <input
+                          type="password"
+                          value={teacherManagementForm.password || ""}
+                          onChange={(e) =>
+                            updateTeacherManagementForm(
+                              "password",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                          placeholder={
+                            teacherManagementForm.id
+                              ? "Leave blank to keep old password"
+                              : "Enter password"
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ASSIGNMENTS */}
+                  <div className="rounded-3xl border border-indigo-100 dark:border-slate-700 bg-indigo-50/70 dark:bg-slate-800 p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white">
+                          Multiple Class & Subject Assignments
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Add multiple classes and subjects for this teacher.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={addTeacherManagementAssignment}
+                        className="w-full sm:w-auto rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 text-sm font-semibold"
+                      >
+                        + Add Class & Subject
+                      </button>
+                    </div>
+
+                    {(teacherManagementForm.assignments || []).length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-900/40 p-6 text-center text-sm text-slate-500">
+                        No assignment added yet. Click “Add Class & Subject”.
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {(teacherManagementForm.assignments || []).map(
+                        (assignment, index) => (
+                          <div
+                            key={index}
+                            className="grid grid-cols-1 md:grid-cols-12 gap-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4"
                           >
-                            {canWriteAcademic ? (
+                            <div className="md:col-span-1 flex items-center">
+                              <span className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                                {index + 1}
+                              </span>
+                            </div>
+
+                            <div className="md:col-span-5">
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Class
+                              </label>
                               <select
-                                value={teacher.status || "Active"}
-                                disabled={
-                                  teacherManagement.statusUpdatingId ===
-                                  teacher.id
-                                }
-                                onChange={(event) =>
-                                  teacherManagement.changeTeacherStatus(
-                                    teacher,
-                                    event.target.value,
+                                value={assignment.academic_class_id || ""}
+                                onChange={(e) =>
+                                  updateTeacherManagementAssignment(
+                                    index,
+                                    "academic_class_id",
+                                    e.target.value,
                                   )
                                 }
-                                className={`rounded-full border-0 px-2.5 py-1 text-xs font-semibold outline-none ${
-                                  teacher.status === "Active"
-                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
-                                    : teacher.status === "Suspended"
-                                    ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
-                                    : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
-                                }`}
+                                className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
                               >
-                                <option value="Active">Active</option>
-                                <option value="Inactive">Inactive</option>
-                                <option value="Suspended">Suspended</option>
+                                <option value="">Select Class</option>
+                                {(
+                                  teacherManagementOptions.academic_classes ||
+                                  []
+                                ).map((cls) => (
+                                  <option key={cls.id} value={cls.id}>
+                                    {cls.display_name}
+                                    {cls.batch_name
+                                      ? ` (${cls.batch_name})`
+                                      : ""}
+                                  </option>
+                                ))}
                               </select>
-                            ) : (
-                              <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                  teacher.status === "Active"
-                                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
-                                    : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
-                                }`}
-                              >
-                                {teacher.status || "Active"}
-                              </span>
-                            )}
-                          </td>
+                            </div>
 
-                          <td
-                            className="whitespace-nowrap px-5 py-4 text-right"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <div className="inline-flex items-center gap-2">
+                            <div className="md:col-span-4">
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Subject
+                              </label>
+                              <select
+                                value={assignment.subject_id || ""}
+                                onChange={(e) =>
+                                  updateTeacherManagementAssignment(
+                                    index,
+                                    "subject_id",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-full rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-4 py-2.5 text-sm outline-none"
+                              >
+                                <option value="">Select Subject</option>
+                                {(teacherManagementOptions.subjects || []).map(
+                                  (subject) => (
+                                    <option key={subject.id} value={subject.id}>
+                                      {subject.subject_name}
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            </div>
+
+                            <div className="md:col-span-2 flex items-end">
                               <button
                                 type="button"
                                 onClick={() =>
-                                  teacherManagement.openTeacherDetail(teacher)
+                                  removeTeacherManagementAssignment(index)
                                 }
-                                title="View teacher"
-                                className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 text-indigo-600 transition hover:bg-indigo-50 dark:border-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+                                className="w-full rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 px-4 py-2.5 text-sm font-semibold hover:bg-red-100"
                               >
-                                <i className="bi bi-eye" />
+                                Remove
                               </button>
-
-                              {canWriteAcademic && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      teacherManagement.openEditTeacherModal(
-                                        teacher,
-                                      )
-                                    }
-                                    title="Edit teacher"
-                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 text-indigo-600 transition hover:bg-indigo-50 dark:border-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
-                                  >
-                                    <i className="bi bi-pencil-square" />
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      teacherManagement.openPasswordModal(
-                                        teacher,
-                                      )
-                                    }
-                                    title="Reset password"
-                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
-                                  >
-                                    <i className="bi bi-key" />
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      teacherManagement.requestDeleteTeacher(
-                                        teacher,
-                                      )
-                                    }
-                                    title="Delete teacher"
-                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 text-red-600 transition hover:bg-red-50 dark:border-red-500/20 dark:text-red-300 dark:hover:bg-red-500/10"
-                                  >
-                                    <i className="bi bi-trash3" />
-                                  </button>
-                                </>
-                              )}
                             </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+
+                  {/* FOOTER */}
+                  <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-4">
+                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={closeTeacherManagementModal}
+                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={saveTeacherManagementTeacher}
+                        disabled={teacherManagementSaving}
+                        className="w-full sm:w-auto px-7 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm disabled:opacity-60"
+                      >
+                        {teacherManagementSaving
+                          ? "Saving..."
+                          : teacherManagementForm.id
+                            ? "Update Teacher"
+                            : "Save Teacher"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW TEACHER MODAL */}
+        {teacherManagementViewModalOpen && teacherManagementSelectedTeacher && (
+          <div className="fixed inset-0 md:pl-64 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 relative">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold">
+                    {teacherManagementSelectedTeacher.full_name}
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    {teacherManagementSelectedTeacher.teacher_id} •{" "}
+                    {teacherManagementSelectedTeacher.status}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeTeacherManagementViewModal}
+                  className="text-gray-500 text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* TABS */}
+              <div className="flex gap-2 border-b border-gray-200 dark:border-slate-700 mb-4">
+                {[
+                  {
+                    key: "overview",
+                    label: "Overview",
+                    icon: "bi-person-lines-fill",
+                  },
+                  {
+                    key: "classes",
+                    label: "Assigned Classes",
+                    icon: "bi-journal-bookmark",
+                  },
+                  {
+                    key: "attendance",
+                    label: "Attendance",
+                    icon: "bi-calendar-check",
+                  },
+                  { key: "leaves", label: "Leaves", icon: "bi-calendar-x" },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setTeacherProfileTab(tab.key)}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
+                      teacherProfileTab === tab.key
+                        ? "border-indigo-600 text-indigo-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    <i className={`bi ${tab.icon}`} />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ================= OVERVIEW TAB ================= */}
+              {teacherProfileTab === "overview" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div className="border rounded-xl p-4">
+                    <h4 className="font-semibold mb-2">Contact</h4>
+                    <p>
+                      Email: {teacherManagementSelectedTeacher.email || "-"}
+                    </p>
+                    <p>
+                      Mobile: {teacherManagementSelectedTeacher.mobile || "-"}
+                    </p>
+                    <p>
+                      Username:{" "}
+                      {teacherManagementSelectedTeacher.username || "-"}
+                    </p>
+                  </div>
+
+                  <div className="border rounded-xl p-4">
+                    <h4 className="font-semibold mb-2">Professional</h4>
+                    <p>
+                      Designation:{" "}
+                      {teacherManagementSelectedTeacher.designation || "-"}
+                    </p>
+                    <p>
+                      Specialization:{" "}
+                      {teacherManagementSelectedTeacher.specialization || "-"}
+                    </p>
+                    <p>
+                      Experience:{" "}
+                      {teacherManagementSelectedTeacher.experience_years || 0}{" "}
+                      years
+                    </p>
+                  </div>
+
+                  <div className="border rounded-xl p-4">
+                    <h4 className="font-semibold mb-2">Employment</h4>
+                    <p>
+                      Joining:{" "}
+                      {teacherManagementSelectedTeacher.joining_date || "-"}
+                    </p>
+                    <p>
+                      Type:{" "}
+                      {teacherManagementSelectedTeacher.employment_type || "-"}
+                    </p>
+                    <p>
+                      Shift: {teacherManagementSelectedTeacher.shift || "-"}
+                    </p>
+                  </div>
+
+                  <div className="border rounded-xl p-4">
+                    <h4 className="font-semibold mb-2">Emergency</h4>
+                    <p>
+                      Name:{" "}
+                      {teacherManagementSelectedTeacher.emergency_name || "-"}
+                    </p>
+                    <p>
+                      Relation:{" "}
+                      {teacherManagementSelectedTeacher.emergency_relation ||
+                        "-"}
+                    </p>
+                    <p>
+                      Phone:{" "}
+                      {teacherManagementSelectedTeacher.emergency_phone || "-"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= ASSIGNED CLASSES TAB ================= */}
+              {teacherProfileTab === "classes" && (
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">
+                    Assigned Classes & Subjects
+                  </h4>
+
+                  {(teacherManagementSelectedTeacher.assignments || [])
+                    .length === 0 ? (
+                    <p className="text-sm text-gray-500">No assignments</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {teacherManagementSelectedTeacher.assignments.map((a) => (
+                        <span
+                          key={a.id || `${a.academic_class_id}-${a.subject_id}`}
+                          className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded"
+                        >
+                          {a.class_name || "Class"} •{" "}
+                          {a.subject_name || "Subject"}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ================= ATTENDANCE TAB ================= */}
+              {teacherProfileTab === "attendance" && (
+                <div className="space-y-3">
+                  {teacherProfileAttendanceLoading ? (
+                    <div className="flex flex-col items-center gap-3 py-12 text-gray-500">
+                      <span className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                      Loading attendance...
+                    </div>
+                  ) : teacherProfileAttendance.length === 0 ? (
+                    <p className="py-10 text-center text-sm text-gray-400">
+                      No attendance records found.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto overflow-hidden rounded-xl border border-gray-100">
+                      <table className="min-w-full text-left text-sm">
+                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                          <tr>
+                            <th className="px-4 py-2.5">Date</th>
+                            <th className="px-4 py-2.5">Status</th>
+                            <th className="px-4 py-2.5">Remarks</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {teacherProfileAttendance.map((record, idx) => (
+                            <tr key={record.record_id || idx}>
+                              <td className="px-4 py-2.5 text-gray-700">
+                                {record.date}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    record.status === "Present"
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : record.status === "Late"
+                                        ? "bg-amber-50 text-amber-700"
+                                        : "bg-red-50 text-red-700"
+                                  }`}
+                                >
+                                  {record.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-gray-500">
+                                {record.remarks || record.reason || "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ================= LEAVES TAB ================= */}
+              {teacherProfileTab === "leaves" && (
+                <div className="space-y-3">
+                  {teacherProfileLeavesLoading ? (
+                    <div className="flex flex-col items-center gap-3 py-12 text-gray-500">
+                      <span className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                      Loading leaves...
+                    </div>
+                  ) : teacherProfileLeaves.length === 0 ? (
+                    <p className="py-10 text-center text-sm text-gray-400">
+                      No leave records found for this teacher.
+                    </p>
+                  ) : (
+                    teacherProfileLeaves.map((leave, idx) => (
+                      <div
+                        key={leave.id || idx}
+                        className="flex items-center justify-between rounded-xl border border-gray-100 p-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">
+                            {leave.leave_type || "Leave"} · {leave.from_date} to{" "}
+                            {leave.to_date}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {leave.reason || "No reason given"}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            leave.status === "Approved"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : leave.status === "Rejected"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {leave.status || "Pending"}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 mt-5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeTeacherManagementViewModal();
+                    openTeacherManagementEditModal(
+                      teacherManagementSelectedTeacher,
+                    );
+                  }}
+                  className="px-5 py-2 bg-blue-600 text-white rounded-lg"
+                >
+                  Edit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={closeTeacherManagementViewModal}
+                  className="px-5 py-2 border rounded-lg"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* =========================== TEACHERS SECTION END ============================ */}
+
+        {/*  ============================= MY CLASSES START =============================  */}
+        {activeSection === "students" && (
+          <section className="section p-4 sm:p-6 space-y-6 hidden active">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 text-white">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Students Management
+                  </h2>
+
+                  <p className="text-xs sm:text-sm opacity-90">
+                    Manage students, profiles and academic records
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={studentManagement.openEnrollModal}
+                  className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-indigo-50 transition-all duration-200"
+                >
+                  <i className="bi bi-person-plus-fill me-2"></i>
+                  Enroll Student
+                </button>
               </div>
             </div>
 
-            {/* ============ ADD/EDIT TEACHER MODAL ============ */}
-            {teacherManagement.teacherModalOpen && (
-              <div
-                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget) {
-                    teacherManagement.closeTeacherModal();
-                  }
-                }}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
+              <input
+                type="text"
+                placeholder="Search class, batch, subject..."
+                value={classSearch}
+                onChange={(e) => setClassSearch(e.target.value)}
+                className="px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl text-sm outline-none"
+              />
+
+              <select
+                value={divisionFilter}
+                onChange={(e) => setDivisionFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl text-sm outline-none"
               >
-                <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-slate-800">
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-800">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                      {teacherManagement.teacherSaveResult
-                        ? "Teacher Saved"
-                        : teacherManagement.teacherForm.id
-                        ? "Update Teacher"
-                        : "Add New Teacher"}
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={teacherManagement.closeTeacherModal}
-                      disabled={teacherManagement.teacherSaving}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
-                    >
-                      <i className="bi bi-x-lg" />
-                    </button>
-                  </div>
+                <option value="">All Divisions</option>
+                {(divisionOptions || []).map((division) => (
+                  <option key={division} value={division}>
+                    {division}
+                  </option>
+                ))}
+              </select>
 
-                  {teacherManagement.teacherSaveResult ? (
-                    <div className="space-y-4 px-6 py-6">
-                      <div className="flex flex-col items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                        <i className="bi bi-check-circle text-3xl text-emerald-600 dark:text-emerald-300" />
-                        <p className="font-semibold text-emerald-800 dark:text-emerald-200">
-                          {teacherManagement.teacherSaveResult.teacher
-                            ?.full_name || "Teacher"}{" "}
-                          {teacherManagement.teacherSaveResult.isEdit
-                            ? "was updated successfully"
-                            : "was added successfully"}
-                        </p>
-                      </div>
+              <select
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-xl text-sm outline-none"
+              >
+                <option value="">All Sections</option>
+                {(sectionOptions || []).map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
+              </select>
 
-                      {teacherManagement.teacherSaveResult.defaultPassword && (
-                        <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-600">
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                            Login Credentials - share with the teacher
-                          </p>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <p className="text-xs text-gray-400">
-                                Username
-                              </p>
-                              <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                                {teacherManagement.teacherSaveResult.teacher
-                                  ?.username}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-400">
-                                Temporary Password
-                              </p>
-                              <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                                {
-                                  teacherManagement.teacherSaveResult
-                                    .defaultPassword
-                                }
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+              <button
+                type="button"
+                onClick={resetClassFilters}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm font-medium"
+              >
+                Reset
+              </button>
+            </div>
 
-                      <div className="flex justify-end pt-2">
-                        <button
-                          type="button"
-                          onClick={teacherManagement.closeTeacherModal}
-                          className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                        >
-                          Done
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <form
-                      onSubmit={teacherManagement.saveTeacher}
-                      className="space-y-6 px-6 py-6"
-                    >
-                      {teacherManagement.teacherErrors.form && (
-                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-                          {teacherManagement.teacherErrors.form}
-                        </div>
-                      )}
-
-                      {/* BASIC INFO */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                          Basic Information
-                        </h3>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              First Name{" "}
-                              <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={teacherManagement.teacherForm.first_name}
-                              onChange={(event) =>
-                                teacherManagement.updateTeacherForm(
-                                  "first_name",
-                                  event.target.value,
-                                )
-                              }
-                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                                teacherManagement.teacherErrors.first_name
-                                  ? "border-red-500"
-                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                              }`}
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Middle Name
-                            </label>
-                            <input
-                              type="text"
-                              value={teacherManagement.teacherForm.middle_name}
-                              onChange={(event) =>
-                                teacherManagement.updateTeacherForm(
-                                  "middle_name",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Last Name{" "}
-                              <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              value={teacherManagement.teacherForm.last_name}
-                              onChange={(event) =>
-                                teacherManagement.updateTeacherForm(
-                                  "last_name",
-                                  event.target.value,
-                                )
-                              }
-                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                                teacherManagement.teacherErrors.last_name
-                                  ? "border-red-500"
-                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                              }`}
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Email <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="email"
-                              value={teacherManagement.teacherForm.email}
-                              onChange={(event) =>
-                                teacherManagement.updateTeacherForm(
-                                  "email",
-                                  event.target.value,
-                                )
-                              }
-                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                                teacherManagement.teacherErrors.email
-                                  ? "border-red-500"
-                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                              }`}
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Mobile
-                            </label>
-                            <input
-                              type="text"
-                              value={teacherManagement.teacherForm.mobile}
-                              onChange={(event) =>
-                                teacherManagement.updateTeacherForm(
-                                  "mobile",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                              Gender
-                            </label>
-                            <select
-                              value={teacherManagement.teacherForm.gender}
-                              onChange={(event) =>
-                                teacherManagement.updateTeacherForm(
-                                  "gender",
-                                  event.target.value,
-                                )
-                              }
-                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                            >
-                              <option value="">Select</option>
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
-                              <option value="Other">Other</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* PROFESSIONAL */}
-                      <div>
-                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                          Professional Details
-                        </h3>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                          <input
-                            type="text"
-                            placeholder="Designation"
-                            value={teacherManagement.teacherForm.designation}
-                            onChange={(event) =>
-                              teacherManagement.updateTeacherForm(
-                                "designation",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Specialization"
-                            value={teacherManagement.teacherForm.specialization}
-                            onChange={(event) =>
-                              teacherManagement.updateTeacherForm(
-                                "specialization",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="number"
-                            placeholder="Experience (years)"
-                            value={
-                              teacherManagement.teacherForm.experience_years
-                            }
-                            onChange={(event) =>
-                              teacherManagement.updateTeacherForm(
-                                "experience_years",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Degree"
-                            value={teacherManagement.teacherForm.degree}
-                            onChange={(event) =>
-                              teacherManagement.updateTeacherForm(
-                                "degree",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="University"
-                            value={teacherManagement.teacherForm.university}
-                            onChange={(event) =>
-                              teacherManagement.updateTeacherForm(
-                                "university",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          />
-                          <select
-                            value={teacherManagement.teacherForm.employment_type}
-                            onChange={(event) =>
-                              teacherManagement.updateTeacherForm(
-                                "employment_type",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                          >
-                            <option value="">Employment type</option>
-                            <option value="Full Time">Full Time</option>
-                            <option value="Part Time">Part Time</option>
-                            <option value="Contract">Contract</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* ASSIGNMENTS */}
-                      <div>
-                        <div className="mb-3 flex items-center justify-between">
-                          <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                            Class &amp; Subject Assignments
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={teacherManagement.addAssignmentRow}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
-                          >
-                            <i className="bi bi-plus-lg" />
-                            Add Assignment
-                          </button>
-                        </div>
-
-                        {teacherManagement.teacherForm.assignments.length ===
-                        0 ? (
-                          <p className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-xs text-gray-400 dark:border-slate-600">
-                            No classes assigned yet. Add one above.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {teacherManagement.teacherForm.assignments.map(
-                              (assignment, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center gap-2"
-                                >
-                                  <select
-                                    value={assignment.academic_class_id}
-                                    onChange={(event) =>
-                                      teacherManagement.updateAssignmentRow(
-                                        index,
-                                        "academic_class_id",
-                                        event.target.value,
-                                      )
-                                    }
-                                    className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                                  >
-                                    <option value="">Select class</option>
-                                    {teacherManagement.teacherOptions.academic_classes.map(
-                                      (cls) => (
-                                        <option key={cls.id} value={cls.id}>
-                                          {cls.display_name}
-                                        </option>
-                                      ),
-                                    )}
-                                  </select>
-
-                                  <select
-                                    value={assignment.subject_id}
-                                    onChange={(event) =>
-                                      teacherManagement.updateAssignmentRow(
-                                        index,
-                                        "subject_id",
-                                        event.target.value,
-                                      )
-                                    }
-                                    className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                                  >
-                                    <option value="">Select subject</option>
-                                    {teacherManagement.teacherOptions.subjects.map(
-                                      (subject) => (
-                                        <option
-                                          key={subject.id}
-                                          value={subject.id}
-                                        >
-                                          {subject.subject_name}
-                                        </option>
-                                      ),
-                                    )}
-                                  </select>
-
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      teacherManagement.removeAssignmentRow(
-                                        index,
-                                      )
-                                    }
-                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-100 text-red-600 transition hover:bg-red-50 dark:border-red-500/20 dark:text-red-300 dark:hover:bg-red-500/10"
-                                  >
-                                    <i className="bi bi-trash3" />
-                                  </button>
-                                </div>
-                              ),
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end">
-                        <button
-                          type="button"
-                          onClick={teacherManagement.closeTeacherModal}
-                          disabled={teacherManagement.teacherSaving}
-                          className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-white disabled:opacity-60 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={teacherManagement.teacherSaving}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {teacherManagement.teacherSaving ? (
-                            <>
-                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                              Saving...
-                            </>
-                          ) : teacherManagement.teacherForm.id ? (
-                            "Update Teacher"
-                          ) : (
-                            "Add Teacher"
-                          )}
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </div>
+            {/* LOADING */}
+            {classesLoading && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center shadow-sm">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Loading classes...
+                </p>
               </div>
             )}
 
-            {/* ============ VIEW TEACHER DETAIL MODAL ============ */}
-            {teacherManagement.detailModal.open && (
-              <div
-                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget) {
-                    teacherManagement.closeTeacherDetail();
-                  }
-                }}
-              >
-                <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-slate-800">
-                  <div className="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-800">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                      Teacher Profile
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={teacherManagement.closeTeacherDetail}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
-                    >
-                      <i className="bi bi-x-lg" />
-                    </button>
-                  </div>
+            {/* EMPTY */}
+            {!classesLoading && myclasses?.length === 0 && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center shadow-sm">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No assigned classes found
+                </p>
+              </div>
+            )}
 
-                  <div className="px-6 py-5">
-                    {teacherManagement.detailLoading ? (
-                      <div className="flex flex-col items-center gap-3 py-16 text-gray-500">
-                        <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
-                        Loading teacher...
-                      </div>
-                    ) : teacherManagement.detailError ? (
-                      <p className="py-10 text-center text-sm text-red-600">
-                        {teacherManagement.detailError}
-                      </p>
-                    ) : teacherManagement.detailData ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-4">
-                          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100 text-xl font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                            {teacherManagement.detailData.first_name?.[0]}
-                            {teacherManagement.detailData.last_name?.[0]}
-                          </span>
-                          <div>
-                            <p className="text-lg font-bold text-gray-900 dark:text-white">
-                              {teacherManagement.detailData.full_name}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              {teacherManagement.detailData.teacher_id} ·{" "}
-                              {teacherManagement.detailData.designation ||
-                                "Teacher"}
-                            </p>
-                          </div>
+            {/* CLASS CARDS */}
+            {!classesLoading && myclasses?.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {myclasses.map((item) => {
+                  const activeStudents =
+                    item.students?.filter((s) => s.status === "Active")
+                      .length || 0;
+
+                  return (
+                    <div
+                      key={item.teacher_class_id}
+                      onClick={() => openClassDetail(item)}
+                      className="cursor-pointer bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm space-y-4 hover:shadow-md transition-all duration-200 hover:-translate-y-1"
+                    >
+                      {/* TOP */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <h3 className="font-semibold text-lg">
+                            {item.class_name}
+                          </h3>
+
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {item.subject_name}
+                          </p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-4 text-sm dark:bg-slate-900/50">
-                          <div>
-                            <p className="text-xs text-gray-400">Mobile</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {teacherManagement.detailData.mobile || "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">Email</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {teacherManagement.detailData.email || "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">
-                              Experience
-                            </p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {teacherManagement.detailData.experience_years ||
-                                0}{" "}
-                              years
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-400">Status</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">
-                              {teacherManagement.detailData.status || "—"}
-                            </p>
-                          </div>
+                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-1 rounded-full whitespace-nowrap">
+                          Active
+                        </span>
+                      </div>
+
+                      {/* STATS */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-center">
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                            Students
+                          </p>
+
+                          <h4 className="font-semibold text-lg">
+                            {item.total_students || 0}
+                          </h4>
+                        </div>
+
+                        <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-xl text-center">
+                          <p className="text-xs text-indigo-600">Active</p>
+
+                          <h4 className="font-semibold text-indigo-600 text-lg">
+                            {activeStudents}
+                          </h4>
+                        </div>
+                      </div>
+
+                      {/* PROGRESS */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                          <span>Class Strength</span>
+
+                          <span>{item.total_students || 0}</span>
+                        </div>
+
+                        <div className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full"
+                            style={{
+                              width: `${
+                                item.total_students > 0
+                                  ? (activeStudents / item.total_students) * 100
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+        {/* ================= CLASS DETAIL MODAL ================= */}
+        <div
+          className={`${
+            isClassDetailOpen ? "flex" : "hidden"
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-50 p-2 sm:p-4`}
+        >
+          <div className="w-full max-w-6xl mx-auto bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 space-y-5 max-h-[95vh] overflow-hidden">
+            {/* HEADER */}
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-lg sm:text-xl font-semibold">
+                  {selectedMyClass?.class_name}
+                </h2>
+
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                  {selectedMyClass?.subject_name} • Student Directory
+                </p>
+              </div>
+
+              <button
+                onClick={closeClassDetail}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* SEARCH + STATS */}
+            <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+              <input
+                type="text"
+                placeholder="Search student..."
+                value={myClassStudentSearch}
+                onChange={(e) => setMyClassStudentSearch(e.target.value)}
+                className="w-full lg:w-72 px-4 py-2 border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-800 dark:text-white rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+              />
+
+              <div className="flex gap-2 text-xs flex-wrap">
+                <span className="bg-gray-100 dark:bg-slate-700 px-3 py-1 rounded-full">
+                  Total: {selectedMyClass?.total_students || 0}
+                </span>
+
+                <span className="bg-green-100 dark:bg-green-900/30 text-green-600 px-3 py-1 rounded-full">
+                  Active:{" "}
+                  {selectedMyClass?.students?.filter(
+                    (s) => s.status === "Active",
+                  ).length || 0}
+                </span>
+
+                <span className="bg-red-100 dark:bg-red-900/30 text-red-600 px-3 py-1 rounded-full">
+                  Inactive:{" "}
+                  {selectedMyClass?.students?.filter(
+                    (s) => s.status === "Inactive",
+                  ).length || 0}
+                </span>
+              </div>
+            </div>
+
+            {/* TABLE HEADER */}
+            <div className="hidden md:grid grid-cols-12 text-xs text-gray-500 dark:text-gray-400 px-4 py-3 bg-gray-50 dark:bg-slate-700 rounded-xl">
+              <div className="col-span-3">Student</div>
+              <div className="col-span-2">Roll No</div>
+              <div className="col-span-2">Mobile</div>
+              <div className="col-span-2">Parent</div>
+              <div className="col-span-2">Status</div>
+              <div className="col-span-1 text-right">Action</div>
+            </div>
+
+            {/* STUDENTS */}
+            <div className="space-y-3 overflow-y-auto max-h-[60vh] pr-1">
+              {filteredStudents?.length > 0 ? (
+                filteredStudents.map((student) => (
+                  <div
+                    key={student.student_id || student.id}
+                    className="grid grid-cols-1 md:grid-cols-12 items-center gap-3 px-4 py-3 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl hover:shadow-sm transition"
+                  >
+                    {/* STUDENT */}
+                    <div className="md:col-span-3 flex items-center gap-3">
+                      <img
+                        src={`https://i.pravatar.cc/150?u=${student.student_id}`}
+                        alt={student.full_name}
+                        className="w-11 h-11 rounded-full object-cover"
+                      />
+
+                      <div>
+                        <p className="text-sm font-medium">
+                          {student.full_name}
+                        </p>
+
+                        <p className="text-xs text-gray-400">
+                          {student.gender || "N/A"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* ROLL */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.roll_number || "-"}
+                    </div>
+
+                    {/* MOBILE */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.mobile || "-"}
+                    </div>
+
+                    {/* PARENT */}
+                    <div className="md:col-span-2 text-sm">
+                      {student.parent_name || "-"}
+                    </div>
+
+                    {/* STATUS */}
+                    <div className="md:col-span-2">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full ${
+                          student.status === "Active"
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-600"
+                            : "bg-red-100 dark:bg-red-900/30 text-red-600"
+                        }`}
+                      >
+                        {student.status}
+                      </span>
+                    </div>
+
+                    {/* ACTION */}
+                    <div className="md:col-span-1 md:text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openStudentProfile(student);
+                        }}
+                        className="text-indigo-600 text-xs font-medium hover:underline"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="bg-gray-50 dark:bg-slate-700 rounded-2xl p-6 text-center">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No students found
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* ================= STUDENT PROFILE MODAL ================= */}
+        <div
+          className={`${
+            isStudentProfileOpen ? "flex" : "hidden"
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[60] p-2 sm:p-4`}
+        >
+          <div className="bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 w-full max-w-5xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
+            {/* HEADER */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Student Profile</h2>
+
+              <button
+                onClick={closeStudentProfile}
+                className="text-gray-400 text-2xl hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* PROFILE */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+              <img
+                src={`https://i.pravatar.cc/150?u=${selectedStudent?.student_id}`}
+                alt={selectedStudent?.full_name}
+                className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm"
+              />
+
+              <div className="text-center sm:text-left">
+                <h3 className="text-xl font-semibold">
+                  {selectedStudent?.full_name}
+                </h3>
+
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Student ID: {selectedStudent?.student_id || "N/A"}
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
+                  <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.status || "Unknown"}
+                  </span>
+
+                  <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.gender || "N/A"}
+                  </span>
+
+                  <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-600 px-2 py-1 rounded-full">
+                    {selectedStudent?.blood_group || "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* TABS */}
+            <div className="flex gap-2 border-b border-gray-200 dark:border-slate-700">
+              {[
+                {
+                  key: "overview",
+                  label: "Overview",
+                  icon: "bi-person-lines-fill",
+                },
+                {
+                  key: "attendance",
+                  label: "Attendance",
+                  icon: "bi-calendar-check",
+                },
+                { key: "leaves", label: "Leaves", icon: "bi-calendar-x" },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setStudentProfileTab(tab.key)}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
+                    studentProfileTab === tab.key
+                      ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  }`}
+                >
+                  <i className={`bi ${tab.icon}`} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* ================= OVERVIEW TAB ================= */}
+            {studentProfileTab === "overview" && (
+              <>
+                {/* INFO */}
+                <div className="grid sm:grid-cols-2 gap-6 text-sm">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                      Contact Info
+                    </h4>
+
+                    <div>Email: {selectedStudent?.email || "-"}</div>
+
+                    <div>Mobile: {selectedStudent?.mobile || "-"}</div>
+
+                    <div>Address: {selectedStudent?.address || "-"}</div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                      Academic
+                    </h4>
+
+                    <div>DOB: {selectedStudent?.date_of_birth || "-"}</div>
+
+                    <div>Roll No: {selectedStudent?.roll_number || "-"}</div>
+
+                    <div>
+                      Previous School: {selectedStudent?.previous_school || "-"}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                      Family
+                    </h4>
+
+                    <div>Father: {selectedStudent?.father_name || "-"}</div>
+
+                    <div>Mother: {selectedStudent?.mother_name || "-"}</div>
+
+                    <div>Parent: {selectedStudent?.parent_name || "-"}</div>
+
+                    <div>
+                      Parent Mobile: {selectedStudent?.parent_mobile || "-"}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                      Emergency
+                    </h4>
+
+                    <div>
+                      Contact: {selectedStudent?.emergency_contact_name || "-"}
+                    </div>
+
+                    <div>
+                      Number: {selectedStudent?.emergency_contact_number || "-"}
+                    </div>
+
+                    <div>
+                      Relation:{" "}
+                      {selectedStudent?.emergency_contact_relation || "-"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* MEDICAL */}
+                <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-xl text-sm">
+                  <h4 className="font-medium text-red-600 mb-2">
+                    Medical Info
+                  </h4>
+
+                  <p>
+                    Medical Conditions:{" "}
+                    {selectedStudent?.medical_conditions || "None"}
+                  </p>
+
+                  <p>Allergies: {selectedStudent?.allergies || "None"}</p>
+                </div>
+              </>
+            )}
+
+            {/* ================= ATTENDANCE TAB ================= */}
+            {studentProfileTab === "attendance" && (
+              <div className="space-y-4">
+                {studentProfileAttendanceLoading ? (
+                  <div className="flex flex-col items-center gap-3 py-12 text-gray-500">
+                    <span className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                    Loading attendance...
+                  </div>
+                ) : studentProfileAttendance?.summary ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-xl bg-emerald-50 dark:bg-emerald-500/10 p-4 text-center">
+                        <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                          {studentProfileAttendance.summary.present || 0}
+                        </p>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                          Present
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-red-50 dark:bg-red-500/10 p-4 text-center">
+                        <p className="text-2xl font-bold text-red-700 dark:text-red-300">
+                          {studentProfileAttendance.summary.absent || 0}
+                        </p>
+                        <p className="text-xs text-red-600 dark:text-red-400">
+                          Absent
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 p-4 text-center">
+                        <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                          {studentProfileAttendance.summary.late || 0}
+                        </p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          Late
+                        </p>
+                      </div>
+                    </div>
+
+                    {(studentProfileAttendance.records || []).length > 0 && (
+                      <div className="overflow-x-auto overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700">
+                        <table className="min-w-full text-left text-sm">
+                          <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-slate-900/70 dark:text-gray-400">
+                            <tr>
+                              <th className="px-4 py-2.5">Date</th>
+                              <th className="px-4 py-2.5">Status</th>
+                              <th className="px-4 py-2.5">Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                            {studentProfileAttendance.records
+                              .slice(0, 15)
+                              .map((record, idx) => (
+                                <tr key={record.id || idx}>
+                                  <td className="px-4 py-2.5 text-gray-700 dark:text-gray-200">
+                                    {record.date}
+                                  </td>
+                                  <td className="px-4 py-2.5">
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                        record.status === "Present"
+                                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                                          : record.status === "Late"
+                                            ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                                            : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                                      }`}
+                                    >
+                                      {record.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">
+                                    {record.remarks || record.reason || "—"}
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="py-10 text-center text-sm text-gray-400">
+                    No attendance data available yet.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ================= LEAVES TAB ================= */}
+            {studentProfileTab === "leaves" && (
+              <div className="space-y-3">
+                {studentProfileLeavesLoading ? (
+                  <div className="flex flex-col items-center gap-3 py-12 text-gray-500">
+                    <span className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                    Loading leaves...
+                  </div>
+                ) : studentProfileLeaves.length === 0 ? (
+                  <p className="py-10 text-center text-sm text-gray-400">
+                    No leave records found for this student.
+                  </p>
+                ) : (
+                  studentProfileLeaves.map((leave, idx) => (
+                    <div
+                      key={leave.id || idx}
+                      className="flex items-center justify-between rounded-xl border border-gray-100 p-3 dark:border-slate-700"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                          {leave.leave_type || "Leave"} · {leave.from_date} to{" "}
+                          {leave.to_date}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {leave.reason || "No reason given"}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          leave.status === "Approved"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                            : leave.status === "Rejected"
+                              ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                              : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                        }`}
+                      >
+                        {leave.status || "Pending"}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ============ ENROLL STUDENT MODAL (kept from Academic's own enroll flow) ============ */}
+        {/* ============ ENROLL STUDENT MODAL ============ */}
+        {studentManagement.enrollModalOpen && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                studentManagement.closeEnrollModal();
+              }
+            }}
+          >
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-slate-800">
+              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-800">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  {studentManagement.enrollResult
+                    ? "Student Enrolled"
+                    : "Enroll Student"}
+                </h2>
+
+                <button
+                  type="button"
+                  onClick={studentManagement.closeEnrollModal}
+                  disabled={studentManagement.enrollSaving}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                >
+                  <i className="bi bi-x-lg" />
+                </button>
+              </div>
+
+              {studentManagement.enrollResult ? (
+                <div className="space-y-4 px-6 py-6">
+                  <div className="flex flex-col items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                    <i className="bi bi-check-circle text-3xl text-emerald-600 dark:text-emerald-300" />
+                    <p className="font-semibold text-emerald-800 dark:text-emerald-200">
+                      {studentManagement.enrollForm.first_name} was enrolled
+                      successfully
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-600">
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      Login Credentials - share these with the student
+                    </p>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs text-gray-400">Student ID</p>
+                        <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                          {studentManagement.enrollResult.student_id}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">User ID</p>
+                        <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                          {studentManagement.enrollResult.user_id}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">
+                          Temporary Password
+                        </p>
+                        <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                          {studentManagement.enrollResult.password}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={studentManagement.closeEnrollModal}
+                      className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={studentManagement.enrollAnother}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700"
+                    >
+                      <i className="bi bi-person-plus" />
+                      Enroll Another
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form
+                  onSubmit={studentManagement.submitEnrollment}
+                  className="space-y-6 px-6 py-6"
+                >
+                  {studentManagement.enrollOptions.academic_classes.length ===
+                    0 &&
+                    !studentManagement.enrollOptionsLoading && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                        <i className="bi bi-exclamation-triangle mr-1.5" />
+                        No classes have been set up yet. Go to{" "}
+                        <span className="font-semibold">
+                          Grades &amp; Sections
+                        </span>{" "}
+                        and <span className="font-semibold">Classes</span>{" "}
+                        first, then come back to enroll students.
+                      </div>
+                    )}
+
+                  {studentManagement.enrollErrors.form && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                      {studentManagement.enrollErrors.form}
+                    </div>
+                  )}
+
+                  {/* CLASS */}
+                  <div>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      Class <span className="text-red-500">*</span>
+                    </label>
+
+                    <select
+                      value={studentManagement.enrollForm.academic_class_id}
+                      onChange={(event) =>
+                        studentManagement.updateEnrollForm(
+                          "academic_class_id",
+                          event.target.value,
+                        )
+                      }
+                      className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition dark:bg-slate-900 dark:text-white ${
+                        studentManagement.enrollErrors.academic_class_id
+                          ? "border-red-500"
+                          : "border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600"
+                      }`}
+                    >
+                      <option value="">Select class</option>
+                      {studentManagement.enrollOptions.academic_classes.map(
+                        (cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.display_name}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </div>
+
+                  {/* LOGIN CREDENTIALS (editable, auto-suggested) */}
+                  {studentManagement.enrollForm.academic_class_id && (
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+                        Login Credentials
+                      </p>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                            Student ID <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={studentManagement.enrollForm.student_id}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "student_id",
+                                event.target.value,
+                              )
+                            }
+                            placeholder={
+                              studentManagement.enrollPreviewLoading
+                                ? "Loading suggestion..."
+                                : "Auto-suggested, editable"
+                            }
+                            className={`w-full rounded-lg border px-3 py-2 font-mono text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
+                              studentManagement.enrollErrors.student_id
+                                ? "border-red-500"
+                                : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                            }`}
+                          />
                         </div>
 
                         <div>
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                            Teaching Load (
-                            {(teacherManagement.detailData.assignments || [])
-                              .length}
-                            )
-                          </p>
+                          <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                            User ID <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={studentManagement.enrollForm.user_id}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "user_id",
+                                event.target.value,
+                              )
+                            }
+                            placeholder={
+                              studentManagement.enrollPreviewLoading
+                                ? "Loading suggestion..."
+                                : "Auto-suggested, editable"
+                            }
+                            className={`w-full rounded-lg border px-3 py-2 font-mono text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
+                              studentManagement.enrollErrors.user_id
+                                ? "border-red-500"
+                                : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                            }`}
+                          />
+                        </div>
 
-                          {(teacherManagement.detailData.assignments || [])
-                            .length === 0 ? (
-                            <p className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-xs text-gray-400 dark:border-slate-600">
-                              No classes assigned yet.
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                            Roll Number
+                          </label>
+                          <input
+                            type="number"
+                            value={studentManagement.enrollForm.roll_number}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "roll_number",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                            Password
+                          </label>
+                          <input
+                            type="text"
+                            value={studentManagement.enrollForm.password}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "password",
+                                event.target.value,
+                              )
+                            }
+                            placeholder="Leave blank to auto-generate"
+                            className={`w-full rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
+                              studentManagement.enrollErrors.password
+                                ? "border-red-500"
+                                : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                            }`}
+                          />
+                          {studentManagement.enrollErrors.password && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {studentManagement.enrollErrors.password}
                             </p>
-                          ) : (
-                            <div className="space-y-1.5">
-                              {teacherManagement.detailData.assignments.map(
-                                (assignment) => (
-                                  <div
-                                    key={assignment.id}
-                                    className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-slate-900/50"
-                                  >
-                                    <span className="text-gray-700 dark:text-gray-200">
-                                      {assignment.division_name}{" "}
-                                      {assignment.section_name}
-                                    </span>
-                                    <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
-                                      {assignment.subject_name}
-                                    </span>
-                                  </div>
-                                ),
-                              )}
-                            </div>
                           )}
                         </div>
                       </div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* ============ DELETE CONFIRM MODAL ============ */}
-            {teacherManagement.deleteModal.open && (
-              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
-                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300">
-                    <i className="bi bi-trash3 text-2xl" />
-                  </span>
-                  <div className="mt-4 text-center">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                      Delete Teacher?
-                    </h2>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      You are deleting{" "}
-                      <span className="font-semibold text-gray-800 dark:text-gray-200">
-                        {teacherManagement.deleteModal.teacher?.full_name}
-                      </span>
-                      . This also removes their class assignments.
-                    </p>
-                    {teacherManagement.deleteError && (
-                      <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-left text-xs text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-                        <div className="flex gap-2">
-                          <i className="bi bi-exclamation-triangle-fill mt-0.5" />
-                          <p>{teacherManagement.deleteError}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
-                    <button
-                      type="button"
-                      onClick={teacherManagement.closeDeleteModal}
-                      disabled={teacherManagement.deleting}
-                      className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={teacherManagement.deleteTeacher}
-                      disabled={teacherManagement.deleting}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {teacherManagement.deleting ? (
-                        <>
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Deleting...
-                        </>
-                      ) : (
-                        <>
-                          <i className="bi bi-trash3" />
-                          Delete Teacher
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+                      <p className="mt-2 text-xs text-indigo-600/80 dark:text-indigo-300/80">
+                        Student ID and User ID are auto-suggested but you can
+                        edit them. Leave Password blank to auto-generate one
+                        from the mobile number.
+                      </p>
+                    </div>
+                  )}
 
-            {/* ============ PASSWORD RESET MODAL ============ */}
-            {teacherManagement.passwordModal.open && (
-              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                <form
-                  onSubmit={teacherManagement.submitPasswordReset}
-                  className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-800"
-                >
-                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5 dark:border-slate-700">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                      Reset Password
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={teacherManagement.closePasswordModal}
-                      disabled={teacherManagement.passwordSaving}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
-                    >
-                      <i className="bi bi-x-lg" />
-                    </button>
-                  </div>
+                  {/* BASIC INFO */}
+                  <div>
+                    <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
+                      Basic Information
+                    </h3>
 
-                  <div className="space-y-4 px-6 py-5">
-                    {teacherManagement.passwordSuccess ? (
-                      <div className="flex flex-col items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                        <i className="bi bi-check-circle text-2xl text-emerald-600 dark:text-emerald-300" />
-                        <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                          Password reset for{" "}
-                          {teacherManagement.passwordModal.teacher?.full_name}
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Set a new password for{" "}
-                          <span className="font-semibold text-gray-800 dark:text-gray-200">
-                            {
-                              teacherManagement.passwordModal.teacher
-                                ?.full_name
-                            }
-                          </span>
-                          .
-                        </p>
-
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          First Name <span className="text-red-500">*</span>
+                        </label>
                         <input
                           type="text"
-                          value={teacherManagement.passwordValue}
+                          value={studentManagement.enrollForm.first_name}
                           onChange={(event) =>
-                            teacherManagement.setPasswordValue(
+                            studentManagement.updateEnrollForm(
+                              "first_name",
                               event.target.value,
                             )
                           }
-                          placeholder="New password (min 6 characters)"
-                          autoFocus
-                          className={`w-full rounded-xl border px-4 py-3 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                            teacherManagement.passwordError
+                          className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
+                            studentManagement.enrollErrors.first_name
                               ? "border-red-500"
                               : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
                           }`}
                         />
+                      </div>
 
-                        {teacherManagement.passwordError && (
-                          <p className="text-xs text-red-500">
-                            {teacherManagement.passwordError}
-                          </p>
-                        )}
-                      </>
-                    )}
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Middle Name
+                        </label>
+                        <input
+                          type="text"
+                          value={studentManagement.enrollForm.middle_name}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "middle_name",
+                              event.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Last Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={studentManagement.enrollForm.last_name}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "last_name",
+                              event.target.value,
+                            )
+                          }
+                          className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
+                            studentManagement.enrollErrors.last_name
+                              ? "border-red-500"
+                              : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Mobile <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={studentManagement.enrollForm.mobile}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "mobile",
+                              event.target.value,
+                            )
+                          }
+                          className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
+                            studentManagement.enrollErrors.mobile
+                              ? "border-red-500"
+                              : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={studentManagement.enrollForm.email}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "email",
+                              event.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Gender
+                        </label>
+                        <select
+                          value={studentManagement.enrollForm.gender}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "gender",
+                              event.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        >
+                          <option value="">Select</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Date of Birth
+                        </label>
+                        <input
+                          type="date"
+                          value={studentManagement.enrollForm.date_of_birth}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "date_of_birth",
+                              event.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Blood Group
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. O+"
+                          value={studentManagement.enrollForm.blood_group}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "blood_group",
+                              event.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Address
+                        </label>
+                        <input
+                          type="text"
+                          value={studentManagement.enrollForm.address}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "address",
+                              event.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col-reverse gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900/50 sm:flex-row sm:justify-end">
+                  {/* PARENT / GUARDIAN */}
+                  <div>
+                    <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
+                      Parent / Guardian
+                    </h3>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <input
+                        type="text"
+                        placeholder="Father's name"
+                        value={studentManagement.enrollForm.father_name}
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "father_name",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Father's mobile"
+                        value={studentManagement.enrollForm.father_mobile}
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "father_mobile",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Father's email"
+                        value={studentManagement.enrollForm.father_email}
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "father_email",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Mother's name"
+                        value={studentManagement.enrollForm.mother_name}
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "mother_name",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Mother's mobile"
+                        value={studentManagement.enrollForm.mother_mobile}
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "mother_mobile",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="email"
+                        placeholder="Mother's email"
+                        value={studentManagement.enrollForm.mother_email}
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "mother_email",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* HEALTH & ENROLLMENT DETAILS */}
+                  <div>
+                    <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
+                      Health &amp; Enrollment Details
+                    </h3>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <input
+                        type="text"
+                        placeholder="Medical conditions (optional)"
+                        value={studentManagement.enrollForm.medical_conditions}
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "medical_conditions",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Allergies (optional)"
+                        value={studentManagement.enrollForm.allergies}
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "allergies",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Admission Date
+                        </label>
+                        <input
+                          type="date"
+                          value={studentManagement.enrollForm.admission_date}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "admission_date",
+                              event.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                        <p className="mt-1 text-xs text-gray-400">
+                          Leave blank to use today&apos;s date.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          Status
+                        </label>
+                        <select
+                          value={studentManagement.enrollForm.status}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "status",
+                              event.target.value,
+                            )
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EMERGENCY + OTHER */}
+                  <div>
+                    <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
+                      Emergency Contact
+                    </h3>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <input
+                        type="text"
+                        placeholder="Contact name"
+                        value={
+                          studentManagement.enrollForm.emergency_contact_name
+                        }
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "emergency_contact_name",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Contact number"
+                        value={
+                          studentManagement.enrollForm.emergency_contact_number
+                        }
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "emergency_contact_number",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Relation"
+                        value={
+                          studentManagement.enrollForm
+                            .emergency_contact_relation
+                        }
+                        onChange={(event) =>
+                          studentManagement.updateEnrollForm(
+                            "emergency_contact_relation",
+                            event.target.value,
+                          )
+                        }
+                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="Previous school (optional)"
+                      value={studentManagement.enrollForm.previous_school}
+                      onChange={(event) =>
+                        studentManagement.updateEnrollForm(
+                          "previous_school",
+                          event.target.value,
+                        )
+                      }
+                      className="mt-4 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end">
                     <button
                       type="button"
-                      onClick={teacherManagement.closePasswordModal}
-                      disabled={teacherManagement.passwordSaving}
+                      onClick={studentManagement.closeEnrollModal}
+                      disabled={studentManagement.enrollSaving}
                       className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-white disabled:opacity-60 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
                     >
-                      {teacherManagement.passwordSuccess ? "Close" : "Cancel"}
+                      Cancel
                     </button>
 
-                    {!teacherManagement.passwordSuccess && (
-                      <button
-                        type="submit"
-                        disabled={teacherManagement.passwordSaving}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {teacherManagement.passwordSaving ? (
-                          <>
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                            Saving...
-                          </>
-                        ) : (
-                          "Reset Password"
-                        )}
-                      </button>
-                    )}
+                    <button
+                      type="submit"
+                      disabled={
+                        studentManagement.enrollSaving ||
+                        studentManagement.enrollOptions.academic_classes
+                          .length === 0
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {studentManagement.enrollSaving ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Enrolling...
+                        </>
+                      ) : (
+                        "Enroll Student"
+                      )}
+                    </button>
                   </div>
                 </form>
-              </div>
-            )}
-          </section>
+              )}
+            </div>
+          </div>
         )}
 
         {/* ================= ACADEMIC YEARS (BATCHES) ================= */}
@@ -2779,8 +3622,8 @@ function AdminDashboard() {
                   </h2>
 
                   <p className="text-xs sm:text-sm opacity-90">
-                    Manage school years like 2025-26, see which one is
-                    active, and review any year&apos;s data.
+                    Manage school years like 2025-26, see which one is active,
+                    and review any year&apos;s data.
                   </p>
                 </div>
 
@@ -2822,14 +3665,13 @@ function AdminDashboard() {
               <p className="text-sm text-indigo-900 dark:text-indigo-200">
                 An <span className="font-semibold">Academic Year</span> is a
                 school year like &quot;2025-26&quot;. Mark one as{" "}
-                <span className="font-semibold">Current</span> so new
-                admissions and classes default to it. Click{" "}
-                <span className="font-semibold">View</span> on any year -
-                past or present - to see its grades, sections and student
-                counts. Use{" "}
-                <span className="font-semibold">Copy Classes</span> to
-                reuse last year&apos;s grade/section setup instead of
-                rebuilding it from scratch.
+                <span className="font-semibold">Current</span> so new admissions
+                and classes default to it. Click{" "}
+                <span className="font-semibold">View</span> on any year - past
+                or present - to see its grades, sections and student counts. Use{" "}
+                <span className="font-semibold">Copy Classes</span> to reuse
+                last year&apos;s grade/section setup instead of rebuilding it
+                from scratch.
               </p>
             </div>
 
@@ -2982,10 +3824,10 @@ function AdminDashboard() {
                                 batch.academic_status === "Current"
                                   ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
                                   : batch.academic_status === "Upcoming"
-                                  ? "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
-                                  : batch.academic_status === "Completed"
-                                  ? "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
-                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                                    ? "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
+                                    : batch.academic_status === "Completed"
+                                      ? "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+                                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
                               }`}
                             >
                               {batch.academic_status === "Current" && (
@@ -3059,7 +3901,9 @@ function AdminDashboard() {
                       {canWriteAcademic && (
                         <button
                           type="button"
-                          onClick={() => batchManagement.openRolloverModal(batch)}
+                          onClick={() =>
+                            batchManagement.openRolloverModal(batch)
+                          }
                           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200 dark:hover:bg-slate-700"
                         >
                           <i className="bi bi-copy" />
@@ -3419,7 +4263,7 @@ function AdminDashboard() {
                             No classes were set up for this academic year.
                           </p>
                         ) : (
-                          <div className="mt-5 overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700">
+                          <div className="mt-5 overflow-x-auto overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700">
                             <table className="min-w-full text-left text-sm">
                               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-900/70 dark:text-gray-400">
                                 <tr>
@@ -3435,8 +4279,7 @@ function AdminDashboard() {
                                   (cls) => (
                                     <tr key={cls.id}>
                                       <td className="px-4 py-2.5 font-medium text-gray-800 dark:text-gray-200">
-                                        {cls.division_name}{" "}
-                                        {cls.section_name}
+                                        {cls.division_name} {cls.section_name}
                                       </td>
                                       <td className="px-4 py-2.5 text-right text-gray-600 dark:text-gray-300">
                                         {cls.student_count}
@@ -3505,8 +4348,7 @@ function AdminDashboard() {
                       <>
                         <div>
                           <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            Copy into{" "}
-                            <span className="text-red-500">*</span>
+                            Copy into <span className="text-red-500">*</span>
                           </label>
 
                           <select
@@ -3518,7 +4360,9 @@ function AdminDashboard() {
                             }
                             className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                           >
-                            <option value="">Select target academic year</option>
+                            <option value="">
+                              Select target academic year
+                            </option>
                             {batchManagement.batches
                               .filter(
                                 (b) =>
@@ -3534,10 +4378,9 @@ function AdminDashboard() {
                         </div>
 
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Only the grade + section combinations are copied
-                          - no students are moved, and classes that
-                          already exist in the target year are skipped
-                          automatically.
+                          Only the grade + section combinations are copied - no
+                          students are moved, and classes that already exist in
+                          the target year are skipped automatically.
                         </p>
 
                         {batchManagement.rolloverError && (
@@ -3589,9 +4432,7 @@ function AdminDashboard() {
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg sm:text-xl font-semibold">
-                    Subjects
-                  </h2>
+                  <h2 className="text-lg sm:text-xl font-semibold">Subjects</h2>
 
                   <p className="text-xs sm:text-sm opacity-90">
                     The subjects taught across your school - Math, Science,
@@ -3608,9 +4449,7 @@ function AdminDashboard() {
                   >
                     <i
                       className={`bi bi-arrow-clockwise ${
-                        subjectManagement.subjectsLoading
-                          ? "animate-spin"
-                          : ""
+                        subjectManagement.subjectsLoading ? "animate-spin" : ""
                       }`}
                     />
                     Refresh
@@ -3643,8 +4482,8 @@ function AdminDashboard() {
                 students choose.{" "}
                 <span className="font-semibold">Practical</span> subjects
                 involve labs or hands-on work. Marking a subject{" "}
-                <span className="font-semibold">Inactive</span> hides it
-                from new timetables and exams without deleting its history.
+                <span className="font-semibold">Inactive</span> hides it from
+                new timetables and exams without deleting its history.
               </p>
             </div>
 
@@ -3733,9 +4572,7 @@ function AdminDashboard() {
                 <select
                   value={subjectManagement.subjectStatusFilter}
                   onChange={(event) =>
-                    subjectManagement.setSubjectStatusFilter(
-                      event.target.value,
-                    )
+                    subjectManagement.setSubjectStatusFilter(event.target.value)
                   }
                   className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 >
@@ -3878,9 +4715,7 @@ function AdminDashboard() {
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    subjectManagement.openSubjectModal(
-                                      subject,
-                                    )
+                                    subjectManagement.openSubjectModal(subject)
                                   }
                                   title="Edit subject"
                                   className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 text-indigo-600 transition hover:bg-indigo-50 dark:border-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
@@ -3891,9 +4726,7 @@ function AdminDashboard() {
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    subjectManagement.deleteSubject(
-                                      subject.id,
-                                    )
+                                    subjectManagement.deleteSubject(subject.id)
                                   }
                                   disabled={subjectManagement.subjectDeleting}
                                   title="Delete subject"
@@ -4110,15 +4943,15 @@ function AdminDashboard() {
                 <div className="text-sm text-indigo-900 dark:text-indigo-200">
                   <p className="font-semibold">How this works</p>
                   <p className="mt-1 leading-relaxed text-indigo-800/90 dark:text-indigo-200/80">
-                    <span className="font-semibold">Grades</span> are your
-                    year levels, like{" "}
+                    <span className="font-semibold">Grades</span> are your year
+                    levels, like{" "}
                     <span className="italic">Class 1, Class 2, Nursery</span>.{" "}
                     <span className="font-semibold">Sections</span> split a
                     grade into smaller groups, like{" "}
-                    <span className="italic">A, B, C</span>. Once you have
-                    both set up, head to{" "}
-                    <span className="font-semibold">Classes</span> to combine
-                    a grade and section into an actual class, like{" "}
+                    <span className="italic">A, B, C</span>. Once you have both
+                    set up, head to{" "}
+                    <span className="font-semibold">Classes</span> to combine a
+                    grade and section into an actual class, like{" "}
                     <span className="italic">Class 10 - A</span>.
                   </p>
                 </div>
@@ -4217,9 +5050,7 @@ function AdminDashboard() {
                       type="search"
                       value={divisionsSections.divisionSearch}
                       onChange={(event) => {
-                        divisionsSections.setDivisionSearch(
-                          event.target.value,
-                        );
+                        divisionsSections.setDivisionSearch(event.target.value);
                         divisionsSections.loadDivisions(event.target.value);
                       }}
                       placeholder="Search grades..."
@@ -4262,8 +5093,8 @@ function AdminDashboard() {
 
                               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                 Add your first grade, like{" "}
-                                <span className="italic">Class 1</span>, to
-                                get started.
+                                <span className="italic">Class 1</span>, to get
+                                started.
                               </p>
                             </div>
                           </td>
@@ -4369,9 +5200,7 @@ function AdminDashboard() {
                       type="search"
                       value={divisionsSections.sectionSearch}
                       onChange={(event) => {
-                        divisionsSections.setSectionSearch(
-                          event.target.value,
-                        );
+                        divisionsSections.setSectionSearch(event.target.value);
                         divisionsSections.loadSections(event.target.value);
                       }}
                       placeholder="Search sections..."
@@ -4833,13 +5662,10 @@ function AdminDashboard() {
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg sm:text-xl font-semibold">
-                    Classes
-                  </h2>
+                  <h2 className="text-lg sm:text-xl font-semibold">Classes</h2>
 
                   <p className="text-xs sm:text-sm opacity-90">
-                    Combine a Grade, Section and Academic Year into a
-                    class.
+                    Combine a Grade, Section and Academic Year into a class.
                   </p>
                 </div>
 
@@ -4885,17 +5711,11 @@ function AdminDashboard() {
                     A class is simply a{" "}
                     <span className="font-semibold">Grade</span> +{" "}
                     <span className="font-semibold">Section</span> for a
-                    specific <span className="font-semibold">
-                      Academic Year
-                    </span>{" "}
-                    - like{" "}
-                    <span className="italic">
-                      Class 10 - A (2025-26)
-                    </span>
-                    . No grades or sections yet? Set them up on the{" "}
-                    <span className="font-semibold">
-                      Grades &amp; Sections
-                    </span>{" "}
+                    specific{" "}
+                    <span className="font-semibold">Academic Year</span> - like{" "}
+                    <span className="italic">Class 10 - A (2025-26)</span>. No
+                    grades or sections yet? Set them up on the{" "}
+                    <span className="font-semibold">Grades &amp; Sections</span>{" "}
                     page first.
                   </p>
                 </div>
@@ -5039,9 +5859,9 @@ function AdminDashboard() {
                             </h3>
 
                             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                              Add your first class, or adjust the filters
-                              above. You&apos;ll need at least one Grade,
-                              Section and Academic Year first.
+                              Add your first class, or adjust the filters above.
+                              You&apos;ll need at least one Grade, Section and
+                              Academic Year first.
                             </p>
 
                             {canWriteAcademic && (
@@ -5159,8 +5979,8 @@ function AdminDashboard() {
                       </h2>
 
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Pick a Grade, Section and Academic Year - together
-                        they make one class.
+                        Pick a Grade, Section and Academic Year - together they
+                        make one class.
                       </p>
                     </div>
 
@@ -5184,8 +6004,7 @@ function AdminDashboard() {
                     <div>
                       <div className="mb-1.5 flex items-center justify-between">
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                          Academic Year{" "}
-                          <span className="text-red-500">*</span>
+                          Academic Year <span className="text-red-500">*</span>
                         </label>
 
                         {!academicClasses.newBatchOpen && (
@@ -5291,9 +6110,7 @@ function AdminDashboard() {
                           {academicClasses.options.batches.length === 0 && (
                             <p className="mt-1 text-xs text-amber-600">
                               No academic years yet - click{" "}
-                              <span className="font-semibold">
-                                Add new
-                              </span>{" "}
+                              <span className="font-semibold">Add new</span>{" "}
                               above to create one.
                             </p>
                           )}
@@ -5322,13 +6139,11 @@ function AdminDashboard() {
                           }`}
                         >
                           <option value="">Select grade</option>
-                          {academicClasses.options.divisions.map(
-                            (division) => (
-                              <option key={division.id} value={division.id}>
-                                {division.division_name}
-                              </option>
-                            ),
-                          )}
+                          {academicClasses.options.divisions.map((division) => (
+                            <option key={division.id} value={division.id}>
+                              {division.division_name}
+                            </option>
+                          ))}
                         </select>
 
                         {academicClasses.classErrors.division_id && (
@@ -5376,8 +6191,8 @@ function AdminDashboard() {
                     {(academicClasses.options.divisions.length === 0 ||
                       academicClasses.options.sections.length === 0) && (
                       <p className="text-xs text-amber-600">
-                        Add grades and sections first from the{" "}
-                        &quot;Grades &amp; Sections&quot; page.
+                        Add grades and sections first from the &quot;Grades
+                        &amp; Sections&quot; page.
                       </p>
                     )}
 
@@ -5528,7 +6343,2915 @@ function AdminDashboard() {
           </section>
         )}
 
+        {/* =========================== PREMIUM TIMETABLE SECTION ============================ */}
+        {activeSection === "timetable" && (
+          <section className="space-y-6 animate-in fade-in duration-500">
+            {/*  HEADER  */}
+            <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold">Timetable Management</h2>
+
+                  <p className="text-sm opacity-90 mt-1">
+                    Create and manage class schedules, teacher lectures and
+                    classroom allocation.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
+                  <button
+                    onClick={() => openLectureModal()}
+                    className="w-full sm:w-auto bg-white text-indigo-600 px-4 py-3 rounded-xl font-medium shadow hover:shadow-md transition"
+                  >
+                    + Schedule Lecture
+                  </button>
+
+                  <button
+                    onClick={refreshTimetable}
+                    className="bg-indigo-800 px-4 py-2 rounded-xl"
+                  >
+                    Refresh
+                  </button>
+
+                  <button
+                    onClick={exportTimetablePDF}
+                    className="bg-green-600 px-4 py-2 rounded-xl"
+                  >
+                    Export PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+            {/* FILTERS */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <select
+                  value={filters.academic_class_id}
+                  onChange={(e) =>
+                    updateFilter("academic_class_id", e.target.value)
+                  }
+                  className="w-full h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                >
+                  <option value="">All Classes</option>
+
+                  {TTClasses?.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.display_name || item.class_name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.subject_id}
+                  onChange={(e) => updateFilter("subject_id", e.target.value)}
+                  className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                >
+                  <option value="">All Subjects</option>
+
+                  {TTSubjects?.map((subject) => (
+                    <option key={subject.id} value={subject.id}>
+                      {subject.subject_name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.teacher_id}
+                  onChange={(e) => updateFilter("teacher_id", e.target.value)}
+                  className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium outline-none transition-all focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                >
+                  <option value="">All Teachers</option>
+
+                  {teachers?.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.first_name} {teacher.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* STATS */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+              {[
+                {
+                  title: "Total Lectures",
+                  value: stats.totalLectures,
+                  icon: "📚",
+                },
+                {
+                  title: "Subjects",
+                  value: stats.totalSubjects,
+                  icon: "📖",
+                },
+                {
+                  title: "Teachers",
+                  value: stats.totalTeachers,
+                  icon: "👨‍🏫",
+                },
+                {
+                  title: "Rooms",
+                  value: stats.totalRooms,
+                  icon: "🏫",
+                },
+                {
+                  title: "Weekly Load",
+                  value: stats.weeklyLoad,
+                  icon: "📊",
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="group rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                        {item.title}
+                      </p>
+
+                      <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                        {item.value}
+                      </h3>
+                    </div>
+
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-xl">
+                      {item.icon}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* TIMETABLE */}
+            <div className="w-full max-w-full overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">
+                    Weekly Timetable
+                  </h3>
+
+                  <p className="text-sm text-slate-500">
+                    View and manage scheduled lectures.
+                  </p>
+                </div>
+
+                <button
+                  onClick={refreshTimetable}
+                  className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+                >
+                  Refresh Data
+                </button>
+              </div>
+
+              {/* ================= MOBILE VIEW ================= */}
+              <div className="lg:hidden space-y-4">
+                {timeSlots.map((slot) => (
+                  <div
+                    key={slot}
+                    className="bg-white rounded-2xl shadow-sm border p-4"
+                  >
+                    <h3 className="font-semibold mb-4">{slot}</h3>
+
+                    <div className="space-y-3">
+                      {days.map((day) => {
+                        const lectures = getLecturesForSlot(day, slot);
+
+                        return (
+                          <div key={day} className="border rounded-xl p-3">
+                            <p className="font-medium text-indigo-600 mb-2">
+                              {day}
+                            </p>
+
+                            {lectures.length > 0 ? (
+                              lectures.map((lecture) => (
+                                <div key={lecture.id} className="space-y-2">
+                                  <p className="font-semibold">
+                                    {lecture.subject_name}
+                                  </p>
+
+                                  <p className="text-sm text-gray-500">
+                                    👨‍🏫 {lecture.teacher_name}
+                                  </p>
+
+                                  <p className="text-sm text-gray-500">
+                                    🏫 Room {lecture.room_no || "N/A"}
+                                  </p>
+
+                                  <p className="text-sm text-gray-500">
+                                    {lecture.start_time}-{lecture.end_time}
+                                  </p>
+
+                                  <div className="flex gap-2 pt-2">
+                                    <button
+                                      onClick={() => openLectureModal(lecture)}
+                                      className="flex-1 rounded-lg bg-blue-50 py-2 text-blue-600"
+                                    >
+                                      Edit
+                                    </button>
+
+                                    <button
+                                      onClick={() => deleteLecture(lecture.id)}
+                                      className="flex-1 rounded-lg bg-red-50 py-2 text-red-600"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  openLectureModal({
+                                    day,
+                                    slot,
+                                  })
+                                }
+                                className="w-full border-2 border-dashed rounded-xl py-4 text-gray-400"
+                              >
+                                + Add Lecture
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ================= DESKTOP VIEW ================= */}
+              <div className="hidden lg:block w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+                <table className="w-full table-fixed border-collapse">
+                  <thead className="sticky top-0 z-10 bg-slate-50">
+                    <tr>
+                      <th className="border-b border-r border-slate-200 px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-600">
+                        Time Slot
+                      </th>
+
+                      {days.map((day) => (
+                        <th
+                          key={day}
+                          className="border-b border-r border-slate-200 px-4 py-4 text-left text-xs font-bold uppercase tracking-wider text-slate-600"
+                        >
+                          {day}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {timeSlots.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={days.length + 1}
+                          className="px-6 py-16 text-center"
+                        >
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="text-5xl">📅</div>
+
+                            <h4 className="text-lg font-semibold text-slate-900">
+                              No Lectures Scheduled
+                            </h4>
+
+                            <p className="text-sm text-slate-500">
+                              Create your first lecture schedule.
+                            </p>
+
+                            <button
+                              onClick={() => openLectureModal()}
+                              className="mt-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                            >
+                              Schedule Lecture
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      timeSlots.map((slot) => (
+                        <tr key={slot} className="hover:bg-slate-50/50">
+                          <td className="border-r border-b border-slate-200 px-4 py-5 align-top font-semibold text-slate-700 whitespace-nowrap">
+                            {slot}
+                          </td>
+
+                          {days.map((day) => {
+                            const lectures = getLecturesForSlot(day, slot);
+
+                            return (
+                              <td
+                                key={`${day}-${slot}`}
+                                className="border-r border-b border-slate-200 p-3 align-top min-w-[280px]"
+                              >
+                                <div className="space-y-3">
+                                  {lectures.length > 0 ? (
+                                    lectures.map((lecture) => (
+                                      <div
+                                        key={lecture.id}
+                                        className="group rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div>
+                                            <h4 className="font-bold text-indigo-700">
+                                              {lecture.subject_name}
+                                            </h4>
+
+                                            <p className="mt-1 text-xs text-slate-500">
+                                              {lecture.lecture_type}
+                                            </p>
+                                          </div>
+
+                                          <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                            P{lecture.period_no}
+                                          </span>
+                                        </div>
+
+                                        <div className="mt-4 space-y-2 text-sm">
+                                          <div className="flex items-center gap-2 text-slate-600">
+                                            <span>👨‍🏫</span>
+                                            <span>
+                                              {lecture.teacher_name ||
+                                                "Not Assigned"}
+                                            </span>
+                                          </div>
+
+                                          <div className="flex items-center gap-2 text-slate-600">
+                                            <span>🏫</span>
+                                            <span>
+                                              Room {lecture.room_no || "N/A"}
+                                            </span>
+                                          </div>
+
+                                          <div className="flex items-center gap-2 text-slate-600">
+                                            <span>⏰</span>
+                                            <span>
+                                              {lecture.start_time} -{" "}
+                                              {lecture.end_time}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        {lecture.remarks && (
+                                          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                                            📝 {lecture.remarks}
+                                          </div>
+                                        )}
+
+                                        <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+                                          <button
+                                            onClick={() =>
+                                              openLectureModal(lecture)
+                                            }
+                                            className="flex-1 rounded-xl bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
+                                          >
+                                            Edit
+                                          </button>
+
+                                          <button
+                                            onClick={() =>
+                                              deleteLecture(lecture.id)
+                                            }
+                                            className="flex-1 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                                          >
+                                            Delete
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <button
+                                      onClick={() =>
+                                        openLectureModal({
+                                          day,
+                                          slot,
+                                        })
+                                      }
+                                      className="flex h-24 w-full items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 text-sm font-medium text-slate-400 transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600"
+                                    >
+                                      + Add Lecture
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ================= LECTURE MODAL ================= */}
+        <div
+          id="lectureModal"
+          className={`fixed inset-0 z-[70] ${
+            lectureModalOpen ? "flex" : "hidden"
+          } items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4`}
+        >
+          <div
+            className="
+      relative
+      w-full
+      max-w-5xl
+      max-h-[92vh]
+      overflow-hidden
+      rounded-2xl
+      bg-white
+      shadow-2xl
+      border border-slate-200
+      flex flex-col
+      animate-in fade-in zoom-in-95 duration-200
+    "
+          >
+            {/* HEADER */}
+            <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 flex items-center justify-between">
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                  Schedule Lecture
+                </h2>
+
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  Create and manage timetable entries
+                </p>
+              </div>
+
+              <button
+                onClick={closeLectureModal}
+                className="
+          flex items-center justify-center
+          h-10 w-10 rounded-xl
+          text-slate-500 hover:text-slate-700
+          hover:bg-slate-100
+          transition-all duration-200
+          flex-shrink-0
+        "
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* BODY */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {/* CLASS */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Class
+                  </label>
+
+                  <select
+                    value={lectureForm.academic_class_id || ""}
+                    onChange={(e) =>
+                      updateLectureForm("academic_class_id", e.target.value)
+                    }
+                    className="
+              w-full h-11 px-4
+              rounded-xl
+              border border-slate-200
+              bg-white
+              text-sm
+              focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500
+              outline-none
+              transition-all
+            "
+                  >
+                    <option value="">Select Class</option>
+
+                    {TTClasses?.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.display_name || item.class_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Division
+                  </label>
+
+                  <select
+                    value={selectedDivision}
+                    onChange={(e) => setSelectedDivision(e.target.value)}
+                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm"
+                  >
+                    <option value="">All Divisions</option>
+
+                    {divisions.map((division) => (
+                      <option key={division} value={division}>
+                        {division}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {/* DIVISION */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Division
+                  </label>
+
+                  <select
+                    value={lectureForm.division_id || ""}
+                    onChange={(e) =>
+                      updateLectureForm("division_id", e.target.value)
+                    }
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              text-sm focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                  >
+                    <option value="">Select Division</option>
+
+                    {TTDivisions?.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.division_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* SECTION */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Section
+                  </label>
+
+                  <select
+                    value={lectureForm.section_id || ""}
+                    onChange={(e) =>
+                      updateLectureForm("section_id", e.target.value)
+                    }
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              text-sm focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                  >
+                    <option value="">Select Section</option>
+
+                    {TTsections?.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.section_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* DAY */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Day
+                  </label>
+
+                  <select
+                    value={lectureForm.day}
+                    onChange={(e) => updateLectureForm("day", e.target.value)}
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              text-sm focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                  >
+                    <option value="">Select Day</option>
+
+                    <option>Monday</option>
+                    <option>Tuesday</option>
+                    <option>Wednesday</option>
+                    <option>Thursday</option>
+                    <option>Friday</option>
+                    <option>Saturday</option>
+                  </select>
+                </div>
+
+                {/* LECTURE TYPE */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Lecture Type
+                  </label>
+
+                  <select
+                    value={lectureForm.lecture_type || "Theory"}
+                    onChange={(e) =>
+                      updateLectureForm("lecture_type", e.target.value)
+                    }
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              text-sm focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                  >
+                    <option>Theory</option>
+                    <option>Practical</option>
+                    <option>Lab</option>
+                    <option>Sports</option>
+                    <option>Activity</option>
+                    <option>Exam</option>
+                  </select>
+                </div>
+
+                {/* PERIOD */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Period
+                  </label>
+
+                  <select
+                    value={lectureForm.period_no || ""}
+                    onChange={(e) => {
+                      const period = TTperiods.find(
+                        (p) => p.no === Number(e.target.value),
+                      );
+                      updateLectureForm("period_no", Number(e.target.value));
+                      updateLectureForm("start_time", period?.start || "");
+                      updateLectureForm("end_time", period?.end || "");
+                    }}
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              text-sm focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                  >
+                    <option value="">Select Period</option>
+
+                    {TTperiods.map((p) => (
+                      <option key={p.no} value={p.no}>
+                        P{p.no} ({p.start}-{p.end})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* TIME SLOT */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Time Slot
+                  </label>
+
+                  <input
+                    readOnly
+                    value={`${lectureForm.start_time || ""} - ${
+                      lectureForm.end_time || ""
+                    }`}
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              bg-slate-50 text-sm text-slate-600
+            "
+                  />
+                </div>
+
+                {/* SUBJECT */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Subject
+                  </label>
+
+                  <select
+                    value={lectureForm.subject_id || ""}
+                    onChange={(e) =>
+                      updateLectureForm("subject_id", e.target.value)
+                    }
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              text-sm focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                  >
+                    <option value="">Select Subject</option>
+
+                    {TTSubjects?.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.subject_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* TEACHER */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Assigned Teacher
+                  </label>
+
+                  <select
+                    value={lectureForm.teacher_id || ""}
+                    onChange={(e) =>
+                      updateLectureForm("teacher_id", e.target.value)
+                    }
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              text-sm focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                  >
+                    <option value="">Select Teacher</option>
+
+                    {teachers?.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.first_name} {item.last_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ROOM */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Classroom
+                  </label>
+
+                  <select
+                    value={lectureForm.room_no || ""}
+                    onChange={(e) =>
+                      updateLectureForm("room_no", e.target.value)
+                    }
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              text-sm focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                  >
+                    <option value="">Select Room</option>
+
+                    {rooms?.map((item) => (
+                      <option key={item.id} value={item.room_no}>
+                        {item.room_no}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* CAPACITY */}
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Room Capacity
+                  </label>
+
+                  <input
+                    readOnly
+                    value={
+                      rooms.find((r) => r.room_no === lectureForm.room_no)
+                        ?.capacity || "-"
+                    }
+                    className="
+              w-full h-11 px-4 rounded-xl border border-slate-200
+              bg-slate-50 text-sm text-slate-600
+            "
+                  />
+                </div>
+
+                {/* REMARKS */}
+                <div className="md:col-span-2 xl:col-span-3 space-y-1">
+                  <label className="text-xs font-medium text-slate-600">
+                    Remarks
+                  </label>
+
+                  <textarea
+                    rows={4}
+                    value={lectureForm.remarks}
+                    onChange={(e) =>
+                      updateLectureForm("remarks", e.target.value)
+                    }
+                    className="
+              w-full rounded-xl border border-slate-200
+              px-4 py-3 text-sm resize-none
+              focus:ring-2 focus:ring-indigo-500/20
+              focus:border-indigo-500 outline-none
+            "
+                    placeholder="Additional notes..."
+                  />
+                </div>
+              </div>
+
+              {/* CONFLICT ALERT */}
+              <div
+                id="lectureConflict"
+                className="hidden mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600"
+              />
+            </div>
+
+            {/* FOOTER */}
+            <div className="sticky bottom-0 bg-white border-t border-slate-200 px-4 sm:px-6 py-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
+                <button
+                  onClick={closeLectureModal}
+                  className="
+            w-full sm:w-auto
+            px-5 py-2.5
+            rounded-xl
+            border border-slate-300
+            bg-white
+            text-slate-700
+            font-medium
+            hover:bg-slate-50
+            transition-all
+          "
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={saveLecture}
+                  className="
+            w-full sm:w-auto
+            px-5 py-2.5
+            rounded-xl
+            bg-indigo-600
+            text-white
+            font-medium
+            hover:bg-indigo-700
+            shadow-sm
+            transition-all
+          "
+                >
+                  Save Lecture
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* ================= LECTURE MODAL END ================= */}
+
+        {activeSection === "attendance" && (
+          <section className="section active p-3 sm:p-5 lg:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-gray-100">
+            {/* HEADER */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 p-6 sm:p-8 shadow-xl">
+              <div className="relative z-10">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white">
+                  Attendance Management
+                </h2>
+
+                <p className="text-blue-100 mt-2 text-sm sm:text-base">
+                  Monitor and manage students & teachers attendance records
+                </p>
+              </div>
+
+              <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+              <div className="absolute right-20 bottom-0 w-28 h-28 bg-cyan-300/20 rounded-full blur-2xl"></div>
+            </div>
+
+            {/* ================= ON LEAVE TODAY (leaves cross-reference) ================= */}
+            {(onLeaveLoading || onLeaveToday.length > 0) && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10 sm:p-5">
+                <div className="flex items-center gap-2">
+                  <i className="bi bi-calendar-x text-amber-600 dark:text-amber-300" />
+                  <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                    On Approved Leave{" "}
+                    {selectedDate ? `- ${selectedDate}` : "Today"}
+                  </h3>
+                  {!onLeaveLoading && (
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-500/30 dark:text-amber-100">
+                      {onLeaveToday.length}
+                    </span>
+                  )}
+                </div>
+
+                {onLeaveLoading ? (
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                    Checking leave records...
+                  </p>
+                ) : (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {onLeaveToday.map((person) => (
+                      <span
+                        key={person.id}
+                        title={person.reason || ""}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-amber-800 shadow-sm dark:bg-slate-800 dark:text-amber-200"
+                      >
+                        <i
+                          className={`bi ${
+                            person.role === "Teacher"
+                              ? "bi-person-badge"
+                              : "bi-mortarboard"
+                          }`}
+                        />
+                        {person.name}
+                        <span className="text-amber-500 dark:text-amber-400">
+                          ({person.leave_type || person.role})
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ================= STATS ================= */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+              <div className="xl:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* PRESENT */}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-500 text-sm">Present</p>
+                      <h2 className="text-2xl font-bold text-green-600 mt-1">
+                        {attendanceStats?.present ?? 0}
+                      </h2>
+                    </div>
+
+                    <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+                      <i className="fas fa-check text-green-600"></i>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ABSENT */}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-500 text-sm">Absent</p>
+                      <h2 className="text-2xl font-bold text-red-500 mt-1">
+                        {attendanceStats.absent ?? 0}
+                      </h2>
+                    </div>
+
+                    <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                      <i className="fas fa-times text-red-500"></i>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TOTAL */}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-500 text-sm">Total</p>
+                      <h2 className="text-2xl font-bold text-blue-600 mt-1">
+                        {attendanceStats.total ?? 0}
+                      </h2>
+                    </div>
+
+                    <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                      <i className="fas fa-users text-blue-600"></i>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PERCENTAGE */}
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-500 text-sm">Attendance %</p>
+                      <h2 className="text-2xl font-bold text-purple-600 mt-1">
+                        {attendanceStats.percentage ?? 0}%
+                      </h2>
+                    </div>
+
+                    <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                      <i className="fas fa-chart-pie text-purple-600"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ================= FILTERS ================= */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                {/* ROLE */}
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Role
+                  </label>
+
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="students">Students</option>
+
+                    <option value="teachers">Teachers</option>
+                  </select>
+                </div>
+
+                {/* DATE */}
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Date
+                  </label>
+
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                {/* CLASS */}
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Class
+                  </label>
+                  <select
+                    value={selectedClass}
+                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    onChange={(e) => setSelectedClass(e.target.value)}
+                  >
+                    <option value="">All Classes</option>
+
+                    {classes.map((cls) => (
+                      <option key={`class-${cls.id}`} value={cls.id}>
+                        {cls.class_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* SEARCH */}
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">
+                    Search
+                  </label>
+
+                  <div className="relative">
+                    <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+
+                    <input
+                      type="text"
+                      value={searchAttendance}
+                      onChange={(e) => setSearchAttendance(e.target.value)}
+                      placeholder="Search..."
+                      className="w-full h-11 rounded-xl border border-gray-200 pl-11 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ================= TABLE ================= */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* TOP */}
+              <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg text-gray-800">
+                    Attendance List
+                  </h3>
+
+                  <p className="text-sm text-gray-500 mt-1">
+                    Manage daily attendance records
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => markAllAttendance(selectedClass, "Present")}
+                    disabled={!selectedClass}
+                    title={
+                      !selectedClass
+                        ? "Select a specific class above first"
+                        : "Mark everyone in this class Present"
+                    }
+                    className="px-4 h-10 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-green-500"
+                  >
+                    Mark All Present
+                  </button>
+
+                  <button
+                    onClick={() => markAllAttendance(selectedClass, "Absent")}
+                    disabled={!selectedClass}
+                    title={
+                      !selectedClass
+                        ? "Select a specific class above first"
+                        : "Mark everyone in this class Absent"
+                    }
+                    className="px-4 h-10 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-red-500"
+                  >
+                    Mark All Absent
+                  </button>
+                </div>
+              </div>
+
+              {/* TABLE */}
+              <div className="overflow-auto">
+                <table className="w-full min-w-[900px] text-sm">
+                  <thead className="bg-gray-50 sticky top-0 z-10 text-gray-600">
+                    <tr>
+                      <th className="p-4 text-left font-semibold">ID</th>
+
+                      <th className="p-4 text-left font-semibold">Name</th>
+
+                      <th className="p-4 text-left font-semibold">Role</th>
+
+                      <th className="p-4 text-left font-semibold">Status</th>
+
+                      <th className="p-4 text-left font-semibold">Reason</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {loadingAttendance ? (
+                      <tr>
+                        <td colSpan="5" className="text-center p-8">
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : attendanceList.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="5"
+                          className="text-center p-8 text-gray-500"
+                        >
+                          No attendance records found
+                        </td>
+                      </tr>
+                    ) : (
+                      attendanceList.map((row) => (
+                        <tr
+                          key={`${row.role}-${row.student_id || row.teacher_id}-${row.session_id || "none"}-${row.record_id || "new"}`}
+                          className="hover:bg-gray-50"
+                        >
+                          <td className="p-4">
+                            {row.student_id ?? row.teacher_id ?? "-"}
+                          </td>
+
+                          <td className="p-4 font-medium">{row.name}</td>
+
+                          <td className="p-4">{row.role}</td>
+
+                          <td className="p-4">
+                            <select
+                              value={row.status || "Not Marked"}
+                              onChange={(e) =>
+                                updateAttendanceStatus(
+                                  row,
+                                  e.target.value,
+                                  row.reason || "",
+                                )
+                              }
+                              className="border rounded-lg px-3 py-2"
+                            >
+                              <option value="Not Marked" disabled>
+                                Not Marked
+                              </option>
+
+                              <option value="Present">Present</option>
+
+                              <option value="Absent">Absent</option>
+
+                              <option value="Late">Late</option>
+                            </select>
+                          </td>
+
+                          <td className="p-4">{row.reason || "-"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* PAGINATION */}
+              <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <p className="text-sm text-gray-500">
+                  Showing {attendanceList.length} of {pagination.total} records
+                </p>
+
+                <div className="flex gap-2">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage(page - 1)}
+                    className="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition disabled:opacity-50"
+                  >
+                    <i className="fas fa-chevron-left text-xs"></i>
+                  </button>
+
+                  <span className="px-4 h-10 flex items-center rounded-xl bg-indigo-600 text-white">
+                    {page}
+                  </span>
+
+                  <button
+                    disabled={
+                      pagination.pages === 0 || page >= pagination.pages
+                    }
+                    onClick={() => setPage(page + 1)}
+                    className="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition disabled:opacity-50"
+                  >
+                    <i className="fas fa-chevron-right text-xs"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "exams" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                    Exam Control Center
+                  </h2>
+                  <p className="text-indigo-100 text-sm mt-1">
+                    Schedule exams, track marks entry, verify, and publish
+                    results. For marks and report cards, see the Results
+                    section.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={refreshExamManagement}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20"
+                  >
+                    <i className="bi bi-arrow-clockwise me-1.5" />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openExamManagementModal()}
+                    className="bg-indigo-500 hover:bg-indigo-600 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md"
+                  >
+                    + Create Examination
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Academic Year
+                  </label>
+                  <select
+                    value={examManagementFilters.academic_year}
+                    onChange={(e) =>
+                      updateExamManagementFilter(
+                        "academic_year",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Years</option>
+                    {(examManagementOptions.batches || []).map((batch) => (
+                      <option key={batch.id} value={batch.batch_name}>
+                        {batch.batch_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Exam
+                  </label>
+                  <select
+                    value={examManagementFilters.exam_name}
+                    onChange={(e) =>
+                      updateExamManagementFilter("exam_name", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Exams</option>
+                    {(examManagementOptions.exams || []).map((exam) => (
+                      <option key={exam} value={exam}>
+                        {exam}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Class
+                  </label>
+                  <select
+                    value={examManagementFilters.academic_class_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter(
+                        "academic_class_id",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Classes</option>
+                    {(examManagementOptions.classes || []).map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.display_name ||
+                          cls.class_name ||
+                          `${cls.division_name}-${cls.section_name}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Subject
+                  </label>
+                  <select
+                    value={examManagementFilters.subject_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter("subject_id", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Subjects</option>
+                    {(examManagementOptions.subjects || []).map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name || subject.subject_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Teacher
+                  </label>
+                  <select
+                    value={examManagementFilters.teacher_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter("teacher_id", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Teachers</option>
+                    {(examManagementOptions.teachers || []).map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.name ||
+                          `${teacher.first_name || ""} ${teacher.last_name || ""}`.trim() ||
+                          teacher.teacher_id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={examManagementFilters.status}
+                    onChange={(e) =>
+                      updateExamManagementFilter("status", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Status</option>
+                    {(examManagementOptions.statuses || []).map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Search Student
+                  </label>
+                  <input
+                    type="text"
+                    value={examManagementFilters.search}
+                    onChange={(e) =>
+                      updateExamManagementFilter("search", e.target.value)
+                    }
+                    placeholder="Name, roll no, class..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={refreshExamManagement}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700"
+                >
+                  {examManagementLoading ? "Loading..." : "Apply / Refresh"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetExamManagementFilters}
+                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+              {[
+                ["Total Exams", examManagementStats.totalExams],
+                ["Classes Covered", examManagementStats.classesCovered],
+                ["Students", examManagementStats.students],
+                ["Published", examManagementStats.resultsPublished],
+                ["Pending Marks", examManagementStats.pendingMarks],
+                ["Pass %", `${examManagementStats.passPercentage || 0}%`],
+                ["Average Score", `${examManagementStats.averageScore || 0}%`],
+                ["At Risk", examManagementStats.atRiskStudents],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm"
+                >
+                  <p className="text-xs text-gray-500 font-medium">{label}</p>
+                  <h5 className="text-xl font-bold text-gray-800">
+                    {value || 0}
+                  </h5>
+                </div>
+              ))}
+            </div>
+
+            {/* Workflow */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <h3 className="font-bold text-gray-800 mb-4">
+                Exam Result Workflow
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-3 text-sm">
+                {[
+                  "Create Exam",
+                  "Assign Subjects",
+                  "Schedule Exam",
+                  "Marks Entry",
+                  "Verification",
+                  "Approval",
+                  "Publish",
+                ].map((step, index) => (
+                  <div
+                    key={step}
+                    className="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-center"
+                  >
+                    <p className="font-bold text-indigo-700">{index + 1}</p>
+                    <p className="font-semibold">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Class Progress */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                  <div>
+                    <h3 className="font-bold text-gray-800">
+                      Class Wise Exam Progress
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Track marks entry, verification, and publishing status.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshExamManagement}
+                    className="text-sm text-indigo-600 font-semibold hover:underline"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
+                  {(examManagementClasses || []).length === 0 ? (
+                    <div className="md:col-span-2 text-sm text-gray-500 text-center py-8">
+                      No exam class progress found.
+                    </div>
+                  ) : (
+                    examManagementClasses.map((item) => (
+                      <div
+                        key={item.exam_id}
+                        className="border border-gray-200 rounded-2xl p-5 hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-800">
+                              {item.class_name}
+                            </h3>
+                            <p className="text-xs text-gray-500">
+                              {item.exam_name} • {item.academic_session}
+                            </p>
+                          </div>
+                          <span className="bg-indigo-100 text-indigo-700 text-[10px] uppercase font-bold px-2 py-1 rounded-full">
+                            {item.status || "Pending"}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Progress</span>
+                            <span className="font-semibold text-indigo-600">
+                              {item.marks_submitted_percentage || 0}%
+                            </span>
+                          </div>
+
+                          <div className="w-full bg-gray-100 rounded-full h-2.5">
+                            <div
+                              className="bg-indigo-600 h-2.5 rounded-full"
+                              style={{
+                                width: `${item.marks_submitted_percentage || 0}%`,
+                              }}
+                            />
+                          </div>
+
+                          <p className="text-xs text-gray-400">
+                            {item.marked || 0}/{item.expected || 0} marks
+                            submitted • {item.subject_count || 0} subjects
+                          </p>
+
+                          <p
+                            className={`inline-flex mt-2 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                              item.marks_entry_enabled
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {item.marks_entry_enabled
+                              ? "Teacher Marks Entry Open"
+                              : "Teacher Marks Entry Locked"}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+                          <button
+                            type="button"
+                            onClick={() => openExamManagementDetails(item)}
+                            className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-gray-200"
+                          >
+                            Details
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateMarksEntryPermission(
+                                item.exam_id,
+                                !item.marks_entry_enabled,
+                              )
+                            }
+                            disabled={
+                              item.is_published || examManagementActionLoading
+                            }
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold disabled:bg-gray-300 disabled:text-gray-500 ${
+                              item.marks_entry_enabled
+                                ? "bg-rose-100 text-rose-700 hover:bg-rose-200"
+                                : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                            }`}
+                            title={
+                              item.is_published
+                                ? "Published exam cannot be changed"
+                                : item.marks_entry_enabled
+                                  ? "Disable teacher marks entry"
+                                  : "Allow teacher marks entry"
+                            }
+                          >
+                            {item.marks_entry_enabled
+                              ? "Lock Entry"
+                              : "Allow Entry"}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              verifyExamManagementExam(item.exam_id)
+                            }
+                            disabled={
+                              item.is_verified || examManagementActionLoading
+                            }
+                            className="bg-blue-600 disabled:bg-gray-300 text-white px-3 py-2 rounded-lg text-xs font-semibold"
+                          >
+                            Verify
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              publishExamManagementExam(item.exam_id)
+                            }
+                            disabled={
+                              !item.is_verified ||
+                              item.is_published ||
+                              examManagementActionLoading
+                            }
+                            className="bg-emerald-600 disabled:bg-gray-300 text-white px-3 py-2 rounded-lg text-xs font-semibold"
+                          >
+                            Publish
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Publish Panel */}
+              <div className="bg-gray-900 rounded-2xl p-6 text-white shadow-xl">
+                <h4 className="text-lg font-bold mb-1">Result Publishing</h4>
+                <p className="text-sm text-gray-300 mb-5">
+                  Schedule verified exam results for publishing.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] uppercase text-gray-400 mb-1">
+                      Select Exam
+                    </label>
+                    <select
+                      value={examManagementPublishForm.exam_id}
+                      onChange={(e) =>
+                        updateExamManagementPublishForm(
+                          "exam_id",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm"
+                    >
+                      <option value="">Select Exam</option>
+                      {(examManagementTerms || []).map((exam) => (
+                        <option key={exam.id} value={exam.id}>
+                          {exam.class_name} • {exam.exam_name} •{" "}
+                          {exam.academic_year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] uppercase text-gray-400 mb-1">
+                      Publish At
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={examManagementPublishForm.publish_at}
+                      onChange={(e) =>
+                        updateExamManagementPublishForm(
+                          "publish_at",
+                          e.target.value,
+                        )
+                      }
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 text-sm text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(examManagementPublishForm.force)}
+                      onChange={(e) =>
+                        updateExamManagementPublishForm(
+                          "force",
+                          e.target.checked,
+                        )
+                      }
+                    />
+                    Force schedule even if not fully complete
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={scheduleExamManagementPublish}
+                    disabled={examManagementActionLoading}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 text-white py-2 rounded-lg text-sm font-semibold"
+                  >
+                    {examManagementActionLoading
+                      ? "Saving..."
+                      : "Schedule Publish"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Exam Terms Table */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 bg-gray-50">
+                <h3 className="font-bold text-gray-800">
+                  Created Examinations
+                </h3>
+                <p className="text-xs text-gray-500">
+                  All created exam terms by class and academic year.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="px-4 py-3">Class</th>
+                      <th className="px-4 py-3">Exam</th>
+                      <th className="px-4 py-3">Year</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Dates</th>
+                      <th className="px-4 py-3">Verified</th>
+                      <th className="px-4 py-3">Published</th>
+                      <th className="px-4 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 text-sm">
+                    {(examManagementTerms || []).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="8"
+                          className="px-4 py-8 text-center text-gray-500"
+                        >
+                          No exams found.
+                        </td>
+                      </tr>
+                    ) : (
+                      examManagementTerms.map((exam) => (
+                        <tr key={exam.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-semibold">
+                            {exam.class_name}
+                          </td>
+                          <td className="px-4 py-3">{exam.exam_name}</td>
+                          <td className="px-4 py-3">{exam.academic_year}</td>
+                          <td className="px-4 py-3">
+                            {exam.exam_type || "N/A"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {exam.start_date || "-"} to {exam.end_date || "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {exam.is_verified ? "Yes" : "No"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {exam.is_published ? "Yes" : "No"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => openExamManagementDetails(exam)}
+                              className="text-indigo-600 font-semibold hover:underline text-xs"
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ================= CREATE EXAM MODAL START ================= */}
+        {examManagementModalOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-3 sm:p-5">
+            <div className="relative w-full max-w-5xl max-h-[94vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
+              {/* Header */}
+              <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-slate-200">
+                <div className="flex items-start justify-between gap-4 px-5 sm:px-7 py-5">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+                      Exam Management
+                    </p>
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+                      Create Examination
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Configure exam details, assign classes, and select
+                      subjects.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closeExamManagementModal}
+                    className="h-10 w-10 shrink-0 rounded-full bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600 transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveExamManagementExam();
+                }}
+                className="overflow-y-auto max-h-[calc(94vh-92px)]"
+              >
+                <div className="p-5 sm:p-7 space-y-6">
+                  {/* Exam Basic Details */}
+                  <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-5 sm:p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="h-11 w-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg">
+                        <i className="bi bi-award text-lg"></i>
+                      </div>
+                      <div>
+                        <h4 className="font-black text-slate-900">
+                          Basic Exam Details
+                        </h4>
+                        <p className="text-xs text-slate-500">
+                          Add exam name, year, type, and schedule dates.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      <div className="xl:col-span-2">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Exam Name *
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          value={examManagementForm.exam_name}
+                          onChange={(e) =>
+                            updateExamManagementForm(
+                              "exam_name",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Annual Examination"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Academic Year *
+                        </label>
+                        <select
+                          required
+                          value={examManagementForm.academic_year}
+                          onChange={(e) =>
+                            updateExamManagementForm(
+                              "academic_year",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        >
+                          <option value="">Select Academic Batch</option>
+                          {(examManagementOptions.batches || []).map(
+                            (batch) => (
+                              <option key={batch.id} value={batch.batch_name}>
+                                {batch.batch_name}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Exam Type
+                        </label>
+                        <select
+                          value={examManagementForm.exam_type}
+                          onChange={(e) =>
+                            updateExamManagementForm(
+                              "exam_type",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        >
+                          <option value="Unit Test">Unit Test</option>
+                          <option value="Mid Term">Mid Term</option>
+                          <option value="Annual">Annual</option>
+                          <option value="Practical">Practical</option>
+                          <option value="Internal">Internal</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Start Date
+                        </label>
+                        <input
+                          type="date"
+                          value={examManagementForm.start_date}
+                          onChange={(e) =>
+                            updateExamManagementForm(
+                              "start_date",
+                              e.target.value,
+                            )
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          End Date
+                        </label>
+                        <input
+                          type="date"
+                          value={examManagementForm.end_date}
+                          onChange={(e) =>
+                            updateExamManagementForm("end_date", e.target.value)
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Assignment Details */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Classes */}
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                          <h4 className="font-black text-slate-900">
+                            Assign Classes
+                          </h4>
+                          <p className="text-xs text-slate-500">
+                            Select one or more classes for this exam.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                          {(examManagementForm.academic_class_ids || []).length}{" "}
+                          Selected
+                        </span>
+                      </div>
+
+                      <select
+                        multiple
+                        value={(
+                          examManagementForm.academic_class_ids || []
+                        ).map(String)}
+                        onChange={(e) => {
+                          const values = Array.from(
+                            e.target.selectedOptions,
+                          ).map((option) => Number(option.value));
+                          updateExamManagementForm(
+                            "academic_class_ids",
+                            values,
+                          );
+                        }}
+                        className="w-full min-h-[180px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                      >
+                        {(examManagementOptions.classes || []).map((cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.display_name ||
+                              cls.class_name ||
+                              `${cls.division_name}-${cls.section_name}`}
+                          </option>
+                        ))}
+                      </select>
+
+                      <p className="mt-3 text-xs text-slate-400">
+                        Hold Ctrl on Windows or Cmd on Mac to select multiple
+                        classes.
+                      </p>
+                    </div>
+
+                    {/* Subjects */}
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                          <h4 className="font-black text-slate-900">
+                            Assign Subjects
+                          </h4>
+                          <p className="text-xs text-slate-500">
+                            Select subjects included in this examination.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                          {(examManagementForm.subject_ids || []).length}{" "}
+                          Selected
+                        </span>
+                      </div>
+
+                      <select
+                        multiple
+                        value={(examManagementForm.subject_ids || []).map(
+                          String,
+                        )}
+                        onChange={(e) => {
+                          const values = Array.from(
+                            e.target.selectedOptions,
+                          ).map((option) => Number(option.value));
+                          updateExamManagementForm("subject_ids", values);
+                        }}
+                        className="w-full min-h-[180px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                      >
+                        {(examManagementOptions.subjects || []).map(
+                          (subject) => (
+                            <option key={subject.id} value={subject.id}>
+                              {subject.name || subject.subject_name}
+                            </option>
+                          ),
+                        )}
+                      </select>
+
+                      <p className="mt-3 text-xs text-slate-400">
+                        Hold Ctrl on Windows or Cmd on Mac to select multiple
+                        subjects.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="sticky bottom-0 -mx-5 sm:-mx-7 -mb-5 sm:-mb-7 border-t border-slate-200 bg-white/95 backdrop-blur-xl px-5 sm:px-7 py-4">
+                    <div className="flex flex-col-reverse sm:flex-row justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={closeExamManagementModal}
+                        className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={examManagementSaving}
+                        className="w-full sm:w-auto rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-200 hover:from-indigo-700 hover:to-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                      >
+                        {examManagementSaving
+                          ? "Saving Examination..."
+                          : "Save Examination"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* ================= CREATE EXAM MODAL END ================= */}
+
+        {/* ================= EXAM DETAILS MODAL START ================= */}
+        {examManagementDetailsModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">
+                    {examManagementSelectedDetails?.exam?.class_name || "Exam"}{" "}
+                    Details
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {examManagementSelectedDetails?.exam?.name} •{" "}
+                    {examManagementSelectedDetails?.exam?.academic_year}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeExamManagementDetails}
+                  className="text-gray-400 hover:text-gray-600 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto max-h-[75vh] space-y-6">
+                {examManagementActionLoading ? (
+                  <div className="text-center text-gray-500 py-10">
+                    Loading details...
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <h4 className="font-bold text-gray-800 mb-3">
+                        Subject Status
+                      </h4>
+                      <div className="overflow-x-auto border rounded-xl">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                            <tr>
+                              <th className="px-4 py-3">Subject</th>
+                              <th className="px-4 py-3">Teacher</th>
+                              <th className="px-4 py-3">Submitted</th>
+                              <th className="px-4 py-3">Pending</th>
+                              <th className="px-4 py-3">Total Students</th>
+                              <th className="px-4 py-3">Status</th>
+                            </tr>
+                          </thead>
+
+                          <tbody className="divide-y divide-gray-100">
+                            {(
+                              examManagementSelectedDetails?.subjects || []
+                            ).map((subject) => (
+                              <tr
+                                key={subject.subject_id}
+                                onClick={() =>
+                                  openExamManagementDetails({
+                                    exam_id:
+                                      examManagementSelectedDetails?.exam?.id,
+                                    subject_id: subject.subject_id,
+                                  })
+                                }
+                                className="cursor-pointer hover:bg-indigo-50"
+                              >
+                                <td className="px-4 py-3 font-semibold">
+                                  {subject.subject}
+                                </td>
+                                <td className="px-4 py-3">{subject.teacher}</td>
+                                <td className="px-4 py-3">
+                                  {subject.submitted_marks || 0}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {subject.pending_marks || 0}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {subject.total_students || 0}
+                                </td>
+                                <td className="px-4 py-3">{subject.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {(examManagementSelectedDetails?.students || []).length >
+                      0 && (
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-3">
+                          Student Marks
+                        </h4>
+                        <div className="overflow-x-auto border rounded-xl">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                              <tr>
+                                <th className="px-4 py-3">Roll</th>
+                                <th className="px-4 py-3">Student</th>
+                                <th className="px-4 py-3">Subject</th>
+                                <th className="px-4 py-3">Internal</th>
+                                <th className="px-4 py-3">External</th>
+                                <th className="px-4 py-3">Oral</th>
+                                <th className="px-4 py-3">Practical</th>
+                                <th className="px-4 py-3">Total</th>
+                                <th className="px-4 py-3">%</th>
+                                <th className="px-4 py-3">Grade</th>
+                                <th className="px-4 py-3">Verification</th>
+                              </tr>
+                            </thead>
+
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {examManagementSelectedDetails.students.map(
+                                (student, index) => {
+                                  const hasResult = Boolean(student.result_id);
+                                  const isSavingThisRow =
+                                    examManagementActionLoading ===
+                                    student.result_id;
+
+                                  const saveMarksField = async (
+                                    fieldName,
+                                    value,
+                                  ) => {
+                                    if (!hasResult) {
+                                      showToast?.(
+                                        "Marks are not submitted by the teacher for this student yet.",
+                                        "warning",
+                                      );
+                                      return;
+                                    }
+
+                                    const numericValue = Number(value);
+
+                                    if (
+                                      Number.isNaN(numericValue) ||
+                                      numericValue < 0
+                                    ) {
+                                      showToast?.(
+                                        "Please enter a valid marks value.",
+                                        "error",
+                                      );
+                                      return;
+                                    }
+
+                                    await updateAdminResultMarks(
+                                      student.result_id,
+                                      {
+                                        [fieldName]: numericValue,
+                                      },
+                                    );
+                                  };
+
+                                  const marksInputClass =
+                                    "w-[72px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400";
+
+                                  return (
+                                    <tr
+                                      key={
+                                        student.result_id ||
+                                        `${student.student_id}-${index}`
+                                      }
+                                      className="transition hover:bg-indigo-50/40"
+                                    >
+                                      <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                                        {student.roll_no || "-"}
+                                      </td>
+
+                                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                                        {student.student_name}
+                                      </td>
+
+                                      <td className="px-4 py-3 text-sm font-medium text-slate-700">
+                                        {student.subject}
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          defaultValue={
+                                            student.internal_marks ?? 0
+                                          }
+                                          disabled={
+                                            !hasResult || isSavingThisRow
+                                          }
+                                          onBlur={(event) =>
+                                            saveMarksField(
+                                              "internal_marks",
+                                              event.target.value,
+                                            )
+                                          }
+                                          className={marksInputClass}
+                                          title={
+                                            hasResult
+                                              ? "Update internal marks"
+                                              : "Teacher has not submitted marks yet"
+                                          }
+                                        />
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          defaultValue={
+                                            student.external_marks ?? 0
+                                          }
+                                          disabled={
+                                            !hasResult || isSavingThisRow
+                                          }
+                                          onBlur={(event) =>
+                                            saveMarksField(
+                                              "external_marks",
+                                              event.target.value,
+                                            )
+                                          }
+                                          className={marksInputClass}
+                                          title={
+                                            hasResult
+                                              ? "Update external marks"
+                                              : "Teacher has not submitted marks yet"
+                                          }
+                                        />
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          defaultValue={student.oral_marks ?? 0}
+                                          disabled={
+                                            !hasResult || isSavingThisRow
+                                          }
+                                          onBlur={(event) =>
+                                            saveMarksField(
+                                              "oral_marks",
+                                              event.target.value,
+                                            )
+                                          }
+                                          className={marksInputClass}
+                                          title={
+                                            hasResult
+                                              ? "Update oral marks"
+                                              : "Teacher has not submitted marks yet"
+                                          }
+                                        />
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          defaultValue={
+                                            student.practical_marks ?? 0
+                                          }
+                                          disabled={
+                                            !hasResult || isSavingThisRow
+                                          }
+                                          onBlur={(event) =>
+                                            saveMarksField(
+                                              "practical_marks",
+                                              event.target.value,
+                                            )
+                                          }
+                                          className={marksInputClass}
+                                          title={
+                                            hasResult
+                                              ? "Update practical marks"
+                                              : "Teacher has not submitted marks yet"
+                                          }
+                                        />
+                                      </td>
+
+                                      <td className="px-4 py-3 text-sm font-bold text-slate-900">
+                                        {student.total_marks ?? 0}
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <span
+                                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                                            Number(student.percentage || 0) >=
+                                            35
+                                              ? "bg-emerald-100 text-emerald-700"
+                                              : "bg-rose-100 text-rose-700"
+                                          }`}
+                                        >
+                                          {student.percentage ?? 0}%
+                                        </span>
+                                      </td>
+
+                                      <td className="px-4 py-3">
+                                        <span
+                                          className={`inline-flex min-w-[42px] justify-center rounded-lg px-2 py-1 text-xs font-bold ${
+                                            student.grade === "Fail"
+                                              ? "bg-rose-100 text-rose-700"
+                                              : "bg-indigo-100 text-indigo-700"
+                                          }`}
+                                        >
+                                          {student.grade || "-"}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        {!hasResult ? (
+                                          <span className="inline-flex rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
+                                            Pending
+                                          </span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            disabled={isSavingThisRow}
+                                            onClick={async () => {
+                                              const nextStatus =
+                                                student.status === "Verified"
+                                                  ? "Submitted"
+                                                  : "Verified";
+
+                                              const actionLabel =
+                                                nextStatus === "Verified"
+                                                  ? "verify"
+                                                  : "unverify";
+
+                                              const confirmed = window.confirm(
+                                                `Do you want to ${actionLabel} marks for ${student.student_name}?`,
+                                              );
+
+                                              if (!confirmed) return;
+
+                                              await updateAdminResultMarks(
+                                                student.result_id,
+                                                {
+                                                  status: nextStatus,
+                                                },
+                                              );
+                                            }}
+                                            className={`inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                              student.status === "Verified"
+                                                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                                : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                            }`}
+                                            title={
+                                              student.status === "Verified"
+                                                ? "Click to move this result back to Submitted"
+                                                : "Click to verify this student's marks"
+                                            }
+                                          >
+                                            {isSavingThisRow
+                                              ? "Saving..."
+                                              : student.status === "Verified"
+                                                ? "✓ Verified"
+                                                : "Verify Marks"}
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                },
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ================= EXAM DETAILS MODAL END ================= */}
+
+        {activeSection === "results" && (
+          <section className="section active p-4 sm:p-6 space-y-6">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                    Results
+                  </h2>
+                  <p className="text-indigo-100 text-sm mt-1">
+                    Search, review, and export student marks. Click any row to
+                    verify or edit its marks directly.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={refreshExamManagement}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20"
+                  >
+                    <i className="bi bi-arrow-clockwise me-1.5" />
+                    Refresh
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={exportExamManagementReportsPDF}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20"
+                  >
+                    Export Reports (PDF)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={exportExamManagementReportCardsPDF}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20"
+                  >
+                    Export Report Cards (PDF)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rows = examManagementFilteredResults || [];
+                      if (rows.length === 0) {
+                        showToast?.("No results to export", "error");
+                        return;
+                      }
+
+                      const headers = [
+                        "Roll",
+                        "Student",
+                        "Class",
+                        "Exam",
+                        "Subject",
+                        "Total",
+                        "Percentage",
+                        "Grade",
+                        "Status",
+                      ];
+
+                      const csvRows = rows.map((row) =>
+                        [
+                          row.roll_no || "",
+                          row.student_name || "",
+                          row.class_name || "",
+                          row.exam_name || "",
+                          row.subject || "",
+                          row.total_marks || 0,
+                          row.percentage || 0,
+                          row.grade || "",
+                          row.status || "",
+                        ]
+                          .map(
+                            (cell) => `"${String(cell).replace(/"/g, '""')}"`,
+                          )
+                          .join(","),
+                      );
+
+                      const csvContent = [headers.join(","), ...csvRows].join(
+                        "\n",
+                      );
+
+                      const blob = new Blob([csvContent], {
+                        type: "text/csv;charset=utf-8;",
+                      });
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = `results_${
+                        new Date().toISOString().split("T")[0]
+                      }.csv`;
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      window.URL.revokeObjectURL(url);
+
+                      showToast?.("Results exported as CSV", "success");
+                    }}
+                    className="bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md"
+                  >
+                    <i className="bi bi-filetype-csv me-1.5" />
+                    Export CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Academic Year
+                  </label>
+                  <select
+                    value={examManagementFilters.academic_year}
+                    onChange={(e) =>
+                      updateExamManagementFilter(
+                        "academic_year",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Years</option>
+                    {(examManagementOptions.batches || []).map((batch) => (
+                      <option key={batch.id} value={batch.batch_name}>
+                        {batch.batch_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Exam
+                  </label>
+                  <select
+                    value={examManagementFilters.exam_name}
+                    onChange={(e) =>
+                      updateExamManagementFilter("exam_name", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Exams</option>
+                    {(examManagementOptions.exams || []).map((exam) => (
+                      <option key={exam} value={exam}>
+                        {exam}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Class
+                  </label>
+                  <select
+                    value={examManagementFilters.academic_class_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter(
+                        "academic_class_id",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Classes</option>
+                    {(examManagementOptions.classes || []).map((cls) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.display_name ||
+                          cls.class_name ||
+                          `${cls.division_name}-${cls.section_name}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Subject
+                  </label>
+                  <select
+                    value={examManagementFilters.subject_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter("subject_id", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Subjects</option>
+                    {(examManagementOptions.subjects || []).map((subject) => (
+                      <option key={subject.id} value={subject.id}>
+                        {subject.name || subject.subject_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Teacher
+                  </label>
+                  <select
+                    value={examManagementFilters.teacher_id}
+                    onChange={(e) =>
+                      updateExamManagementFilter("teacher_id", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Teachers</option>
+                    {(examManagementOptions.teachers || []).map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.name ||
+                          `${teacher.first_name || ""} ${teacher.last_name || ""}`.trim() ||
+                          teacher.teacher_id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={examManagementFilters.status}
+                    onChange={(e) =>
+                      updateExamManagementFilter("status", e.target.value)
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="">All Status</option>
+                    {(examManagementOptions.statuses || []).map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">
+                    Search Student
+                  </label>
+                  <input
+                    type="text"
+                    value={examManagementFilters.search}
+                    onChange={(e) =>
+                      updateExamManagementFilter("search", e.target.value)
+                    }
+                    placeholder="Name, roll no, class..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={refreshExamManagement}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700"
+                >
+                  {examManagementLoading ? "Loading..." : "Apply / Refresh"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetExamManagementFilters}
+                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+              {[
+                ["Total Exams", examManagementStats.totalExams],
+                ["Classes Covered", examManagementStats.classesCovered],
+                ["Students", examManagementStats.students],
+                ["Published", examManagementStats.resultsPublished],
+                ["Pending Marks", examManagementStats.pendingMarks],
+                ["Pass %", `${examManagementStats.passPercentage || 0}%`],
+                ["Average Score", `${examManagementStats.averageScore || 0}%`],
+                ["At Risk", examManagementStats.atRiskStudents],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm"
+                >
+                  <p className="text-xs text-gray-500 font-medium">{label}</p>
+                  <h5 className="text-xl font-bold text-gray-800">
+                    {value || 0}
+                  </h5>
+                </div>
+              ))}
+            </div>
+
+            {/* Workflow */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <h3 className="font-bold text-gray-800 mb-4">
+                Exam Result Workflow
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-3 text-sm">
+                {[
+                  "Create Exam",
+                  "Assign Subjects",
+                  "Schedule Exam",
+                  "Marks Entry",
+                  "Verification",
+                  "Approval",
+                  "Publish",
+                ].map((step, index) => (
+                  <div
+                    key={step}
+                    className="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-center"
+                  >
+                    <p className="font-bold text-indigo-700">{index + 1}</p>
+                    <p className="font-semibold">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            {(() => {
+              const rows = examManagementFilteredResults || [];
+              const total = rows.length;
+              const passCount = rows.filter(
+                (r) => String(r.status || "").toLowerCase() === "pass",
+              ).length;
+              const failCount = rows.filter(
+                (r) => String(r.status || "").toLowerCase() === "fail",
+              ).length;
+              const avgPercentage =
+                total > 0
+                  ? (
+                      rows.reduce(
+                        (sum, r) => sum + (Number(r.percentage) || 0),
+                        0,
+                      ) / total
+                    ).toFixed(1)
+                  : 0;
+              const passRate =
+                total > 0 ? ((passCount / total) * 100).toFixed(1) : 0;
+
+              return (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <p className="text-xs font-semibold uppercase text-gray-400">
+                      Total Results
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-gray-800">
+                      {total}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <p className="text-xs font-semibold uppercase text-gray-400">
+                      Average %
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-indigo-600">
+                      {avgPercentage}%
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <p className="text-xs font-semibold uppercase text-gray-400">
+                      Pass Rate
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-emerald-600">
+                      {passRate}%
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      {passCount} passed
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                    <p className="text-xs font-semibold uppercase text-gray-400">
+                      Failing
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-red-600">
+                      {failCount}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      needs attention
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Result Rows */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 bg-gray-50">
+                <h3 className="font-bold text-gray-800">Student Result Rows</h3>
+                <p className="text-xs text-gray-500">
+                  Searchable result data from submitted marks. Click a row to
+                  verify or edit.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="px-4 py-3">Roll</th>
+                      <th className="px-4 py-3">Student</th>
+                      <th className="px-4 py-3">Class</th>
+                      <th className="px-4 py-3">Exam</th>
+                      <th className="px-4 py-3">Subject</th>
+                      <th className="px-4 py-3">Total</th>
+                      <th className="px-4 py-3">%</th>
+                      <th className="px-4 py-3">Grade</th>
+                      <th className="px-4 py-3">Status</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100 text-sm">
+                    {(examManagementFilteredResults || []).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="9"
+                          className="px-4 py-8 text-center text-gray-500"
+                        >
+                          No result rows found.
+                        </td>
+                      </tr>
+                    ) : (
+                      examManagementFilteredResults.map((row, index) => (
+                        <tr
+                          key={
+                            row.result_id ||
+                            `${row.student_id}-${row.subject_id}-${index}`
+                          }
+                          onClick={() =>
+                            row.exam_id &&
+                            openExamManagementDetails({
+                              exam_id: row.exam_id,
+                              subject_id: row.subject_id,
+                            })
+                          }
+                          className={
+                            row.exam_id
+                              ? "cursor-pointer hover:bg-indigo-50 transition"
+                              : ""
+                          }
+                          title={
+                            row.exam_id
+                              ? "Click to view/edit this subject's marks"
+                              : ""
+                          }
+                        >
+                          <td className="px-4 py-3">{row.roll_no || "-"}</td>
+                          <td className="px-4 py-3 font-semibold">
+                            {row.student_name}
+                          </td>
+                          <td className="px-4 py-3">{row.class_name}</td>
+                          <td className="px-4 py-3">{row.exam_name}</td>
+                          <td className="px-4 py-3">{row.subject}</td>
+                          <td className="px-4 py-3">{row.total_marks || 0}</td>
+                          <td className="px-4 py-3">{row.percentage || 0}%</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                ["A+", "A", "A-"].includes(row.grade)
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : ["B+", "B", "B-"].includes(row.grade)
+                                    ? "bg-sky-100 text-sky-700"
+                                    : ["C+", "C", "C-"].includes(row.grade)
+                                      ? "bg-amber-100 text-amber-700"
+                                      : row.grade
+                                        ? "bg-red-100 text-red-700"
+                                        : "bg-gray-100 text-gray-500"
+                              }`}
+                            >
+                              {row.grade || "-"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                String(row.status).toLowerCase() === "pass"
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : String(row.status).toLowerCase() === "fail"
+                                    ? "bg-red-50 text-red-700"
+                                    : "bg-amber-50 text-amber-700"
+                              }`}
+                            >
+                              {row.status || "Pending"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
         {activeSection === "profile" && (
           <section className="space-y-6 py-2 text-gray-800 dark:text-gray-100">
             {/* ================= PROFILE HEADER ================= */}

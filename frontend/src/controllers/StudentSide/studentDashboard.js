@@ -8,7 +8,7 @@ import {
 
 import {
   BASE_URL,
-} from "../config/appConfig";
+} from "../../config/appConfig";
 
 export function useStudentDashboard(
   activeSection,

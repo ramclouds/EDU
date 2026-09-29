@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
 import { useNavigate } from "react-router-dom";
-import { BASE_URL } from "../config/appConfig";
+import { BASE_URL } from "../../config/appConfig";
 
 export function useTeacherDashboard(activeSection, setActiveSection) {
   const navigate = useNavigate();
