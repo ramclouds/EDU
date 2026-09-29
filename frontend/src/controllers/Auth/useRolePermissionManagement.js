@@ -51,6 +51,13 @@ export const DASHBOARD_PAGES = [
     icon: "fas fa-book",
   },
   {
+    key: "academic-admin-dashboard",
+    moduleCode: "academic",
+    label: "Academic Dashboard",
+    description: "Classes, subjects, timetables and exam records.",
+    icon: "fas fa-graduation-cap",
+  },
+  {
     key: "accounts-admin-dashboard",
     moduleCode: "accounts",
     label: "Accounts Dashboard",

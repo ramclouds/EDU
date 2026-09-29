@@ -2,16 +2,16 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { APP_NAME, APP_YEAR } from "../config/appConfig";
 import "../css/dashboard.css";
-import { useTeacherDashboard } from "../controllers/teacherDashboard";
-import { useTeacherAssignments } from "../controllers/Assingments/useTeacherAssignments";
+import { useTeacherDashboard } from "../controllers/TeachersSide/teacherDashboard";
+import { useTeacherAssignments } from "../controllers/TeachersSide/useTeacherAssignments";
 import { useDashboardUI } from "../controllers/useDashboardUI";
-import { useTeacherLeaves } from "../controllers/Leaves/useTeacherLeaves";
-import { useTeacherTimetable } from "../controllers/TimeTable/useTeacherTimetable";
-import { useTeacherProfile } from "../controllers/Profiles/useTeacherProfile";
-import { useTeacherAttendance } from "../controllers/Attendance/useTeacherAttendance";
-import { useMyClasses } from "../controllers/MyClasses/useMyClass";
-import { useTeacherExamResult } from "../controllers/ExamResult/useTeacherExamResult";
-import { useAnalytics } from "../controllers/Analytics/useAnalytics";
+import { useTeacherLeaves } from "../controllers/TeachersSide/useTeacherLeaves";
+import { useTeacherTimetable } from "../controllers/TeachersSide/useTeacherTimetable";
+import { useTeacherProfile } from "../controllers/TeachersSide/useTeacherProfile";
+import { useTeacherAttendance } from "../controllers/TeachersSide/useTeacherAttendance";
+import { useMyClasses } from "../controllers/Academic/useMyClass";
+import { useTeacherExamResult } from "../controllers/Academic/useTeacherExamResult";
+import { useAnalytics } from "../controllers/TeachersSide/useAnalytics";
 import { BASE_URL, FILE_BASE_URL } from "../config/appConfig";
 
 function TeacherDashboard() {

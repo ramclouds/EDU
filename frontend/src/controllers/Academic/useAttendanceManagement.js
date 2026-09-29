@@ -327,7 +327,7 @@ export function useAttendanceManagement({ activeSection, fetchWithAuth, showToas
             if (!classId) {
 
                 showToast(
-                    "Session ID missing",
+                    "Please select a specific class first",
                     "error"
                 );
 
@@ -346,7 +346,6 @@ export function useAttendanceManagement({ activeSection, fetchWithAuth, showToas
                         academic_class_id: classId,
                         date: selectedDate,
                         role,
-                        status,
                         status,
                     }),
                 }

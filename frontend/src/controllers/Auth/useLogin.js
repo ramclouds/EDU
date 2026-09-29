@@ -162,6 +162,7 @@ export function useLogin() {
         const adminRoutes = {
           "Super Admin": "/super-admin-dashboard",
           "Library Admin": "/library-admin-dashboard",
+          "Academic Admin": "/academic-admin-dashboard",
           "Accounts Admin": "/accounts-admin-dashboard",
           "Hostel Admin": "/hostel-admin-dashboard",
           "HR Admin": "/hr-admin-dashboard",
@@ -174,50 +175,17 @@ export function useLogin() {
           window.location.href = route;
           return;
         }
+
+        console.error(
+          "Unknown admin type:",
+          data.user?.admin_type
+        );
       }
 
+      // The backend always sends `data.dashboard`, so in practice we
+      // never get here - this only fires if the backend response is
+      // missing both `dashboard` and a role we recognise.
       alert("No dashboard route configured");
-
-      // ================= ROLE BASED REDIRECT =================
-
-      if (data.dashboard) {
-        window.location.href = data.dashboard;
-        return;
-      }
-
-      if (data.role === "student") {
-        window.location.href = "/student-dashboard";
-        return;
-      }
-
-      if (data.role === "teacher") {
-        window.location.href = "/teacher-dashboard";
-        return;
-      }
-
-      if (data.role === "admin") {
-        const adminDashboardRoutes = {
-          "Super Admin": "/super-admin-dashboard",
-          "Library Admin": "/library-admin-dashboard",
-          "Accounts Admin": "/accounts-admin-dashboard",
-          "Hostel Admin": "/hostel-admin-dashboard",
-          "HR Admin": "/hr-admin-dashboard",
-        };
-
-        const dashboard =
-          adminDashboardRoutes[data.user?.admin_type];
-
-        if (!dashboard) {
-          console.error(
-            "Unknown admin type:",
-            data.user?.admin_type
-          );
-          alert("Dashboard access is not configured");
-          return;
-        }
-
-        window.location.href = dashboard;
-      }
 
     } catch (error) {
       console.error(error);
@@ -239,7 +207,7 @@ export function useLogin() {
     try {
 
       const response = await fetch(
-        "http://localhost:5000/api/forgot-password",
+        `${BASE_URL}/forgot-password`,
         {
           method: "POST",
           headers: {

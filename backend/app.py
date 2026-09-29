@@ -12,7 +12,12 @@ load_dotenv()
 from utils.auth import Login, SignUp, db, bcrypt
 
 # ==== STUDENT / TEACHER ====
-from utils.studentDetails import StudentDetails, UpdateStudentProfile, ChangePassword
+from utils.studentDetails import (
+    StudentDetails,
+    UpdateStudentProfile,
+    ChangePassword,
+    AdminStudentsListAPI,
+)
 
 from utils.teacherDetails import (
     TeacherDetails,
@@ -98,7 +103,7 @@ from utils.timetable import (
     AdminTimetablePDFAPI,
 )
 
-from utils.examResult import (
+from utils.academic import (
     StudentExamResultsAPI,
     PerformanceAPI,
     UpcomingExamsAPI,
@@ -125,6 +130,18 @@ from utils.examResult import (
     AdminExamReportCardsPDFAPI,
     TeacherExamsAPI,
     AdminExamMarksEntryPermissionAPI,
+    AdminBatchesAPI,
+    AdminBatchDetailAPI,
+    AdminBatchSetCurrentAPI,
+    AdminBatchOverviewAPI,
+    AdminBatchRolloverAPI,
+    AdminDivisionsAPI,
+    AdminDivisionDetailAPI,
+    AdminSectionsAPI,
+    AdminSectionDetailAPI,
+    AdminAcademicClassesAPI,
+    AdminAcademicClassDetailAPI,
+    AdminAcademicSetupOptionsAPI,
 )
 
 # ==== OTHER ====
@@ -988,6 +1005,75 @@ def create_app():
         view_func=AdminExamReportCardsPDFAPI.as_view("admin_exam_report_cards_pdf"),
         methods=["GET"],
     )
+    # ACADEMIC SETUP - BATCHES
+    app.add_url_rule(
+        "/api/admin/academic/batches",
+        view_func=AdminBatchesAPI.as_view("admin_academic_batches"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/admin/academic/batches/<int:batch_id>",
+        view_func=AdminBatchDetailAPI.as_view("admin_academic_batch_detail"),
+        methods=["PUT", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/admin/academic/batches/<int:batch_id>/set-current",
+        view_func=AdminBatchSetCurrentAPI.as_view("admin_academic_batch_set_current"),
+        methods=["PUT"],
+    )
+    app.add_url_rule(
+        "/api/admin/academic/batches/<int:batch_id>/overview",
+        view_func=AdminBatchOverviewAPI.as_view("admin_academic_batch_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/admin/academic/batches/<int:batch_id>/rollover",
+        view_func=AdminBatchRolloverAPI.as_view("admin_academic_batch_rollover"),
+        methods=["POST"],
+    )
+
+    # ACADEMIC SETUP - DIVISIONS
+    app.add_url_rule(
+        "/api/admin/academic/divisions",
+        view_func=AdminDivisionsAPI.as_view("admin_academic_divisions"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/admin/academic/divisions/<int:division_id>",
+        view_func=AdminDivisionDetailAPI.as_view("admin_academic_division_detail"),
+        methods=["PUT", "DELETE"],
+    )
+
+    # ACADEMIC SETUP - SECTIONS
+    app.add_url_rule(
+        "/api/admin/academic/sections",
+        view_func=AdminSectionsAPI.as_view("admin_academic_sections"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/admin/academic/sections/<int:section_id>",
+        view_func=AdminSectionDetailAPI.as_view("admin_academic_section_detail"),
+        methods=["PUT", "DELETE"],
+    )
+
+    # ACADEMIC SETUP - CLASSES (batch + division + section combination)
+    app.add_url_rule(
+        "/api/admin/academic/classes",
+        view_func=AdminAcademicClassesAPI.as_view("admin_academic_classes"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/admin/academic/classes/<int:class_id>",
+        view_func=AdminAcademicClassDetailAPI.as_view("admin_academic_class_detail"),
+        methods=["GET", "PUT", "DELETE"],
+    )
+
+    # ACADEMIC SETUP - combined dropdown options
+    app.add_url_rule(
+        "/api/admin/academic/setup-options",
+        view_func=AdminAcademicSetupOptionsAPI.as_view("admin_academic_setup_options"),
+        methods=["GET"],
+    )
 
     # =========================================================
     # LIBRARY CATEGORY MANAGEMENT
@@ -1639,6 +1725,13 @@ def create_app():
         "/api/admin/student/promote",
         view_func=StudentPromotionAPI.as_view("promote_student"),
         methods=["POST"],
+    )
+
+    # STUDENT ROSTER (Academic Admin Students section)
+    app.add_url_rule(
+        "/api/admin/students",
+        view_func=AdminStudentsListAPI.as_view("admin_students_list"),
+        methods=["GET"],
     )
 
     # ADMIN TEACHER MANAGEMENT

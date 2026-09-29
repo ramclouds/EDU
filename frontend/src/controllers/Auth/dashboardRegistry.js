@@ -1,18 +1,3 @@
-/**
- * DASHBOARD REGISTRY
- * ---------------------------------------------------------------
- * Single, configurable list of every dashboard page in the app.
- * To add a new dashboard in the future, add one entry here (and a
- * matching entry in the backend DASHBOARD_REGISTRY in
- * rolePermissionManagement.py) - nothing else needs to change.
- *
- * NOTE: this list only describes the pages that *exist*. Whether the
- * current user may actually open a given page is decided by the
- * backend (RBAC) and delivered via the `dashboard_access` array
- * returned at login / from GET /rbac/my-dashboards. See
- * useDashboardAccess.js.
- * ---------------------------------------------------------------
- */
 
 export const DASHBOARD_REGISTRY = [
   {
@@ -25,6 +10,12 @@ export const DASHBOARD_REGISTRY = [
     key: "library-admin-dashboard",
     label: "Library Dashboard",
     route: "/library-admin-dashboard",
+    icon: "bi-journal-bookmark",
+  },
+  {
+    key: "academic-admin-dashboard",
+    label: "Academic Dashboard",
+    route: "/academic-admin-dashboard",
     icon: "bi-journal-bookmark",
   },
   {

@@ -1,5 +1,6 @@
 import logging
-from datetime import datetime
+from datetime import date, datetime
+
 from flask import jsonify, request
 from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,8 +12,7 @@ from utils.auth import (
     generate_student_id,
     generate_user_id,
 )
-from utils.auth_middleware import login_required
-from datetime import date
+from utils.rolePermissionManagement import permission_required
 from utils.studentDetails import (
     AcademicClass,
     Batch,
@@ -25,87 +25,29 @@ logger = logging.getLogger(__name__)
 
 
 class StudentEnrollmentOptionsAPI(MethodView):
-    @login_required
+    """
+    Feeds the "Enroll Student" form's Batch/Division/Section/Class
+    dropdowns.
+
+    BUG FIX: this used to auto-create a batch plus a hardcoded set of
+    divisions ("1st".."10th") and sections ("A".."D") on every single
+    GET request - a read request silently writing to the database, and
+    worse, injecting made-up grade/section names that could collide
+    with whatever the school actually configured via Academic Setup
+    (Divisions & Sections / Academic Years). This now only reads
+    what's already been configured there. If nothing has been set up
+    yet, the frontend shows a clear "set up Academic Setup first"
+    prompt instead of silently fabricating data.
+    """
+
+    @permission_required("academic", "view")
     def get(self):
         try:
-            # ✅ Batch will NOT be created automatically
-            # ✅ Ensure current academic batch exists
-            today = date.today()
-            start_year = today.year if today.month >= 6 else today.year - 1
-            end_year = start_year + 1
-            current_batch_name = f"{start_year}-{end_year}"
-
-            current_batch = Batch.query.filter_by(batch_name=current_batch_name).first()
-
-            if not current_batch:
-                current_batch = Batch(
-                    batch_name=current_batch_name,
-                    start_date=date(start_year, 6, 1),
-                    end_date=date(end_year, 5, 31),
-                )
-            db.session.add(current_batch)
-            db.session.flush()
-
-            batches = Batch.query.order_by(Batch.id.asc()).all()
-
-            # ✅ Auto-create only divisions/classes
-            division_names = [
-                "1st",
-                "2nd",
-                "3rd",
-                "4th",
-                "5th",
-                "6th",
-                "7th",
-                "8th",
-                "9th",
-                "10th",
-            ]
-
-            section_names = ["A", "B", "C", "D"]
-
-            divisions = []
-            for division_name in division_names:
-                division = Division.query.filter_by(division_name=division_name).first()
-
-                if not division:
-                    division = Division(division_name=division_name)
-                    db.session.add(division)
-                    db.session.flush()
-
-                divisions.append(division)
-
-            sections = []
-            for section_name in section_names:
-                section = Section.query.filter_by(section_name=section_name).first()
-
-                if not section:
-                    section = Section(section_name=section_name)
-                    db.session.add(section)
-                    db.session.flush()
-
-                sections.append(section)
-
-            # ✅ Academic classes created only for manually existing batches
-            for batch in batches:
-                for division in divisions:
-                    for section in sections:
-                        exists = AcademicClass.query.filter_by(
-                            batch_id=batch.id,
-                            division_id=division.id,
-                            section_id=section.id,
-                        ).first()
-
-                        if not exists:
-                            db.session.add(
-                                AcademicClass(
-                                    batch_id=batch.id,
-                                    division_id=division.id,
-                                    section_id=section.id,
-                                )
-                            )
-
-            db.session.commit()
+            batches = Batch.query.order_by(
+                Batch.is_current.desc(), Batch.batch_name.desc()
+            ).all()
+            divisions = Division.query.order_by(Division.division_name.asc()).all()
+            sections = Section.query.order_by(Section.section_name.asc()).all()
 
             academic_classes = (
                 db.session.query(
@@ -132,21 +74,16 @@ class StudentEnrollmentOptionsAPI(MethodView):
                             {
                                 "id": b.id,
                                 "batch_name": b.batch_name,
+                                "is_current": bool(b.is_current),
                             }
                             for b in batches
                         ],
                         "divisions": [
-                            {
-                                "id": d.id,
-                                "division_name": d.division_name,
-                            }
+                            {"id": d.id, "division_name": d.division_name}
                             for d in divisions
                         ],
                         "sections": [
-                            {
-                                "id": s.id,
-                                "section_name": s.section_name,
-                            }
+                            {"id": s.id, "section_name": s.section_name}
                             for s in sections
                         ],
                         "academic_classes": [
@@ -159,7 +96,7 @@ class StudentEnrollmentOptionsAPI(MethodView):
                                 "division_name": row.division_name,
                                 "section_id": row.section_id,
                                 "section_name": row.section_name,
-                                "display_name": f"{row.division_name}-{row.section_name}",
+                                "display_name": f"{row.division_name} {row.section_name} ({row.batch_name})",
                             }
                             for row in academic_classes
                         ],
@@ -169,13 +106,12 @@ class StudentEnrollmentOptionsAPI(MethodView):
             )
 
         except Exception as e:
-            db.session.rollback()
             logger.exception(e)
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"success": False, "error": str(e)}), 500
 
 
 class StudentEnrollmentPreviewAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             academic_class_id = request.args.get("academic_class_id", type=int)
@@ -210,17 +146,17 @@ class StudentEnrollmentPreviewAPI(MethodView):
 
         except Exception as e:
             logger.exception(e)
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"success": False, "error": str(e)}), 500
 
 
 class EnrollStudentAPI(MethodView):
-    @login_required
+    @permission_required("academic", "create")
     def post(self):
         try:
             data = request.get_json(silent=True)
 
             if not data:
-                return jsonify({"error": "Invalid JSON payload"}), 400
+                return jsonify({"success": False, "error": "Invalid JSON payload"}), 400
 
             required_fields = [
                 "first_name",
@@ -236,9 +172,18 @@ class EnrollStudentAPI(MethodView):
             if missing:
                 return (
                     jsonify(
-                        {"error": f"Missing required fields: {', '.join(missing)}"}
+                        {
+                            "success": False,
+                            "error": f"Missing required fields: {', '.join(missing)}",
+                        }
                     ),
                     400,
+                )
+
+            if not AcademicClass.query.get(data.get("academic_class_id")):
+                return (
+                    jsonify({"success": False, "error": "Selected class not found"}),
+                    404,
                 )
 
             mobile = str(data["mobile"]).strip()
@@ -257,7 +202,8 @@ class EnrollStudentAPI(MethodView):
                 return (
                     jsonify(
                         {
-                            "error": "Student already exists with email/mobile/student ID/user ID"
+                            "success": False,
+                            "error": "Student already exists with email/mobile/student ID/user ID",
                         }
                     ),
                     409,
@@ -349,22 +295,22 @@ class EnrollStudentAPI(MethodView):
         except SQLAlchemyError as e:
             db.session.rollback()
             logger.exception(e)
-            return jsonify({"error": "Database error"}), 500
+            return jsonify({"success": False, "error": "Database error"}), 500
 
         except Exception as e:
             db.session.rollback()
             logger.exception(e)
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"success": False, "error": str(e)}), 500
 
 
 class StudentPromotionAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def post(self):
         try:
             data = request.get_json(silent=True)
 
             if not data:
-                return jsonify({"error": "Invalid payload"}), 400
+                return jsonify({"success": False, "error": "Invalid payload"}), 400
 
             promotion_type = data.get("promotion_type")
 
@@ -375,7 +321,10 @@ class StudentPromotionAPI(MethodView):
             ]
 
             if promotion_type not in valid_types:
-                return jsonify({"error": "Invalid promotion type"}), 400
+                return (
+                    jsonify({"success": False, "error": "Invalid promotion type"}),
+                    400,
+                )
 
             promoted_count = 0
 
@@ -386,7 +335,12 @@ class StudentPromotionAPI(MethodView):
 
                 if not student_id or not target_class_id:
                     return (
-                        jsonify({"error": "student_id and target_class_id required"}),
+                        jsonify(
+                            {
+                                "success": False,
+                                "error": "student_id and target_class_id required",
+                            }
+                        ),
                         400,
                     )
 
@@ -396,7 +350,12 @@ class StudentPromotionAPI(MethodView):
                 ).first()
 
                 if not current_record:
-                    return jsonify({"error": "Academic record not found"}), 404
+                    return (
+                        jsonify(
+                            {"success": False, "error": "Academic record not found"}
+                        ),
+                        404,
+                    )
 
                 current_record.is_current = False
 
@@ -417,7 +376,12 @@ class StudentPromotionAPI(MethodView):
 
                 if not student_ids or not target_class_id:
                     return (
-                        jsonify({"error": "student_ids and target_class_id required"}),
+                        jsonify(
+                            {
+                                "success": False,
+                                "error": "student_ids and target_class_id required",
+                            }
+                        ),
                         400,
                     )
 
@@ -447,7 +411,10 @@ class StudentPromotionAPI(MethodView):
                 if not source_class_id or not target_class_id:
                     return (
                         jsonify(
-                            {"error": "source_class_id and target_class_id required"}
+                            {
+                                "success": False,
+                                "error": "source_class_id and target_class_id required",
+                            }
                         ),
                         400,
                     )
@@ -458,7 +425,10 @@ class StudentPromotionAPI(MethodView):
                 ).all()
 
                 if not students:
-                    return jsonify({"error": "No students found"}), 404
+                    return (
+                        jsonify({"success": False, "error": "No students found"}),
+                        404,
+                    )
 
                 for record in students:
                     record.is_current = False
@@ -490,9 +460,9 @@ class StudentPromotionAPI(MethodView):
         except SQLAlchemyError as e:
             db.session.rollback()
             logger.exception(e)
-            return jsonify({"error": "Database error"}), 500
+            return jsonify({"success": False, "error": "Database error"}), 500
 
         except Exception as e:
             db.session.rollback()
             logger.exception(e)
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"success": False, "error": str(e)}), 500

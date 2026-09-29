@@ -8,8 +8,8 @@ import {
 } from "../config/appConfig";
 import "../css/dashboard.css";
 import { useDashboardUI } from "../controllers/useDashboardUI";
-import { useAdminDashboard } from "../controllers/adminDashboard";
-import { useAdminProfile } from "../controllers/Profiles/useAdminProfile";
+import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
+import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
 
 function HRAdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)

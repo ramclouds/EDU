@@ -3,6 +3,8 @@ from flask.views import MethodView
 from sqlalchemy import or_, func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from utils.auth import db
+from utils.rolePermissionManagement import permission_required
+
 
 class Subject(db.Model):
     __tablename__ = "subjects"
@@ -10,6 +12,8 @@ class Subject(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     subject_code = db.Column(db.String(20), unique=True)
     subject_name = db.Column(db.String(100), nullable=False, unique=True)
+    subject_type = db.Column(db.String(20), nullable=False, server_default="Core")
+    status = db.Column(db.String(20), nullable=False, server_default="Active")
     created_at = db.Column(db.DateTime, server_default=func.now())
 
 
@@ -29,6 +33,7 @@ def clean_text(value):
 
 
 class AdminSubjectsAPI(MethodView):
+    @permission_required("academic", "view")
     def get(self):
         try:
             search = clean_text(request.args.get("search"))
@@ -88,6 +93,7 @@ class AdminSubjectsAPI(MethodView):
         except Exception as e:
             return jsonify({"success": False, "error": str(e)}), 500
 
+    @permission_required("academic", "create")
     def post(self):
         try:
             data = request.get_json(silent=True) or {}
@@ -180,6 +186,7 @@ class AdminSubjectsAPI(MethodView):
 
 
 class AdminSubjectDetailAPI(MethodView):
+    @permission_required("academic", "view")
     def get(self, subject_id):
         subject = Subject.query.get(subject_id)
 
@@ -196,6 +203,7 @@ class AdminSubjectDetailAPI(MethodView):
             200,
         )
 
+    @permission_required("academic", "edit")
     def put(self, subject_id):
         try:
             subject = Subject.query.get(subject_id)
@@ -277,6 +285,7 @@ class AdminSubjectDetailAPI(MethodView):
             db.session.rollback()
             return jsonify({"success": False, "error": str(e)}), 500
 
+    @permission_required("academic", "delete")
     def delete(self, subject_id):
         try:
             subject = Subject.query.get(subject_id)

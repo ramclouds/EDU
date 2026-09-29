@@ -15,7 +15,7 @@ import LibraryAdminDashboard from "./pages/library-Mgmt-dashboard";
 import AccountsAdminDashboard from "./pages/accounts-Mgmt-dashboard";
 import HostelAdminDashboard from "./pages/hostels-Mgmt-dashboard";
 import HRAdminDashboard from "./pages/hr-Mgmt-dashboard";
-// import AcademicAdminDashboard from "./pages/admin/AcademicAdminDashboard";
+import AcademicAdminDashboard from "./pages/academic-Mgmt-dashboard";
 
 // Adjust this relative path to wherever useDashboardAccess.js ends up
 // living in your project (it sits next to useLogin.js in this patch).
@@ -57,9 +57,6 @@ function ProtectedRoute({ children, allowedRole, dashboardKey }) {
     return <Navigate to="/" replace />;
   }
 
-  // Students and teachers always own their single dashboard - no RBAC
-  // lookup needed, and no admin can ever be routed here (allowedRole
-  // above already filters that out).
   if (
     dashboardKey === "student-dashboard" ||
     dashboardKey === "teacher-dashboard"
@@ -67,11 +64,6 @@ function ProtectedRoute({ children, allowedRole, dashboardKey }) {
     return children;
   }
 
-  // Every other dashboard (Super Admin, Library, Accounts, Hostel, HR,
-  // and any future one added to dashboardRegistry.js) is gated purely
-  // by whether Role & Permission Management has granted this account
-  // "view" access to it - configured per role or per user, and
-  // enforced here for every admin, including Super Admin.
   if (!loaded && loading) {
     return <AccessCheckLoader />;
   }
@@ -147,6 +139,20 @@ export default function App() {
             dashboardKey="library-admin-dashboard"
           >
             <LibraryAdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ================= ACADEMIC ADMIN ================= */}
+
+      <Route
+        path="/academic-admin-dashboard"
+        element={
+          <ProtectedRoute
+            allowedRole="admin"
+            dashboardKey="academic-admin-dashboard"
+          >
+            <AcademicAdminDashboard />
           </ProtectedRoute>
         }
       />
