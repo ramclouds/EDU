@@ -11,11 +11,21 @@ from utils.rolePermissionManagement import permission_required
 logger = logging.getLogger(__name__)
 
 
+def _current_school_id():
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
 # MODELS
 class StudentAcademicRecord(db.Model):
     __tablename__ = "student_academic_records"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    # Denormalized (see AcademicClass.school_id's comment) — set from the
+    # enrolling admin, not derived via join.
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     student_id = db.Column(
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
@@ -35,6 +45,14 @@ class AcademicClass(db.Model):
     __tablename__ = "academic_classes"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    # Denormalized copy of the owning Batch/Division/Section's school_id
+    # (set from the request's current admin, not derived via join) so
+    # every query here can filter by school_id directly instead of
+    # joining through batches every time.
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     batch_id = db.Column(
         db.Integer, db.ForeignKey("batches.id", ondelete="CASCADE"), nullable=False
@@ -59,7 +77,16 @@ class Batch(db.Model):
     __tablename__ = "batches"
 
     id = db.Column(db.Integer, primary_key=True)
-    batch_name = db.Column(db.String(20), nullable=False, unique=True)
+
+    # ================= TENANCY ================= (see Admin.school_id
+    # in utils/auth.py). batch_name was globally unique before this,
+    # which meant two different schools could never both have a
+    # "2024-2025" batch — changed to unique-per-school below.
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
+    batch_name = db.Column(db.String(20), nullable=False)
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
     # Marks the school's active academic year. Only one Batch should have
@@ -70,19 +97,39 @@ class Batch(db.Model):
     is_current = db.Column(db.Boolean, nullable=False, server_default="0")
     created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
 
+    __table_args__ = (
+        db.UniqueConstraint("school_id", "batch_name", name="uq_school_batch_name"),
+    )
+
 
 class Division(db.Model):
     __tablename__ = "divisions"
 
     id = db.Column(db.Integer, primary_key=True)
-    division_name = db.Column(db.String(20), nullable=False, unique=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+    division_name = db.Column(db.String(20), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "school_id", "division_name", name="uq_school_division_name"
+        ),
+    )
 
 
 class Section(db.Model):
     __tablename__ = "sections"
 
     id = db.Column(db.Integer, primary_key=True)
-    section_name = db.Column(db.String(10), nullable=False, unique=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+    section_name = db.Column(db.String(10), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("school_id", "section_name", name="uq_school_section_name"),
+    )
 
 
 # API
@@ -190,6 +237,16 @@ class UpdateStudentProfile(MethodView):
             except (ValueError, TypeError):
                 return jsonify({"error": "Student id must be an integer"}), 400
 
+            # SECURITY: this had no authorization check at all beyond a
+            # valid token of ANY kind — any logged-in student, teacher,
+            # or admin from ANY school could edit ANY student's profile
+            # by passing an arbitrary id. The route (/api/student/update/
+            # <id>) is a self-service endpoint, so restrict it to the
+            # student editing their own record.
+            caller = getattr(request, "user", None)
+            if not isinstance(caller, Student) or caller.id != id:
+                return jsonify({"error": "Forbidden"}), 403
+
             student = Student.query.get(id)
 
             if not student:
@@ -279,6 +336,7 @@ class UpdateStudentProfile(MethodView):
 
         except Exception as e:
             logger.exception(f"UpdateStudentProfile error: {e}")
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
@@ -357,6 +415,7 @@ class ChangePassword(MethodView):
 
         except Exception as e:
             logger.exception(f"ChangePassword error: {e}")
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
@@ -397,7 +456,13 @@ class AdminStudentsListAPI(MethodView):
     than silently hiding).
     """
 
-    @permission_required("academic", "view")
+    # BUG FIX: this was gated on the "academic" module, but neither the
+    # Academic Admin nor the Accounts Admin default role is granted
+    # "academic" (they're granted the "students" module - see
+    # DEFAULT_ROLES in rolePermissionManagement.py). That meant this
+    # roster endpoint 403'd for every non-super-admin caller. "students"
+    # is the correct module for a student roster.
+    @permission_required("students", "view")
     def get(self):
         try:
             search = str(request.args.get("search") or "").strip()
@@ -407,7 +472,7 @@ class AdminStudentsListAPI(MethodView):
                 str(request.args.get("unassigned") or "").lower() == "true"
             )
 
-            query = Student.query
+            query = Student.query.filter(Student.school_id == _current_school_id())
 
             if search:
                 like = f"%{search}%"

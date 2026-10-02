@@ -28,11 +28,25 @@ from utils.studentDetails import (
 logger = logging.getLogger(__name__)
 
 
+from utils.tenancy import (
+    caller_can_access_student,
+    caller_can_access_teacher,
+    current_school_id as _current_school_id,
+)
+
+
+
 # MODELS
 class Exam(db.Model):
     __tablename__ = "exams"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Denormalized (see AcademicClass.school_id) — the (class, year, name)
+    # unique constraint below is already effectively per-school because
+    # academic_class_id belongs to exactly one school.
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     academic_class_id = db.Column(
         db.Integer, db.ForeignKey("academic_classes.id"), nullable=False, index=True
     )
@@ -79,6 +93,9 @@ class ExamResult(db.Model):
     __tablename__ = "exam_results"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     student_id = db.Column(
         db.Integer,
         db.ForeignKey("students.id"),
@@ -158,6 +175,10 @@ class StudentExamResultsAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             year = request.args.get("year")
             exam = request.args.get("exam")
 
@@ -234,6 +255,10 @@ class PerformanceAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             results = (
                 db.session.query(
                     Exam.exam_name, func.avg(ExamResult.total_marks).label("avg_marks")
@@ -261,6 +286,10 @@ class UpcomingExamsAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             record = StudentAcademicRecord.query.filter_by(
                 student_id=student_id, is_current=True
             ).first()
@@ -305,12 +334,19 @@ class TeacherExamsAPI(MethodView):
             if not teacher_id:
                 return jsonify({"error": "teacher_id required"}), 400
 
+            allowed, _ = caller_can_access_teacher(teacher_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
             assigned_class_ids = list(
                 set([tc.academic_class_id for tc in teacher_classes])
             )
 
-            query = Exam.query.filter(Exam.academic_class_id.in_(assigned_class_ids))
+            query = Exam.query.filter(
+                Exam.academic_class_id.in_(assigned_class_ids),
+                Exam.school_id == _current_school_id(),
+            )
 
             if class_id and class_id != "all":
                 query = query.filter(Exam.academic_class_id == int(class_id))
@@ -347,6 +383,10 @@ class ExamFilterOptionsAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             years = (
                 db.session.query(Exam.academic_year)
                 .join(ExamResult, Exam.id == ExamResult.exam_id)
@@ -381,7 +421,10 @@ class DownloadResultPDF(MethodView):
     @login_required
     def get(self, student_id):
         try:
-            student = Student.query.get(student_id)
+            allowed, student = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             if not student:
                 return jsonify({"error": "Student not found"}), 404
 
@@ -590,6 +633,10 @@ class TeacherStudentsAPI(MethodView):
 
             teacher_id = request.args.get("teacher_id")
 
+            allowed, _ = caller_can_access_teacher(teacher_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
 
             academic_class_ids = [tc.academic_class_id for tc in teacher_classes]
@@ -665,6 +712,10 @@ class TeacherSubjectsAPI(MethodView):
             if not teacher_id:
                 return jsonify({"error": "teacher_id required"}), 400
 
+            allowed, _ = caller_can_access_teacher(teacher_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
             subject_ids = list(set([tc.subject_id for tc in teacher_classes]))
             subjects = Subject.query.filter(Subject.id.in_(subject_ids)).all()
@@ -696,6 +747,10 @@ class TeacherClassesAPI(MethodView):
 
             if not teacher_id:
                 return jsonify({"error": "teacher_id required"}), 400
+
+            allowed, _ = caller_can_access_teacher(teacher_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
 
             teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
 
@@ -730,6 +785,10 @@ class TeacherStudentMarksAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             subject = request.args.get("subject")
             exam = request.args.get("exam")
 
@@ -806,6 +865,12 @@ class SaveTeacherMarksAPI(MethodView):
             subject_name = data.get("subject")
             exam_name = data.get("examType")
 
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
+            school_id = _current_school_id()
+
             # MARKS
             internal = float(data.get("internal", 0))
             external = float(data.get("external", 0))
@@ -868,7 +933,9 @@ class SaveTeacherMarksAPI(MethodView):
 
             # ================= SUBJECT =================
 
-            subject = Subject.query.filter_by(subject_name=subject_name).first()
+            subject = Subject.query.filter_by(
+                subject_name=subject_name, school_id=school_id
+            ).first()
 
             if not subject:
                 return jsonify({"error": "Subject not found"}), 404
@@ -888,6 +955,7 @@ class SaveTeacherMarksAPI(MethodView):
             exam_query = Exam.query.filter_by(
                 academic_class_id=academic_record.academic_class_id,
                 exam_name=exam_name,
+                school_id=school_id,
             )
 
             if academic_year:
@@ -979,6 +1047,7 @@ class SaveTeacherMarksAPI(MethodView):
                     status="Submitted",
                     remarks=remarks,
                     created_by=data.get("teacherId"),
+                    school_id=school_id,
                 )
 
                 db.session.add(result)
@@ -1010,7 +1079,9 @@ class TeacherReportCardAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
-            student = Student.query.get(student_id)
+            allowed, student = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
 
             if not student:
                 return jsonify({"error": "Student not found"}), 404
@@ -1132,6 +1203,10 @@ class TeacherAnalyticsAPI(MethodView):
 
             if not teacher_id:
                 return jsonify({"error": "teacher_id required"}), 400
+
+            allowed, _ = caller_can_access_teacher(teacher_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
 
             # ================= GET ASSIGNED CLASSES =================
             teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
@@ -1361,6 +1436,10 @@ class TeacherAnalyticsPDFAPI(MethodView):
 
             if not teacher_id:
                 return jsonify({"error": "teacher_id required"}), 400
+
+            allowed, _ = caller_can_access_teacher(teacher_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
 
             # ================= ASSIGNED CLASSES =================
             teacher_classes = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
@@ -1839,7 +1918,9 @@ class AdminExamMarksEntryPermissionAPI(MethodView):
             if enabled is None:
                 return jsonify({"error": "marks_entry_enabled is required"}), 400
 
-            exam = Exam.query.get(exam_id)
+            exam = Exam.query.filter_by(
+                id=exam_id, school_id=_current_school_id()
+            ).first()
 
             if not exam:
                 return jsonify({"error": "Exam not found"}), 404
@@ -1908,7 +1989,9 @@ class AdminExamBulkEditAPI(MethodView):
             for item in updates:
                 result_id = _parse_int(item.get("result_id"))
                 fields = item.get("fields") or {}
-                result = ExamResult.query.get(result_id)
+                result = ExamResult.query.filter_by(
+                    id=result_id, school_id=_current_school_id()
+                ).first()
                 if not result:
                     continue
 
@@ -1956,7 +2039,7 @@ class AdminExamReportsPDFAPI(MethodView):
             exam_name = request.args.get("exam_name")
 
             # reuse dashboard logic manually to avoid HTTP call
-            exam_query = Exam.query
+            exam_query = Exam.query.filter(Exam.school_id == _current_school_id())
             if academic_year and academic_year != "all":
                 exam_query = exam_query.filter(Exam.academic_year == academic_year)
             if exam_name and exam_name != "all":
@@ -2137,6 +2220,7 @@ def _class_lookup():
         .join(Division, Division.id == AcademicClass.division_id)
         .join(Section, Section.id == AcademicClass.section_id)
         .join(Batch, Batch.id == AcademicClass.batch_id)
+        .filter(AcademicClass.school_id == _current_school_id())
         .all()
     )
     return {
@@ -2155,11 +2239,16 @@ class AdminExamOptionsAPI(MethodView):
     @login_required
     def get(self):
         try:
-            batches = Batch.query.order_by(Batch.batch_name.desc()).all()
+            school_id = _current_school_id()
+
+            batches = Batch.query.filter_by(school_id=school_id).order_by(
+                Batch.batch_name.desc()
+            ).all()
             years = [b.batch_name for b in batches]
             exam_names = [
                 r[0]
                 for r in db.session.query(Exam.exam_name)
+                .filter(Exam.school_id == school_id)
                 .distinct()
                 .order_by(Exam.exam_name.asc())
                 .all()
@@ -2169,11 +2258,16 @@ class AdminExamOptionsAPI(MethodView):
                 .join(Division, Division.id == AcademicClass.division_id)
                 .join(Section, Section.id == AcademicClass.section_id)
                 .join(Batch, Batch.id == AcademicClass.batch_id)
+                .filter(AcademicClass.school_id == school_id)
                 .order_by(Division.division_name.asc(), Section.section_name.asc())
                 .all()
             )
-            subjects = Subject.query.order_by(Subject.subject_name.asc()).all()
-            teachers = Teacher.query.order_by(Teacher.id.asc()).all()
+            subjects = Subject.query.filter_by(school_id=school_id).order_by(
+                Subject.subject_name.asc()
+            ).all()
+            teachers = Teacher.query.filter_by(school_id=school_id).order_by(
+                Teacher.id.asc()
+            ).all()
 
             return (
                 jsonify(
@@ -2257,6 +2351,7 @@ class AdminExamTermAPI(MethodView):
                 .join(Division, Division.id == AcademicClass.division_id)
                 .join(Section, Section.id == AcademicClass.section_id)
                 .join(Batch, Batch.id == AcademicClass.batch_id)
+                .filter(Exam.school_id == _current_school_id())
             )
             if academic_year and academic_year != "all":
                 query = query.filter(Exam.academic_year == academic_year)
@@ -2334,19 +2429,25 @@ class AdminExamTermAPI(MethodView):
                 return jsonify({"error": "start_date cannot be after end_date"}), 400
 
             created_or_updated = []
+            school_id = _current_school_id()
+
             for class_id in class_ids:
-                if not AcademicClass.query.get(class_id):
+                if not AcademicClass.query.filter_by(
+                    id=class_id, school_id=school_id
+                ).first():
                     continue
                 exam = Exam.query.filter_by(
                     academic_class_id=class_id,
                     academic_year=academic_year,
                     exam_name=exam_name,
+                    school_id=school_id,
                 ).first()
                 if not exam:
                     exam = Exam(
                         academic_class_id=class_id,
                         academic_year=academic_year,
                         exam_name=exam_name,
+                        school_id=school_id,
                     )
                     db.session.add(exam)
                     db.session.flush()
@@ -2355,7 +2456,9 @@ class AdminExamTermAPI(MethodView):
                 exam.end_date = end_date
 
                 for subject_id in subject_ids:
-                    if not Subject.query.get(subject_id):
+                    if not Subject.query.filter_by(
+                        id=subject_id, school_id=school_id
+                    ).first():
                         continue
                     existing = ExamSubject.query.filter_by(
                         exam_id=exam.id, subject_id=subject_id
@@ -2396,7 +2499,7 @@ class AdminExamDashboardAPI(MethodView):
             status_filter = request.args.get("status")
             search = (request.args.get("search") or "").strip().lower()
 
-            exam_query = Exam.query
+            exam_query = Exam.query.filter(Exam.school_id == _current_school_id())
             if academic_year and academic_year != "all":
                 exam_query = exam_query.filter(Exam.academic_year == academic_year)
             if exam_name and exam_name != "all":
@@ -2594,7 +2697,9 @@ class AdminExamClassDetailsAPI(MethodView):
     @login_required
     def get(self, exam_id):
         try:
-            exam = Exam.query.get(exam_id)
+            exam = Exam.query.filter_by(
+                id=exam_id, school_id=_current_school_id()
+            ).first()
             if not exam:
                 return jsonify({"error": "Exam not found"}), 404
 
@@ -2753,7 +2858,9 @@ class AdminExamVerifyAPI(MethodView):
             data = request.get_json(silent=True) or {}
             admin_id = data.get("admin_id") or data.get("user_id")
             force = bool(data.get("force", False))
-            exam = Exam.query.get(exam_id)
+            exam = Exam.query.filter_by(
+                id=exam_id, school_id=_current_school_id()
+            ).first()
             if not exam:
                 return jsonify({"error": "Exam not found"}), 404
             progress = _exam_progress(exam)
@@ -2798,7 +2905,9 @@ class AdminExamPublishAPI(MethodView):
         try:
             data = request.get_json(silent=True) or {}
             force = bool(data.get("force", False))
-            exam = Exam.query.get(exam_id)
+            exam = Exam.query.filter_by(
+                id=exam_id, school_id=_current_school_id()
+            ).first()
             if not exam:
                 return jsonify({"error": "Exam not found"}), 404
             if not getattr(exam, "is_verified", False) and not force:
@@ -2852,7 +2961,9 @@ class AdminExamSchedulePublishAPI(MethodView):
                     ),
                     400,
                 )
-            exam = Exam.query.get(exam_id)
+            exam = Exam.query.filter_by(
+                id=exam_id, school_id=_current_school_id()
+            ).first()
             if not exam:
                 return jsonify({"error": "Exam not found"}), 404
             if not getattr(exam, "is_verified", False) and not data.get("force"):
@@ -2921,6 +3032,7 @@ class AdminExamResultsAPI(MethodView):
                 .join(Division, Division.id == AcademicClass.division_id)
                 .join(Section, Section.id == AcademicClass.section_id)
                 .filter(StudentAcademicRecord.is_current == True)
+                .filter(ExamResult.school_id == _current_school_id())
             )
             if exam_id:
                 query = query.filter(ExamResult.exam_id == exam_id)
@@ -3008,7 +3120,9 @@ class AdminExamReportCardsPDFAPI(MethodView):
             )
             if not exam_id:
                 return jsonify({"error": "exam_id is required"}), 400
-            exam = Exam.query.get(exam_id)
+            exam = Exam.query.filter_by(
+                id=exam_id, school_id=_current_school_id()
+            ).first()
             if not exam:
                 return jsonify({"error": "Exam not found"}), 404
             if class_id and class_id != exam.academic_class_id:
@@ -3224,7 +3338,7 @@ class AdminBatchesAPI(MethodView):
         try:
             search = _clean_text(request.args.get("search"))
 
-            query = Batch.query
+            query = Batch.query.filter(Batch.school_id == _current_school_id())
             if search:
                 query = query.filter(Batch.batch_name.ilike(f"%{search}%"))
 
@@ -3234,6 +3348,7 @@ class AdminBatchesAPI(MethodView):
 
             counts = dict(
                 db.session.query(AcademicClass.batch_id, func.count(AcademicClass.id))
+                .filter(AcademicClass.school_id == _current_school_id())
                 .group_by(AcademicClass.batch_id)
                 .all()
             )
@@ -3247,6 +3362,7 @@ class AdminBatchesAPI(MethodView):
                     StudentAcademicRecord,
                     StudentAcademicRecord.academic_class_id == AcademicClass.id,
                 )
+                .filter(AcademicClass.school_id == _current_school_id())
                 .filter(StudentAcademicRecord.is_current == True)
                 .group_by(AcademicClass.batch_id)
                 .all()
@@ -3265,7 +3381,9 @@ class AdminBatchesAPI(MethodView):
                             for b in batches
                         ],
                         "stats": {
-                            "total": Batch.query.count(),
+                            "total": Batch.query.filter(
+                                Batch.school_id == _current_school_id()
+                            ).count(),
                             "in_use": len(counts),
                             "current_batch": next(
                                 (b.batch_name for b in batches if b.is_current), None
@@ -3284,6 +3402,7 @@ class AdminBatchesAPI(MethodView):
         try:
             data = request.get_json(silent=True) or {}
             name = _clean_text(data.get("batch_name"))
+            school_id = _current_school_id()
 
             if not name:
                 return (
@@ -3292,7 +3411,8 @@ class AdminBatchesAPI(MethodView):
                 )
 
             duplicate = Batch.query.filter(
-                func.lower(Batch.batch_name) == name.lower()
+                Batch.school_id == school_id,
+                func.lower(Batch.batch_name) == name.lower(),
             ).first()
             if duplicate:
                 return (
@@ -3317,9 +3437,12 @@ class AdminBatchesAPI(MethodView):
             make_current = bool(data.get("is_current"))
 
             if make_current:
-                Batch.query.update({Batch.is_current: False})
+                Batch.query.filter(Batch.school_id == school_id).update(
+                    {Batch.is_current: False}
+                )
 
             batch = Batch(
+                school_id=school_id,
                 batch_name=name,
                 start_date=start_date,
                 end_date=end_date,
@@ -3359,7 +3482,8 @@ class AdminBatchDetailAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, batch_id):
         try:
-            batch = Batch.query.get(batch_id)
+            school_id = _current_school_id()
+            batch = Batch.query.filter_by(id=batch_id, school_id=school_id).first()
             if not batch:
                 return jsonify({"success": False, "error": "Batch not found"}), 404
 
@@ -3373,6 +3497,7 @@ class AdminBatchDetailAPI(MethodView):
                 )
 
             duplicate = Batch.query.filter(
+                Batch.school_id == school_id,
                 Batch.id != batch_id,
                 func.lower(Batch.batch_name) == name.lower(),
             ).first()
@@ -3403,9 +3528,9 @@ class AdminBatchDetailAPI(MethodView):
             if "is_current" in data:
                 make_current = bool(data.get("is_current"))
                 if make_current:
-                    Batch.query.filter(Batch.id != batch_id).update(
-                        {Batch.is_current: False}
-                    )
+                    Batch.query.filter(
+                        Batch.school_id == school_id, Batch.id != batch_id
+                    ).update({Batch.is_current: False})
                 batch.is_current = make_current
 
             db.session.commit()
@@ -3446,7 +3571,9 @@ class AdminBatchDetailAPI(MethodView):
     @permission_required("academic", "delete")
     def delete(self, batch_id):
         try:
-            batch = Batch.query.get(batch_id)
+            batch = Batch.query.filter_by(
+                id=batch_id, school_id=_current_school_id()
+            ).first()
             if not batch:
                 return jsonify({"success": False, "error": "Batch not found"}), 404
 
@@ -3480,11 +3607,14 @@ class AdminBatchSetCurrentAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, batch_id):
         try:
-            batch = Batch.query.get(batch_id)
+            school_id = _current_school_id()
+            batch = Batch.query.filter_by(id=batch_id, school_id=school_id).first()
             if not batch:
                 return jsonify({"success": False, "error": "Batch not found"}), 404
 
-            Batch.query.filter(Batch.id != batch_id).update({Batch.is_current: False})
+            Batch.query.filter(
+                Batch.school_id == school_id, Batch.id != batch_id
+            ).update({Batch.is_current: False})
             batch.is_current = True
             db.session.commit()
 
@@ -3514,7 +3644,9 @@ class AdminBatchOverviewAPI(MethodView):
     @permission_required("academic", "view")
     def get(self, batch_id):
         try:
-            batch = Batch.query.get(batch_id)
+            batch = Batch.query.filter_by(
+                id=batch_id, school_id=_current_school_id()
+            ).first()
             if not batch:
                 return jsonify({"success": False, "error": "Batch not found"}), 404
 
@@ -3604,7 +3736,8 @@ class AdminBatchRolloverAPI(MethodView):
     @permission_required("academic", "create")
     def post(self, batch_id):
         try:
-            source_batch = Batch.query.get(batch_id)
+            school_id = _current_school_id()
+            source_batch = Batch.query.filter_by(id=batch_id, school_id=school_id).first()
             if not source_batch:
                 return (
                     jsonify({"success": False, "error": "Source batch not found"}),
@@ -3620,7 +3753,9 @@ class AdminBatchRolloverAPI(MethodView):
                     400,
                 )
 
-            target_batch = Batch.query.get(target_batch_id)
+            target_batch = Batch.query.filter_by(
+                id=target_batch_id, school_id=school_id
+            ).first()
             if not target_batch:
                 return (
                     jsonify({"success": False, "error": "Target batch not found"}),
@@ -3638,7 +3773,9 @@ class AdminBatchRolloverAPI(MethodView):
                     400,
                 )
 
-            source_classes = AcademicClass.query.filter_by(batch_id=batch_id).all()
+            source_classes = AcademicClass.query.filter_by(
+                batch_id=batch_id, school_id=school_id
+            ).all()
 
             if not source_classes:
                 return (
@@ -3653,7 +3790,9 @@ class AdminBatchRolloverAPI(MethodView):
 
             existing_combos = {
                 (c.division_id, c.section_id)
-                for c in AcademicClass.query.filter_by(batch_id=target_batch_id).all()
+                for c in AcademicClass.query.filter_by(
+                    batch_id=target_batch_id, school_id=school_id
+                ).all()
             }
 
             created = 0
@@ -3670,6 +3809,7 @@ class AdminBatchRolloverAPI(MethodView):
                         batch_id=target_batch_id,
                         division_id=source_class.division_id,
                         section_id=source_class.section_id,
+                        school_id=school_id,
                     )
                 )
                 existing_combos.add(combo)
@@ -3717,7 +3857,9 @@ class AdminDivisionsAPI(MethodView):
         try:
             search = _clean_text(request.args.get("search"))
 
-            query = Division.query
+            query = Division.query.filter(
+                Division.school_id == _current_school_id()
+            )
             if search:
                 query = query.filter(Division.division_name.ilike(f"%{search}%"))
 
@@ -3727,6 +3869,7 @@ class AdminDivisionsAPI(MethodView):
                 db.session.query(
                     AcademicClass.division_id, func.count(AcademicClass.id)
                 )
+                .filter(AcademicClass.school_id == _current_school_id())
                 .group_by(AcademicClass.division_id)
                 .all()
             )
@@ -3739,7 +3882,9 @@ class AdminDivisionsAPI(MethodView):
                             division_to_dict(d, counts.get(d.id, 0)) for d in divisions
                         ],
                         "stats": {
-                            "total": Division.query.count(),
+                            "total": Division.query.filter(
+                                Division.school_id == _current_school_id()
+                            ).count(),
                             "in_use": len(counts),
                         },
                     }
@@ -3758,6 +3903,7 @@ class AdminDivisionsAPI(MethodView):
         try:
             data = request.get_json(silent=True) or {}
             name = _clean_text(data.get("division_name"))
+            school_id = _current_school_id()
 
             if not name:
                 return (
@@ -3766,7 +3912,8 @@ class AdminDivisionsAPI(MethodView):
                 )
 
             duplicate = Division.query.filter(
-                func.lower(Division.division_name) == name.lower()
+                Division.school_id == school_id,
+                func.lower(Division.division_name) == name.lower(),
             ).first()
             if duplicate:
                 return (
@@ -3774,7 +3921,7 @@ class AdminDivisionsAPI(MethodView):
                     409,
                 )
 
-            division = Division(division_name=name)
+            division = Division(division_name=name, school_id=school_id)
             db.session.add(division)
             db.session.commit()
 
@@ -3815,7 +3962,10 @@ class AdminDivisionDetailAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, division_id):
         try:
-            division = Division.query.get(division_id)
+            school_id = _current_school_id()
+            division = Division.query.filter_by(
+                id=division_id, school_id=school_id
+            ).first()
             if not division:
                 return jsonify({"success": False, "error": "Division not found"}), 404
 
@@ -3829,6 +3979,7 @@ class AdminDivisionDetailAPI(MethodView):
                 )
 
             duplicate = Division.query.filter(
+                Division.school_id == school_id,
                 Division.id != division_id,
                 func.lower(Division.division_name) == name.lower(),
             ).first()
@@ -3865,7 +4016,9 @@ class AdminDivisionDetailAPI(MethodView):
     @permission_required("academic", "delete")
     def delete(self, division_id):
         try:
-            division = Division.query.get(division_id)
+            division = Division.query.filter_by(
+                id=division_id, school_id=_current_school_id()
+            ).first()
             if not division:
                 return jsonify({"success": False, "error": "Division not found"}), 404
 
@@ -3904,7 +4057,7 @@ class AdminSectionsAPI(MethodView):
         try:
             search = _clean_text(request.args.get("search"))
 
-            query = Section.query
+            query = Section.query.filter(Section.school_id == _current_school_id())
             if search:
                 query = query.filter(Section.section_name.ilike(f"%{search}%"))
 
@@ -3912,6 +4065,7 @@ class AdminSectionsAPI(MethodView):
 
             counts = dict(
                 db.session.query(AcademicClass.section_id, func.count(AcademicClass.id))
+                .filter(AcademicClass.school_id == _current_school_id())
                 .group_by(AcademicClass.section_id)
                 .all()
             )
@@ -3924,7 +4078,9 @@ class AdminSectionsAPI(MethodView):
                             section_to_dict(s, counts.get(s.id, 0)) for s in sections
                         ],
                         "stats": {
-                            "total": Section.query.count(),
+                            "total": Section.query.filter(
+                                Section.school_id == _current_school_id()
+                            ).count(),
                             "in_use": len(counts),
                         },
                     }
@@ -3940,6 +4096,7 @@ class AdminSectionsAPI(MethodView):
         try:
             data = request.get_json(silent=True) or {}
             name = _clean_text(data.get("section_name"))
+            school_id = _current_school_id()
 
             if not name:
                 return (
@@ -3948,7 +4105,8 @@ class AdminSectionsAPI(MethodView):
                 )
 
             duplicate = Section.query.filter(
-                func.lower(Section.section_name) == name.lower()
+                Section.school_id == school_id,
+                func.lower(Section.section_name) == name.lower(),
             ).first()
             if duplicate:
                 return (
@@ -3956,7 +4114,7 @@ class AdminSectionsAPI(MethodView):
                     409,
                 )
 
-            section = Section(section_name=name)
+            section = Section(section_name=name, school_id=school_id)
             db.session.add(section)
             db.session.commit()
 
@@ -3991,7 +4149,8 @@ class AdminSectionDetailAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, section_id):
         try:
-            section = Section.query.get(section_id)
+            school_id = _current_school_id()
+            section = Section.query.filter_by(id=section_id, school_id=school_id).first()
             if not section:
                 return jsonify({"success": False, "error": "Section not found"}), 404
 
@@ -4005,6 +4164,7 @@ class AdminSectionDetailAPI(MethodView):
                 )
 
             duplicate = Section.query.filter(
+                Section.school_id == school_id,
                 Section.id != section_id,
                 func.lower(Section.section_name) == name.lower(),
             ).first()
@@ -4038,7 +4198,9 @@ class AdminSectionDetailAPI(MethodView):
     @permission_required("academic", "delete")
     def delete(self, section_id):
         try:
-            section = Section.query.get(section_id)
+            section = Section.query.filter_by(
+                id=section_id, school_id=_current_school_id()
+            ).first()
             if not section:
                 return jsonify({"success": False, "error": "Section not found"}), 404
 
@@ -4084,6 +4246,7 @@ class AdminAcademicClassesAPI(MethodView):
                 .join(Division, Division.id == AcademicClass.division_id)
                 .join(Section, Section.id == AcademicClass.section_id)
                 .join(Batch, Batch.id == AcademicClass.batch_id)
+                .filter(AcademicClass.school_id == _current_school_id())
             )
 
             if batch_id:
@@ -4135,7 +4298,9 @@ class AdminAcademicClassesAPI(MethodView):
                         "success": True,
                         "classes": classes,
                         "stats": {
-                            "total": AcademicClass.query.count(),
+                            "total": AcademicClass.query.filter(
+                                AcademicClass.school_id == _current_school_id()
+                            ).count(),
                             "total_students_assigned": sum(student_counts.values()),
                         },
                     }
@@ -4153,6 +4318,7 @@ class AdminAcademicClassesAPI(MethodView):
             batch_id = _parse_int(data.get("batch_id"))
             division_id = _parse_int(data.get("division_id"))
             section_id = _parse_int(data.get("section_id"))
+            school_id = _current_school_id()
 
             if not batch_id or not division_id or not section_id:
                 return (
@@ -4165,24 +4331,29 @@ class AdminAcademicClassesAPI(MethodView):
                     400,
                 )
 
-            if not Batch.query.get(batch_id):
+            if not Batch.query.filter_by(id=batch_id, school_id=school_id).first():
                 return (
                     jsonify({"success": False, "error": "Selected batch not found"}),
                     404,
                 )
-            if not Division.query.get(division_id):
+            if not Division.query.filter_by(
+                id=division_id, school_id=school_id
+            ).first():
                 return (
                     jsonify({"success": False, "error": "Selected division not found"}),
                     404,
                 )
-            if not Section.query.get(section_id):
+            if not Section.query.filter_by(id=section_id, school_id=school_id).first():
                 return (
                     jsonify({"success": False, "error": "Selected section not found"}),
                     404,
                 )
 
             duplicate = AcademicClass.query.filter_by(
-                batch_id=batch_id, division_id=division_id, section_id=section_id
+                batch_id=batch_id,
+                division_id=division_id,
+                section_id=section_id,
+                school_id=school_id,
             ).first()
             if duplicate:
                 return (
@@ -4196,7 +4367,10 @@ class AdminAcademicClassesAPI(MethodView):
                 )
 
             academic = AcademicClass(
-                batch_id=batch_id, division_id=division_id, section_id=section_id
+                batch_id=batch_id,
+                division_id=division_id,
+                section_id=section_id,
+                school_id=school_id,
             )
             db.session.add(academic)
             db.session.commit()
@@ -4246,7 +4420,9 @@ class AdminAcademicClassDetailAPI(MethodView):
     @permission_required("academic", "view")
     def get(self, class_id):
         try:
-            academic = AcademicClass.query.get(class_id)
+            academic = AcademicClass.query.filter_by(
+                id=class_id, school_id=_current_school_id()
+            ).first()
             if not academic:
                 return jsonify({"success": False, "error": "Class not found"}), 404
 
@@ -4275,7 +4451,10 @@ class AdminAcademicClassDetailAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, class_id):
         try:
-            academic = AcademicClass.query.get(class_id)
+            school_id = _current_school_id()
+            academic = AcademicClass.query.filter_by(
+                id=class_id, school_id=school_id
+            ).first()
             if not academic:
                 return jsonify({"success": False, "error": "Class not found"}), 404
 
@@ -4284,17 +4463,19 @@ class AdminAcademicClassDetailAPI(MethodView):
             division_id = _parse_int(data.get("division_id"), academic.division_id)
             section_id = _parse_int(data.get("section_id"), academic.section_id)
 
-            if not Batch.query.get(batch_id):
+            if not Batch.query.filter_by(id=batch_id, school_id=school_id).first():
                 return (
                     jsonify({"success": False, "error": "Selected batch not found"}),
                     404,
                 )
-            if not Division.query.get(division_id):
+            if not Division.query.filter_by(
+                id=division_id, school_id=school_id
+            ).first():
                 return (
                     jsonify({"success": False, "error": "Selected division not found"}),
                     404,
                 )
-            if not Section.query.get(section_id):
+            if not Section.query.filter_by(id=section_id, school_id=school_id).first():
                 return (
                     jsonify({"success": False, "error": "Selected section not found"}),
                     404,
@@ -4302,6 +4483,7 @@ class AdminAcademicClassDetailAPI(MethodView):
 
             duplicate = AcademicClass.query.filter(
                 AcademicClass.id != class_id,
+                AcademicClass.school_id == school_id,
                 AcademicClass.batch_id == batch_id,
                 AcademicClass.division_id == division_id,
                 AcademicClass.section_id == section_id,
@@ -4360,7 +4542,9 @@ class AdminAcademicClassDetailAPI(MethodView):
     @permission_required("academic", "delete")
     def delete(self, class_id):
         try:
-            academic = AcademicClass.query.get(class_id)
+            academic = AcademicClass.query.filter_by(
+                id=class_id, school_id=_current_school_id()
+            ).first()
             if not academic:
                 return jsonify({"success": False, "error": "Class not found"}), 404
 

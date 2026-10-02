@@ -1,15 +1,22 @@
 import os
 from flask import Flask, jsonify, send_from_directory, request
-from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from dotenv import load_dotenv
-import traceback
 
 # ==== LOAD ENV ====
 load_dotenv()
 
 # ==== CORE ====
-from utils.auth import Login, SignUp, db, bcrypt
+from utils.auth import Login, Logout, SignUp, db, bcrypt
+from utils.auth_middleware import login_required
+from utils.platform import (
+    DeveloperLogin,
+    DeveloperLogout,
+    PlatformStatsAPI,
+    SchoolDetailAPI,
+    SchoolListCreateAPI,
+    SchoolStatusAPI,
+)
 
 # ==== STUDENT / TEACHER ====
 from utils.studentDetails import (
@@ -25,7 +32,50 @@ from utils.teacherDetails import (
     ChangeTeacherPassword,
 )
 
-from utils.adminsDetails import AdminDetails, UpdateAdminProfile, ChangeAdminPassword
+from utils.adminsDetails import (
+    AdminDetails,
+    UpdateAdminProfile,
+    ChangeAdminPassword,
+    AdminListAPI,
+    CreateAdminAPI,
+)
+
+# ==== STAFF DIRECTORY (Accounts Admin's combined Staff section) ====
+from utils.staffDirectory import AdminStaffListAPI
+
+# ==== ACCOUNTS (fees, payroll, general ledger) ====
+from utils.accounts import (
+    StudentFeeOverviewAPI,
+    FeeInstallmentListAPI,
+    FeeInstallmentDetailAPI,
+    FeePaymentListAPI,
+    FeePaymentDetailAPI,
+    FeeDashboardSummaryAPI,
+    StaffSalaryOverviewAPI,
+    SalaryStructureAPI,
+    PayslipListAPI,
+    PayslipDetailAPI,
+    PayrollSummaryAPI,
+    AccountsTransactionListAPI,
+    AccountsTransactionDetailAPI,
+    FeeStructureListAPI,
+    FeeStructureDetailAPI,
+    FeeStructureApplyAPI,
+    PendingFeesListAPI,
+    AccountsBatchOptionsAPI,
+    FeeReportsAPI,
+    ExpenseCategoryListAPI,
+    ExpenseCategoryDetailAPI,
+    PayrollStaffListAPI,
+    PayslipsAllListAPI,
+    RunPayrollAPI,
+    BankAccountListAPI,
+    BankAccountDetailAPI,
+    FinancialOverviewAPI,
+    ProfitLossAPI,
+    SendFeeRemindersAPI,
+    AccountsActivityLogsAPI,
+)
 from utils.assets import (
     CreateAssetAPI,
     GetAssetsAPI,
@@ -292,20 +342,38 @@ def create_app():
     app = Flask(__name__)
 
     # ==== CONFIG ====
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("MYSQL_DSN")
+    is_production = os.getenv("FLASK_ENV", "development") == "production"
+
+    mysql_dsn = os.getenv("MYSQL_DSN")
+    if not mysql_dsn:
+        raise RuntimeError(
+            "MYSQL_DSN is not set. Add it to your .env (see .env.example)."
+        )
+    app.config["SQLALCHEMY_DATABASE_URI"] = mysql_dsn
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET", "super-secret-key")
+
+    secret_key = os.getenv("APP_SECRET_KEY") or os.getenv("JWT_SECRET")
+    if is_production and not secret_key:
+        raise RuntimeError(
+            "APP_SECRET_KEY is not set. Refusing to start in production "
+            "without one — set it in your environment (see .env.example)."
+        )
+    app.config["SECRET_KEY"] = secret_key or "dev-only-insecure-secret"
 
     # ==== INIT ====
     db.init_app(app)
     bcrypt.init_app(app)
-    JWTManager(app)
 
     # ==== CORS ====
+    # Comma-separated list of allowed origins, e.g.
+    # CORS_ORIGINS=https://app.example.com,https://admin.example.com
+    cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+    cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+
     CORS(
         app,
         supports_credentials=True,
-        origins=["http://localhost:5173"],
+        origins=cors_origins,
         allow_headers=["Content-Type", "Authorization"],
         methods=[
             "GET",
@@ -332,6 +400,44 @@ def create_app():
 
     app.add_url_rule(
         "/api/signup", view_func=SignUp.as_view("signup"), methods=["POST"]
+    )
+
+    app.add_url_rule(
+        "/api/logout",
+        view_func=login_required(Logout.as_view("logout")),
+        methods=["POST"],
+    )
+
+    # ================= PLATFORM / DEVELOPER (multi-school) =================
+    app.add_url_rule(
+        "/api/developer/login",
+        view_func=DeveloperLogin.as_view("developer_login"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/logout",
+        view_func=DeveloperLogout.as_view("developer_logout"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools",
+        view_func=SchoolListCreateAPI.as_view("developer_schools"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>",
+        view_func=SchoolDetailAPI.as_view("developer_school_detail"),
+        methods=["GET", "PUT"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/status",
+        view_func=SchoolStatusAPI.as_view("developer_school_status"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/stats",
+        view_func=PlatformStatsAPI.as_view("developer_stats"),
+        methods=["GET"],
     )
 
     # =========================================================
@@ -452,6 +558,18 @@ def create_app():
         "/api/admin/<int:id>/change-password",
         view_func=ChangeAdminPassword.as_view("change_admin_password"),
         methods=["PUT"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/list",
+        view_func=AdminListAPI.as_view("admin_list"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/create",
+        view_func=CreateAdminAPI.as_view("create_admin"),
+        methods=["POST"],
     )
 
     # ASSETS MANAGEMENT
@@ -1727,10 +1845,195 @@ def create_app():
         methods=["POST"],
     )
 
-    # STUDENT ROSTER (Academic Admin Students section)
+    # STUDENT ROSTER (Academic Admin Students section, Accounts Admin
+    # Students section)
     app.add_url_rule(
         "/api/admin/students",
         view_func=AdminStudentsListAPI.as_view("admin_students_list"),
+        methods=["GET"],
+    )
+
+    # STAFF DIRECTORY (Accounts Admin Staff section - teachers +
+    # non-teaching staff + admins combined)
+    app.add_url_rule(
+        "/api/admin/staff",
+        view_func=AdminStaffListAPI.as_view("admin_staff_list"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: STUDENT FEES ====================
+    app.add_url_rule(
+        "/api/accounts/students/<int:student_id>/fees",
+        view_func=StudentFeeOverviewAPI.as_view("accounts_student_fee_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/students/<int:student_id>/installments",
+        view_func=FeeInstallmentListAPI.as_view("accounts_fee_installments"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/installments/<int:installment_id>",
+        view_func=FeeInstallmentDetailAPI.as_view("accounts_fee_installment_detail"),
+        methods=["PUT", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/accounts/students/<int:student_id>/payments",
+        view_func=FeePaymentListAPI.as_view("accounts_fee_payments"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/payments/<int:payment_id>",
+        view_func=FeePaymentDetailAPI.as_view("accounts_fee_payment_detail"),
+        methods=["GET", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/accounts/fees/summary",
+        view_func=FeeDashboardSummaryAPI.as_view("accounts_fee_summary"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: STAFF PAYROLL ====================
+    app.add_url_rule(
+        "/api/accounts/staff/<string:record_type>/<int:record_id>/salary",
+        view_func=StaffSalaryOverviewAPI.as_view("accounts_staff_salary_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/staff/<string:record_type>/<int:record_id>/salary-structure",
+        view_func=SalaryStructureAPI.as_view("accounts_salary_structure"),
+        methods=["GET", "PUT"],
+    )
+    app.add_url_rule(
+        "/api/accounts/staff/<string:record_type>/<int:record_id>/payslips",
+        view_func=PayslipListAPI.as_view("accounts_payslips"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/payslips/<int:payslip_id>",
+        view_func=PayslipDetailAPI.as_view("accounts_payslip_detail"),
+        methods=["GET", "PUT"],
+    )
+    app.add_url_rule(
+        "/api/accounts/payroll/summary",
+        view_func=PayrollSummaryAPI.as_view("accounts_payroll_summary"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: GENERAL LEDGER ====================
+    app.add_url_rule(
+        "/api/accounts/transactions",
+        view_func=AccountsTransactionListAPI.as_view("accounts_transactions"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/transactions/<int:transaction_id>",
+        view_func=AccountsTransactionDetailAPI.as_view("accounts_transaction_detail"),
+        methods=["GET", "PUT", "DELETE"],
+    )
+
+    # ==================== ACCOUNTS: FEE STRUCTURE TEMPLATES ====================
+    app.add_url_rule(
+        "/api/accounts/fee-structures",
+        view_func=FeeStructureListAPI.as_view("accounts_fee_structures"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/fee-structures/<int:structure_id>",
+        view_func=FeeStructureDetailAPI.as_view("accounts_fee_structure_detail"),
+        methods=["PUT", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/accounts/fee-structures/<int:structure_id>/apply",
+        view_func=FeeStructureApplyAPI.as_view("accounts_fee_structure_apply"),
+        methods=["POST"],
+    )
+
+    # ==================== ACCOUNTS: PENDING FEES ====================
+    app.add_url_rule(
+        "/api/accounts/fees/pending",
+        view_func=PendingFeesListAPI.as_view("accounts_pending_fees"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: BATCH OPTIONS ====================
+    app.add_url_rule(
+        "/api/accounts/batches",
+        view_func=AccountsBatchOptionsAPI.as_view("accounts_batch_options"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: FEE REPORTS ====================
+    app.add_url_rule(
+        "/api/accounts/fees/reports",
+        view_func=FeeReportsAPI.as_view("accounts_fee_reports"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: EXPENSE CATEGORIES ====================
+    app.add_url_rule(
+        "/api/accounts/expense-categories",
+        view_func=ExpenseCategoryListAPI.as_view("accounts_expense_categories"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/expense-categories/<int:category_id>",
+        view_func=ExpenseCategoryDetailAPI.as_view("accounts_expense_category_detail"),
+        methods=["PUT", "DELETE"],
+    )
+
+    # ==================== ACCOUNTS: SALARY MANAGEMENT ====================
+    app.add_url_rule(
+        "/api/accounts/payroll/staff",
+        view_func=PayrollStaffListAPI.as_view("accounts_payroll_staff_list"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: PAYSLIPS (ROSTER-WIDE) ====================
+    app.add_url_rule(
+        "/api/accounts/payslips",
+        view_func=PayslipsAllListAPI.as_view("accounts_payslips_all"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/payroll/run",
+        view_func=RunPayrollAPI.as_view("accounts_payroll_run"),
+        methods=["POST"],
+    )
+
+    # ==================== ACCOUNTS: BANK ACCOUNTS ====================
+    app.add_url_rule(
+        "/api/accounts/bank-accounts",
+        view_func=BankAccountListAPI.as_view("accounts_bank_accounts"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/bank-accounts/<int:account_id>",
+        view_func=BankAccountDetailAPI.as_view("accounts_bank_account_detail"),
+        methods=["PUT", "DELETE"],
+    )
+
+    # ==================== ACCOUNTS: FINANCIAL REPORTS ====================
+    app.add_url_rule(
+        "/api/accounts/financial-overview",
+        view_func=FinancialOverviewAPI.as_view("accounts_financial_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/profit-loss",
+        view_func=ProfitLossAPI.as_view("accounts_profit_loss"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/fees/send-reminders",
+        view_func=SendFeeRemindersAPI.as_view("accounts_send_fee_reminders"),
+        methods=["POST"],
+    )
+
+    # ==================== ACCOUNTS: ACTIVITY LOGS (Super Admin only) ====================
+    app.add_url_rule(
+        "/api/accounts/activity-logs",
+        view_func=AccountsActivityLogsAPI.as_view("accounts_activity_logs"),
         methods=["GET"],
     )
 
@@ -1789,17 +2092,35 @@ def create_app():
     SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
 
+    def _safe_send(base_folder, filename):
+        """Resolve filename under base_folder and refuse to serve anything
+        outside it. The previous version only ran the path through
+        os.path.normpath, which does NOT stop `../../../etc/passwd`-style
+        traversal once joined — normpath collapses the segments but the
+        result can still resolve outside base_folder. This checks the final
+        absolute path is actually contained within base_folder before
+        touching the filesystem.
+        """
+        base_abs = os.path.abspath(base_folder)
+        full_path = os.path.abspath(os.path.join(base_abs, filename))
+
+        if os.path.commonpath([base_abs, full_path]) != base_abs:
+            return None
+
+        if not os.path.isfile(full_path):
+            return None
+
+        return full_path
+
     # STUDENT SUBMITTED FILES
     @app.route("/Submitted_Assignments/<path:filename>")
+    @login_required
     def submitted_files(filename):
 
         try:
+            full_path = _safe_send(SUBMITTED_FOLDER, filename)
 
-            safe_filename = os.path.normpath(filename)
-            full_path = os.path.join(SUBMITTED_FOLDER, safe_filename)
-
-            if not os.path.exists(full_path):
-
+            if full_path is None:
                 return jsonify({"error": "File not found"}), 404
 
             directory = os.path.dirname(full_path)
@@ -1808,28 +2129,25 @@ def create_app():
                 directory, actual_filename, as_attachment=False
             )
 
-            # 🔥 OPEN IN BROWSER
             response.headers["Content-Disposition"] = (
                 f'inline; filename="{actual_filename}"'
             )
 
             return response
 
-        except Exception as e:
-            traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+        except Exception:
+            app.logger.exception("Failed to serve submitted assignment file")
+            return jsonify({"error": "Unable to serve file"}), 500
 
     # TEACHER ASSIGNMENT FILES
     @app.route("/Assignment_Files/<path:filename>")
+    @login_required
     def assignment_files(filename):
 
         try:
+            full_path = _safe_send(TEACHER_ASSIGNMENT_FOLDER, filename)
 
-            safe_filename = os.path.normpath(filename)
-            full_path = os.path.join(TEACHER_ASSIGNMENT_FOLDER, safe_filename)
-
-            if not os.path.exists(full_path):
-
+            if full_path is None:
                 return jsonify({"error": "File not found"}), 404
 
             directory = os.path.dirname(full_path)
@@ -1838,16 +2156,15 @@ def create_app():
                 directory, actual_filename, as_attachment=False
             )
 
-            # 🔥 OPEN INLINE
             response.headers["Content-Disposition"] = (
                 f'inline; filename="{actual_filename}"'
             )
 
             return response
 
-        except Exception as e:
-            traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+        except Exception:
+            app.logger.exception("Failed to serve assignment file")
+            return jsonify({"error": "Unable to serve file"}), 500
 
     # ERROR HANDLERS
     @app.errorhandler(404)
@@ -1876,9 +2193,19 @@ def create_app():
 app = create_app()
 
 if __name__ == "__main__":
+    is_dev = os.getenv("FLASK_ENV", "development") == "development"
 
     with app.app_context():
-        if os.getenv("FLASK_ENV") == "development":
+        if is_dev:
+            # Dev convenience only. Production schema changes must go
+            # through real migrations (Flask-Migrate / Alembic), never
+            # db.create_all(), or existing data and pending column
+            # migrations (see project notes) can be silently skipped.
             db.create_all()
 
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # debug=True enables the Werkzeug interactive debugger, which allows
+    # arbitrary code execution from the browser if this ever gets exposed
+    # publicly. It must never be hardcoded on — tie it to FLASK_ENV, and
+    # run behind a real WSGI server (gunicorn/waitress) in production
+    # rather than this dev server at all (see wsgi.py).
+    app.run(host="0.0.0.0", port=5000, debug=is_dev)

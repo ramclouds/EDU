@@ -8,9 +8,12 @@ import {
   FILE_BASE_URL,
 } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
 import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
+import { useAdminManagement } from "../controllers/AdminSide/useAdminManagement";
+import CreateAdminModal from "../components/CreateAdminModal";
 import { useAssets } from "../controllers/Assets/useAssets";
 import { useLeaveManagement } from "../controllers/academic/useLeaveManagement";
 import { useStudentEnrollment } from "../controllers/Academic/useStudentEnrollment";
@@ -22,6 +25,7 @@ function AdminDashboard() {
   const [noticeTab, setNoticeTab] = useState("announcements");
   const [activeSection, setActiveSection] = useState("dashboard");
   const [search, setSearch] = useState("");
+  const [showCreateAdminModal, setShowCreateAdminModal] = useState(false);
 
   // Which of the other admin dashboards this account may currently
   // open - Super Admin normally sees all of them, but this stays
@@ -105,6 +109,46 @@ function AdminDashboard() {
 
     toast,
   } = useAdminDashboard(activeSection);
+
+  // ================= SECURITY & ACTIVITY LOGS =================
+  // Reads the token directly (not via fetchWithAuth) for the same
+  // stability reason as useAdminManagement.js — fetchWithAuth is a new
+  // function reference every render in this hook, so depending on it
+  // here would re-fire this effect every render and infinite-loop.
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [activityLogsLoading, setActivityLogsLoading] = useState(false);
+  const [activityLogsError, setActivityLogsError] = useState(null);
+
+  useEffect(() => {
+    if (activeSection !== "security") return;
+
+    let cancelled = false;
+    setActivityLogsLoading(true);
+    setActivityLogsError(null);
+
+    fetch(`${BASE_URL}/admin/activity-logs`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (cancelled) return;
+        if (ok) {
+          setActivityLogs(Array.isArray(data) ? data : []);
+        } else {
+          setActivityLogsError(data.error || "Failed to load activity logs");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setActivityLogsError("Failed to load activity logs");
+      })
+      .finally(() => {
+        if (!cancelled) setActivityLogsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection]);
 
   // ================= ENROLLMENT HOOK =================
   const {
@@ -275,6 +319,14 @@ function AdminDashboard() {
     handleLogout,
   } = useAdminProfile({ fetchWithAuth, showToast });
 
+  // ================= ADMIN MANAGEMENT (create/list admins) =================
+  const {
+    admins: allAdmins,
+    loading: adminsLoading,
+    creating: creatingAdmin,
+    createAdmin,
+  } = useAdminManagement();
+
   // ================= ASSETS HOOK =================
   const {
     // DATA
@@ -401,6 +453,7 @@ function AdminDashboard() {
             {
               title: "USER MANAGEMENT",
               items: [
+                ["manage-admins", "bi-person-gear", "Manage Admins"],
                 ["parents", "bi-people-fill", "Parents"],
                 ["roles", "bi-shield-lock", "Roles & Permissions"],
               ],
@@ -1318,6 +1371,95 @@ function AdminDashboard() {
                   )}
                 </div>
               </div>
+            )}
+          </section>
+        )}
+
+        {activeSection === "manage-admins" && (
+          <section className="space-y-6">
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                  Manage Admins
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Create and view Academic, Library, Accounts, Hostel, HR,
+                  and Super Admin accounts.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateAdminModal(true)}
+                className="whitespace-nowrap rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:opacity-90"
+              >
+                <i className="bi bi-plus-lg mr-1"></i> New admin
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {adminsLoading ? (
+                <div className="p-10 text-center text-gray-400">
+                  Loading…
+                </div>
+              ) : allAdmins.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">
+                  No admin accounts yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-slate-700">
+                        <th className="px-5 py-3">Name</th>
+                        <th className="px-5 py-3">Email</th>
+                        <th className="px-5 py-3">Type</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3">Username</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allAdmins.map((a) => (
+                        <tr
+                          key={a.id}
+                          className="border-b border-gray-50 last:border-0 dark:border-slate-700/50"
+                        >
+                          <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">
+                            {a.first_name} {a.last_name}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {a.email}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {a.admin_type}
+                          </td>
+                          <td className="px-5 py-3">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                a.status === "Active"
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400"
+                              }`}
+                            >
+                              {a.status}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">
+                            {a.username}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {showCreateAdminModal && (
+              <CreateAdminModal
+                onClose={() => setShowCreateAdminModal(false)}
+                onCreate={createAdmin}
+                creating={creatingAdmin}
+              />
             )}
           </section>
         )}
@@ -3705,7 +3847,7 @@ function AdminDashboard() {
         {/* ============================= Asset Inventory END ============================= */}
         {/*  Add Asset Modal START  */}
         {isAddAssetModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 overflow-y-auto py-10">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 overflow-y-auto py-10">
             <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden animate-[fadeIn_.3s_ease]">
               {/* HEADER */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
@@ -4103,6 +4245,79 @@ function AdminDashboard() {
         )}
         {/* ============================= Add Asset Modal END ============================= */}
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "security" && (
+          <section className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                Security & Activity Logs
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                A record of actions taken across the school's dashboards.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {activityLogsLoading ? (
+                <div className="p-10 text-center text-gray-400">
+                  Loading…
+                </div>
+              ) : activityLogsError ? (
+                <div className="p-10 text-center text-red-500">
+                  {activityLogsError}
+                </div>
+              ) : activityLogs.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">
+                  No activity recorded yet.
+                </div>
+              ) : (
+                <div className="max-h-[70vh] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white dark:bg-slate-800">
+                      <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-slate-700">
+                        <th className="px-5 py-3">Time</th>
+                        <th className="px-5 py-3">Role</th>
+                        <th className="px-5 py-3">Action</th>
+                        <th className="px-5 py-3">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activityLogs.map((log) => (
+                        <tr
+                          key={log.id}
+                          className="border-b border-gray-50 last:border-0 dark:border-slate-700/50"
+                        >
+                          <td className="whitespace-nowrap px-5 py-3 text-gray-500 dark:text-gray-400">
+                            {log.time}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {log.role}
+                          </td>
+                          <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">
+                            {log.action}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {log.description}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={admin}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
             {/* ================= PROFILE HEADER ================= */}
@@ -4564,7 +4779,7 @@ function AdminDashboard() {
         )}
         {/* ===================== PROFILE SECTION END ========================*/}
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100]">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md border border-gray-100 dark:border-slate-700">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

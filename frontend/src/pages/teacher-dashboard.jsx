@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { APP_NAME, APP_YEAR } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useTeacherDashboard } from "../controllers/TeachersSide/teacherDashboard";
 import { useTeacherAssignments } from "../controllers/TeachersSide/useTeacherAssignments";
 import { useDashboardUI } from "../controllers/useDashboardUI";
@@ -1423,7 +1424,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         <div
           className={`${
             isClassDetailOpen ? "flex" : "hidden"
-          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-50 p-2 sm:p-4`}
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[100] p-2 sm:p-4`}
         >
           <div className="w-full max-w-6xl mx-auto bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 space-y-5 max-h-[95vh] overflow-hidden">
             {/* HEADER */}
@@ -2431,7 +2432,7 @@ bg-gray-50 dark:bg-slate-700
         )}
         {/* ASSIGNMENT DETAIL MODAL */}
         {selectedAssignment && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-2 sm:p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-2 sm:p-4">
             <div className="bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 w-full max-w-3xl rounded-t-3xl sm:rounded-3xl flex flex-col h-[95vh] sm:max-h-[90vh] overflow-hidden">
               {/* HEADER */}
               <div className="p-4 sm:p-5 border-b dark:border-slate-700 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
@@ -2658,7 +2659,7 @@ bg-gray-50 dark:bg-slate-700
         {showModal && (
           <div
             onClick={() => setShowModal(false)}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-2 sm:p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-2 sm:p-4"
           >
             <div
               onClick={(e) => e.stopPropagation()}
@@ -2871,7 +2872,7 @@ bg-gray-50 dark:bg-slate-700
                       "assignmentDraft",
                       JSON.stringify(assignmentForm),
                     );
-                    alert("Draft saved");
+                    showToast("Draft saved", "success");
                   }}
                   className="px-5 py-3 rounded-xl bg-gray-100 dark:bg-slate-700 text-sm"
                 >
@@ -3359,7 +3360,7 @@ bg-gray-50 dark:bg-slate-700
         )}
         {/*  COMPREHENSIVE PERFORMANCE MANAGEMENT REPORT CARD MODAL  */}
         {reportModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-slate-800 dark:text-gray-100 w-full max-w-6xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
               {/* HEADER */}
               <div className="flex justify-between items-center border-b pb-4 dark:border-slate-700">
@@ -4056,6 +4057,16 @@ bg-gray-50 dark:bg-slate-700
         )}
         {/*  ============================= TEACHER LEAVE SECTION END ============================= */}
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={teacher}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
             {/* PROFILE HEADER */}
@@ -4592,7 +4603,7 @@ bg-gray-50 dark:bg-slate-700
         )}
         {/* ===================== PROFILE SECTION END ========================*/}
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100] p-4">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md border border-gray-100 dark:border-slate-700">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

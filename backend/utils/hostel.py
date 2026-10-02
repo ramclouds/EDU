@@ -1565,7 +1565,6 @@ class StudentHostelDetails(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1583,7 +1582,6 @@ class StudentHostelDetails(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1695,7 +1693,6 @@ class CreateHostelComplaint(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1713,7 +1710,6 @@ class CreateHostelComplaint(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1801,7 +1797,6 @@ class StudentHostelFeesAPI(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1815,7 +1810,6 @@ class StudentHostelFeesAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1859,7 +1853,6 @@ class StudentHostelLeaveRequestAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1958,7 +1951,6 @@ class StudentHostelLeaveRequestAPI(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1974,7 +1966,6 @@ class StudentHostelLeaveRequestAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2020,7 +2011,6 @@ class StudentHostelLeaveRequestCancelAPI(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2034,7 +2024,6 @@ class StudentHostelLeaveRequestCancelAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2076,7 +2065,6 @@ class StudentHostelVisitorAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2150,7 +2138,6 @@ class StudentHostelVisitorAPI(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2166,7 +2153,6 @@ class StudentHostelVisitorAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2233,7 +2219,6 @@ class StudentHostelMessMenuAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2313,7 +2298,6 @@ class StudentHostelAttendanceAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,

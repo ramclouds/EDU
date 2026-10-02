@@ -1,34 +1,41 @@
-bcrypt            
-blinker            
-certifi           
-cffi               
-charset-normalizer 
-click             
-colorama           
-cryptography       
-Flask              
-Flask-Bcrypt      
-flask-cors         
-Flask-JWT-Extended 
-Flask-Mail         
-Flask-MySQLdb     
-Flask-SQLAlchemy   
-greenlet           
-idna               
-itsdangerous       
-Jinja2             
-MarkupSafe         
-mysqlclient        
-pillow             
-pip               
-pycparser         
-PyJWT              
-PyMySQL            
-python-dotenv      
-reportlab          
-requests           
-setuptools         
-SQLAlchemy         
-typing_extensions  
-urllib3           
-Werkzeug
+# Pinned to the versions this project was built and tested against.
+# Regenerate with `pip freeze > requirements.txt` inside the venv after
+# any dependency change, and re-test before deploying.
+
+bcrypt==5.0.0
+blinker==1.9.0
+certifi==2026.2.25
+cffi==2.1.0
+charset-normalizer==3.4.6
+click==8.3.1
+colorama==0.4.6
+cryptography==49.0.0
+Flask==3.1.2
+Flask-Bcrypt==1.0.1
+flask-cors==6.0.2
+Flask-Mail==0.10.0
+Flask-MySQLdb==2.0.0
+Flask-SQLAlchemy==3.1.1
+greenlet==3.3.1
+idna==3.11
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+mysqlclient==2.2.8
+pillow==12.1.1
+pycparser==3.0
+PyJWT==2.11.0
+PyMySQL==1.1.2
+python-dotenv==1.2.1
+reportlab==4.4.10
+requests==2.33.0
+SQLAlchemy==2.0.46
+typing_extensions==4.15.0
+urllib3==2.6.3
+Werkzeug==3.1.5
+
+# --- Production serving (new) ---
+# The Flask dev server (app.run) is not fit for production: it's
+# single-threaded and not hardened against slow/hostile clients.
+# gunicorn is the WSGI server; see wsgi.py + gunicorn_conf.py.
+gunicorn==23.0.0

@@ -152,11 +152,11 @@ class TimetableOptionsAPI(MethodView):
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load timetable options")
 
             return (
-                jsonify({"error": str(e)}),
+                jsonify({"error": "Internal server error"}),
                 500,
             )
 
@@ -224,7 +224,7 @@ class TimetableLectureAPI(MethodView):
         except Exception as e:
 
             db.session.rollback()
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
     @permission_required("academic", "edit")
     def put(self, lecture_id):
@@ -701,4 +701,4 @@ class DownloadTeacherTimetablePDFAPI(MethodView):
 
             logger.exception(f"DownloadTeacherTimetablePDFAPI error: {e}")
 
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500

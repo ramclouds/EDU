@@ -187,6 +187,7 @@ class TeacherDetails(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
@@ -305,6 +306,7 @@ class UpdateTeacherProfile(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
@@ -365,4 +367,5 @@ class ChangeTeacherPassword(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500

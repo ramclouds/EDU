@@ -387,6 +387,7 @@ class TeacherLeaveBalanceAPI(MethodView):
 
         except Exception:
             logger.exception("Balance fetch failed")
+            db.session.rollback()
             return jsonify({"error": "Failed to fetch balance"}), 500
 
 # Student- ADMIN / TEACHER APPROVE STUDENT LEAVE

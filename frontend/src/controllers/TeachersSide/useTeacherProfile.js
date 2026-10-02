@@ -50,6 +50,14 @@ export function useTeacherProfile({ fetchWithAuth }) {
 
     // ================= LOGOUT =================
     const logoutUser = () => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            fetch(`${BASE_URL}/logout`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => {});
+        }
+
         localStorage.clear();
         window.location.href = "/";
     };

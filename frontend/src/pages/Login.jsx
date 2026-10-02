@@ -10,6 +10,9 @@ export default function Login() {
     password,
     setPassword,
 
+    schoolCode,
+    setSchoolCode,
+
     resetEmail,
     setResetEmail,
 
@@ -91,6 +94,24 @@ export default function Login() {
               Sign in to continue to your portal
             </p>
 
+            {/* SCHOOL CODE (multi-school) */}
+            <div className="mb-4">
+              <label className="text-sm font-medium">
+                School code{" "}
+                <span className="text-gray-400 font-normal">
+                  (leave blank if your school hasn't been given one)
+                </span>
+              </label>
+
+              <input
+                type="text"
+                value={schoolCode}
+                onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
+                placeholder="e.g. SCH-A1B2C3"
+                className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 uppercase placeholder:normal-case"
+              />
+            </div>
+
             {/* EMAIL OR USERNAME */}
             <div className="mb-4">
               <label className="text-sm font-medium">Email</label>
@@ -163,7 +184,7 @@ export default function Login() {
 
       {/* FORGOT PASSWORD MODAL */}
       {showForgotModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-[100]">
           <div className="bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl relative">
             <button
               onClick={() => setShowForgotModal(false)}

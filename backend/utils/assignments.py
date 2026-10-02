@@ -395,7 +395,8 @@ class GetStudentAssignmentsAPI(MethodView):
 
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # Get only Teacher Assigned Classes
@@ -509,7 +510,7 @@ class CreateAssignmentAPI(MethodView):
             db.session.rollback()
             traceback.print_exc()
 
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # Teacher Assignment Dashboard API (Accordion Data)
@@ -863,7 +864,7 @@ class UpdateAssignmentAPI(MethodView):
 
             traceback.print_exc()
 
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 class DeleteAssignmentAPI(MethodView):
@@ -945,4 +946,5 @@ class ForceResubmitAPI(MethodView):
 
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500

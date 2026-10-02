@@ -1,9 +1,13 @@
 from utils.auth import db
 from utils.auth_middleware import login_required, get_current_user
+from utils.rolePermissionManagement import super_admin_required
 from datetime import datetime
 from flask import jsonify, request
 from sqlalchemy import or_
 from flask.views import MethodView
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # COMMON NOTIFICATION MODEL
@@ -886,15 +890,10 @@ class LibraryNotificationDetailsAPI(MethodView):
 #  GET ACTIVITY LOGS (FIXED API)
 class ActivityLogsAPI(MethodView):
 
-    @login_required
+    decorators = [super_admin_required]
+
     def get(self):
         try:
-            current_user = get_current_user()
-
-            # 🔒 Only admin can view logs
-            if current_user.role != "admin":
-                return jsonify({"error": "Unauthorized"}), 403
-
             logs = ActivityLog.query.order_by(ActivityLog.created_at.desc()).all()
 
             return jsonify(
@@ -913,5 +912,6 @@ class ActivityLogsAPI(MethodView):
                 ]
             )
 
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+        except Exception:
+            logger.exception("Failed to fetch activity logs")
+            return jsonify({"error": "Internal server error"}), 500
