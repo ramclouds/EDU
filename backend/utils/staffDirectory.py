@@ -13,6 +13,7 @@ except ImportError:
     Staff = None
 
 from utils.rolePermissionManagement import permission_required
+from utils.tenancy import current_school_id as _current_school_id
 
 logger = logging.getLogger(__name__)
 
@@ -123,10 +124,11 @@ class AdminStaffListAPI(MethodView):
             status = str(request.args.get("status") or "").strip()
 
             rows = []
+            school_id = _current_school_id()
 
             # ---------------- TEACHERS ----------------
             if category in ("", "all", "teaching"):
-                query = Teacher.query
+                query = Teacher.query.filter(Teacher.school_id == school_id)
 
                 if search:
                     like = f"%{search}%"
@@ -147,7 +149,9 @@ class AdminStaffListAPI(MethodView):
 
             # ---------------- NON-TEACHING STAFF ----------------
             if Staff is not None and category in ("", "all", "non-teaching"):
-                query = Staff.query.filter(Staff.is_deleted.is_(False))
+                query = Staff.query.filter(
+                    Staff.is_deleted.is_(False), Staff.school_id == school_id
+                )
 
                 if search:
                     like = f"%{search}%"
@@ -168,7 +172,9 @@ class AdminStaffListAPI(MethodView):
 
             # ---------------- ADMINS ----------------
             if category in ("", "all", "admin"):
-                query = Admin.query.filter(Admin.is_deleted.is_(False))
+                query = Admin.query.filter(
+                    Admin.is_deleted.is_(False), Admin.school_id == school_id
+                )
 
                 if search:
                     like = f"%{search}%"

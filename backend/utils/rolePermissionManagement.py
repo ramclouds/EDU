@@ -145,15 +145,6 @@ DEFAULT_ROLES = [
         "is_system": True,
         "modules": [
             "dashboard",
-            # "academic" is the academic-admin-dashboard's own
-            # DASHBOARD_REGISTRY module_code — without it here, an
-            # Academic Admin with this role assigned gets 403
-            # DASHBOARD_ACCESS_DENIED on their own dashboard the moment
-            # any role is assigned (the owner_admin_type fallback in
-            # get_user_dashboard_access only applies when NO role is
-            # assigned yet). Every other admin type's default role
-            # already includes its own module_code (library/accounts/
-            # hostel/hr) — this was the one left out.
             "academic",
             "students",
             "teachers",
@@ -400,15 +391,6 @@ def get_user_dashboard_access(user, dashboard_entry):
     if not access:
         return {"can_view": False, "can_write": False}
 
-    # BUG FIX: a brand-new admin has no RBACUserRole row yet (nobody has
-    # opened Role & Permission Management for them). Previously this was
-    # indistinguishable from "explicitly assigned a role with zero
-    # permissions", so a legitimate admin_type owner (e.g. Academic Admin)
-    # could never log in to their own dashboard until a Super Admin
-    # manually assigned them a role - see the DASHBOARD_ACCESS_DENIED
-    # gate in Login.post(). If there's no role assignment at all AND
-    # this admin_type owns this dashboard, grant baseline access instead
-    # of locking the account out of its own dashboard.
     if access["role"] is None and dashboard_entry.get("owner_admin_type") == getattr(
         user, "admin_type", None
     ):
@@ -537,19 +519,6 @@ class RBACRole(db.Model):
     __tablename__ = "rbac_roles"
 
     id = db.Column(db.Integer, primary_key=True)
-
-    # NULL = a system default role, shared as a template across every
-    # school (e.g. "academic-admin", seeded by seed_rbac_defaults()).
-    # A real value = a custom role a school created for itself, visible
-    # and usable only by that school. `code` was globally unique before
-    # this, which would have blocked two different schools from both
-    # having a custom role coded "department-head" — uniqueness for
-    # custom roles is now enforced at the application level (see
-    # RBACRoleListCreateAPI) as (school_id, code) instead of a single
-    # global DB constraint, since the 6 system roles still need to stay
-    # globally unique among themselves (school_id IS NULL for all of
-    # them, so a DB-level composite unique index wouldn't reliably catch
-    # collisions there under standard SQL NULL semantics).
     school_id = db.Column(
         db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
@@ -1229,11 +1198,17 @@ def build_user_access(user_type, user_id):
         for override in temporary_overrides
         if override.access_reason and override.access_reason.strip()
     ]
+    is_super_admin = is_super_admin_user(user)
 
     effective_permissions = {}
 
     for module in modules:
         module_code = module.code
+
+        if is_super_admin:
+            effective_permissions[module_code] = empty_action_map(True)
+            continue
+
         base = role_permissions.get(module_code, empty_action_map(False))
         override = override_permissions.get(module_code, {})
 

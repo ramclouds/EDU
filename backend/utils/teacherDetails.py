@@ -25,12 +25,23 @@ def _can_access_teacher(teacher_id):
     just by guessing an id in the URL. Now: a teacher may only access
     their own record; any admin may access any teacher (Academic
     Admin oversight, Super Admin, etc).
+
+    MULTI-TENANCY UPDATE: that admin check originally granted ANY admin
+    access to ANY teacher regardless of school — predating school_id —
+    which would let an admin at one school view/edit/reset the password
+    of a teacher at a completely different school just by guessing an
+    id. Now also requires the admin and teacher to share a school
+    (None == None still matches, so a legacy/unmigrated single-school
+    install keeps working exactly as before).
     """
     current_user = get_current_user()
     current_user_type = get_current_user_type()
 
     if current_user_type == "admin":
-        return True
+        target = Teacher.query.get(teacher_id)
+        return target is not None and (
+            getattr(current_user, "school_id", None) == target.school_id
+        )
 
     if (
         current_user_type == "teacher"
