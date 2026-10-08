@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, time
 from flask import jsonify, request
 from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
@@ -7,6 +8,11 @@ from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import permission_required
 from utils.studentDetails import StudentAcademicRecord, AcademicClass, Division, Section
 from utils.subjects import Subject
+from utils.tenancy import (
+    caller_can_access_student,
+    caller_can_access_teacher,
+    current_school_id as _current_school_id,
+)
 
 from io import BytesIO
 from flask import send_file
@@ -19,11 +25,27 @@ from reportlab.lib.units import inch
 logger = logging.getLogger(__name__)
 
 
+def _parse_time(value):
+    if isinstance(value, time):
+        return value
+    if not isinstance(value, str):
+        raise ValueError("time must be a string like 09:00")
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(value.strip(), fmt).time()
+        except ValueError:
+            continue
+    raise ValueError(f"invalid time: {value!r}")
+
+
 # MODEL
 class TimetableLecture(db.Model):
     __tablename__ = "timetable_lectures"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     academic_class_id = db.Column(
         db.Integer, db.ForeignKey("academic_classes.id"), nullable=False
     )
@@ -58,6 +80,9 @@ class Timetable(db.Model):
     __tablename__ = "timetable"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     academic_class_id = db.Column(db.Integer, nullable=False)
     day = db.Column(
         db.Enum("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"),
@@ -75,11 +100,12 @@ class TimetableOptionsAPI(MethodView):
     @permission_required("academic", "view")
     def get(self):
         try:
-            teachers = Teacher.query.all()
-            subjects = Subject.query.all()
-            classes = AcademicClass.query.all()
-            divisions = Division.query.all()
-            sections = Section.query.all()
+            school_id = _current_school_id()
+            teachers = Teacher.query.filter_by(school_id=school_id).all()
+            subjects = Subject.query.filter_by(school_id=school_id).all()
+            classes = AcademicClass.query.filter_by(school_id=school_id).all()
+            divisions = Division.query.filter_by(school_id=school_id).all()
+            sections = Section.query.filter_by(school_id=school_id).all()
 
             # Create lookup maps
             division_map = {d.id: d.division_name for d in divisions}
@@ -152,11 +178,11 @@ class TimetableOptionsAPI(MethodView):
                 }
             )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to load timetable options")
 
             return (
-                jsonify({"error": str(e)}),
+                jsonify({"error": "Internal server error"}),
                 500,
             )
 
@@ -170,33 +196,58 @@ class TimetableLectureAPI(MethodView):
         data = request.get_json()
         teacher_id = data["teacher_id"]
         academic_class_id = data["academic_class_id"]
+        subject_id = data["subject_id"]
         day = data["day"]
         period_no = data["period_no"]
+        school_id = _current_school_id()
 
-        # Teacher Conflict
+        try:
+            start_time = _parse_time(data["start_time"])
+            end_time = _parse_time(data["end_time"])
+        except (KeyError, ValueError) as exc:
+            return jsonify({"error": str(exc) if isinstance(exc, ValueError) else "start_time and end_time are required"}), 400
+
+        # Every referenced row must belong to the caller's school. Without
+        # this, a timetable could place one school's teacher into another
+        # school's class, and the conflict checks below (which were global)
+        # would let one school's entries block another's.
+        if not Teacher.query.filter_by(id=teacher_id, school_id=school_id).first():
+            return jsonify({"error": "Teacher not found"}), 404
+        if not AcademicClass.query.filter_by(
+            id=academic_class_id, school_id=school_id
+        ).first():
+            return jsonify({"error": "Class not found"}), 404
+        if not Subject.query.filter_by(id=subject_id, school_id=school_id).first():
+            return jsonify({"error": "Subject not found"}), 404
+
+        # Teacher Conflict (scoped to this school)
         teacher_conflict = TimetableLecture.query.filter_by(
-            teacher_id=teacher_id, day=day, period_no=period_no
+            school_id=school_id, teacher_id=teacher_id, day=day, period_no=period_no
         ).first()
 
         if teacher_conflict:
             return jsonify({"error": "Teacher already assigned"}), 400
 
-        # Class Conflict
+        # Class Conflict (scoped to this school)
         class_conflict = TimetableLecture.query.filter_by(
-            academic_class_id=academic_class_id, day=day, period_no=period_no
+            school_id=school_id,
+            academic_class_id=academic_class_id,
+            day=day,
+            period_no=period_no,
         ).first()
 
         if class_conflict:
             return jsonify({"error": "Class already occupied"}), 400
 
         lecture = TimetableLecture(
+            school_id=school_id,
             academic_class_id=academic_class_id,
             teacher_id=teacher_id,
-            subject_id=data["subject_id"],
+            subject_id=subject_id,
             day=day,
             period_no=period_no,
-            start_time=data["start_time"],
-            end_time=data["end_time"],
+            start_time=start_time,
+            end_time=end_time,
             room_no=data.get("room_no"),
             lecture_type=data.get("lecture_type", "Theory"),
             remarks=data.get("remarks"),
@@ -210,7 +261,9 @@ class TimetableLectureAPI(MethodView):
     @permission_required("academic", "delete")
     def delete(self, lecture_id):
 
-        lecture = TimetableLecture.query.get(lecture_id)
+        lecture = TimetableLecture.query.filter_by(
+            id=lecture_id, school_id=_current_school_id()
+        ).first()
 
         if not lecture:
             return jsonify({"error": "Lecture not found"}), 404
@@ -224,19 +277,32 @@ class TimetableLectureAPI(MethodView):
         except Exception as e:
 
             db.session.rollback()
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
     @permission_required("academic", "edit")
     def put(self, lecture_id):
 
-        lecture = TimetableLecture.query.get(lecture_id)
+        school_id = _current_school_id()
+        lecture = TimetableLecture.query.filter_by(
+            id=lecture_id, school_id=school_id
+        ).first()
 
         if not lecture:
             return jsonify({"error": "Lecture not found"}), 404
 
         data = request.get_json()
 
+        if not Teacher.query.filter_by(
+            id=data["teacher_id"], school_id=school_id
+        ).first():
+            return jsonify({"error": "Teacher not found"}), 404
+        if not Subject.query.filter_by(
+            id=data["subject_id"], school_id=school_id
+        ).first():
+            return jsonify({"error": "Subject not found"}), 404
+
         conflict = TimetableLecture.query.filter(
+            TimetableLecture.school_id == school_id,
             TimetableLecture.id != lecture_id,
             TimetableLecture.teacher_id == data["teacher_id"],
             TimetableLecture.day == data["day"],
@@ -250,8 +316,11 @@ class TimetableLectureAPI(MethodView):
         lecture.subject_id = data["subject_id"]
         lecture.day = data["day"]
         lecture.period_no = data["period_no"]
-        lecture.start_time = data["start_time"]
-        lecture.end_time = data["end_time"]
+        try:
+            lecture.start_time = _parse_time(data["start_time"])
+            lecture.end_time = _parse_time(data["end_time"])
+        except (KeyError, ValueError) as exc:
+            return jsonify({"error": str(exc) if isinstance(exc, ValueError) else "start_time and end_time are required"}), 400
         lecture.room_no = data.get("room_no")
         lecture.remarks = data.get("remarks")
         lecture.lecture_type = data.get("lecture_type")
@@ -266,7 +335,9 @@ class AdminTimetablePDFAPI(MethodView):
     def get(self):
 
         class_id = request.args.get("academic_class_id")
-        rows = TimetableLecture.query.filter_by(academic_class_id=class_id).all()
+        rows = TimetableLecture.query.filter_by(
+            academic_class_id=class_id, school_id=_current_school_id()
+        ).all()
 
         ...
 
@@ -278,8 +349,11 @@ class AdminTimetableAPI(MethodView):
     def get(self):
 
         academic_class_id = request.args.get("academic_class_id")
+        school_id = _current_school_id()
 
-        query = TimetableLecture.query
+        query = TimetableLecture.query.filter(
+            TimetableLecture.school_id == school_id
+        )
 
         if academic_class_id:
             query = query.filter_by(academic_class_id=academic_class_id)
@@ -290,8 +364,12 @@ class AdminTimetableAPI(MethodView):
 
         for row in rows:
 
-            teacher = Teacher.query.get(row.teacher_id)
-            subject = Subject.query.get(row.subject_id)
+            teacher = Teacher.query.filter_by(
+                id=row.teacher_id, school_id=school_id
+            ).first()
+            subject = Subject.query.filter_by(
+                id=row.subject_id, school_id=school_id
+            ).first()
 
             response.append(
                 {
@@ -330,6 +408,13 @@ class StudentTimetableAPI(MethodView):
             except (ValueError, TypeError):
                 return jsonify({"error": "Student id must be an integer"}), 400
 
+            # A student may view their own timetable; staff may view any
+            # student at their own school. Anyone else gets 403 — previously
+            # any logged-in user could read any student's timetable by id.
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             # GET CURRENT CLASS
             record = StudentAcademicRecord.query.filter_by(
                 student_id=student_id, is_current=True
@@ -342,7 +427,10 @@ class StudentTimetableAPI(MethodView):
 
             # FETCH TIMETABLE
             rows = (
-                TimetableLecture.query.filter_by(academic_class_id=academic_class_id)
+                TimetableLecture.query.filter_by(
+                    academic_class_id=academic_class_id,
+                    school_id=_current_school_id(),
+                )
                 .order_by(TimetableLecture.day, TimetableLecture.period_no)
                 .all()
             )
@@ -419,14 +507,18 @@ class TeacherTimetableAPI(MethodView):
             except (ValueError, TypeError):
                 return jsonify({"error": "Teacher id must be integer"}), 400
 
-            teacher = Teacher.query.get(teacher_id)
+            allowed, teacher = caller_can_access_teacher(teacher_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
 
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
 
             # FETCH TIMETABLE
             rows = (
-                TimetableLecture.query.filter_by(teacher_id=teacher_id)
+                TimetableLecture.query.filter_by(
+                    teacher_id=teacher_id, school_id=_current_school_id()
+                )
                 .order_by(TimetableLecture.day, TimetableLecture.period_no)
                 .all()
             )
@@ -517,14 +609,18 @@ class DownloadTeacherTimetablePDFAPI(MethodView):
                 return jsonify({"error": "Teacher id must be integer"}), 400
 
             # FETCH TEACHER
-            teacher = Teacher.query.get(teacher_id)
+            allowed, teacher = caller_can_access_teacher(teacher_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
 
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
 
             # FETCH TIMETABLE
             rows = (
-                TimetableLecture.query.filter_by(teacher_id=teacher_id)
+                TimetableLecture.query.filter_by(
+                    teacher_id=teacher_id, school_id=_current_school_id()
+                )
                 .order_by(TimetableLecture.day, TimetableLecture.period_no)
                 .all()
             )
@@ -701,4 +797,4 @@ class DownloadTeacherTimetablePDFAPI(MethodView):
 
             logger.exception(f"DownloadTeacherTimetablePDFAPI error: {e}")
 
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500

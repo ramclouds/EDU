@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+/*
+ * Z-INDEX SCALE — keep every new fixed/sticky element within this range
+ * so nothing can ever end up trapped behind the sidebar/topbar again
+ * (that bug — modals at z-50, same or below the sidebar's z-60 — was
+ * found and fixed across every dashboard; don't reintroduce it):
+ *   0–39   page content, sticky in-page headers
+ *   40–69  navigation chrome (topbar, sidebar, mobile nav overlay)
+ *   70–99  dropdowns / popovers anchored to chrome
+ *   100+   modals, dialogs, toasts — ALWAYS z-[100] or higher
+ */
+
+/* Matches the previous CDN config: `dark` class on <html> toggles dark mode. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Premium visual layer, applied once here so every dashboard picks it up
+ * automatically through the Tailwind utility classes they already use
+ * (rounded-2xl, shadow-sm/md/lg, focus rings, etc.) — no per-page JSX
+ * changes needed for this pass.
+ */
+@theme {
+  /* Softer, layered "premium" shadows instead of the flat default ones.
+     Anything using shadow-sm / shadow-md / shadow-lg picks these up. */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 1px 0 rgb(15 23 42 / 0.03);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 12px 28px -6px rgb(15 23 42 / 0.12), 0 4px 10px -4px rgb(15 23 42 / 0.08);
+  --shadow-xl: 0 24px 48px -12px rgb(15 23 42 / 0.18), 0 8px 16px -8px rgb(15 23 42 / 0.1);
+}
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme(--color-slate-300) transparent;
+  }
+  .dark * {
+    scrollbar-color: theme(--color-slate-600) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: theme(--color-slate-300);
+    border-radius: 9999px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: theme(--color-slate-600);
+  }
+
+  :focus-visible {
+    outline: 2px solid theme(--color-indigo-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /*
+   * Every dashboard's sticky topbar carries z-40 exactly once (verified
+   * across all 8 dashboards), so this reliably targets it regardless of
+   * each file's exact markup — fixes the page header and the first
+   * section/content header rendering with no gap ("touching").
+   */
+  .sticky.z-40 {
+    margin-bottom: 1.25rem;
+  }
+
+  /*
+   * Subtle lift-on-hover for the standard card shape used across every
+   * dashboard (rounded-2xl/3xl + a shadow utility). Purely visual, no
+   * behavior change, and safe to apply broadly since it only fires on
+   * elements that were already opting into "card" styling.
+   */
+  .rounded-2xl.shadow-sm,
+  .rounded-2xl.shadow-md,
+  .rounded-3xl.shadow-sm,
+  .rounded-3xl.shadow-md {
+    transition:
+      box-shadow 200ms ease,
+      transform 200ms ease,
+      border-color 200ms ease;
+  }
+  .rounded-2xl.shadow-sm:hover,
+  .rounded-2xl.shadow-md:hover,
+  .rounded-3xl.shadow-sm:hover,
+  .rounded-3xl.shadow-md:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
+  /* Frosted-glass treatment for sticky/translucent headers that already
+     use bg-white/NN or backdrop-blur, for a more premium top bar. */
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg {
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
+  }
+}

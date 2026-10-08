@@ -156,6 +156,17 @@ export function useStudentDashboard(
 
   const logoutUser =
     useCallback(() => {
+      // Best-effort server-side session revocation (see useAdminProfile.js
+      // for the same fix) — previously logout only ever cleared
+      // localStorage, so a token stayed valid server-side regardless.
+      const token = localStorage.getItem("token");
+      if (token) {
+        fetch(`${BASE_URL}/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      }
+
       localStorage.clear();
 
       window.location.href = "/";

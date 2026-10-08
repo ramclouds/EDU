@@ -6,20 +6,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>React App</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!--
+    Tailwind used to load here via the runtime CDN script
+    (cdn.tailwindcss.com), which Tailwind's own docs say is not meant for
+    production: it recompiles every utility class client-side on every
+    load, ships far more CSS than the app uses, and prints a console
+    warning. It's now compiled at build time instead — see
+    vite.config.js (@tailwindcss/vite) and src/css/theme.css, imported
+    from main.jsx. Dark mode still toggles the same way, via a `dark`
+    class on <html>/<body> (see src/css/theme.css's @custom-variant).
+
+    bootstrap-icons also used to load from a CDN here; it's now imported
+    from the npm package already in package.json (see main.jsx), so one
+    less external dependency at runtime.
+  -->
 
   <style>
     body {
       font-family: "Inter", sans-serif;
     }
   </style>
-  <script>
-    tailwind.config = {
-      darkMode: 'class'
-    }
-  </script>
 
 </head>
 

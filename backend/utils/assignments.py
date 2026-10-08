@@ -19,6 +19,11 @@ from utils.studentDetails import (
 )
 
 from utils.teacherDetails import TeacherClass, Subject
+from utils.tenancy import (
+    caller_can_access_student,
+    caller_can_access_teacher,
+    current_school_id as _current_school_id,
+)
 
 # =============================
 # CONFIG
@@ -36,6 +41,10 @@ class Assignment(db.Model):
     __tablename__ = "assignments"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     academic_class_id = db.Column(
         db.Integer,
@@ -194,6 +203,10 @@ class SubmitAssignmentAPI(MethodView):
     @login_required
     def post(self, student_id, assignment_id):
         try:
+            allowed, student = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             file = request.files.get("file")
 
             if not file:
@@ -202,10 +215,11 @@ class SubmitAssignmentAPI(MethodView):
             if not allowed_file(file.filename):
                 return jsonify({"error": "Invalid file type"}), 400
 
-            student = Student.query.get(student_id)
-            assignment = Assignment.query.get(assignment_id)
+            assignment = Assignment.query.filter_by(
+                id=assignment_id, school_id=student.school_id
+            ).first()
 
-            if not student or not assignment:
+            if not assignment:
                 return jsonify({"error": "Invalid student or assignment"}), 404
 
             info = get_student_class_info(student_id)
@@ -298,6 +312,10 @@ class GetStudentAssignmentsAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             record = StudentAcademicRecord.query.filter_by(
                 student_id=student_id, is_current=True
             ).first()
@@ -395,7 +413,8 @@ class GetStudentAssignmentsAPI(MethodView):
 
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # Get only Teacher Assigned Classes
@@ -403,6 +422,9 @@ class TeacherAssignedClassesAPI(MethodView):
 
     @login_required
     def get(self, teacher_id):
+        allowed, _ = caller_can_access_teacher(teacher_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
 
         mappings = (
             db.session.query(
@@ -443,6 +465,17 @@ class CreateAssignmentAPI(MethodView):
     def post(self, teacher_id):
 
         try:
+            # Without this, a teacher at a DIFFERENT school who happened
+            # to know (or guess) another school's teacher_id + a real
+            # academic_class_id/subject_id combination for that teacher
+            # could create an assignment impersonating them — the
+            # TeacherClass check below only verifies the combo exists
+            # somewhere, not that the caller IS that teacher (or admin
+            # staff at the same school).
+            caller_allowed, _ = caller_can_access_teacher(teacher_id)
+            if not caller_allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             title = request.form.get("title")
             description = request.form.get("description")
 
@@ -478,6 +511,7 @@ class CreateAssignmentAPI(MethodView):
                 due_date=due_date,
                 total_marks=total_marks,
                 created_by=teacher_id,
+                school_id=_current_school_id(),
             )
 
             db.session.add(assignment)
@@ -509,7 +543,7 @@ class CreateAssignmentAPI(MethodView):
             db.session.rollback()
             traceback.print_exc()
 
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # Teacher Assignment Dashboard API (Accordion Data)
@@ -517,6 +551,9 @@ class TeacherAssignmentsAPI(MethodView):
 
     @login_required
     def get(self, teacher_id):
+        allowed, _ = caller_can_access_teacher(teacher_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
 
         query = text("""
 SELECT
@@ -632,6 +669,10 @@ class AssignmentSubmissionListAPI(MethodView):
 
     @login_required
     def get(self, assignment_id):
+        if not Assignment.query.filter_by(
+            id=assignment_id, school_id=_current_school_id()
+        ).first():
+            return jsonify({"error": "Assignment not found"}), 404
 
         query = text("""
 SELECT
@@ -691,7 +732,23 @@ class GradeAssignmentAPI(MethodView):
 
         data = request.form if request.form else request.get_json(silent=True) or {}
 
-        sub = AssignmentSubmission.query.get(submission_id)
+        # AssignmentSubmission has no school_id of its own — previously
+        # this also had no not-found check at all (sub could be None and
+        # crash) and no ownership check (any teacher from any school
+        # could grade/overwrite any submission by id).
+        sub = (
+            AssignmentSubmission.query.join(
+                Assignment, Assignment.id == AssignmentSubmission.assignment_id
+            )
+            .filter(
+                AssignmentSubmission.id == submission_id,
+                Assignment.school_id == _current_school_id(),
+            )
+            .first()
+        )
+
+        if not sub:
+            return jsonify({"error": "Submission not found"}), 404
 
         sub.marks_obtained = data.get("marks")
         sub.feedback = data.get("feedback")
@@ -728,11 +785,25 @@ class UpdateAssignmentAPI(MethodView):
 
         try:
 
-            assignment = Assignment.query.get_or_404(assignment_id)
-
             # =============================
             # AUTH CHECK
             # =============================
+            # The old check only compared the URL's teacher_id against
+            # assignment.created_by — both attacker-controlled, so a
+            # matching pair (if guessed/known) passed regardless of who
+            # was actually calling. Now verifies the CALLER really is
+            # that teacher (or admin staff at the same school).
+            caller_allowed, _ = caller_can_access_teacher(teacher_id)
+            if not caller_allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
+            assignment = Assignment.query.filter_by(
+                id=assignment_id, school_id=_current_school_id()
+            ).first()
+
+            if not assignment:
+                return jsonify({"error": "Assignment not found"}), 404
+
             if assignment.created_by != teacher_id:
                 return jsonify({"error": "Unauthorized"}), 403
 
@@ -863,7 +934,7 @@ class UpdateAssignmentAPI(MethodView):
 
             traceback.print_exc()
 
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 class DeleteAssignmentAPI(MethodView):
@@ -872,7 +943,16 @@ class DeleteAssignmentAPI(MethodView):
     def delete(self, teacher_id, assignment_id):
 
         try:
-            assignment = Assignment.query.get_or_404(assignment_id)
+            caller_allowed, _ = caller_can_access_teacher(teacher_id)
+            if not caller_allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
+            assignment = Assignment.query.filter_by(
+                id=assignment_id, school_id=_current_school_id()
+            ).first()
+
+            if not assignment:
+                return jsonify({"error": "Assignment not found"}), 404
 
             if assignment.created_by != teacher_id:
                 return jsonify({"error": "Unauthorized"}), 403
@@ -925,7 +1005,16 @@ class ForceResubmitAPI(MethodView):
     @login_required
     def post(self, submission_id):
         try:
-            sub = AssignmentSubmission.query.get(submission_id)
+            sub = (
+                AssignmentSubmission.query.join(
+                    Assignment, Assignment.id == AssignmentSubmission.assignment_id
+                )
+                .filter(
+                    AssignmentSubmission.id == submission_id,
+                    Assignment.school_id == _current_school_id(),
+                )
+                .first()
+            )
 
             if not sub:
                 return jsonify({"error": "Submission not found"}), 404
@@ -945,4 +1034,5 @@ class ForceResubmitAPI(MethodView):
 
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500

@@ -1,11 +1,11 @@
+import os
 import uuid
 from flask import request, jsonify
 from flask.views import MethodView
-from flask_jwt_extended import create_access_token
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import re
 
@@ -13,6 +13,12 @@ bcrypt = Bcrypt()
 db = SQLAlchemy()
 
 logger = logging.getLogger(__name__)
+
+# Sliding session expiry for the opaque auth_token issued at login.
+# Overridable via TOKEN_EXPIRY_HOURS in the environment. The middleware
+# refreshes this on every authenticated request, so an active user stays
+# logged in, but an idle/leaked token stops working after this window.
+TOKEN_EXPIRY_HOURS = float(os.getenv("TOKEN_EXPIRY_HOURS", "12"))
 
 
 # ===========================
@@ -25,6 +31,13 @@ class Admin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     admin_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
     user_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
+
+    # ================= TENANCY =================
+    # Which school this admin belongs to. Nullable for now so existing
+    # single-school installs keep working unmigrated; a follow-up data
+    # migration should backfill this for every existing row once a
+    # School record exists for them (see utils/platform.py).
+    school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True)
 
     # ================= PERSONAL =================
     first_name = db.Column(db.String(100), nullable=False)
@@ -141,6 +154,7 @@ class Admin(db.Model):
     emergency_phone = db.Column(db.String(15))
     # ================= SYSTEM ================
     auth_token = db.Column(db.String(255))
+    token_expires_at = db.Column(db.DateTime, nullable=True)
     password = db.Column(db.String(255), nullable=False)
     status = db.Column(
         db.Enum(
@@ -246,6 +260,9 @@ class Student(db.Model):
     student_id = db.Column(db.String(20), unique=True, nullable=False)
     user_id = db.Column(db.String(20), unique=True, nullable=False)
 
+    # ================= TENANCY ================= (see Admin.school_id)
+    school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True)
+
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     middle_name = db.Column(db.String(100))
@@ -290,6 +307,7 @@ class Student(db.Model):
     password = db.Column(db.String(255), nullable=False)
     status = db.Column(db.Enum("Active", "Inactive"), default="Active")
     auth_token = db.Column(db.String(255))
+    token_expires_at = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -300,6 +318,9 @@ class Teacher(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     teacher_id = db.Column(db.String(50), unique=True, nullable=False)
     user_id = db.Column(db.Integer, nullable=False)
+
+    # ================= TENANCY ================= (see Admin.school_id)
+    school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True)
 
     # 👤 NAME
     first_name = db.Column(db.String(100))
@@ -352,6 +373,7 @@ class Teacher(db.Model):
     # ⚙️ SYSTEM
     username = db.Column(db.String(50), unique=True)
     auth_token = db.Column(db.String(255))
+    token_expires_at = db.Column(db.DateTime, nullable=True)
     password = db.Column(db.String(255), nullable=False)
     role = db.Column(db.Enum("teacher", "admin"), default="teacher")
     status = db.Column(db.String(20), default="Active")
@@ -373,23 +395,61 @@ class Login(MethodView):
 
             identifier = data.get("identifier")  # email or username
             password = data.get("password")
+            school_code = (data.get("school_code") or "").strip()
 
             if not identifier or not password:
                 return jsonify({"error": "Email/Username and password required"}), 400
 
+            # ================= SCHOOL RESOLUTION (multi-tenant) =================
+            # Local import: utils.platform imports from this module, so a
+            # module-level import here would be circular.
+            from utils.platform import School
+
+            school = None
+            if school_code:
+                school = School.query.filter_by(school_code=school_code).first()
+                if not school:
+                    return jsonify({"error": "Invalid school code"}), 401
+                if not school.is_login_allowed():
+                    return (
+                        jsonify(
+                            {
+                                "error": (
+                                    "This school's account is suspended or its "
+                                    "trial/subscription has expired. Contact "
+                                    "support to continue."
+                                ),
+                                "error_code": "SCHOOL_ACCESS_DENIED",
+                            }
+                        ),
+                        403,
+                    )
+            # If no school_code was sent, we fall back to an unscoped lookup
+            # below — kept for installs that haven't been onboarded as a
+            # School yet (school_id is still NULL on their rows). Once every
+            # school is created via the Developer dashboard, school_code
+            # should become a required field here.
+            school_filter = {"school_id": school.id} if school else {}
+
             user = (
-                Student.query.filter_by(email=identifier).first()
-                or Teacher.query.filter_by(email=identifier).first()
-                or Teacher.query.filter_by(username=identifier).first()
-                or Admin.query.filter_by(email=identifier).first()
-                or Admin.query.filter_by(username=identifier).first()
+                Student.query.filter_by(email=identifier, **school_filter).first()
+                or Teacher.query.filter_by(email=identifier, **school_filter).first()
+                or Teacher.query.filter_by(
+                    username=identifier, **school_filter
+                ).first()
+                or Admin.query.filter_by(email=identifier, **school_filter).first()
+                or Admin.query.filter_by(
+                    username=identifier, **school_filter
+                ).first()
                 or NonTeachingStaff.query.filter_by(
                     email=identifier,
                     is_deleted=False,
+                    **school_filter,
                 ).first()
                 or NonTeachingStaff.query.filter_by(
                     username=identifier,
                     is_deleted=False,
+                    **school_filter,
                 ).first()
             )
 
@@ -462,6 +522,9 @@ class Login(MethodView):
             # so a denied login never receives a usable session token.
             token = str(uuid.uuid4())
             user.auth_token = token
+            user.token_expires_at = datetime.utcnow() + timedelta(
+                hours=TOKEN_EXPIRY_HOURS
+            )
             db.session.commit()
 
             # Auto dashboard based on role and admin type
@@ -557,7 +620,36 @@ class Login(MethodView):
             import traceback
 
             traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
+
+
+class Logout(MethodView):
+    """Invalidates the caller's current session token server-side.
+
+    Requires the request to already carry a valid token, then clears it so
+    it can never be reused — closing the gap where auth_token had no
+    server-side revocation at all. Uses a local import for get_current_user
+    (rather than importing auth_middleware at module level) because
+    auth_middleware imports from this module — a module-level import here
+    would create a circular import.
+    """
+
+    def post(self):
+        from utils.auth_middleware import get_current_user
+
+        user = get_current_user()
+        if user is None:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        try:
+            user.auth_token = None
+            user.token_expires_at = None
+            db.session.commit()
+            return jsonify({"message": "Logged out"}), 200
+        except SQLAlchemyError:
+            db.session.rollback()
+            logger.exception("Logout failed")
+            return jsonify({"error": "Unable to log out"}), 500
 
 
 # ==================================
@@ -577,6 +669,11 @@ class NonTeachingStaff(db.Model):
         unique=True,
         nullable=False,
         index=True,
+    )
+
+    # ================= TENANCY ================= (see Admin.school_id)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
 
     user_id = db.Column(
@@ -810,6 +907,7 @@ class NonTeachingStaff(db.Model):
         db.String(255),
         nullable=True,
     )
+    token_expires_at = db.Column(db.DateTime, nullable=True)
 
     status = db.Column(
         db.Enum(
@@ -928,6 +1026,19 @@ class NonTeachingStaff(db.Model):
             "created_at": (self.created_at.isoformat() if self.created_at else None),
             "updated_at": (self.updated_at.isoformat() if self.updated_at else None),
         }
+
+
+# ===========================
+# BUG FIX: auth_middleware.py and rolePermissionManagement.py both do
+# `from utils.auth import Staff` wrapped in try/except ImportError, and
+# silently fall back to Staff = None if it fails. There was never a
+# class literally named "Staff" here (it's "NonTeachingStaff"), so that
+# import ALWAYS failed - meaning non-teaching staff could never log in
+# (login_required's _find_user_by_token skipped their table entirely)
+# and every RBAC permission check for staff users silently evaluated to
+# "no access". This alias makes that import succeed.
+# ===========================
+Staff = NonTeachingStaff
 
 
 # ===========================
@@ -1226,4 +1337,5 @@ class SignUp(MethodView):
 
         except Exception as e:
             logger.exception(f"Signup error: {e}")
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500

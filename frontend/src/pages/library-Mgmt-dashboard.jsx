@@ -2,10 +2,10 @@ import { useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { APP_NAME, APP_YEAR, FILE_BASE_URL } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
 import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
-import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import { useLibraryCategories } from "../controllers/Library/useLibraryCategories";
 import { useLibraryAuthors } from "../controllers/Library/useLibraryAuthors";
 import { useLibraryStudents } from "../controllers/Library/useAddLibraryStudents";
@@ -76,11 +76,6 @@ function AdminDashboard() {
   const [search, setSearch] = useState("");
 
   const { canWriteLibrary, libraryAccessLevel } = useLibraryPermission();
-  const { dashboards: accessibleDashboards } = useDashboardAccess();
-
-  const otherAccessibleDashboards = (accessibleDashboards || []).filter(
-    (dashboard) => dashboard.key !== "library-admin-dashboard",
-  );
 
   // ================= DASHBOARD HOOK =================
   const {
@@ -835,54 +830,6 @@ function AdminDashboard() {
             </div>
           ))}
 
-          {/* OTHER DASHBOARDS THIS ADMIN HAS BEEN GRANTED ACCESS TO */}
-          {otherAccessibleDashboards.length > 0 && (
-            <div>
-              {sidebarExpanded && (
-                <p className="text-xs text-gray-400 px-2 mt-4">
-                  OTHER DASHBOARDS
-                </p>
-              )}
-
-              {otherAccessibleDashboards.map((dashboard) => (
-                <button
-                  key={dashboard.key}
-                  type="button"
-                  title={!sidebarExpanded ? dashboard.label : ""}
-                  onClick={() => {
-                    navigate(dashboard.route);
-                    closeSidebarOnMobile();
-                  }}
-                  className={`relative flex w-full items-center rounded-xl py-3
-              transition-all duration-300 ease-in-out
-              ${
-                sidebarExpanded
-                  ? "gap-3 px-4 justify-start"
-                  : "justify-center px-0"
-              }
-              text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white`}
-                >
-                  <i className="bi bi-grid-3x3-gap-fill text-base shrink-0" />
-
-                  <span
-                    className={`whitespace-nowrap truncate overflow-hidden
-                transition-all duration-300 ease-in-out
-                ${
-                  sidebarExpanded
-                    ? "opacity-100 max-w-[190px]"
-                    : "opacity-0 max-w-0"
-                }`}
-                  >
-                    {dashboard.label}
-                  </span>
-
-                  {sidebarExpanded && (
-                    <i className="bi bi-box-arrow-up-right ml-auto shrink-0 text-xs opacity-60" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
         </nav>
 
         {/* FOOTER */}
@@ -2917,7 +2864,7 @@ function AdminDashboard() {
 
             {/* Create/Edit Modal */}
             {authorModalOpen && (
-              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
                 <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden">
                   <div className="px-5 py-4 border-b flex items-center justify-between">
                     <div>
@@ -3065,7 +3012,7 @@ function AdminDashboard() {
 
             {/* Delete Modal */}
             {authorDeleteModal.open && (
-              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
                 <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
                   <div className="p-5">
                     <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl mb-4">
@@ -11498,6 +11445,16 @@ function AdminDashboard() {
         )}
 
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={admin}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="space-y-6 py-2 text-gray-800 dark:text-gray-100">
             {/* ================= PROFILE HEADER ================= */}

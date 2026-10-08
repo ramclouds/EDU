@@ -176,7 +176,7 @@ class MyClasses(MethodView):
 
         except Exception as e:
             logger.exception("MyClasses API failed")
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # Backward compatible old teacher route

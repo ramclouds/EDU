@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { APP_NAME, APP_TAGLINE, APP_YEAR } from "../config/appConfig";
+import toast from "react-hot-toast";
+import { APP_NAME, APP_TAGLINE, APP_YEAR, BASE_URL } from "../config/appConfig";
 
 export default function Signup() {
   const [role, setRole] = useState("");
@@ -26,7 +27,7 @@ export default function Signup() {
     };
 
     try {
-      const response = await fetch("http://localhost:5000/api/signup", {
+      const response = await fetch(`${BASE_URL}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -35,14 +36,18 @@ export default function Signup() {
       const data = await response.json();
 
       if (response.ok) {
-        alert(`User created successfully\nStudent ID: ${data.student_id}`);
+        toast.success(
+          data.student_id
+            ? `Account created — Student ID: ${data.student_id}`
+            : "Account created successfully",
+        );
         e.target.reset();
       } else {
-        alert(data.error);
+        toast.error(data.error || "Signup failed");
       }
     } catch (error) {
       console.error(error);
-      alert("Server error");
+      toast.error("Server error — please try again");
     }
   };
 

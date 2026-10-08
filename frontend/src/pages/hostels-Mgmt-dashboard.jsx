@@ -7,10 +7,10 @@ import {
   FILE_BASE_URL,
 } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
 import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
-import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import { useHostelPermission } from "../controllers/Hostel/useHostelPermission";
 import { useHostelBlocksFloors } from "../controllers/Hostel/useHostelBlocksFloors";
 import { useHostelRooms } from "../controllers/Hostel/useHostelRooms";
@@ -197,14 +197,6 @@ function AdminDashboard() {
   // can view/filter everywhere below, but every add/edit/delete/
   // allocate/vacate action is hidden or blocked.
   const { canWriteHostel, hostelAccessLevel } = useHostelPermission();
-
-  // Every dashboard (including this one) this admin currently has
-  // access to - powers the "OTHER DASHBOARDS" sidebar links below.
-  const { dashboards: accessibleDashboards } = useDashboardAccess();
-
-  const otherAccessibleDashboards = (accessibleDashboards || []).filter(
-    (dashboard) => dashboard.key !== "hostel-admin-dashboard",
-  );
 
   // ================= FLOORS & BLOCKS SECTION HOOK =================
   const {
@@ -1015,54 +1007,6 @@ function AdminDashboard() {
             </div>
           ))}
 
-          {/* OTHER DASHBOARDS THIS ADMIN HAS BEEN GRANTED ACCESS TO */}
-          {otherAccessibleDashboards.length > 0 && (
-            <div>
-              {sidebarExpanded && (
-                <p className="text-xs text-gray-400 px-2 mt-4 mb-2 font-medium tracking-wide">
-                  OTHER DASHBOARDS
-                </p>
-              )}
-
-              {otherAccessibleDashboards.map((dashboard) => (
-                <button
-                  key={dashboard.key}
-                  type="button"
-                  title={!sidebarExpanded ? dashboard.label : ""}
-                  onClick={() => {
-                    navigate(dashboard.route);
-                    closeSidebarOnMobile();
-                  }}
-                  className={`relative flex w-full items-center rounded-xl py-3
-              transition-all duration-300 ease-in-out
-              ${
-                sidebarExpanded
-                  ? "gap-3 px-4 justify-start"
-                  : "justify-center px-0"
-              }
-              text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white`}
-                >
-                  <i className="bi bi-grid-3x3-gap-fill text-base shrink-0" />
-
-                  <span
-                    className={`whitespace-nowrap truncate overflow-hidden
-                transition-all duration-300 ease-in-out
-                ${
-                  sidebarExpanded
-                    ? "opacity-100 max-w-[190px]"
-                    : "opacity-0 max-w-0"
-                }`}
-                  >
-                    {dashboard.label}
-                  </span>
-
-                  {sidebarExpanded && (
-                    <i className="bi bi-box-arrow-up-right ml-auto shrink-0 text-xs opacity-60" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
         </nav>
         {/* FOOTER */}
         <div
@@ -11050,6 +10994,16 @@ function AdminDashboard() {
         )}
 
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={admin}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
             {/* ================= PROFILE HEADER ================= */}
@@ -11523,7 +11477,7 @@ function AdminDashboard() {
         )}
         {/* ===================== PROFILE SECTION END ========================*/}
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100]">
             <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

@@ -8,6 +8,21 @@ const EMPTY_ACCESS = {
   delete: false,
 };
 
+const isSuperAdminSession = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const role = String(
+      localStorage.getItem("role") || user.role || user.user_type || "",
+    ).toLowerCase();
+    const adminType = String(
+      localStorage.getItem("admin_type") || user.admin_type || "",
+    ).toLowerCase();
+    return role === "super_admin" || adminType === "super admin";
+  } catch {
+    return false;
+  }
+};
+
 const readEffectivePermissions = () => {
   try {
     const raw = localStorage.getItem("effective_permissions");
@@ -18,6 +33,11 @@ const readEffectivePermissions = () => {
 };
 
 const readLibraryAccess = () => {
+  // Super Admin has full access to every dashboard by default.
+  if (isSuperAdminSession()) {
+    return { view: true, create: true, edit: true, delete: true };
+  }
+
   const all = readEffectivePermissions();
   const access = all?.[MODULE_CODE];
 

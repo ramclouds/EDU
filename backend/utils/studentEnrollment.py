@@ -24,6 +24,10 @@ from utils.studentDetails import (
 logger = logging.getLogger(__name__)
 
 
+def _current_school_id():
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
 class StudentEnrollmentOptionsAPI(MethodView):
     """
     Feeds the "Enroll Student" form's Batch/Division/Section/Class
@@ -43,11 +47,17 @@ class StudentEnrollmentOptionsAPI(MethodView):
     @permission_required("academic", "view")
     def get(self):
         try:
-            batches = Batch.query.order_by(
+            school_id = _current_school_id()
+
+            batches = Batch.query.filter(Batch.school_id == school_id).order_by(
                 Batch.is_current.desc(), Batch.batch_name.desc()
             ).all()
-            divisions = Division.query.order_by(Division.division_name.asc()).all()
-            sections = Section.query.order_by(Section.section_name.asc()).all()
+            divisions = Division.query.filter(
+                Division.school_id == school_id
+            ).order_by(Division.division_name.asc()).all()
+            sections = Section.query.filter(
+                Section.school_id == school_id
+            ).order_by(Section.section_name.asc()).all()
 
             academic_classes = (
                 db.session.query(
@@ -62,6 +72,7 @@ class StudentEnrollmentOptionsAPI(MethodView):
                 .join(Batch, Batch.id == AcademicClass.batch_id)
                 .join(Division, Division.id == AcademicClass.division_id)
                 .join(Section, Section.id == AcademicClass.section_id)
+                .filter(AcademicClass.school_id == school_id)
                 .order_by(Batch.batch_name.desc(), Division.id.asc(), Section.id.asc())
                 .all()
             )
@@ -107,7 +118,7 @@ class StudentEnrollmentOptionsAPI(MethodView):
 
         except Exception as e:
             logger.exception(e)
-            return jsonify({"success": False, "error": str(e)}), 500
+            return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 class StudentEnrollmentPreviewAPI(MethodView):
@@ -119,6 +130,19 @@ class StudentEnrollmentPreviewAPI(MethodView):
             next_roll_number = ""
 
             if academic_class_id:
+                # Confirm the class actually belongs to this school before
+                # using it for anything — otherwise a crafted request could
+                # probe another school's roll-number sequence.
+                owned_class = AcademicClass.query.filter_by(
+                    id=academic_class_id, school_id=_current_school_id()
+                ).first()
+
+                if not owned_class:
+                    return (
+                        jsonify({"success": False, "error": "Class not found"}),
+                        404,
+                    )
+
                 last_record = (
                     StudentAcademicRecord.query.filter_by(
                         academic_class_id=academic_class_id,
@@ -146,7 +170,7 @@ class StudentEnrollmentPreviewAPI(MethodView):
 
         except Exception as e:
             logger.exception(e)
-            return jsonify({"success": False, "error": str(e)}), 500
+            return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 class EnrollStudentAPI(MethodView):
@@ -180,7 +204,12 @@ class EnrollStudentAPI(MethodView):
                     400,
                 )
 
-            if not AcademicClass.query.get(data.get("academic_class_id")):
+            school_id = _current_school_id()
+
+            owned_class = AcademicClass.query.filter_by(
+                id=data.get("academic_class_id"), school_id=school_id
+            ).first()
+            if not owned_class:
                 return (
                     jsonify({"success": False, "error": "Selected class not found"}),
                     404,
@@ -221,6 +250,7 @@ class EnrollStudentAPI(MethodView):
             student = Student(
                 student_id=student_code,
                 user_id=user_code,
+                school_id=school_id,
                 first_name=data.get("first_name"),
                 middle_name=data.get("middle_name"),
                 last_name=data.get("last_name"),
@@ -267,6 +297,7 @@ class EnrollStudentAPI(MethodView):
                 academic_class_id=data.get("academic_class_id"),
                 roll_number=data.get("roll_number"),
                 is_current=True,
+                school_id=school_id,
             )
 
             db.session.add(academic_record)
@@ -300,7 +331,7 @@ class EnrollStudentAPI(MethodView):
         except Exception as e:
             db.session.rollback()
             logger.exception(e)
-            return jsonify({"success": False, "error": str(e)}), 500
+            return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 class StudentPromotionAPI(MethodView):
@@ -327,6 +358,7 @@ class StudentPromotionAPI(MethodView):
                 )
 
             promoted_count = 0
+            school_id = _current_school_id()
 
             if promotion_type == "single_student":
                 student_id = data.get("student_id")
@@ -344,8 +376,17 @@ class StudentPromotionAPI(MethodView):
                         400,
                     )
 
+                if not AcademicClass.query.filter_by(
+                    id=target_class_id, school_id=school_id
+                ).first():
+                    return (
+                        jsonify({"success": False, "error": "Target class not found"}),
+                        404,
+                    )
+
                 current_record = StudentAcademicRecord.query.filter_by(
                     student_id=student_id,
+                    school_id=school_id,
                     is_current=True,
                 ).first()
 
@@ -365,6 +406,7 @@ class StudentPromotionAPI(MethodView):
                         academic_class_id=target_class_id,
                         roll_number=target_roll_number,
                         is_current=True,
+                        school_id=school_id,
                     )
                 )
 
@@ -385,8 +427,17 @@ class StudentPromotionAPI(MethodView):
                         400,
                     )
 
+                if not AcademicClass.query.filter_by(
+                    id=target_class_id, school_id=school_id
+                ).first():
+                    return (
+                        jsonify({"success": False, "error": "Target class not found"}),
+                        404,
+                    )
+
                 records = StudentAcademicRecord.query.filter(
                     StudentAcademicRecord.student_id.in_(student_ids),
+                    StudentAcademicRecord.school_id == school_id,
                     StudentAcademicRecord.is_current == True,
                 ).all()
 
@@ -399,6 +450,7 @@ class StudentPromotionAPI(MethodView):
                             academic_class_id=target_class_id,
                             roll_number=record.roll_number,
                             is_current=True,
+                            school_id=school_id,
                         )
                     )
 
@@ -419,8 +471,24 @@ class StudentPromotionAPI(MethodView):
                         400,
                     )
 
+                if not AcademicClass.query.filter_by(
+                    id=source_class_id, school_id=school_id
+                ).first():
+                    return (
+                        jsonify({"success": False, "error": "Source class not found"}),
+                        404,
+                    )
+                if not AcademicClass.query.filter_by(
+                    id=target_class_id, school_id=school_id
+                ).first():
+                    return (
+                        jsonify({"success": False, "error": "Target class not found"}),
+                        404,
+                    )
+
                 students = StudentAcademicRecord.query.filter_by(
                     academic_class_id=source_class_id,
+                    school_id=school_id,
                     is_current=True,
                 ).all()
 
@@ -439,6 +507,7 @@ class StudentPromotionAPI(MethodView):
                             academic_class_id=target_class_id,
                             roll_number=record.roll_number,
                             is_current=True,
+                            school_id=school_id,
                         )
                     )
 
@@ -465,4 +534,4 @@ class StudentPromotionAPI(MethodView):
         except Exception as e:
             db.session.rollback()
             logger.exception(e)
-            return jsonify({"success": False, "error": str(e)}), 500
+            return jsonify({"success": False, "error": "Internal server error"}), 500

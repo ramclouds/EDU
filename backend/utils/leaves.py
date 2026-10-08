@@ -10,6 +10,7 @@ from utils.studentDetails import (
 )
 from utils.Notifications import Notification, ActivityLog, create_notification
 from utils.teacherDetails import Teacher
+from utils.tenancy import current_school_id as _current_school_id
 from flask import request, jsonify
 from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,11 +19,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def _is_admin(user):
+    """True for any admin-class account.
+
+    The Admin.role column holds 'admin' or 'super_admin', and a Super
+    Admin is still an admin. Comparing role == "admin" locked Super Admins
+    out of every leave-approval and leave-overview screen, so this helper
+    is the one place that decides it.
+    """
+    return getattr(user, "role", None) in ("admin", "super_admin")
+
 # Teacher
 class TeacherLeave(db.Model):
     __tablename__ = "teacher_leaves"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     teacher_id = db.Column(
         db.Integer, db.ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False
@@ -57,6 +72,9 @@ class StudentLeave(db.Model):
     __tablename__ = "student_leaves"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     student_id = db.Column(
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
@@ -111,6 +129,7 @@ class ApplyLeave(MethodView):
             # 🔥 OVERLAP CHECK
             overlap = TeacherLeave.query.filter(
                 TeacherLeave.teacher_id == teacher_id,
+                TeacherLeave.school_id == current_user.school_id,
                 TeacherLeave.status != "Rejected",
                 TeacherLeave.from_date <= to_date,
                 TeacherLeave.to_date >= from_date,
@@ -120,6 +139,7 @@ class ApplyLeave(MethodView):
                 return jsonify({"error": "Leave overlap detected"}), 409
 
             leave = TeacherLeave(
+                school_id=current_user.school_id,
                 teacher_id=teacher_id,
                 leave_type=leave_type,
                 from_date=from_date,
@@ -168,6 +188,7 @@ class ApplyStudentLeave(MethodView):
             # 🔥 OVERLAP CHECK
             overlap = StudentLeave.query.filter(
                 StudentLeave.student_id == student_id,
+                StudentLeave.school_id == current_user.school_id,
                 StudentLeave.status != "Rejected",
                 StudentLeave.from_date <= to_date,
                 StudentLeave.to_date >= from_date,
@@ -177,6 +198,7 @@ class ApplyStudentLeave(MethodView):
                 return jsonify({"error": "Leave overlap detected"}), 409
 
             leave = StudentLeave(
+                school_id=current_user.school_id,
                 student_id=student_id,
                 leave_type=leave_type,
                 from_date=from_date,
@@ -201,11 +223,11 @@ class ApplyStudentLeave(MethodView):
                 student_id=student_id, is_current=True
             ).first()
 
-            teachers = Teacher.query.all()
-
-            # 🔁 FALLBACK (IMPORTANT)
-            if not teachers:
-                teachers = Teacher.query.all()
+            # Notify teachers at THIS student's school only. The previous
+            # Teacher.query.all() sent every student's leave request to
+            # every teacher on the platform. The "fallback" re-ran the same
+            # unscoped query, so it never added anything; removed.
+            teachers = Teacher.query.filter_by(school_id=current_user.school_id).all()
 
             # 🔔 CREATE NOTIFICATIONS
             for t in teachers:
@@ -387,6 +409,7 @@ class TeacherLeaveBalanceAPI(MethodView):
 
         except Exception:
             logger.exception("Balance fetch failed")
+            db.session.rollback()
             return jsonify({"error": "Failed to fetch balance"}), 500
 
 # Student- ADMIN / TEACHER APPROVE STUDENT LEAVE
@@ -398,7 +421,7 @@ class UpdateStudentLeaveStatus(MethodView):
             current_user = get_current_user()
 
             # 🔒 ROLE CHECK
-            if current_user.role not in ["admin", "teacher"]:
+            if not (_is_admin(current_user) or current_user.role == "teacher"):
                 return jsonify({"error": "Unauthorized"}), 403
 
             data = request.get_json()
@@ -407,7 +430,12 @@ class UpdateStudentLeaveStatus(MethodView):
             if status not in ["Approved", "Rejected"]:
                 return jsonify({"error": "Invalid status"}), 400
 
-            leave = StudentLeave.query.get(leave_id)
+            # Only staff at the leave's own school may act on it. A leave
+            # from another school is reported as not found, not forbidden,
+            # so the response never reveals that the id exists.
+            leave = StudentLeave.query.filter_by(
+                id=leave_id, school_id=_current_school_id()
+            ).first()
 
             if not leave:
                 return jsonify({"error": "Leave not found"}), 404
@@ -455,6 +483,7 @@ class UpdateStudentLeaveStatus(MethodView):
             # 🧾 ACTIVITY LOG (ENHANCED)
             db.session.add(
                 ActivityLog(
+                    school_id=getattr(current_user, "school_id", None),
                     user_id=current_user.id,
                     role=current_user.role,
                     action=f"{status}_STUDENT_LEAVE",
@@ -497,7 +526,7 @@ class UpdateLeaveStatus(MethodView):
             current_user = get_current_user()
 
             # 🔒 ONLY ADMIN
-            if current_user.role != "admin":
+            if not _is_admin(current_user):
                 return jsonify({"error": "Only admin can approve teacher leave"}), 403
 
             data = request.get_json()
@@ -506,7 +535,9 @@ class UpdateLeaveStatus(MethodView):
             if status not in ["Approved", "Rejected"]:
                 return jsonify({"error": "Invalid status"}), 400
 
-            leave = TeacherLeave.query.get(leave_id)
+            leave = TeacherLeave.query.filter_by(
+                id=leave_id, school_id=_current_school_id()
+            ).first()
 
             if not leave:
                 return jsonify({"error": "Leave not found"}), 404
@@ -519,7 +550,12 @@ class UpdateLeaveStatus(MethodView):
             ).first()
 
             if not balance:
-                balance = TeacherLeaveBalance(teacher_id=leave.teacher_id)
+                balance = TeacherLeaveBalance(
+                    teacher_id=leave.teacher_id,
+                    casual_leave=10,
+                    sick_leave=8,
+                    used_leave=0,
+                )
                 db.session.add(balance)
 
             # ✅ APPROVE
@@ -551,6 +587,7 @@ class UpdateLeaveStatus(MethodView):
             # 🧾 ACTIVITY LOG
             db.session.add(
                 ActivityLog(
+                    school_id=getattr(current_user, "school_id", None),
                     user_id=current_user.id,
                     role="admin",
                     action=f"{leave.status}_TEACHER_LEAVE",
@@ -572,10 +609,14 @@ class AllStudentLeaves(MethodView):
     def get(self):
         current_user = get_current_user()
 
-        if current_user.role not in ["teacher", "admin"]:
+        if not (_is_admin(current_user) or current_user.role == "teacher"):
             return jsonify({"error": "Unauthorized"}), 403
 
-        leaves = StudentLeave.query.order_by(StudentLeave.applied_at.desc()).all()
+        leaves = (
+            StudentLeave.query.filter_by(school_id=current_user.school_id)
+            .order_by(StudentLeave.applied_at.desc())
+            .all()
+        )
 
         result = []
 
@@ -634,13 +675,13 @@ class AllTeacherLeaves(MethodView):
         try:
             current_user = get_current_user()
 
-            if current_user.role != "admin":
+            if not _is_admin(current_user):
                 return jsonify({"error": "Unauthorized"}), 403
 
             leaves = (
-                TeacherLeave.query.order_by(
-                    TeacherLeave.applied_at.desc()
-                ).all()
+                TeacherLeave.query.filter_by(school_id=current_user.school_id)
+                .order_by(TeacherLeave.applied_at.desc())
+                .all()
             )
 
             result = []
@@ -689,11 +730,15 @@ class AdminLeaveDashboard(MethodView):
 
         current_user = get_current_user()
 
-        if current_user.role != "admin":
+        if not _is_admin(current_user):
             return jsonify({"error": "Unauthorized"}), 403
 
-        teacher_leaves = TeacherLeave.query.all()
-        student_leaves = StudentLeave.query.all()
+        teacher_leaves = TeacherLeave.query.filter_by(
+            school_id=current_user.school_id
+        ).all()
+        student_leaves = StudentLeave.query.filter_by(
+            school_id=current_user.school_id
+        ).all()
 
         return jsonify(
             {

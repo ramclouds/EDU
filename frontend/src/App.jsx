@@ -1,7 +1,10 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import DeveloperLogin from "./pages/developer-login";
+import DeveloperDashboard from "./pages/developer-dashboard";
 
 import StudentDashboard from "./pages/student-dashboard";
 import TeacherDashboard from "./pages/teacher-dashboard";
@@ -53,7 +56,14 @@ function ProtectedRoute({ children, allowedRole, dashboardKey }) {
     return <Navigate to="/" replace />;
   }
 
-  if (allowedRole && userRole !== allowedRole) {
+  // A Super Admin is stored with role "super_admin" but is still an
+  // admin for every admin-only route, so "admin" must accept both.
+  const roleMatches =
+    !allowedRole ||
+    userRole === allowedRole ||
+    (allowedRole === "admin" && userRole === "super_admin");
+
+  if (!roleMatches) {
     return <Navigate to="/" replace />;
   }
 
@@ -81,11 +91,20 @@ function ProtectedRoute({ children, allowedRole, dashboardKey }) {
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      {/* react-hot-toast was already a dependency but its <Toaster/>
+          container was never mounted anywhere, so toast(...) calls
+          (if any were added) would silently render nothing. Mounted
+          once here, globally, for every page to use instead of
+          blocking native alert()/confirm() popups. */}
+      <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
+      <Routes>
       {/* ================= PUBLIC ================= */}
 
       <Route path="/" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/developer/login" element={<DeveloperLogin />} />
+      <Route path="/developer/dashboard" element={<DeveloperDashboard />} />
 
       {/* ================= STUDENT ================= */}
 
@@ -193,6 +212,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-    </Routes>
+      </Routes>
+    </>
   );
 }

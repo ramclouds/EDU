@@ -602,6 +602,22 @@ export function useAdminProfile({
     ===================================================== */
 
     const handleLogout = useCallback(() => {
+        // Best-effort server-side revocation: the backend now issues a
+        // real expiring token and can invalidate it on logout (previously
+        // there was no /api/logout at all, so a token stayed valid until
+        // it naturally expired even after the user "logged out" here).
+        // Fire-and-forget: don't block clearing local state on the network
+        // call, since the user should be able to log out even offline.
+        const token = localStorage.getItem("token");
+        if (token) {
+            fetch(`${BASE_URL}/logout`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => {
+                // Ignore — local session is cleared regardless below.
+            });
+        }
+
         localStorage.removeItem("token");
         localStorage.removeItem("user");
 

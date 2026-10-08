@@ -1,8 +1,9 @@
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import jsonify, request
 
-from utils.auth import Admin, Student, Teacher
+from utils.auth import TOKEN_EXPIRY_HOURS, Admin, Student, Teacher, db
 
 try:
     from utils.auth import Staff
@@ -55,8 +56,25 @@ def login_required(function):
             if user is None:
                 return jsonify({"error": "Invalid token"}), 401
 
+            expires_at = getattr(user, "token_expires_at", None)
+            if expires_at is not None and datetime.utcnow() > expires_at:
+                # Session expired — revoke it so the stale token can't be
+                # reused, rather than leaving it dangling in the database.
+                user.auth_token = None
+                user.token_expires_at = None
+                db.session.commit()
+                return jsonify({"error": "Session expired, please log in again"}), 401
+
             if str(getattr(user, "status", "Active")).lower() != "active":
                 return jsonify({"error": "Account inactive"}), 403
+
+            # Sliding expiry: any authenticated activity extends the
+            # session instead of forcing a re-login mid-task.
+            if hasattr(user, "token_expires_at"):
+                user.token_expires_at = datetime.utcnow() + timedelta(
+                    hours=TOKEN_EXPIRY_HOURS
+                )
+                db.session.commit()
 
             request.user = user
             request.auth_token = token
@@ -73,6 +91,7 @@ def login_required(function):
                 request.user_type = None
 
         except Exception:
+            db.session.rollback()
             return jsonify({"error": "Unable to validate authentication token"}), 401
 
         return function(*args, **kwargs)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { APP_NAME, APP_YEAR, FILE_BASE_URL } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useStudentProfile } from "../controllers/StudentSide/useStudentProfile";
 import { useStudentDashboard } from "../controllers/StudentSide/studentDashboard";
 import { useDashboardUI } from "../controllers/useDashboardUI";
@@ -442,6 +443,7 @@ function StudentDashboard() {
             ["leaves", "bi-calendar-check", "My Leave"],
             ["announcements", "bi-bell", "Notices"],
             ["profile", "bi-person", "Profile"],
+            ["settings", "bi-gear", "Settings"],
           ].map(([key, icon, label]) => {
             const isActive = activeSection === key;
 
@@ -2752,7 +2754,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= RAISE COMPLAINT MODAL ================= */}
                 {showComplaintModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowComplaintModal(false)}
                   >
                     <div
@@ -2846,7 +2848,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= APPLY LEAVE MODAL ================= */}
                 {showLeaveModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowLeaveModal(false)}
                   >
                     <div
@@ -2964,7 +2966,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= ADD VISITOR MODAL ================= */}
                 {showVisitorModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowVisitorModal(false)}
                   >
                     <div
@@ -3933,7 +3935,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= BOOK DETAIL MODAL ================= */}
                 {libraryRecordModalOpen && selectedLibraryRecord && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={closeLibraryRecord}
                   >
                     <div
@@ -4343,6 +4345,16 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* ===================== NOTICES SECTION END ========================*/}
 
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={student}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="section p-4 sm:p-6 space-y-6 active">
             {/* PROFILE HEADER */}
@@ -4668,7 +4680,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* ===================== PROFILE SECTION END ========================*/}
 
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100]">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md border border-gray-100 dark:border-slate-700">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

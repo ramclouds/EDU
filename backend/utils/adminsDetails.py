@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import datetime
 
 import bcrypt
@@ -8,9 +9,23 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from utils.auth import Admin, db
-from utils.auth_middleware import login_required
+from utils.auth_middleware import login_required, get_current_user
+from utils.rolePermissionManagement import (
+    super_admin_required,
+    RBACRole,
+    RBACUserRole,
+)
 
 logger = logging.getLogger(__name__)
+
+ADMIN_TYPE_ENUM_VALUES = {
+    "Super Admin",
+    "Academic Admin",
+    "Library Admin",
+    "Accounts Admin",
+    "Hostel Admin",
+    "HR Admin",
+}
 
 
 # DASHBOARD PERMISSIONS
@@ -974,4 +989,199 @@ class ChangeAdminPassword(MethodView):
                 error,
             )
 
+            return jsonify({"error": "Something went wrong"}), 500
+
+
+# =========================================================
+# LIST ADMINS (Super Admin only)
+# =========================================================
+class AdminListAPI(MethodView):
+    """Powers the Super Admin dashboard's admin-management section —
+    previously there was no way to even see a list of every admin
+    account across the school, let alone create one."""
+
+    decorators = [super_admin_required]
+
+    def get(self):
+        try:
+            admins = (
+                Admin.query.filter_by(is_deleted=False)
+                .order_by(Admin.created_at.desc())
+                .all()
+            )
+            return jsonify([admin_to_dict(a) for a in admins]), 200
+        except SQLAlchemyError as db_error:
+            logger.exception("Database error while listing admins: %s", db_error)
+            return jsonify({"error": "Database error"}), 500
+        except Exception as error:
+            logger.exception("Unexpected error listing admins: %s", error)
+            return jsonify({"error": "Something went wrong"}), 500
+
+
+# =========================================================
+# CREATE ADMIN (Super Admin only)
+# =========================================================
+class CreateAdminAPI(MethodView):
+    """Creates a new Admin account of any admin_type (Academic, Library,
+    Accounts, Hostel, HR, or another Super Admin). This did not exist
+    anywhere in the codebase before — the only ways to get an Admin row
+    were the Developer's one-time school-onboarding flow (which creates
+    exactly one Super Admin) or direct DB access."""
+
+    decorators = [super_admin_required]
+
+    def post(self):
+        try:
+            data = request.get_json(silent=True) or {}
+
+            first_name = (data.get("first_name") or "").strip()
+            last_name = (data.get("last_name") or "").strip()
+            email = (data.get("email") or "").strip().lower()
+            admin_type = (data.get("admin_type") or "").strip()
+            password = data.get("password") or ""
+            username = (data.get("username") or "").strip()
+
+            missing = [
+                field
+                for field, val in [
+                    ("first_name", first_name),
+                    ("last_name", last_name),
+                    ("email", email),
+                    ("admin_type", admin_type),
+                    ("password", password),
+                ]
+                if not val
+            ]
+            if missing:
+                return (
+                    jsonify(
+                        {"error": f"Missing required fields: {', '.join(missing)}"}
+                    ),
+                    400,
+                )
+
+            if admin_type not in ADMIN_TYPE_ENUM_VALUES:
+                return (
+                    jsonify(
+                        {
+                            "error": (
+                                "admin_type must be one of: "
+                                + ", ".join(sorted(ADMIN_TYPE_ENUM_VALUES))
+                            )
+                        }
+                    ),
+                    400,
+                )
+
+            if len(password) < 8:
+                return (
+                    jsonify({"error": "Password must be at least 8 characters"}),
+                    400,
+                )
+
+            if Admin.query.filter_by(email=email).first():
+                return jsonify({"error": "Email already in use"}), 409
+
+            if not username:
+                username = email.split("@")[0]
+            base_username = username
+            suffix = 1
+            while Admin.query.filter_by(username=username).first():
+                suffix += 1
+                username = f"{base_username}{suffix}"
+
+            current_user = get_current_user()
+            # New admins belong to the same school as the Super Admin who
+            # created them (multi-tenant aware — see utils/platform.py).
+            # A Super Admin created before school_id existed (school_id is
+            # nullable) will produce school_id=None here too, which keeps
+            # the same unscoped/legacy behavior the rest of the app falls
+            # back to.
+            school_id = getattr(current_user, "school_id", None)
+
+            hashed_password = bcrypt.hashpw(
+                password.encode("utf-8"), bcrypt.gensalt()
+            ).decode("utf-8")
+
+            new_admin = Admin(
+                admin_id=f"ADM-{uuid.uuid4().hex[:10].upper()}",
+                user_id=uuid.uuid4().hex[:12],
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                username=username,
+                password=hashed_password,
+                admin_type=admin_type,
+                role="super_admin" if admin_type == "Super Admin" else "admin",
+                school_id=school_id,
+                status="Active",
+                designation=data.get("designation"),
+                department=data.get("department"),
+                mobile=data.get("mobile"),
+            )
+
+            db.session.add(new_admin)
+            db.session.flush()  # need new_admin.id before creating the role link
+
+            # Without this, the admin can log in (the dashboard-routing
+            # check has a looser owner_admin_type fallback) but every
+            # actual data request gets 403 Permission Denied, because
+            # permission_required checks effective_permissions, which is
+            # empty with no role assigned — the dashboard would render
+            # its shell and then immediately bounce back to login as
+            # every initial data fetch failed. Reproduced and confirmed
+            # via a full login test before this fix.
+            role_code = admin_type.lower().replace(" ", "-")
+            default_role = RBACRole.query.filter_by(
+                code=role_code, school_id=None
+            ).first()
+            if default_role:
+                db.session.add(
+                    RBACUserRole(
+                        user_type="admin",
+                        user_id=new_admin.id,
+                        role_id=default_role.id,
+                        assigned_by=getattr(current_user, "email", "system"),
+                    )
+                )
+            else:
+                # Only happens if seed_rbac_defaults() was never run for
+                # this admin_type — log it loudly rather than silently
+                # shipping an admin who can log in but do nothing.
+                logger.warning(
+                    "No default RBAC role found for admin_type=%s "
+                    "(role_code=%s) — created admin %s will have no "
+                    "permissions until a role is assigned manually.",
+                    admin_type,
+                    role_code,
+                    email,
+                )
+
+            db.session.commit()
+
+            logger.info(
+                "Admin created: id=%s admin_type=%s by=%s",
+                new_admin.id,
+                admin_type,
+                getattr(current_user, "email", "?"),
+            )
+
+            return (
+                jsonify(
+                    {
+                        "message": "Admin created",
+                        "admin": admin_to_dict(new_admin),
+                        "login": {"username": username, "email": email},
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as db_error:
+            db.session.rollback()
+            logger.exception("Database error while creating admin: %s", db_error)
+            return jsonify({"error": "Database error"}), 500
+        except Exception as error:
+            db.session.rollback()
+            logger.exception("Unexpected error creating admin: %s", error)
             return jsonify({"error": "Something went wrong"}), 500

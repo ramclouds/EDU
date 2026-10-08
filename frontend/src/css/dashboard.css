@@ -54,10 +54,13 @@
     background-color: #1e293b !important;
 }
 
-/* HEADER */
-.dark .bg-gradient-to-r {
-    background: #1e293b !important;
-}
+/* Previously: `.dark .bg-gradient-to-r { background: #1e293b !important; }`
+   flattened EVERY gradient element to plain slate in dark mode — not just
+   headers, but every colorful gradient stat banner and badge across all
+   7 dashboards (bg-gradient-to-r is used for far more than headers).
+   Removed: the existing gradients (blue-500/indigo-600, etc.) already
+   read fine on dark backgrounds, so dark mode kept its color instead of
+   going flat everywhere. */
 
 /* BUTTON HOVER */
 .dark .hover\:bg-gray-100:hover {

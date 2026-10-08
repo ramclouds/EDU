@@ -9,19 +9,17 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.24",
-    "postcss": "^8.5.6",
+    "@tailwindcss/vite": "^4.1.18",
+    "@vitejs/plugin-react": "^4.3.4",
     "tailwindcss": "^4.1.18",
-    "vite": "^8.0.0-beta.13"
-  },
-  "overrides": {
-    "vite": "^8.0.0-beta.13"
+    "vite": "^5.4.11"
   },
   "dependencies": {
     "axios": "^1.16.0",
     "bootstrap-icons": "^1.13.1",
     "chart.js": "^4.5.1",
-    "cors": "^2.8.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.13.0"
   }

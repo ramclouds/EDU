@@ -22,10 +22,21 @@ from utils.teacherDetails import Teacher
 logger = logging.getLogger(__name__)
 
 
+from utils.tenancy import (
+    caller_can_access_student,
+    caller_can_access_teacher,
+    current_school_id as _current_school_id,
+)
+
+
 class TeacherAttendance(db.Model):
     __tablename__ = "teacher_attendance"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     teacher_id = db.Column(
         db.Integer,
@@ -76,6 +87,9 @@ class AttendanceSession(db.Model):
     __tablename__ = "attendance_sessions"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     academic_class_id = db.Column(
         db.Integer, db.ForeignKey("academic_classes.id"), nullable=False
     )
@@ -152,6 +166,9 @@ class AttendanceRecord(db.Model):
     __tablename__ = "attendance_records"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     session_id = db.Column(
         db.Integer,
         db.ForeignKey("attendance_sessions.id", ondelete="CASCADE"),
@@ -198,6 +215,17 @@ class StudentAttendanceAPI(MethodView):
         try:
 
             student_id = int(student_id)
+
+            # Called both by a student viewing their own attendance and by
+            # an admin/teacher viewing a specific student's record, so
+            # the rule is "self, or staff at the same school" — see
+            # utils/tenancy.py. Previously there was no check at all
+            # beyond @login_required.
+            allowed, target_student = caller_can_access_student(student_id)
+
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             # TOTAL
             total = (
                 db.session.query(func.count(AttendanceRecord.id))
@@ -330,6 +358,12 @@ class TeacherAssignedClassesAPI(MethodView):
         try:
 
             teacher_id = int(teacher_id)
+
+            allowed, target_teacher = caller_can_access_teacher(teacher_id)
+
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             mappings = TeacherClass.query.filter_by(teacher_id=teacher_id).all()
             result = []
 
@@ -368,16 +402,21 @@ class StudentsByClassAPI(MethodView):
 
         try:
             academic_class_id = int(academic_class_id)
-            academic_class = AcademicClass.query.get(academic_class_id)
+            academic_class = AcademicClass.query.filter_by(
+                id=academic_class_id, school_id=_current_school_id()
+            ).first()
+
+            if not academic_class:
+                return jsonify({"error": "Class not found"}), 404
+
             division = None
             section = None
             class_label = None
 
-            if academic_class:
-                division = Division.query.get(academic_class.division_id)
-                section = Section.query.get(academic_class.section_id)
-                if division and section:
-                    class_label = f"{division.division_name}-" f"{section.section_name}"
+            division = Division.query.get(academic_class.division_id)
+            section = Section.query.get(academic_class.section_id)
+            if division and section:
+                class_label = f"{division.division_name}-" f"{section.section_name}"
 
             records = StudentAcademicRecord.query.filter_by(
                 academic_class_id=academic_class_id, is_current=True
@@ -431,12 +470,20 @@ class AttendanceMarkAPI(MethodView):
             if not date:
                 return jsonify({"error": "date required"}), 400
 
+            school_id = _current_school_id()
+
+            if not AcademicClass.query.filter_by(
+                id=academic_class_id, school_id=school_id
+            ).first():
+                return jsonify({"error": "Class not found"}), 404
+
             session_date = datetime.strptime(date, "%Y-%m-%d").date()
 
             # CHECK SESSION
             session = AttendanceSession.query.filter(
                 AttendanceSession.academic_class_id == academic_class_id,
                 AttendanceSession.session_date == session_date,
+                AttendanceSession.school_id == school_id,
             ).first()
 
             # CREATE SESSION
@@ -446,6 +493,7 @@ class AttendanceMarkAPI(MethodView):
                     academic_class_id=academic_class_id,
                     session_date=session_date,
                     teacher_id=teacher_id,
+                    school_id=school_id,
                 )
 
                 try:
@@ -459,6 +507,7 @@ class AttendanceMarkAPI(MethodView):
                     session = AttendanceSession.query.filter(
                         AttendanceSession.academic_class_id == academic_class_id,
                         AttendanceSession.session_date == session_date,
+                        AttendanceSession.school_id == school_id,
                     ).first()
 
                     if not session:
@@ -498,6 +547,7 @@ class AttendanceMarkAPI(MethodView):
                             remarks=remarks,
                             marked_by_role="Teacher",
                             marked_by_user_id=teacher_id,
+                            school_id=school_id,
                         )
                     )
 
@@ -516,7 +566,7 @@ class AttendanceMarkAPI(MethodView):
         except Exception as e:
             db.session.rollback()
             logger.exception(e)
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # =========================================================
@@ -532,6 +582,7 @@ class GetAttendanceByDateAPI(MethodView):
             session = AttendanceSession.query.filter_by(
                 academic_class_id=academic_class_id,
                 session_date=date_obj,
+                school_id=_current_school_id(),
             ).first()
 
             if not session:
@@ -927,6 +978,7 @@ class AdminAttendanceStatsAPI(MethodView):
                         AttendanceRecord.session_id == AttendanceSession.id,
                     )
                     .filter(AttendanceSession.session_date == attendance_date)
+                    .filter(AttendanceRecord.school_id == _current_school_id())
                 )
 
                 total = query.count()
@@ -957,7 +1009,8 @@ class AdminAttendanceStatsAPI(MethodView):
             # =====================================================
 
             teacher_query = TeacherAttendance.query.filter(
-                TeacherAttendance.attendance_date == attendance_date
+                TeacherAttendance.attendance_date == attendance_date,
+                TeacherAttendance.school_id == _current_school_id(),
             )
 
             total = teacher_query.count()
@@ -1080,6 +1133,8 @@ class AdminAttendanceListAPI(MethodView):
                 if division:
                     query = query.filter(Division.division_name == division)
 
+                query = query.filter(Student.school_id == _current_school_id())
+
                 if class_id:
                     query = query.filter(AcademicClass.id == class_id)
 
@@ -1162,6 +1217,7 @@ class AdminAttendanceListAPI(MethodView):
                     TeacherAttendance.updated_at,
                 )
                 .select_from(Teacher)
+                .filter(Teacher.school_id == _current_school_id())
                 .outerjoin(
                     TeacherAttendance,
                     and_(
@@ -1278,7 +1334,9 @@ class UpdateAttendanceStatusAPI(MethodView):
 
                 if record_id:
 
-                    record = AttendanceRecord.query.get(record_id)
+                    record = AttendanceRecord.query.filter_by(
+                        id=record_id, school_id=_current_school_id()
+                    ).first()
 
                     if not record:
                         return jsonify({"error": "Attendance record not found"}), 404
@@ -1302,10 +1360,17 @@ class UpdateAttendanceStatusAPI(MethodView):
                         return jsonify({"error": "date required"}), 400
 
                     attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
+                    school_id = _current_school_id()
+
+                    if not AcademicClass.query.filter_by(
+                        id=class_id, school_id=school_id
+                    ).first():
+                        return jsonify({"error": "Class not found"}), 404
 
                     session = AttendanceSession.query.filter(
                         AttendanceSession.academic_class_id == class_id,
                         AttendanceSession.session_date == attendance_date,
+                        AttendanceSession.school_id == school_id,
                     ).first()
 
                     if not session:
@@ -1316,6 +1381,7 @@ class UpdateAttendanceStatusAPI(MethodView):
                             teacher_id=None,
                             marked_by_role="Admin",
                             marked_by_user_id=current_user.id,
+                            school_id=school_id,
                         )
 
                     db.session.add(session)
@@ -1339,6 +1405,7 @@ class UpdateAttendanceStatusAPI(MethodView):
                         remarks=remarks,
                         marked_by_role="Admin",
                         marked_by_user_id=current_user.id,
+                        school_id=_current_school_id(),
                     )
 
                     db.session.add(record)
@@ -1350,7 +1417,9 @@ class UpdateAttendanceStatusAPI(MethodView):
 
                 if record_id:
 
-                    teacher_record = TeacherAttendance.query.get(record_id)
+                    teacher_record = TeacherAttendance.query.filter_by(
+                        id=record_id, school_id=_current_school_id()
+                    ).first()
 
                     if not teacher_record:
                         return (
@@ -1375,6 +1444,11 @@ class UpdateAttendanceStatusAPI(MethodView):
                     if not date:
                         return jsonify({"error": "date required"}), 400
 
+                    if not Teacher.query.filter_by(
+                        id=teacher_id, school_id=_current_school_id()
+                    ).first():
+                        return jsonify({"error": "Teacher not found"}), 404
+
                     attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
 
                     teacher_record = TeacherAttendance(
@@ -1384,6 +1458,7 @@ class UpdateAttendanceStatusAPI(MethodView):
                         reason=remarks,
                         marked_by_role="Admin",
                         marked_by_user_id=current_user.id,
+                        school_id=_current_school_id(),
                     )
 
                     db.session.add(teacher_record)
@@ -1485,12 +1560,17 @@ class MarkAllAttendanceAPI(MethodView):
                         400,
                     )
 
-                if not AcademicClass.query.get(academic_class_id):
+                school_id = _current_school_id()
+
+                if not AcademicClass.query.filter_by(
+                    id=academic_class_id, school_id=school_id
+                ).first():
                     return jsonify({"error": "Class not found"}), 404
 
                 session = AttendanceSession.query.filter(
                     AttendanceSession.academic_class_id == academic_class_id,
                     AttendanceSession.session_date == attendance_date,
+                    AttendanceSession.school_id == school_id,
                 ).first()
 
                 if not session:
@@ -1500,6 +1580,7 @@ class MarkAllAttendanceAPI(MethodView):
                         teacher_id=None,
                         marked_by_role="Admin",
                         marked_by_user_id=current_user.id,
+                        school_id=school_id,
                     )
                     db.session.add(session)
                     db.session.flush()
@@ -1542,6 +1623,7 @@ class MarkAllAttendanceAPI(MethodView):
                                 status=status,
                                 marked_by_role="Admin",
                                 marked_by_user_id=current_user.id,
+                                school_id=school_id,
                             )
                         )
 
@@ -1563,7 +1645,9 @@ class MarkAllAttendanceAPI(MethodView):
             # =====================================================
             # TEACHERS
             # =====================================================
-            teachers = Teacher.query.filter_by(status="Active").all()
+            teachers = Teacher.query.filter_by(
+                status="Active", school_id=_current_school_id()
+            ).all()
 
             if not teachers:
                 return jsonify({"error": "No active teachers found"}), 404
@@ -1571,7 +1655,8 @@ class MarkAllAttendanceAPI(MethodView):
             existing_records = {
                 r.teacher_id: r
                 for r in TeacherAttendance.query.filter_by(
-                    attendance_date=attendance_date
+                    attendance_date=attendance_date,
+                    school_id=_current_school_id(),
                 ).all()
             }
 
@@ -1592,6 +1677,7 @@ class MarkAllAttendanceAPI(MethodView):
                             status=status,
                             marked_by_role="Admin",
                             marked_by_user_id=current_user.id,
+                            school_id=_current_school_id(),
                         )
                     )
 
