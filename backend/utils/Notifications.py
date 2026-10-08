@@ -1,6 +1,7 @@
 from utils.auth import db
 from utils.auth_middleware import login_required, get_current_user
 from utils.rolePermissionManagement import super_admin_required
+from utils.tenancy import current_school_id as _current_school_id
 from datetime import datetime
 from flask import jsonify, request
 from sqlalchemy import or_
@@ -13,6 +14,12 @@ logger = logging.getLogger(__name__)
 # COMMON NOTIFICATION MODEL
 class Notification(db.Model):
     __tablename__ = "notifications"
+
+    # Scoped per school. Nullable so rows written before multi-tenancy
+    # (and legacy single-school installs) keep working as school_id None.
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(
         db.Integer,
@@ -200,6 +207,41 @@ class Notification(db.Model):
         }
 
 
+def recipient_school_id(user_id, role, fallback=None):
+    """School a notification recipient belongs to, read from their own row.
+
+    A notification can be addressed to someone other than the caller, so
+    the caller's school is the wrong answer in general. Look the recipient
+    up by (role, id); if no row matches, fall back to the given school
+    (normally the sender's) so a sender can still reach a legacy row with
+    no school. Returns None when neither can be determined, which keeps
+    legacy single-school installs working.
+    """
+    if user_id is None:
+        return fallback
+
+    try:
+        from utils.auth import Admin, Teacher, Student, NonTeachingStaff
+
+        model = {
+            "admin": Admin,
+            "teacher": Teacher,
+            "student": Student,
+            "staff": NonTeachingStaff,
+        }.get(str(role or "").lower())
+
+        if model is None:
+            return fallback
+
+        row = model.query.filter_by(id=user_id).first()
+        if row is not None:
+            return getattr(row, "school_id", None)
+    except Exception:
+        logger.exception("recipient_school_id lookup failed")
+
+    return fallback
+
+
 # 📌 CREATE NOTIFICATION (HELPER)
 
 
@@ -208,6 +250,7 @@ def create_notification(
 ):
     try:
         notification = Notification(
+            school_id=recipient_school_id(user_id, role, _current_school_id()),
             user_id=user_id,
             role=role,
             title=title,
@@ -332,7 +375,9 @@ class NotificationsAPI(MethodView):
 
         notifications = (
             Notification.query.filter_by(
-                user_id=current_user.id, role=current_user.role
+                user_id=current_user.id,
+                role=current_user.role,
+                school_id=_current_school_id(),
             )
             .order_by(Notification.created_at.desc())
             .all()
@@ -372,6 +417,7 @@ class MarkNotificationReadAPI(MethodView):
             id=notification_id,
             user_id=current_user.id,
             role=current_user.role,
+            school_id=_current_school_id(),
         ).first()
 
         if not notification:
@@ -401,6 +447,7 @@ class MarkAllNotificationsReadAPI(MethodView):
             user_id=current_user.id,
             role=current_user.role,
             is_read=False,
+            school_id=_current_school_id(),
         ).update({"is_read": True}, synchronize_session=False)
 
         db.session.commit()
@@ -421,6 +468,7 @@ class DeleteNotificationAPI(MethodView):
             id=notification_id,
             user_id=current_user.id,
             role=current_user.role,
+            school_id=_current_school_id(),
         ).first()
 
         if not notification:
@@ -443,7 +491,10 @@ class UnreadNotificationCountAPI(MethodView):
 
         # 🐛 BUGFIX: missing role filter, same issue as above.
         count = Notification.query.filter_by(
-            user_id=current_user.id, role=current_user.role, is_read=False
+            user_id=current_user.id,
+            role=current_user.role,
+            is_read=False,
+            school_id=_current_school_id(),
         ).count()
 
         return jsonify({"unread_count": count})
@@ -493,7 +544,9 @@ class LibraryNotificationsAPI(MethodView):
 
             role_filter = clean_notification_text(request.args.get("role"))
 
-            query = Notification.query
+            query = Notification.query.filter(
+                Notification.school_id == _current_school_id()
+            )
 
             # Only library-related notification types.
             query = query.filter(
@@ -688,6 +741,9 @@ class LibraryNotificationsAPI(MethodView):
             sent_at = None
 
         notification = Notification(
+            school_id=recipient_school_id(
+                normalized_user_id, role, _current_school_id()
+            ),
             user_id=normalized_user_id,
             role=role,
             recipient_name=(recipient_name or None),
@@ -756,10 +812,10 @@ class LibraryNotificationRetryAPI(MethodView):
         if access_error:
             return access_error
 
-        notification = db.session.get(
-            Notification,
-            notification_id,
-        )
+        notification = Notification.query.filter_by(
+            school_id=_current_school_id(),
+            id=notification_id,
+        ).first()
 
         if not notification:
             return (
@@ -816,6 +872,10 @@ class ActivityLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     user_id = db.Column(db.Integer)
     role = db.Column(db.String(50))
 
@@ -832,6 +892,7 @@ class ActivityLog(db.Model):
 def log_activity(user_id, role, action, description, student_id=None, leave_id=None):
     try:
         log = ActivityLog(
+            school_id=_current_school_id(),
             user_id=user_id,
             role=role,
             action=action,
@@ -860,10 +921,10 @@ class LibraryNotificationDetailsAPI(MethodView):
         if access_error:
             return access_error
 
-        notification = db.session.get(
-            Notification,
-            notification_id,
-        )
+        notification = Notification.query.filter_by(
+            school_id=_current_school_id(),
+            id=notification_id,
+        ).first()
 
         if not notification:
             return (
@@ -894,7 +955,13 @@ class ActivityLogsAPI(MethodView):
 
     def get(self):
         try:
-            logs = ActivityLog.query.order_by(ActivityLog.created_at.desc()).all()
+            logs = (
+                ActivityLog.query.filter(
+                    ActivityLog.school_id == _current_school_id()
+                )
+                .order_by(ActivityLog.created_at.desc())
+                .all()
+            )
 
             return jsonify(
                 [

@@ -1,26 +1,3 @@
-"""
-ACCOUNTS MODULE
-
-Everything the Accounts Admin dashboard needs that isn't already covered
-by studentDetails.py / teacherDetails.py / adminsDetails.py / staffDirectory.py:
-
-  - Student fees: installments, payments, pending/overdue tracking
-  - Staff payroll: salary structure, monthly payslips, payment history
-  - A general ledger for other income/expense (donations, rent, utilities,
-    maintenance, etc.) that doesn't belong to either of the above
-
-Staff (teacher / non-teaching staff / admin) are addressed generically
-via (record_type, record_id) - the same "teacher" | "staff" | "admin"
-tags used in utils/staffDirectory.py - since salary structures and
-payslips apply identically to all three and there's no single staff
-table to foreign-key against.
-
-Structured the same way as utils/hostel.py: plain MethodView classes,
-@login_required + a manual authorize_accounts_admin() permission check
-(so read/write/edit can be checked per-action rather than per-endpoint),
-module-level serializers, SQLAlchemy models defined right here.
-"""
-
 from datetime import date, datetime, timedelta
 import re
 import uuid
@@ -40,16 +17,12 @@ except ImportError:
 from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import user_has_permission
 
-# Reuse the app's one real per-user notification system rather than
-# inventing a second one - see utils/Notifications.py's Notification
-# model. Sending a notification is best-effort: if it fails, the
-# triggering action (payment recorded, payslip paid, etc.) must still
-# succeed, so every call site below wraps this in its own try/except
-# via _notify_user() rather than letting a notification error roll
-# back the real transaction. ActivityLog/log_activity power the
-# Activity Logs section (Super Admin oversight of what the Accounts
-# Admin has done).
-from utils.Notifications import Notification, ActivityLog, log_activity
+from utils.Notifications import (
+    Notification,
+    ActivityLog,
+    log_activity,
+    recipient_school_id,
+)
 from utils.studentDetails import (
     StudentAcademicRecord,
     AcademicClass,
@@ -89,6 +62,21 @@ def _parse_date(value):
 
 def _gen_reference(prefix):
     return f"{prefix}-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+
+
+def current_school_id():
+    """Caller's school. None for a legacy/unmigrated install (matches None)."""
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
+def scoped_get(model, pk):
+    if pk is None:
+        return None
+    try:
+        pk = int(pk)
+    except (TypeError, ValueError):
+        return None
+    return model.query.filter_by(id=pk, school_id=current_school_id()).first()
 
 
 def authorize_accounts_admin(required_right="read"):
@@ -197,7 +185,7 @@ def _resolve_staff_person(record_type, record_id):
     record_type = str(record_type or "").strip().lower()
 
     if record_type == "teacher":
-        person = Teacher.query.get(record_id)
+        person = scoped_get(Teacher, record_id)
         if not person:
             return None
         return {
@@ -217,7 +205,7 @@ def _resolve_staff_person(record_type, record_id):
     if record_type == "staff":
         if Staff is None:
             return None
-        person = Staff.query.get(record_id)
+        person = scoped_get(Staff, record_id)
         if not person or getattr(person, "is_deleted", False):
             return None
         return {
@@ -235,7 +223,7 @@ def _resolve_staff_person(record_type, record_id):
         }
 
     if record_type == "admin":
-        person = Admin.query.get(record_id)
+        person = scoped_get(Admin, record_id)
         if not person or getattr(person, "is_deleted", False):
             return None
         return {
@@ -300,7 +288,7 @@ def _refresh_overdue_installments():
     into Overdue. Called at the top of the read endpoints that surface
     fee status school-wide, since there's no scheduled job doing this."""
     today = date.today()
-    stale = FeeInstallment.query.filter(
+    stale = FeeInstallment.query.filter(FeeInstallment.school_id == current_school_id(), 
         FeeInstallment.status.in_(["Pending", "Partial"]),
         FeeInstallment.due_date < today,
     ).all()
@@ -323,6 +311,7 @@ def _notify_user(user_id, role, title, message, notif_type, **extra):
     """
     try:
         notification = Notification(
+            school_id=recipient_school_id(user_id, role),
             user_id=user_id,
             role=role,
             title=title,
@@ -455,6 +444,9 @@ class FeeStructure(db.Model):
     __tablename__ = "fee_structures"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     name = db.Column(db.String(120), nullable=False)
     fee_category = db.Column(
@@ -495,6 +487,9 @@ class FeeInstallment(db.Model):
     __tablename__ = "fee_installments"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     student_id = db.Column(
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
@@ -580,6 +575,9 @@ class FeePayment(db.Model):
     __tablename__ = "fee_payments"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     student_id = db.Column(
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
@@ -588,7 +586,10 @@ class FeePayment(db.Model):
         db.Integer, db.ForeignKey("fee_installments.id", ondelete="SET NULL")
     )
 
-    receipt_number = db.Column(db.String(40), unique=True, nullable=False)
+    # Unique per school, not globally: two schools must be able to issue
+    # receipt 0001 each. (The old global unique would have made the second
+    # school's first payment fail.)
+    receipt_number = db.Column(db.String(40), nullable=False)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
 
     payment_mode = db.Column(
@@ -618,6 +619,9 @@ class SalaryStructure(db.Model):
     __tablename__ = "salary_structures"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     record_type = db.Column(db.Enum("teacher", "staff", "admin"), nullable=False)
     record_id = db.Column(db.Integer, nullable=False)
@@ -677,6 +681,9 @@ class Payslip(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     record_type = db.Column(db.Enum("teacher", "staff", "admin"), nullable=False)
     record_id = db.Column(db.Integer, nullable=False)
@@ -720,6 +727,9 @@ class AccountsTransaction(db.Model):
     __tablename__ = "accounts_transactions"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     entry_type = db.Column(db.Enum("Income", "Expense"), nullable=False)
     category = db.Column(db.String(80), nullable=False)
@@ -754,6 +764,9 @@ class BankAccount(db.Model):
     __tablename__ = "bank_accounts"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     account_name = db.Column(db.String(120), nullable=False)
     bank_name = db.Column(db.String(120), nullable=False)
@@ -783,8 +796,11 @@ class ExpenseCategory(db.Model):
     __tablename__ = "expense_categories"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
-    name = db.Column(db.String(80), unique=True, nullable=False)
+    name = db.Column(db.String(80), nullable=False)
     description = db.Column(db.String(255))
     monthly_budget = db.Column(db.Numeric(10, 2))  # null = no budget cap set
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -978,18 +994,18 @@ class StudentFeeOverviewAPI(MethodView):
             return access_error
 
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
 
             installments = (
-                FeeInstallment.query.filter_by(student_id=student_id)
+                FeeInstallment.query.filter_by(school_id=current_school_id(), student_id=student_id)
                 .order_by(FeeInstallment.due_date.asc())
                 .all()
             )
 
             payments = (
-                FeePayment.query.filter_by(student_id=student_id)
+                FeePayment.query.filter_by(school_id=current_school_id(), student_id=student_id)
                 .order_by(FeePayment.payment_date.desc(), FeePayment.id.desc())
                 .all()
             )
@@ -1051,7 +1067,7 @@ class FeeInstallmentListAPI(MethodView):
             return access_error
 
         installments = (
-            FeeInstallment.query.filter_by(student_id=student_id)
+            FeeInstallment.query.filter_by(school_id=current_school_id(), student_id=student_id)
             .order_by(FeeInstallment.due_date.asc())
             .all()
         )
@@ -1072,7 +1088,7 @@ class FeeInstallmentListAPI(MethodView):
             return access_error
 
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
 
@@ -1090,6 +1106,7 @@ class FeeInstallmentListAPI(MethodView):
                 return jsonify({"success": False, "error": "A valid due_date (YYYY-MM-DD) is required"}), 400
 
             installment = FeeInstallment(
+                school_id=current_school_id(),
                 student_id=student_id,
                 title=title,
                 fee_category=_clean_str(data.get("fee_category")) or "Tuition",
@@ -1152,7 +1169,7 @@ class FeeInstallmentDetailAPI(MethodView):
             return access_error
 
         try:
-            installment = FeeInstallment.query.get(installment_id)
+            installment = scoped_get(FeeInstallment, installment_id)
             if not installment:
                 return jsonify({"success": False, "error": "Installment not found"}), 404
 
@@ -1211,7 +1228,7 @@ class FeeInstallmentDetailAPI(MethodView):
             return access_error
 
         try:
-            installment = FeeInstallment.query.get(installment_id)
+            installment = scoped_get(FeeInstallment, installment_id)
             if not installment:
                 return jsonify({"success": False, "error": "Installment not found"}), 404
 
@@ -1254,7 +1271,7 @@ class FeePaymentListAPI(MethodView):
             return access_error
 
         payments = (
-            FeePayment.query.filter_by(student_id=student_id)
+            FeePayment.query.filter_by(school_id=current_school_id(), student_id=student_id)
             .order_by(FeePayment.payment_date.desc(), FeePayment.id.desc())
             .all()
         )
@@ -1267,7 +1284,7 @@ class FeePaymentListAPI(MethodView):
             return access_error
 
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
 
@@ -1280,7 +1297,7 @@ class FeePaymentListAPI(MethodView):
             installment = None
             installment_id = data.get("installment_id")
             if installment_id:
-                installment = FeeInstallment.query.get(installment_id)
+                installment = scoped_get(FeeInstallment, installment_id)
                 if not installment or installment.student_id != int(student_id):
                     return jsonify({"success": False, "error": "Installment not found for this student"}), 404
 
@@ -1296,6 +1313,7 @@ class FeePaymentListAPI(MethodView):
                     )
 
             payment = FeePayment(
+                school_id=current_school_id(),
                 student_id=student_id,
                 installment_id=installment.id if installment else None,
                 receipt_number=_gen_reference("RCPT"),
@@ -1362,7 +1380,7 @@ class FeePaymentDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        payment = FeePayment.query.get(payment_id)
+        payment = scoped_get(FeePayment, payment_id)
         if not payment:
             return jsonify({"success": False, "error": "Payment not found"}), 404
 
@@ -1375,14 +1393,14 @@ class FeePaymentDetailAPI(MethodView):
             return access_error
 
         try:
-            payment = FeePayment.query.get(payment_id)
+            payment = scoped_get(FeePayment, payment_id)
             if not payment:
                 return jsonify({"success": False, "error": "Payment not found"}), 404
 
             payment.status = "Refunded"
 
             if payment.installment_id:
-                installment = FeeInstallment.query.get(payment.installment_id)
+                installment = scoped_get(FeeInstallment, payment.installment_id)
                 if installment:
                     installment.paid_amount = round(
                         max(float(installment.paid_amount or 0) - float(payment.amount or 0), 0), 2
@@ -1434,7 +1452,7 @@ class FeeDashboardSummaryAPI(MethodView):
                 .scalar()
             )
 
-            overdue_count = FeeInstallment.query.filter_by(status="Overdue").count()
+            overdue_count = FeeInstallment.query.filter_by(school_id=current_school_id(), status="Overdue").count()
 
             month_collected = (
                 db.session.query(func.coalesce(func.sum(FeePayment.amount), 0))
@@ -1447,7 +1465,7 @@ class FeeDashboardSummaryAPI(MethodView):
             )
 
             recent_payments = (
-                FeePayment.query.filter_by(status="Success")
+                FeePayment.query.filter_by(school_id=current_school_id(), status="Success")
                 .order_by(FeePayment.payment_date.desc(), FeePayment.id.desc())
                 .limit(10)
                 .all()
@@ -1455,7 +1473,7 @@ class FeeDashboardSummaryAPI(MethodView):
 
             recent_with_names = []
             for payment in recent_payments:
-                student = Student.query.get(payment.student_id)
+                student = scoped_get(Student, payment.student_id)
                 row = serialize_payment(payment)
                 row["student_name"] = (
                     _clean_str(f"{student.first_name} {student.last_name}")
@@ -1508,7 +1526,7 @@ class StaffSalaryOverviewAPI(MethodView):
             return jsonify({"success": False, "error": "Staff member not found"}), 404
 
         structure = (
-            SalaryStructure.query.filter_by(
+            SalaryStructure.query.filter(SalaryStructure.school_id == current_school_id(), 
                 record_type=record_type, record_id=record_id, is_current=True
             )
             .order_by(SalaryStructure.effective_from.desc())
@@ -1516,7 +1534,7 @@ class StaffSalaryOverviewAPI(MethodView):
         )
 
         payslips = (
-            Payslip.query.filter_by(record_type=record_type, record_id=record_id)
+            Payslip.query.filter_by(school_id=current_school_id(), record_type=record_type, record_id=record_id)
             .order_by(Payslip.year.desc(), Payslip.month.desc())
             .all()
         )
@@ -1555,7 +1573,7 @@ class SalaryStructureAPI(MethodView):
             return access_error
 
         structure = (
-            SalaryStructure.query.filter_by(
+            SalaryStructure.query.filter(SalaryStructure.school_id == current_school_id(), 
                 record_type=record_type, record_id=record_id, is_current=True
             )
             .order_by(SalaryStructure.effective_from.desc())
@@ -1592,11 +1610,12 @@ class SalaryStructureAPI(MethodView):
             # Supersede any previous current structure rather than
             # mutating it, so historic payslips stay tied to the
             # numbers that were actually in effect when they were paid.
-            SalaryStructure.query.filter_by(
+            SalaryStructure.query.filter(SalaryStructure.school_id == current_school_id(), 
                 record_type=record_type, record_id=record_id, is_current=True
             ).update({"is_current": False})
 
             structure = SalaryStructure(
+                school_id=current_school_id(),
                 record_type=record_type,
                 record_id=record_id,
                 basic=basic,
@@ -1652,7 +1671,7 @@ class PayslipListAPI(MethodView):
             return access_error
 
         payslips = (
-            Payslip.query.filter_by(record_type=record_type, record_id=record_id)
+            Payslip.query.filter_by(school_id=current_school_id(), record_type=record_type, record_id=record_id)
             .order_by(Payslip.year.desc(), Payslip.month.desc())
             .all()
         )
@@ -1676,7 +1695,7 @@ class PayslipListAPI(MethodView):
             month = int(data.get("month") or date.today().month)
             year = int(data.get("year") or date.today().year)
 
-            if Payslip.query.filter_by(
+            if Payslip.query.filter(Payslip.school_id == current_school_id(), 
                 record_type=record_type, record_id=record_id, month=month, year=year
             ).first():
                 return (
@@ -1685,7 +1704,7 @@ class PayslipListAPI(MethodView):
                 )
 
             structure = (
-                SalaryStructure.query.filter_by(
+                SalaryStructure.query.filter(SalaryStructure.school_id == current_school_id(), 
                     record_type=record_type, record_id=record_id, is_current=True
                 )
                 .order_by(SalaryStructure.effective_from.desc())
@@ -1717,6 +1736,7 @@ class PayslipListAPI(MethodView):
             net = round(max(gross - deductions, 0), 2)
 
             payslip = Payslip(
+                school_id=current_school_id(),
                 record_type=record_type,
                 record_id=record_id,
                 month=month,
@@ -1777,7 +1797,7 @@ class PayslipDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        payslip = Payslip.query.get(payslip_id)
+        payslip = scoped_get(Payslip, payslip_id)
         if not payslip:
             return jsonify({"success": False, "error": "Payslip not found"}), 404
 
@@ -1790,7 +1810,7 @@ class PayslipDetailAPI(MethodView):
             return access_error
 
         try:
-            payslip = Payslip.query.get(payslip_id)
+            payslip = scoped_get(Payslip, payslip_id)
             if not payslip:
                 return jsonify({"success": False, "error": "Payslip not found"}), 404
 
@@ -1867,7 +1887,7 @@ class PayrollSummaryAPI(MethodView):
         try:
             today = date.today()
 
-            month_payslips = Payslip.query.filter_by(month=today.month, year=today.year).all()
+            month_payslips = Payslip.query.filter_by(school_id=current_school_id(), month=today.month, year=today.year).all()
 
             paid = [p for p in month_payslips if p.status == "Paid"]
             pending = [p for p in month_payslips if p.status in ("Pending", "Processing")]
@@ -1913,7 +1933,7 @@ class AccountsTransactionListAPI(MethodView):
         year = request.args.get("year")
         bank_account_id = request.args.get("bank_account_id")
 
-        query = AccountsTransaction.query
+        query = AccountsTransaction.query.filter(AccountsTransaction.school_id == current_school_id())
 
         if entry_type in ("Income", "Expense"):
             query = query.filter(AccountsTransaction.entry_type == entry_type)
@@ -1965,10 +1985,11 @@ class AccountsTransactionListAPI(MethodView):
                 return jsonify({"success": False, "error": "A valid amount is required"}), 400
 
             bank_account_id = data.get("bank_account_id")
-            if bank_account_id and not BankAccount.query.get(int(bank_account_id)):
+            if bank_account_id and not scoped_get(BankAccount, int(bank_account_id)):
                 return jsonify({"success": False, "error": "Bank account not found"}), 404
 
             transaction = AccountsTransaction(
+                school_id=current_school_id(),
                 entry_type=entry_type,
                 category=category,
                 amount=amount,
@@ -2016,7 +2037,7 @@ class AccountsTransactionDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        transaction = AccountsTransaction.query.get(transaction_id)
+        transaction = scoped_get(AccountsTransaction, transaction_id)
         if not transaction:
             return jsonify({"success": False, "error": "Transaction not found"}), 404
 
@@ -2029,7 +2050,7 @@ class AccountsTransactionDetailAPI(MethodView):
             return access_error
 
         try:
-            transaction = AccountsTransaction.query.get(transaction_id)
+            transaction = scoped_get(AccountsTransaction, transaction_id)
             if not transaction:
                 return jsonify({"success": False, "error": "Transaction not found"}), 404
 
@@ -2053,7 +2074,7 @@ class AccountsTransactionDetailAPI(MethodView):
                 transaction.description = _clean_str(data.get("description")) or None
             if "bank_account_id" in data:
                 bank_account_id = data.get("bank_account_id")
-                if bank_account_id and not BankAccount.query.get(int(bank_account_id)):
+                if bank_account_id and not scoped_get(BankAccount, int(bank_account_id)):
                     return jsonify({"success": False, "error": "Bank account not found"}), 404
                 transaction.bank_account_id = int(bank_account_id) if bank_account_id else None
 
@@ -2088,7 +2109,7 @@ class AccountsTransactionDetailAPI(MethodView):
             return access_error
 
         try:
-            transaction = AccountsTransaction.query.get(transaction_id)
+            transaction = scoped_get(AccountsTransaction, transaction_id)
             if not transaction:
                 return jsonify({"success": False, "error": "Transaction not found"}), 404
 
@@ -2168,7 +2189,7 @@ class FeeStructureListAPI(MethodView):
         batch_id = request.args.get("batch_id")
         active_only = str(request.args.get("active_only") or "").lower() == "true"
 
-        query = FeeStructure.query
+        query = FeeStructure.query.filter(FeeStructure.school_id == current_school_id())
 
         if academic_year:
             query = query.filter(FeeStructure.academic_year == academic_year)
@@ -2208,10 +2229,11 @@ class FeeStructureListAPI(MethodView):
 
             batch_id = data.get("batch_id")
             if batch_id:
-                if not Batch.query.get(int(batch_id)):
+                if not scoped_get(Batch, int(batch_id)):
                     return jsonify({"success": False, "error": "Batch not found"}), 404
 
             structure = FeeStructure(
+                school_id=current_school_id(),
                 name=name,
                 fee_category=_clean_str(data.get("fee_category")) or "Tuition",
                 academic_year=_clean_str(data.get("academic_year")) or None,
@@ -2260,7 +2282,7 @@ class FeeStructureDetailAPI(MethodView):
             return access_error
 
         try:
-            structure = FeeStructure.query.get(structure_id)
+            structure = scoped_get(FeeStructure, structure_id)
             if not structure:
                 return jsonify({"success": False, "error": "Fee structure not found"}), 404
 
@@ -2318,7 +2340,7 @@ class FeeStructureDetailAPI(MethodView):
             return access_error
 
         try:
-            structure = FeeStructure.query.get(structure_id)
+            structure = scoped_get(FeeStructure, structure_id)
             if not structure:
                 return jsonify({"success": False, "error": "Fee structure not found"}), 404
 
@@ -2369,7 +2391,7 @@ class FeeStructureApplyAPI(MethodView):
             return access_error
 
         try:
-            structure = FeeStructure.query.get(structure_id)
+            structure = scoped_get(FeeStructure, structure_id)
             if not structure:
                 return jsonify({"success": False, "error": "Fee structure not found"}), 404
 
@@ -2392,6 +2414,7 @@ class FeeStructureApplyAPI(MethodView):
                     continue
 
                 installment = FeeInstallment(
+                    school_id=current_school_id(),
                     student_id=student.id,
                     source_structure_id=structure.id,
                     title=structure.name,
@@ -2470,7 +2493,7 @@ class PendingFeesListAPI(MethodView):
             search = _clean_str(request.args.get("search"))
             batch_id = request.args.get("batch_id")
 
-            query = FeeInstallment.query.join(
+            query = FeeInstallment.query.filter(FeeInstallment.school_id == current_school_id()).join(
                 Student, Student.id == FeeInstallment.student_id
             )
 
@@ -2505,7 +2528,7 @@ class PendingFeesListAPI(MethodView):
             overdue_count = 0
 
             for installment in installments:
-                student = Student.query.get(installment.student_id)
+                student = scoped_get(Student, installment.student_id)
                 row = serialize_installment(installment)
                 row["student_name"] = (
                     _clean_str(f"{student.first_name} {student.last_name}")
@@ -2580,7 +2603,7 @@ class SendFeeRemindersAPI(MethodView):
             today = date.today()
             horizon = today + timedelta(days=days_ahead)
 
-            installments = FeeInstallment.query.filter(
+            installments = FeeInstallment.query.filter(FeeInstallment.school_id == current_school_id(), 
                 FeeInstallment.status.in_(["Pending", "Partial", "Overdue"]),
                 FeeInstallment.due_date <= horizon,
             ).all()
@@ -2609,7 +2632,7 @@ class SendFeeRemindersAPI(MethodView):
                     skipped += 1
                     continue
 
-                student = Student.query.get(student_id)
+                student = scoped_get(Student, student_id)
                 if not student:
                     continue
 
@@ -2696,7 +2719,7 @@ class FeeReportsAPI(MethodView):
 
             academic_year = _clean_str(request.args.get("academic_year"))
 
-            installment_query = FeeInstallment.query
+            installment_query = FeeInstallment.query.filter(FeeInstallment.school_id == current_school_id())
             if academic_year:
                 installment_query = installment_query.filter(
                     FeeInstallment.academic_year == academic_year
@@ -2704,7 +2727,7 @@ class FeeReportsAPI(MethodView):
             installments = installment_query.all()
             installment_by_id = {i.id: i for i in installments}
 
-            all_payments = FeePayment.query.filter(FeePayment.status == "Success").all()
+            all_payments = FeePayment.query.filter(FeePayment.school_id == current_school_id(), FeePayment.status == "Success").all()
 
             if academic_year:
                 relevant_payments = [
@@ -2855,7 +2878,7 @@ class FeeReportsAPI(MethodView):
             )[:10]:
                 if balance <= 0:
                     continue
-                student = Student.query.get(student_id)
+                student = scoped_get(Student, student_id)
                 if not student:
                     continue
                 top_defaulters.append(
@@ -2910,7 +2933,7 @@ class ExpenseCategoryListAPI(MethodView):
 
         active_only = str(request.args.get("active_only") or "").lower() == "true"
 
-        query = ExpenseCategory.query
+        query = ExpenseCategory.query.filter(ExpenseCategory.school_id == current_school_id())
         if active_only:
             query = query.filter(ExpenseCategory.is_active.is_(True))
 
@@ -2952,10 +2975,11 @@ class ExpenseCategoryListAPI(MethodView):
             if not name:
                 return jsonify({"success": False, "error": "Name is required"}), 400
 
-            if ExpenseCategory.query.filter(func.lower(ExpenseCategory.name) == name.lower()).first():
+            if ExpenseCategory.query.filter(ExpenseCategory.school_id == current_school_id(), func.lower(ExpenseCategory.name) == name.lower()).first():
                 return jsonify({"success": False, "error": "A category with this name already exists"}), 409
 
             category = ExpenseCategory(
+                school_id=current_school_id(),
                 name=name,
                 description=_clean_str(data.get("description")) or None,
                 monthly_budget=_parse_amount(data.get("monthly_budget"), None),
@@ -2998,7 +3022,7 @@ class ExpenseCategoryDetailAPI(MethodView):
             return access_error
 
         try:
-            category = ExpenseCategory.query.get(category_id)
+            category = scoped_get(ExpenseCategory, category_id)
             if not category:
                 return jsonify({"success": False, "error": "Category not found"}), 404
 
@@ -3007,7 +3031,7 @@ class ExpenseCategoryDetailAPI(MethodView):
             if "name" in data:
                 new_name = _clean_str(data.get("name"))
                 if new_name and new_name.lower() != category.name.lower():
-                    if ExpenseCategory.query.filter(
+                    if ExpenseCategory.query.filter(ExpenseCategory.school_id == current_school_id(), 
                         func.lower(ExpenseCategory.name) == new_name.lower()
                     ).first():
                         return jsonify({"success": False, "error": "A category with this name already exists"}), 409
@@ -3050,11 +3074,11 @@ class ExpenseCategoryDetailAPI(MethodView):
             return access_error
 
         try:
-            category = ExpenseCategory.query.get(category_id)
+            category = scoped_get(ExpenseCategory, category_id)
             if not category:
                 return jsonify({"success": False, "error": "Category not found"}), 404
 
-            in_use = AccountsTransaction.query.filter(
+            in_use = AccountsTransaction.query.filter(AccountsTransaction.school_id == current_school_id(), 
                 AccountsTransaction.category == category.name
             ).first()
 
@@ -3125,7 +3149,7 @@ class PayrollStaffListAPI(MethodView):
                 or search in (p["staff_code"] or "").lower()
             ]
 
-        structures = SalaryStructure.query.filter_by(is_current=True).all()
+        structures = SalaryStructure.query.filter_by(school_id=current_school_id(), is_current=True).all()
         structure_lookup = {(s.record_type, s.record_id): s for s in structures}
 
         rows = []
@@ -3186,7 +3210,7 @@ class PayslipsAllListAPI(MethodView):
             status = _clean_str(request.args.get("status"))
             record_type = _clean_str(request.args.get("record_type")).lower()
 
-            query = Payslip.query
+            query = Payslip.query.filter(Payslip.school_id == current_school_id())
 
             if month:
                 query = query.filter(Payslip.month == int(month))
@@ -3261,11 +3285,11 @@ class RunPayrollAPI(MethodView):
             year = int(data.get("year") or date.today().year)
             working_days = int(data.get("working_days") or 30)
 
-            structures = SalaryStructure.query.filter_by(is_current=True).all()
+            structures = SalaryStructure.query.filter_by(school_id=current_school_id(), is_current=True).all()
 
             already_generated = {
                 (p.record_type, p.record_id)
-                for p in Payslip.query.filter_by(month=month, year=year).all()
+                for p in Payslip.query.filter_by(school_id=current_school_id(), month=month, year=year).all()
             }
 
             created = 0
@@ -3283,6 +3307,7 @@ class RunPayrollAPI(MethodView):
                 net = round(max(gross - deductions, 0), 2)
 
                 payslip = Payslip(
+                    school_id=current_school_id(),
                     record_type=structure.record_type,
                     record_id=structure.record_id,
                     month=month,
@@ -3374,7 +3399,7 @@ class BankAccountListAPI(MethodView):
 
         active_only = str(request.args.get("active_only") or "").lower() == "true"
 
-        query = BankAccount.query
+        query = BankAccount.query.filter(BankAccount.school_id == current_school_id())
         if active_only:
             query = query.filter(BankAccount.is_active.is_(True))
 
@@ -3438,12 +3463,13 @@ class BankAccountListAPI(MethodView):
             if not account_number:
                 return jsonify({"success": False, "error": "Account number is required"}), 400
 
-            if BankAccount.query.filter(
+            if BankAccount.query.filter(BankAccount.school_id == current_school_id(), 
                 BankAccount.account_number == account_number
             ).first():
                 return jsonify({"success": False, "error": "An account with this number already exists"}), 409
 
             account = BankAccount(
+                school_id=current_school_id(),
                 account_name=account_name,
                 bank_name=bank_name,
                 account_number=account_number,
@@ -3492,7 +3518,7 @@ class BankAccountDetailAPI(MethodView):
             return access_error
 
         try:
-            account = BankAccount.query.get(account_id)
+            account = scoped_get(BankAccount, account_id)
             if not account:
                 return jsonify({"success": False, "error": "Bank account not found"}), 404
 
@@ -3505,7 +3531,7 @@ class BankAccountDetailAPI(MethodView):
             if "account_number" in data:
                 new_number = _clean_str(data.get("account_number"))
                 if new_number and new_number != account.account_number:
-                    if BankAccount.query.filter(
+                    if BankAccount.query.filter(BankAccount.school_id == current_school_id(), 
                         BankAccount.account_number == new_number,
                         BankAccount.id != account.id,
                     ).first():
@@ -3557,7 +3583,7 @@ class BankAccountDetailAPI(MethodView):
             return access_error
 
         try:
-            account = BankAccount.query.get(account_id)
+            account = scoped_get(BankAccount, account_id)
             if not account:
                 return jsonify({"success": False, "error": "Bank account not found"}), 404
 
@@ -3645,7 +3671,7 @@ class FinancialOverviewAPI(MethodView):
             )
 
             # ---------------- PAYROLL (this period) ----------------
-            month_payslips = Payslip.query.filter_by(month=month, year=year).all()
+            month_payslips = Payslip.query.filter_by(school_id=current_school_id(), month=month, year=year).all()
             payroll_paid = sum(
                 float(p.net_salary or 0) for p in month_payslips if p.status == "Paid"
             )
@@ -3712,7 +3738,7 @@ class FinancialOverviewAPI(MethodView):
                 )
                 m_payroll = sum(
                     float(p.net_salary or 0)
-                    for p in Payslip.query.filter_by(month=tm, year=ty, status="Paid").all()
+                    for p in Payslip.query.filter_by(school_id=current_school_id(), month=tm, year=ty, status="Paid").all()
                 )
                 m_expense = (
                     db.session.query(func.coalesce(func.sum(AccountsTransaction.amount), 0))
@@ -3828,7 +3854,7 @@ class ProfitLossAPI(MethodView):
 
                 payroll_paid = sum(
                     float(p.net_salary or 0)
-                    for p in Payslip.query.filter_by(month=m, year=y, status="Paid").all()
+                    for p in Payslip.query.filter_by(school_id=current_school_id(), month=m, year=y, status="Paid").all()
                 )
 
                 other_income_total = sum(float(r[1]) for r in income_rows)
