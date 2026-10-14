@@ -1,22 +1,6 @@
-"""Shared multi-tenancy helpers.
-
-Every module that scopes data by school used to carry its own copy of
-`_current_school_id()`; the ownership checks for "student id / teacher id
-in the URL" endpoints were being re-implemented per file, which is how a
-legacy-install regression slipped into the attendance module. Keeping the
-rules in one place means they can't drift apart.
-
-Semantics (important, easy to get wrong):
-  * school_id None means "legacy / unscoped install". None == None is a
-    MATCH — a single-school install that never onboarded through the
-    Developer dashboard must keep working exactly as before.
-  * A real school_id only ever matches the same school_id, never None and
-    never another school.
-"""
-
 from flask import request
 
-from utils.auth import Student, Teacher
+from utils.auth import Admin, Student, Teacher
 
 
 def current_school_id():
@@ -24,15 +8,7 @@ def current_school_id():
 
 
 def caller_can_access_student(student_id):
-    """(allowed, student). Allowed when the caller IS this student, or is
-    non-student staff at the same school as the student.
 
-    Endpoints that take a student id from the URL are called both by the
-    student themself and by admins/teachers looking someone up, so a
-    pure self-only rule would break legitimate use. Returns
-    (False, None) for an unknown id — callers should answer 404/403
-    identically so the response never reveals whether an id exists at
-    another school."""
     try:
         student_id = int(student_id)
     except (TypeError, ValueError):
@@ -54,9 +30,7 @@ def caller_can_access_student(student_id):
 
 
 def caller_can_access_teacher(teacher_id):
-    """(allowed, teacher). Allowed when the caller IS this teacher, or is
-    non-teacher staff (admin etc.) at the same school. Teachers looking
-    at other teachers is not allowed."""
+
     try:
         teacher_id = int(teacher_id)
     except (TypeError, ValueError):
@@ -78,3 +52,13 @@ def caller_can_access_teacher(teacher_id):
         getattr(caller, "school_id", None) == teacher.school_id,
         teacher,
     )
+
+
+def caller_can_manage_admin(target_admin):
+    """Self, or a Super Admin at the same school. Other admins are refused."""
+    caller = getattr(request, "user", None)
+    if not isinstance(caller, Admin) or target_admin is None:
+        return False
+    if caller.id == target_admin.id:
+        return True
+    return caller.role == "super_admin" and caller.school_id == target_admin.school_id

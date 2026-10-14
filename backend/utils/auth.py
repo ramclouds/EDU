@@ -410,6 +410,8 @@ class Login(MethodView):
                 school = School.query.filter_by(school_code=school_code).first()
                 if not school:
                     return jsonify({"error": "Invalid school code"}), 401
+                if school.refresh_status():
+                    db.session.commit()
                 if not school.is_login_allowed():
                     return (
                         jsonify(
@@ -624,15 +626,6 @@ class Login(MethodView):
 
 
 class Logout(MethodView):
-    """Invalidates the caller's current session token server-side.
-
-    Requires the request to already carry a valid token, then clears it so
-    it can never be reused — closing the gap where auth_token had no
-    server-side revocation at all. Uses a local import for get_current_user
-    (rather than importing auth_middleware at module level) because
-    auth_middleware imports from this module — a module-level import here
-    would create a circular import.
-    """
 
     def post(self):
         from utils.auth_middleware import get_current_user

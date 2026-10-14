@@ -117,12 +117,18 @@ class MyClasses(MethodView):
             user_id = int(user_id)
 
             # ================= ADMIN: SHOW ALL CLASSES =================
-            if role == "admin":
+            # A Super Admin's role is stored as "super_admin"; it is an admin
+            # for this route too, and was previously falling through unhandled.
+            if role in ("admin", "super_admin"):
                 admin = Admin.query.get(user_id)
                 if not admin:
                     return jsonify({"error": "Admin not found"}), 404
 
-                academic_classes = AcademicClass.query.order_by(
+                # Only this school's classes. The unscoped query listed every
+                # school's classes to any admin.
+                academic_classes = AcademicClass.query.filter(
+                    AcademicClass.school_id == admin.school_id
+                ).order_by(
                     AcademicClass.batch_id.asc(),
                     AcademicClass.division_id.asc(),
                     AcademicClass.section_id.asc(),

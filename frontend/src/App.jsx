@@ -56,14 +56,16 @@ function ProtectedRoute({ children, allowedRole, dashboardKey }) {
     return <Navigate to="/" replace />;
   }
 
-  // A Super Admin is stored with role "super_admin" but is still an
-  // admin for every admin-only route, so "admin" must accept both.
+  // The backend stores a Super Admin's role as "super_admin". Every
+  // admin-area guard asks for "admin", so treat any admin-class role as
+  // satisfying it. Student and teacher guards are unchanged.
+  const ADMIN_ROLES = ["admin", "super_admin"];
   const roleMatches =
-    !allowedRole ||
-    userRole === allowedRole ||
-    (allowedRole === "admin" && userRole === "super_admin");
+    allowedRole === "admin"
+      ? ADMIN_ROLES.includes(userRole)
+      : userRole === allowedRole;
 
-  if (!roleMatches) {
+  if (allowedRole && !roleMatches) {
     return <Navigate to="/" replace />;
   }
 

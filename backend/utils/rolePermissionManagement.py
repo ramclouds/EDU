@@ -91,6 +91,12 @@ DEFAULT_MODULES = [
         "sort_order": 15,
     },
     {
+        "code": "assets",
+        "name": "Assets",
+        "category": "Operations",
+        "sort_order": 130,
+    },
+    {
         "code": "hostel",
         "name": "Hostel",
         "category": "Administration",
@@ -354,10 +360,7 @@ def _dashboard_rights_from_actions(action_map):
 
 
 def get_user_dashboard_access(user, dashboard_entry):
-    """
-    Resolve {can_view, can_write} for one dashboard entry for a given
-    logged-in user (Admin / Teacher / Student / Staff instance).
-    """
+
 
     if not dashboard_entry:
         return {"can_view": False, "can_write": False}
@@ -420,11 +423,6 @@ def get_user_dashboard_access(user, dashboard_entry):
 
 
 def list_dashboard_access_for_user(user):
-    """
-    Return every dashboard the user may see, each with can_view /
-    can_write flags - used to drive the login redirect, ProtectedRoute
-    guard and the sidebar navigation on the frontend.
-    """
 
     results = []
 
@@ -448,11 +446,6 @@ def list_dashboard_access_for_user(user):
 
 
 def get_home_dashboard_for_user(user):
-    """
-    Resolve the dashboard a user should land on right after login,
-    based on their role/admin_type - independent of whether they
-    actually have access to it (callers must still check access).
-    """
 
     if isinstance(user, Student):
         return DASHBOARD_BY_KEY["student-dashboard"]
@@ -1350,10 +1343,6 @@ def permission_required(module_code, action="view"):
 
 # DATABASE SEED
 def seed_rbac_defaults():
-    """
-    Run once after db.create_all() or through a Flask CLI command.
-    Safe to execute repeatedly.
-    """
 
     try:
         module_lookup = {}
@@ -1580,9 +1569,7 @@ class RBACBootstrapAPI(MethodView):
 
 # ROLE CRUD API
 def _override_belongs_to_my_school():
-    """SQL condition: this override row targets a user in the caller's
-    school. Built per user_type because the override table is
-    polymorphic (user_type + user_id, no FK)."""
+
     school_id = _current_school_id()
     clauses = []
 
@@ -1605,8 +1592,7 @@ def _override_belongs_to_my_school():
 
 
 def _visible_roles_filter():
-    """System default roles (school_id IS NULL) plus this school's own
-    custom roles — never another school's custom roles."""
+
     return or_(
         RBACRole.school_id.is_(None),
         RBACRole.school_id == _current_school_id(),
@@ -1741,13 +1727,7 @@ def _get_visible_role(role_id):
 
 
 def _role_is_editable(role):
-    """System roles (school_id NULL) are shared by every school, so a
-    school-level Super Admin must never be able to edit or delete them —
-    doing so would silently change permissions for every other school
-    using that role. Only a role owned by the caller's own school is
-    editable. For a legacy single-school install (caller school_id is
-    None), system roles ARE effectively that install's own, since
-    nothing else shares them — None == None keeps that working."""
+
     return role.school_id == _current_school_id()
 
 
@@ -2045,14 +2025,7 @@ class RBACRolePermissionAPI(MethodView):
 
 # USER LIST API
 def _get_user_in_my_school(user_type, user_id):
-    """Look up a user by (type, id), but only if they belong to the
-    caller's own school. Every endpoint below that takes a user_type +
-    user_id from the URL used to trust it blindly, so a Super Admin
-    from one school could read or change role assignments and
-    permission overrides for any user at any other school just by
-    guessing an id. Returns None (-> caller should 404, not 403, so it
-    doesn't reveal that the id exists elsewhere) when not found or in
-    a different school."""
+
     model = get_user_model(user_type)
 
     if not model:

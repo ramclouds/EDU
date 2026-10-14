@@ -7,6 +7,7 @@ from sqlalchemy import or_
 
 from utils.auth import db
 from utils.auth_middleware import login_required
+from utils.rolePermissionManagement import permission_required
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,13 @@ class Asset(db.Model):
     __tablename__ = "assets"
 
     id = db.Column(db.BigInteger, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
-    asset_id = db.Column(db.String(50), unique=True, nullable=False)
-    asset_code = db.Column(db.String(50), unique=True, nullable=False)
+    # Unique per school (see migration: uq_school_asset_id, uq_school_asset_code).
+    asset_id = db.Column(db.String(50), nullable=False)
+    asset_code = db.Column(db.String(50), nullable=False)
 
     asset_name = db.Column(db.String(150), nullable=False)
     asset_description = db.Column(db.Text)
@@ -30,7 +35,8 @@ class Asset(db.Model):
 
     brand = db.Column(db.String(100))
     model_number = db.Column(db.String(100))
-    serial_number = db.Column(db.String(150), unique=True)
+    # Unique per school (see migration: uq_school_serial_number).
+    serial_number = db.Column(db.String(150))
 
     barcode = db.Column(db.String(150))
     qr_code = db.Column(db.String(255))
@@ -133,6 +139,9 @@ class AssetHistory(db.Model):
     __tablename__ = "asset_history"
 
     id = db.Column(db.BigInteger, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     asset_id = db.Column(db.String(100))
     asset_code = db.Column(db.String(100))
     action = db.Column(db.String(50))
@@ -240,9 +249,25 @@ def asset_to_dict(asset):
 # =========================================================
 # SAVE HISTORY
 # =========================================================
+def current_school_id():
+    """Caller's school. None for a legacy/unmigrated install (matches None)."""
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
+def scoped_get_asset(pk):
+    """Load an asset by primary key, only if it belongs to the caller's
+    school. Another school's asset returns None, so the caller gets 404."""
+    try:
+        pk = int(pk)
+    except (TypeError, ValueError):
+        return None
+    return Asset.query.filter_by(id=pk, school_id=current_school_id()).first()
+
+
 def create_asset_history(asset, action, performed_by=None):
 
     history = AssetHistory(
+        school_id=asset.school_id,
         asset_id=asset.asset_id,
         asset_code=asset.asset_code,
         action=action,
@@ -271,7 +296,7 @@ def parse_date(value):
 # =========================================================
 class CreateAssetAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "create")
     def post(self):
 
         try:
@@ -328,16 +353,24 @@ class CreateAssetAPI(MethodView):
             # =====================================================
             # DUPLICATE CHECK
             # =====================================================
+            # Duplicate check scoped to THIS school. An unscoped check made a
+            # second school unable to use an asset id, code or serial that the
+            # first school already had.
+            school_id = current_school_id()
             query = Asset.query.filter(
+                Asset.school_id == school_id,
                 or_(
                     Asset.asset_id == asset_id,
                     Asset.asset_code == asset_code,
-                )
+                ),
             )
 
             if serial_number:
                 query = query.union(
-                    Asset.query.filter(Asset.serial_number == serial_number)
+                    Asset.query.filter(
+                        Asset.school_id == school_id,
+                        Asset.serial_number == serial_number,
+                    )
                 )
 
             existing = query.first()
@@ -350,6 +383,7 @@ class CreateAssetAPI(MethodView):
             # CREATE ASSET
             # =====================================================
             asset = Asset(
+                school_id=school_id,
                 asset_id=asset_id,
                 asset_code=asset_code,
                 asset_name=asset_name,
@@ -481,14 +515,17 @@ class CreateAssetAPI(MethodView):
 # =========================================================
 class GetAssetsAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "view")
     def get(self):
 
         try:
 
             search = request.args.get("search")
 
-            query = Asset.query.filter_by(is_deleted=False)
+            query = Asset.query.filter_by(
+                is_deleted=False,
+                school_id=current_school_id(),
+            )
 
             if search:
 
@@ -516,7 +553,7 @@ class GetAssetsAPI(MethodView):
 # =========================================================
 class AssetDetailsAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "view")
     def get(self, id):
 
         try:
@@ -524,6 +561,7 @@ class AssetDetailsAPI(MethodView):
             asset = Asset.query.filter_by(
                 id=id,
                 is_deleted=False,
+                school_id=current_school_id(),
             ).first()
 
             if not asset:
@@ -544,7 +582,7 @@ class AssetDetailsAPI(MethodView):
 # =========================================================
 class UpdateAssetAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "edit")
     def put(self, id):
 
         try:
@@ -552,6 +590,7 @@ class UpdateAssetAPI(MethodView):
             asset = Asset.query.filter_by(
                 id=id,
                 is_deleted=False,
+                school_id=current_school_id(),
             ).first()
 
             if not asset:
@@ -712,6 +751,7 @@ class UpdateAssetAPI(MethodView):
             if "serial_number" in data and asset.serial_number:
 
                 existing_serial = Asset.query.filter(
+                    Asset.school_id == asset.school_id,
                     Asset.serial_number == asset.serial_number,
                     Asset.id != asset.id,
                 ).first()
@@ -779,7 +819,7 @@ class UpdateAssetAPI(MethodView):
 # =========================================================
 class RestoreAssetAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "edit")
     def post(self, id):
 
         try:
@@ -787,6 +827,7 @@ class RestoreAssetAPI(MethodView):
             asset = Asset.query.filter_by(
                 id=id,
                 is_deleted=True,
+                school_id=current_school_id(),
             ).first()
 
             if not asset:
@@ -817,7 +858,7 @@ class RestoreAssetAPI(MethodView):
 # DELETE ASSET
 # =========================================================
 class DeleteAssetAPI(MethodView):
-    @login_required
+    @permission_required("assets", "delete")
     def delete(self, id):
 
         try:
@@ -825,6 +866,7 @@ class DeleteAssetAPI(MethodView):
             asset = Asset.query.filter_by(
                 id=id,
                 is_deleted=False,
+                school_id=current_school_id(),
             ).first()
 
             if not asset:
@@ -862,11 +904,14 @@ class DeleteAssetAPI(MethodView):
 
 
 class GetDeletedAssetsAPI(MethodView):
-    @login_required
+    @permission_required("assets", "view")
     def get(self):
 
         assets = (
-            Asset.query.filter_by(is_deleted=True)
+            Asset.query.filter_by(
+                is_deleted=True,
+                school_id=current_school_id(),
+            )
             .order_by(Asset.updated_at.desc())
             .all()
         )

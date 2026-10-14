@@ -10,6 +10,11 @@ load_dotenv()
 from utils.auth import Login, Logout, SignUp, db, bcrypt
 from utils.auth_middleware import login_required
 from utils.platform import (
+    PlatformInfoAPI,
+    SchoolActivityAPI,
+    ExtendTrialAPI,
+    ResetAdminPasswordAPI,
+    DeveloperAuditAPI,
     DeveloperLogin,
     DeveloperLogout,
     PlatformStatsAPI,
@@ -257,11 +262,14 @@ from utils.hostel import (
     HostelReportsAPI,
 )
 
+from utils.school_overview import ParentsAPI, EventsAPI, EventDetailAPI
 from utils.announcement import (
     CreateNoticeAPI,
     StudentNoticeAPI,
     TeacherNoticeAPI,
     AdminNoticeAPI,
+    AdminNoticeManageAPI,
+    DeleteNoticeAPI,
     MarkNoticeReadAPI,
 )
 
@@ -438,6 +446,31 @@ def create_app():
         "/api/developer/stats",
         view_func=PlatformStatsAPI.as_view("developer_stats"),
         methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/platform",
+        view_func=PlatformInfoAPI.as_view("developer_platform"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/audit",
+        view_func=DeveloperAuditAPI.as_view("developer_audit"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/activity",
+        view_func=SchoolActivityAPI.as_view("developer_school_activity"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/extend-trial",
+        view_func=ExtendTrialAPI.as_view("developer_extend_trial"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/reset-admin-password",
+        view_func=ResetAdminPasswordAPI.as_view("developer_reset_admin_password"),
+        methods=["POST"],
     )
 
     # =========================================================
@@ -703,6 +736,35 @@ def create_app():
         "/api/announcements/read/<int:notice_id>/<int:user_id>",
         view_func=MarkNoticeReadAPI.as_view("mark_notice_read"),
         methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/announcements/manage",
+        view_func=AdminNoticeManageAPI.as_view("admin_notice_manage"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/announcements/<int:notice_id>",
+        view_func=DeleteNoticeAPI.as_view("delete_notice"),
+        methods=["DELETE"],
+    )
+
+    # ================= PARENTS & EVENTS (Super Admin sections) =================
+    app.add_url_rule(
+        "/api/admin/parents",
+        view_func=ParentsAPI.as_view("admin_parents"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/admin/events",
+        view_func=EventsAPI.as_view("admin_events"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/admin/events/<int:event_id>",
+        view_func=EventDetailAPI.as_view("admin_event_detail"),
+        methods=["DELETE"],
     )
 
     # NOTIFICATIONS
@@ -2093,14 +2155,7 @@ def create_app():
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
 
     def _safe_send(base_folder, filename):
-        """Resolve filename under base_folder and refuse to serve anything
-        outside it. The previous version only ran the path through
-        os.path.normpath, which does NOT stop `../../../etc/passwd`-style
-        traversal once joined — normpath collapses the segments but the
-        result can still resolve outside base_folder. This checks the final
-        absolute path is actually contained within base_folder before
-        touching the filesystem.
-        """
+
         base_abs = os.path.abspath(base_folder)
         full_path = os.path.abspath(os.path.join(base_abs, filename))
 
@@ -2175,11 +2230,6 @@ def create_app():
     def internal_error(e):
         return jsonify({"error": "Internal server error"}), 500
 
-    # =========================================================
-    # RBAC INITIALIZATION
-    # =========================================================
-    # This updates only RBAC default modules/roles. It is idempotent and
-    # does not change login, routing, dashboard, or other application logic.
     with app.app_context():
         try:
             seed_rbac_defaults()
@@ -2197,15 +2247,7 @@ if __name__ == "__main__":
 
     with app.app_context():
         if is_dev:
-            # Dev convenience only. Production schema changes must go
-            # through real migrations (Flask-Migrate / Alembic), never
-            # db.create_all(), or existing data and pending column
-            # migrations (see project notes) can be silently skipped.
+
             db.create_all()
 
-    # debug=True enables the Werkzeug interactive debugger, which allows
-    # arbitrary code execution from the browser if this ever gets exposed
-    # publicly. It must never be hardcoded on — tie it to FLASK_ENV, and
-    # run behind a real WSGI server (gunicorn/waitress) in production
-    # rather than this dev server at all (see wsgi.py).
     app.run(host="0.0.0.0", port=5000, debug=is_dev)

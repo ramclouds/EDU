@@ -12,7 +12,7 @@ from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from flask import request
-from utils.auth import db, Teacher
+from utils.auth import db, Admin, Teacher
 from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import permission_required
 from utils.subjects import Subject
@@ -734,7 +734,6 @@ class TeacherSubjectsAPI(MethodView):
             logger.exception(e)
             return jsonify({"error": "Failed to load subjects"}), 500
 
-
 # ========================= TEACHER CLASSES =========================
 class TeacherClassesAPI(MethodView):
 
@@ -865,13 +864,14 @@ class SaveTeacherMarksAPI(MethodView):
             subject_name = data.get("subject")
             exam_name = data.get("examType")
 
-            allowed, _ = caller_can_access_student(student_id)
-            if not allowed:
-                return jsonify({"error": "Forbidden"}), 403
+            # Saving marks is a staff action. The previous check also allowed
+            # the student to write their own marks.
+            if not isinstance(request.user, (Admin, Teacher)):
+                return jsonify({"error": "Only staff can save marks"}), 403
 
             school_id = _current_school_id()
 
-            # MARKS
+            # MARKSGF
             internal = float(data.get("internal", 0))
             external = float(data.get("external", 0))
             oral = float(data.get("oral", 0))
@@ -1908,7 +1908,7 @@ def _exam_progress(exam):
 
 
 class AdminExamMarksEntryPermissionAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def put(self, exam_id):
         try:
             data = request.get_json(silent=True) or {}
@@ -1962,7 +1962,7 @@ class AdminExamMarksEntryPermissionAPI(MethodView):
 
 
 class AdminExamBulkEditAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def put(self):
         try:
             data = request.get_json(silent=True) or {}
@@ -2032,7 +2032,7 @@ class AdminExamBulkEditAPI(MethodView):
 
 
 class AdminExamReportsPDFAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             academic_year = request.args.get("academic_year")
@@ -2236,7 +2236,7 @@ def _class_lookup():
 
 
 class AdminExamOptionsAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             school_id = _current_school_id()
@@ -2335,7 +2335,7 @@ class AdminExamOptionsAPI(MethodView):
 
 
 class AdminExamTermAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             academic_year = request.args.get("academic_year")
@@ -2406,7 +2406,7 @@ class AdminExamTermAPI(MethodView):
             logger.exception(e)
             return jsonify({"error": "Failed to load exam terms"}), 500
 
-    @login_required
+    @permission_required("academic", "create")
     def post(self):
         try:
             data = request.get_json(silent=True) or {}
@@ -2486,7 +2486,7 @@ class AdminExamTermAPI(MethodView):
 
 
 class AdminExamDashboardAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             academic_year = request.args.get("academic_year")
@@ -2694,7 +2694,7 @@ class AdminExamDashboardAPI(MethodView):
 
 
 class AdminExamClassDetailsAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self, exam_id):
         try:
             exam = Exam.query.filter_by(
@@ -2852,7 +2852,7 @@ class AdminExamClassDetailsAPI(MethodView):
 
 
 class AdminExamVerifyAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def post(self, exam_id):
         try:
             data = request.get_json(silent=True) or {}
@@ -2900,7 +2900,7 @@ class AdminExamVerifyAPI(MethodView):
 
 
 class AdminExamPublishAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def post(self, exam_id):
         try:
             data = request.get_json(silent=True) or {}
@@ -2939,7 +2939,7 @@ class AdminExamPublishAPI(MethodView):
 
 
 class AdminExamSchedulePublishAPI(MethodView):
-    @login_required
+    @permission_required("academic", "edit")
     def post(self, exam_id):
         try:
             data = request.get_json(silent=True) or {}
@@ -2997,7 +2997,7 @@ class AdminExamSchedulePublishAPI(MethodView):
 
 
 class AdminExamResultsAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             exam_id = _parse_int(request.args.get("exam_id"))
@@ -3111,7 +3111,7 @@ class AdminExamResultsAPI(MethodView):
 
 
 class AdminExamReportCardsPDFAPI(MethodView):
-    @login_required
+    @permission_required("academic", "view")
     def get(self):
         try:
             exam_id = _parse_int(request.args.get("exam_id"))

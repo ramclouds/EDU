@@ -96,10 +96,7 @@ SUPER_ADMIN_RIGHTS = [
 
 # NORMALIZATION HELPERS
 def normalize_list(value):
-    """
-    Convert comma-separated string, JSON-like list, tuple or set
-    into a clean list of strings.
-    """
+
 
     if value is None:
         return []
@@ -181,12 +178,6 @@ def get_expected_dashboard_permission(admin_type):
 
 # ACCESS RESOLVER
 def _rbac_dashboard_rights(admin, config):
-    """
-    Ask the real RBAC system (Role & Permission Management) whether this
-    admin currently has view/write access to their own dashboard.
-    Returns None if RBAC lookup isn't available, so callers can fall
-    back to the legacy CSV-based fields.
-    """
 
     if not config:
         return None
@@ -209,21 +200,6 @@ def _rbac_dashboard_rights(admin, config):
 
 
 def _rbac_all_dashboard_access(admin):
-    """
-    Every dashboard (key/label/route/can_view/can_write) this admin
-    currently has *view* access to via RBAC - not just the one dashboard
-    tied to their admin_type.
-
-    BUG FIX: a Super Admin can grant an admin extra dashboards beyond
-    their own via Role & Permission Management (e.g. a Library Admin
-    who is *also* given Hostel Dashboard access). resolve_admin_access()
-    used to only ever resolve the admin's own home dashboard, so that
-    second grant never showed up in the admin's profile/table and the
-    corresponding sidebar link never appeared on their own dashboard.
-
-    Returns None if RBAC lookup isn't available (caller falls back to
-    legacy behavior for that admin).
-    """
 
     try:
         from utils.rolePermissionManagement import list_dashboard_access_for_user
@@ -235,24 +211,6 @@ def _rbac_all_dashboard_access(admin):
 
 
 def resolve_admin_access(admin):
-    """
-    Build dashboard access and CRUD rights for an admin.
-
-    This is now a thin wrapper: the source of truth for "can this admin
-    open this dashboard, and can they edit or only view it" is the RBAC
-    Role & Permission Management system (see rolePermissionManagement.py
-    / DASHBOARD_REGISTRY). Legacy `permissions` / `modules_enabled` /
-    `access_level` columns on the Admin row are only used as a fallback
-    when no RBAC role/module mapping exists yet for that admin_type.
-
-    permissions:
-        Contains dashboard permission only.
-        Example: hr-admin-dashboard
-
-    access_level:
-        Contains operation rights.
-        Example: read,write,edit
-    """
 
     admin_type = str(admin.admin_type or "").strip()
 
@@ -320,11 +278,6 @@ def resolve_admin_access(admin):
             can_write_flag = "write" in stored_rights
             rights = stored_rights
 
-        # BUG FIX: merge in every OTHER dashboard RBAC says this admin
-        # can view (e.g. Super Admin additionally granted this Library
-        # Admin access to the Hostel Dashboard too). Without this, only
-        # the admin's own home dashboard ever showed up here, no matter
-        # what extra access was granted in Role & Permission Management.
         rbac_all_access = _rbac_all_dashboard_access(admin)
 
         dashboard_access_detail = rbac_all_access or []
@@ -559,14 +512,6 @@ def parse_date(date_value):
 
 
 def normalize_admin_access_fields(data, existing_admin=None):
-    """
-    Normalize permissions and access_level before saving.
-
-    For known admin types:
-    - permissions becomes the dashboard permission
-    - modules_enabled becomes the dashboard permission
-    - access_level contains CRUD rights
-    """
 
     normalized_data = dict(data or {})
 
@@ -642,6 +587,18 @@ class AdminDetails(MethodView):
             if not admin:
                 return jsonify({"error": "Admin not found"}), 404
 
+            # OWNERSHIP: an admin reads their own profile; any other admin reads
+            # only admins at their own school. Previously any logged-in user of
+            # any school could read any admin's full profile by id.
+            caller = getattr(request, "user", None)
+            is_self = isinstance(caller, Admin) and caller.id == admin.id
+            same_school = (
+                caller is not None
+                and getattr(caller, "school_id", None) == admin.school_id
+            )
+            if not (is_self or same_school):
+                return jsonify({"error": "Forbidden"}), 403
+
             return jsonify(admin_to_dict(admin)), 200
 
         except (TypeError, ValueError):
@@ -682,11 +639,18 @@ class UpdateAdminProfile(MethodView):
 
             if not admin:
                 return jsonify({"error": "Admin not found"}), 404
+            from utils.tenancy import caller_can_manage_admin
+            if not caller_can_manage_admin(admin):
+                return jsonify({"error": "Forbidden"}), 403
 
             request_data = request.get_json(silent=True)
 
             if not request_data:
                 return jsonify({"error": "Invalid JSON"}), 400
+
+            # Privilege fields are never changed through a profile update.
+            for _priv in ("role", "admin_type", "permissions", "access_level", "modules_enabled", "school_id"):
+                request_data.pop(_priv, None)
 
             data = normalize_admin_access_fields(
                 request_data,
@@ -749,12 +713,8 @@ class UpdateAdminProfile(MethodView):
                 "country",
                 "pincode",
                 # Role
-                "role",
-                "admin_type",
                 "designation",
                 "department",
-                "permissions",
-                "access_level",
                 # Professional
                 "qualification",
                 "specialization",
@@ -771,7 +731,6 @@ class UpdateAdminProfile(MethodView):
                 # System control
                 "users_managed",
                 "active_sessions",
-                "modules_enabled",
                 # Finance
                 "fee_access",
                 "discount_authority",
@@ -876,7 +835,6 @@ class UpdateAdminProfile(MethodView):
 
             return jsonify({"error": "Something went wrong"}), 500
 
-
 # CHANGE ADMIN PASSWORD
 class ChangeAdminPassword(MethodView):
 
@@ -895,6 +853,10 @@ class ChangeAdminPassword(MethodView):
 
             if not admin:
                 return jsonify({"error": "Admin not found"}), 404
+            caller = getattr(request, "user", None)
+            if not (isinstance(caller, Admin) and caller.id == admin.id):
+                return jsonify({"error": "You can only change your own password"}), 403
+
 
             data = request.get_json(silent=True)
 
@@ -996,9 +958,6 @@ class ChangeAdminPassword(MethodView):
 # LIST ADMINS (Super Admin only)
 # =========================================================
 class AdminListAPI(MethodView):
-    """Powers the Super Admin dashboard's admin-management section —
-    previously there was no way to even see a list of every admin
-    account across the school, let alone create one."""
 
     decorators = [super_admin_required]
 
@@ -1022,11 +981,6 @@ class AdminListAPI(MethodView):
 # CREATE ADMIN (Super Admin only)
 # =========================================================
 class CreateAdminAPI(MethodView):
-    """Creates a new Admin account of any admin_type (Academic, Library,
-    Accounts, Hostel, HR, or another Super Admin). This did not exist
-    anywhere in the codebase before — the only ways to get an Admin row
-    were the Developer's one-time school-onboarding flow (which creates
-    exactly one Super Admin) or direct DB access."""
 
     decorators = [super_admin_required]
 

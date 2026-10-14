@@ -18,22 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def _can_access_teacher(teacher_id):
-    """
-    BUG FIX: these endpoints previously had no ownership check at all -
-    any logged-in account (another teacher, a student) could view or
-    edit any teacher's profile, including changing their password,
-    just by guessing an id in the URL. Now: a teacher may only access
-    their own record; any admin may access any teacher (Academic
-    Admin oversight, Super Admin, etc).
 
-    MULTI-TENANCY UPDATE: that admin check originally granted ANY admin
-    access to ANY teacher regardless of school — predating school_id —
-    which would let an admin at one school view/edit/reset the password
-    of a teacher at a completely different school just by guessing an
-    id. Now also requires the admin and teacher to share a school
-    (None == None still matches, so a legacy/unmigrated single-school
-    install keeps working exactly as before).
-    """
     current_user = get_current_user()
     current_user_type = get_current_user_type()
 

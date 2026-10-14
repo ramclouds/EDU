@@ -1,3 +1,26 @@
+"""
+ACCOUNTS MODULE
+
+Everything the Accounts Admin dashboard needs that isn't already covered
+by studentDetails.py / teacherDetails.py / adminsDetails.py / staffDirectory.py:
+
+  - Student fees: installments, payments, pending/overdue tracking
+  - Staff payroll: salary structure, monthly payslips, payment history
+  - A general ledger for other income/expense (donations, rent, utilities,
+    maintenance, etc.) that doesn't belong to either of the above
+
+Staff (teacher / non-teaching staff / admin) are addressed generically
+via (record_type, record_id) - the same "teacher" | "staff" | "admin"
+tags used in utils/staffDirectory.py - since salary structures and
+payslips apply identically to all three and there's no single staff
+table to foreign-key against.
+
+Structured the same way as utils/hostel.py: plain MethodView classes,
+@login_required + a manual authorize_accounts_admin() permission check
+(so read/write/edit can be checked per-action rather than per-endpoint),
+module-level serializers, SQLAlchemy models defined right here.
+"""
+
 from datetime import date, datetime, timedelta
 import re
 import uuid
@@ -17,6 +40,15 @@ except ImportError:
 from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import user_has_permission
 
+# Reuse the app's one real per-user notification system rather than
+# inventing a second one - see utils/Notifications.py's Notification
+# model. Sending a notification is best-effort: if it fails, the
+# triggering action (payment recorded, payslip paid, etc.) must still
+# succeed, so every call site below wraps this in its own try/except
+# via _notify_user() rather than letting a notification error roll
+# back the real transaction. ActivityLog/log_activity power the
+# Activity Logs section (Super Admin oversight of what the Accounts
+# Admin has done).
 from utils.Notifications import (
     Notification,
     ActivityLog,
@@ -70,6 +102,7 @@ def current_school_id():
 
 
 def scoped_get(model, pk):
+
     if pk is None:
         return None
     try:
@@ -80,10 +113,7 @@ def scoped_get(model, pk):
 
 
 def authorize_accounts_admin(required_right="read"):
-    """
-    Same shape as hostel.py's authorize_hostel_admin(), checked against
-    the "accounts" module instead of "hostel". Super Admins always pass.
-    """
+
     current_user = getattr(request, "user", None)
 
     if not isinstance(current_user, Admin):
@@ -177,11 +207,7 @@ def _student_class_details(student_id):
 
 
 def _resolve_staff_person(record_type, record_id):
-    """
-    Look up a teacher / non-teaching staff / admin by (record_type, id)
-    and return a small, consistent identity dict, or None if not found
-    or record_type is invalid.
-    """
+
     record_type = str(record_type or "").strip().lower()
 
     if record_type == "teacher":
@@ -244,10 +270,7 @@ def _resolve_staff_person(record_type, record_id):
 
 
 def _all_staff_persons():
-    """Every teacher + non-teaching staff + admin as the same identity
-    shape _resolve_staff_person returns, for the Salary Management and
-    payroll bulk-generation screens that need the whole roster at once
-    rather than one lookup at a time."""
+
     people = []
 
     for teacher in Teacher.query.all():
@@ -264,8 +287,7 @@ def _all_staff_persons():
 
 
 def _students_in_batch(batch_id):
-    """All students whose current academic record places them in the
-    given batch. batch_id=None returns every active student."""
+
     if batch_id is None:
         return Student.query.filter(Student.status == "Active").all()
 
@@ -284,9 +306,7 @@ def _students_in_batch(batch_id):
 
 
 def _refresh_overdue_installments():
-    """Flip any Pending/Partial installment whose due date has passed
-    into Overdue. Called at the top of the read endpoints that surface
-    fee status school-wide, since there's no scheduled job doing this."""
+
     today = date.today()
     stale = FeeInstallment.query.filter(FeeInstallment.school_id == current_school_id(), 
         FeeInstallment.status.in_(["Pending", "Partial"]),
@@ -301,14 +321,7 @@ def _refresh_overdue_installments():
 
 
 def _notify_user(user_id, role, title, message, notif_type, **extra):
-    """
-    Best-effort: create one row in the app's real notification inbox
-    (utils/Notifications.py's Notification model) for a single
-    recipient. Runs in its own try/except with its own commit, so a
-    notification failure (bad data, DB hiccup) never rolls back or
-    fails the fee payment / payslip / installment action that
-    triggered it - the money still gets recorded either way.
-    """
+
     try:
         notification = Notification(
             school_id=recipient_school_id(user_id, role),
@@ -375,20 +388,6 @@ def _notify_staff(record_type, record_id, title, message, notif_type):
         notif_type=notif_type,
         **extra,
     )
-
-
-# ============================= AUDIT / OVERSIGHT =============================
-# Every meaningful write an Accounts Admin makes gets logged here via
-# ActivityLog (utils/Notifications.py - the same audit trail the rest
-# of the app already uses, not a new one). The Activity Logs section
-# that reads this back is Super-Admin-only, both on the frontend
-# (sidebar item hidden unless isSuperAdmin) and here on the backend
-# (see _require_super_admin below) - an Accounts Admin can generate
-# these log rows by using the dashboard, but can never read them back.
-
-# Actions large/destructive enough to also interrupt a Super Admin
-# with a real-time alert, not just a line in a log they'd have to go
-# looking for.
 LARGE_EXPENSE_ALERT_THRESHOLD = 50000  # ₹ - tune to whatever counts as "large" for this school
 
 
@@ -414,9 +413,7 @@ def _super_admin_ids():
 
 
 def _alert_super_admins(current_user, action, description):
-    """For risky/destructive actions: log it AND push a real-time
-    notification to every Super Admin, so oversight doesn't depend on
-    someone remembering to check the Activity Logs screen."""
+
     _log_accounts_activity(current_user, action, description)
 
     actor_name = _clean_str(
@@ -435,12 +432,6 @@ def _alert_super_admins(current_user, action, description):
 
 # ============================= MODELS =============================
 class FeeStructure(db.Model):
-    """A reusable fee template - e.g. "Class 10 Term 1 Tuition, due
-    15 Jun, ₹5000" - that can be applied in bulk to generate a
-    FeeInstallment for every student in a batch (or every student in
-    the school if no batch is set) instead of creating installments
-    one student at a time."""
-
     __tablename__ = "fee_structures"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -479,10 +470,6 @@ class FeeStructure(db.Model):
 
 
 class FeeInstallment(db.Model):
-    """One fee due for one student - a term fee, an admission fee, a bus
-    fee, an exam fee, etc. Split out per-installment rather than one
-    lump "total fee" per student so partial payments and due-date-based
-    overdue tracking both work per line item."""
 
     __tablename__ = "fee_installments"
 
@@ -495,9 +482,6 @@ class FeeInstallment(db.Model):
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
 
-    # Set when this installment was generated by "Apply" on a
-    # FeeStructure template, so re-applying that template can skip
-    # students who already have it instead of double-billing them.
     source_structure_id = db.Column(
         db.Integer, db.ForeignKey("fee_structures.id", ondelete="SET NULL")
     )
@@ -549,9 +533,7 @@ class FeeInstallment(db.Model):
         return round(max(self.net_payable() - float(self.paid_amount or 0), 0), 2)
 
     def refresh_status(self):
-        """Recompute status from paid_amount vs due date. Called after
-        every payment is recorded or an installment's amount/date
-        changes."""
+
         if self.status == "Waived":
             return
 
@@ -568,9 +550,7 @@ class FeeInstallment(db.Model):
 
 
 class FeePayment(db.Model):
-    """A single payment transaction. Usually linked to one installment,
-    but installment_id can be null for an unallocated advance payment
-    that accounts can apply to installments later."""
+
 
     __tablename__ = "fee_payments"
 
@@ -612,9 +592,6 @@ class FeePayment(db.Model):
 
 
 class SalaryStructure(db.Model):
-    """Versioned pay structure for a staff member. Editing salary
-    creates a new row and flips is_current instead of mutating history,
-    so past payslips stay accurate even if the structure changes later."""
 
     __tablename__ = "salary_structures"
 
@@ -669,10 +646,6 @@ class SalaryStructure(db.Model):
 
 
 class Payslip(db.Model):
-    """One generated payslip for one staff member for one month. Snapshots
-    the gross/deductions/net at generation time so it stays correct even
-    if the underlying SalaryStructure is edited afterwards."""
-
     __tablename__ = "payslips"
     __table_args__ = (
         db.UniqueConstraint(
@@ -743,9 +716,6 @@ class AccountsTransaction(db.Model):
     reference_no = db.Column(db.String(100))
     description = db.Column(db.String(255))
 
-    # Which bank account this money moved through, if any - null means
-    # cash or otherwise untracked. Lets Bank Accounts compute a real
-    # running balance instead of just being a static address book.
     bank_account_id = db.Column(
         db.Integer, db.ForeignKey("bank_accounts.id", ondelete="SET NULL")
     )
@@ -755,11 +725,6 @@ class AccountsTransaction(db.Model):
 
 
 class BankAccount(db.Model):
-    """A school bank account. Balance isn't stored directly - it's
-    opening_balance plus every AccountsTransaction (income/expense,
-    including fee payments and payroll where applicable) linked to this
-    account, so it stays correct automatically as transactions are
-    recorded rather than needing manual reconciliation."""
 
     __tablename__ = "bank_accounts"
 
@@ -788,10 +753,6 @@ class BankAccount(db.Model):
 
 
 class ExpenseCategory(db.Model):
-    """A managed expense category (Utilities, Maintenance, Supplies,
-    ...) with an optional monthly budget, so the Expense Categories
-    section can show budget-vs-spent instead of admins typing free-text
-    categories with no structure or oversight."""
 
     __tablename__ = "expense_categories"
 
@@ -1425,13 +1386,6 @@ class FeePaymentDetailAPI(MethodView):
 
 
 class FeeDashboardSummaryAPI(MethodView):
-    """
-    GET /api/accounts/fees/summary
-
-    School-wide fee stats for the dashboard/stat cards: total collected
-    this month, total outstanding, overdue count, recent payments.
-    """
-
     @login_required
     def get(self):
         _, access_error = authorize_accounts_admin("read")
@@ -1508,12 +1462,6 @@ class FeeDashboardSummaryAPI(MethodView):
 # STAFF PAYROLL
 # =====================================================================
 class StaffSalaryOverviewAPI(MethodView):
-    """
-    GET /api/accounts/staff/<record_type>/<record_id>/salary
-
-    Everything the "click on a staff name" modal needs: identity +
-    current salary structure + payslip history.
-    """
 
     @login_required
     def get(self, record_type, record_id):
@@ -1607,9 +1555,6 @@ class SalaryStructureAPI(MethodView):
             if basic is None or basic <= 0:
                 return jsonify({"success": False, "error": "A valid basic salary is required"}), 400
 
-            # Supersede any previous current structure rather than
-            # mutating it, so historic payslips stay tied to the
-            # numbers that were actually in effect when they were paid.
             SalaryStructure.query.filter(SalaryStructure.school_id == current_school_id(), 
                 record_type=record_type, record_id=record_id, is_current=True
             ).update({"is_current": False})
@@ -1843,8 +1788,6 @@ class PayslipDetailAPI(MethodView):
                     ),
                 )
 
-            # Only fire on the Pending/Processing -> Paid transition, not
-            # on every idempotent re-save of an already-Paid payslip.
             if new_status == "Paid" and not was_already_paid:
                 period_label = date(payslip.year, payslip.month, 1).strftime("%B %Y")
                 _notify_staff(
@@ -2135,15 +2078,6 @@ class AccountsTransactionDetailAPI(MethodView):
 # BATCH OPTIONS (for the Fee Structure "apply to a batch" dropdown)
 # =====================================================================
 class AccountsBatchOptionsAPI(MethodView):
-    """
-    GET /api/accounts/batches
-
-    A lightweight batch list for the Fee Structure form's "target
-    batch" dropdown. Deliberately separate from AdminBatchesAPI in
-    academic.py, which is gated on the "academic" module the Accounts
-    Admin role doesn't have - this one is gated on "accounts" instead
-    so Accounts doesn't need Academic permissions just to bill a batch.
-    """
 
     @login_required
     def get(self):
@@ -2374,15 +2308,6 @@ class FeeStructureDetailAPI(MethodView):
 
 
 class FeeStructureApplyAPI(MethodView):
-    """
-    POST /api/accounts/fee-structures/<structure_id>/apply
-
-    Generates one FeeInstallment per target student (every student in
-    the template's batch, or every active student if the template has
-    no batch). Students who already have an installment from this
-    template are skipped, so it's safe to click "Apply" again after
-    new students join instead of double-billing everyone.
-    """
 
     @login_required
     def post(self, structure_id):
@@ -2471,15 +2396,7 @@ class FeeStructureApplyAPI(MethodView):
 # PENDING FEES (school-wide view across every student)
 # =====================================================================
 class PendingFeesListAPI(MethodView):
-    """
-    GET /api/accounts/fees/pending
-
-    Every unpaid/partially-paid/overdue installment school-wide, with
-    the student's name/class attached, for the Pending Fees section.
-    Query params: status ("Pending" | "Partial" | "Overdue" | "" for
-    all three), search (student name/ID/mobile), batch_id.
-    """
-
+\
     @login_required
     def get(self):
         _, access_error = authorize_accounts_admin("read")
@@ -2571,23 +2488,6 @@ class PendingFeesListAPI(MethodView):
 
 
 class SendFeeRemindersAPI(MethodView):
-    """
-    POST /api/accounts/fees/send-reminders
-
-    Body (all optional): { "days_ahead": 3 }
-
-    The "due date alert" workflow: there's no scheduler in this app, so
-    this is the button that actually sends reminders - hit it manually
-    from the Pending Fees screen, or point a daily cron/task scheduler
-    at this URL to make it fully automatic. Sends ONE reminder per
-    student (not per installment) summarizing everything they owe:
-    installments overdue now, plus installments due within
-    `days_ahead` days (default 3).
-
-    De-duplicated per calendar day: a student who already got a
-    fee_due/fee_overdue reminder today won't get a second one from a
-    repeat click, but will get a fresh one tomorrow if still unpaid.
-    """
 
     @login_required
     def post(self):
@@ -2689,24 +2589,6 @@ class SendFeeRemindersAPI(MethodView):
 # FEE REPORTS (aggregate views across every student)
 # =====================================================================
 class FeeReportsAPI(MethodView):
-    """
-    GET /api/accounts/fees/reports
-
-    Everything the Fee Reports section needs in one call: headline
-    totals + collection rate, a 12-month collection trend, billed vs
-    collected by fee category, collections by payment mode, billed vs
-    collected by batch, and the top 10 students by outstanding balance.
-
-    All computed in Python over the (school-scale) installment/payment
-    tables rather than heavy grouped SQL, matching how
-    FeeDashboardSummaryAPI already aggregates elsewhere in this module.
-
-    Optional query param: academic_year - scopes billed/collected/trend
-    figures to installments tagged with that year (unallocated
-    payments, which aren't tied to any installment, are excluded from
-    the collected total when this filter is active, since there's no
-    year to match them against).
-    """
 
     @login_required
     def get(self):
@@ -3115,14 +2997,6 @@ class ExpenseCategoryDetailAPI(MethodView):
 # SALARY MANAGEMENT (whole-roster payroll view)
 # =====================================================================
 class PayrollStaffListAPI(MethodView):
-    """
-    GET /api/accounts/payroll/staff
-
-    Every teacher + non-teaching staff + admin with their salary setup
-    status attached, for the Salary Management section. Query params:
-    search, category ("teaching" | "non-teaching" | "admin" | ""),
-    setup ("set" | "not_set" | "").
-    """
 
     @login_required
     def get(self):
@@ -3190,13 +3064,6 @@ class PayrollStaffListAPI(MethodView):
 # PAYSLIPS (whole-roster view + bulk payroll run)
 # =====================================================================
 class PayslipsAllListAPI(MethodView):
-    """
-    GET /api/accounts/payslips
-
-    Every payslip school-wide, with the owning staff member's name
-    attached, for the Payslips section. Query params: month, year,
-    status, record_type.
-    """
 
     @login_required
     def get(self):
@@ -3263,14 +3130,6 @@ class PayslipsAllListAPI(MethodView):
 
 
 class RunPayrollAPI(MethodView):
-    """
-    POST /api/accounts/payroll/run
-
-    Bulk-generates a payslip for the given month/year for every staff
-    member who has a salary structure set up and doesn't already have
-    one for that period - the "Run Payroll" button, so accounts doesn't
-    have to open each person's modal individually every month.
-    """
 
     @login_required
     def post(self):
@@ -3366,9 +3225,7 @@ class RunPayrollAPI(MethodView):
 # BANK ACCOUNTS
 # =====================================================================
 def _bank_account_balance(account):
-    """opening_balance + every Income linked to this account - every
-    Expense linked to this account. Computed on read rather than
-    stored, so it's always correct against whatever transactions exist."""
+
     income = (
         db.session.query(func.coalesce(func.sum(AccountsTransaction.amount), 0))
         .filter(
@@ -3620,16 +3477,6 @@ class BankAccountDetailAPI(MethodView):
 # FINANCIAL REPORTS (fees + payroll + general ledger, combined)
 # =====================================================================
 class FinancialOverviewAPI(MethodView):
-    """
-    GET /api/accounts/financial-overview?month=&year=
-
-    The one number that "Net Balance" on the dashboard home couldn't
-    give honestly, because fees live in a separate table from the
-    general ledger: true revenue (fee collections + other income) vs
-    true cost (payroll + other expenses) for a period, plus a 6-month
-    combined trend.
-    """
-
     @login_required
     def get(self):
         _, access_error = authorize_accounts_admin("read")
@@ -3950,14 +3797,6 @@ def _require_super_admin():
 
 
 class AccountsActivityLogsAPI(MethodView):
-    """
-    GET /api/accounts/activity-logs
-
-    Every logged action taken by an Accounts Admin (admin_type =
-    "Accounts Admin"), newest first. Super-Admin-only - see
-    _require_super_admin() above. Query params: search, action
-    (exact match), admin_id, days (defaults to last 30).
-    """
 
     @login_required
     def get(self):

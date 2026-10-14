@@ -106,15 +106,6 @@ def _staff_row(staff):
 
 
 class AdminStaffListAPI(MethodView):
-    """
-    GET /api/admin/staff
-
-    Query params:
-      search   - matches name, staff code, email or mobile across all
-                 three tables
-      category - "teaching" | "non-teaching" | "admin" | "" (all)
-      status   - "Active" | "Inactive" | "Suspended" | "" (all)
-    """
 
     @permission_required("teachers", "view")
     def get(self):

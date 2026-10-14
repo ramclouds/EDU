@@ -96,6 +96,22 @@ def normalize_admin_rights(admin):
     return {item.strip().lower() for item in access_level.split(",") if item.strip()}
 
 
+def current_school_id():
+    """Caller's school. None for a legacy/unmigrated install (matches None)."""
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
+def scoped_get(model, pk):
+
+    if pk is None:
+        return None
+    try:
+        pk = int(pk)
+    except (TypeError, ValueError):
+        return None
+    return model.query.filter_by(id=pk, school_id=current_school_id()).first()
+
+
 def authorize_library_admin(required_right="read"):
     current_user = getattr(request, "user", None)
 
@@ -169,6 +185,10 @@ def authorize_library_admin(required_right="read"):
 class BookCategory(db.Model):
     __tablename__ = "book_categories"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(
         db.Integer,
         primary_key=True,
@@ -177,14 +197,12 @@ class BookCategory(db.Model):
     name = db.Column(
         db.String(CATEGORY_MAX_NAME_LENGTH),
         nullable=False,
-        unique=True,
         index=True,
     )
 
     slug = db.Column(
         db.String(120),
         nullable=False,
-        unique=True,
         index=True,
     )
 
@@ -281,6 +299,10 @@ class BookCategory(db.Model):
 class BookAuthor(db.Model):
     __tablename__ = "book_authors"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(
         db.Integer,
         primary_key=True,
@@ -289,14 +311,12 @@ class BookAuthor(db.Model):
     name = db.Column(
         db.String(AUTHOR_MAX_NAME_LENGTH),
         nullable=False,
-        unique=True,
         index=True,
     )
 
     slug = db.Column(
         db.String(180),
         nullable=False,
-        unique=True,
         index=True,
     )
 
@@ -392,6 +412,10 @@ class BookAuthor(db.Model):
 class Book(db.Model):
     __tablename__ = "books"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(
         db.Integer,
         primary_key=True,
@@ -399,7 +423,6 @@ class Book(db.Model):
 
     book_code = db.Column(
         db.String(30),
-        unique=True,
         nullable=True,
         index=True,
     )
@@ -444,7 +467,6 @@ class Book(db.Model):
 
     isbn = db.Column(
         db.String(30),
-        unique=True,
         nullable=True,
         index=True,
     )
@@ -574,6 +596,10 @@ class Book(db.Model):
 class BookIssue(db.Model):
     __tablename__ = "book_issues"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(
         db.Integer,
         primary_key=True,
@@ -635,6 +661,10 @@ class BookIssue(db.Model):
 
 class LibraryFinePayment(db.Model):
     __tablename__ = "library_fine_payments"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(
         db.Integer,
@@ -730,6 +760,10 @@ class LibraryFinePayment(db.Model):
 class TeacherBookIssue(db.Model):
     __tablename__ = "teacher_book_issues"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(
         db.Integer,
         primary_key=True,
@@ -813,6 +847,10 @@ class TeacherBookIssue(db.Model):
 
 class TeacherLibraryFinePayment(db.Model):
     __tablename__ = "teacher_library_fine_payments"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(
         db.Integer,
@@ -914,6 +952,10 @@ class TeacherLibraryFinePayment(db.Model):
 class StaffBookIssue(db.Model):
     __tablename__ = "staff_book_issues"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(
         db.Integer,
         primary_key=True,
@@ -999,6 +1041,9 @@ class AdminBookIssue(db.Model):
     __tablename__ = "admin_book_issues"
 
     id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     admin_id = db.Column(
         db.Integer,
@@ -1040,6 +1085,10 @@ class AdminBookIssue(db.Model):
 
 class StaffLibraryFinePayment(db.Model):
     __tablename__ = "staff_library_fine_payments"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(
         db.Integer,
@@ -1180,6 +1229,7 @@ def validate_category_payload(payload, category=None):
 
     if name:
         duplicate_query = BookCategory.query.filter(
+            BookCategory.school_id == current_school_id(),
             func.lower(BookCategory.name) == name.lower(),
             BookCategory.is_deleted.is_(False),
         )
@@ -1244,9 +1294,13 @@ class LibraryCategoryListAPI(MethodView):
                     db.and_(
                         Book.category_id == BookCategory.id,
                         Book.is_deleted.is_(False),
+                        Book.school_id == current_school_id(),
                     ),
                 )
-                .filter(BookCategory.is_deleted.is_(False))
+                .filter(
+                    BookCategory.is_deleted.is_(False),
+                    BookCategory.school_id == current_school_id(),
+                )
                 .group_by(BookCategory.id)
             )
 
@@ -1404,6 +1458,7 @@ class LibraryCategoryListAPI(MethodView):
 
             category = BookCategory(
                 **category_data,
+                school_id=current_school_id(),
                 created_by=str(
                     getattr(
                         current_admin,
@@ -1487,6 +1542,7 @@ class LibraryCategoryDetailAPI(MethodView):
             return access_error
 
         category = BookCategory.query.filter(
+            BookCategory.school_id == current_school_id(),
             BookCategory.id == category_id,
             BookCategory.is_deleted.is_(False),
         ).first()
@@ -1520,6 +1576,7 @@ class LibraryCategoryDetailAPI(MethodView):
             return access_error
 
         category = BookCategory.query.filter(
+            BookCategory.school_id == current_school_id(),
             BookCategory.id == category_id,
             BookCategory.is_deleted.is_(False),
         ).first()
@@ -1646,6 +1703,7 @@ class LibraryCategoryDetailAPI(MethodView):
             return access_error
 
         category = BookCategory.query.filter(
+            BookCategory.school_id == current_school_id(),
             BookCategory.id == category_id,
             BookCategory.is_deleted.is_(False),
         ).first()
@@ -1750,6 +1808,7 @@ class LibraryCategoryStatusAPI(MethodView):
             return access_error
 
         category = BookCategory.query.filter(
+            BookCategory.school_id == current_school_id(),
             BookCategory.id == category_id,
             BookCategory.is_deleted.is_(False),
         ).first()
@@ -1890,16 +1949,6 @@ def get_student_full_name(student):
 
 
 def get_student_academic_details(student):
-    """
-    Load the student's current academic assignment from
-    studentDetails.py models.
-
-    Student
-        -> StudentAcademicRecord
-        -> AcademicClass
-        -> Batch / Division / Section
-    """
-
     academic_record = (
         db.session.query(StudentAcademicRecord)
         .filter(
@@ -2265,6 +2314,7 @@ def validate_author_payload(payload, author=None):
 
     if name:
         duplicate_query = BookAuthor.query.filter(
+            BookAuthor.school_id == current_school_id(),
             func.lower(BookAuthor.name) == name.lower(),
             BookAuthor.is_deleted.is_(False),
         )
@@ -2330,9 +2380,13 @@ class LibraryAuthorListAPI(MethodView):
                     db.and_(
                         Book.author_id == BookAuthor.id,
                         Book.is_deleted.is_(False),
+                        Book.school_id == current_school_id(),
                     ),
                 )
-                .filter(BookAuthor.is_deleted.is_(False))
+                .filter(
+                    BookAuthor.is_deleted.is_(False),
+                    BookAuthor.school_id == current_school_id(),
+                )
                 .group_by(BookAuthor.id)
             )
 
@@ -2507,6 +2561,7 @@ class LibraryAuthorListAPI(MethodView):
 
             author = BookAuthor(
                 **author_data,
+                school_id=current_school_id(),
                 created_by=admin_reference,
                 updated_by=admin_reference,
             )
@@ -2580,6 +2635,7 @@ class LibraryAuthorDetailAPI(MethodView):
             return access_error
 
         author = BookAuthor.query.filter(
+            BookAuthor.school_id == current_school_id(),
             BookAuthor.id == author_id,
             BookAuthor.is_deleted.is_(False),
         ).first()
@@ -2613,6 +2669,7 @@ class LibraryAuthorDetailAPI(MethodView):
             return access_error
 
         author = BookAuthor.query.filter(
+            BookAuthor.school_id == current_school_id(),
             BookAuthor.id == author_id,
             BookAuthor.is_deleted.is_(False),
         ).first()
@@ -2745,6 +2802,7 @@ class LibraryAuthorDetailAPI(MethodView):
             return access_error
 
         author = BookAuthor.query.filter(
+            BookAuthor.school_id == current_school_id(),
             BookAuthor.id == author_id,
             BookAuthor.is_deleted.is_(False),
         ).first()
@@ -2865,6 +2923,7 @@ class LibraryAuthorStatusAPI(MethodView):
             return access_error
 
         author = BookAuthor.query.filter(
+            BookAuthor.school_id == current_school_id(),
             BookAuthor.id == author_id,
             BookAuthor.is_deleted.is_(False),
         ).first()
@@ -3007,6 +3066,14 @@ def validate_book_payload(data):
         if author_id <= 0:
             raise ValueError
 
+        # The author must exist in THIS school. A positive integer alone
+        # let a book be filed under another school's author.
+        if not BookAuthor.query.filter(
+            BookAuthor.id == author_id,
+            BookAuthor.school_id == current_school_id(),
+        ).first():
+            raise ValueError
+
     except (TypeError, ValueError):
         author_id = None
         errors["author_id"] = "Please select a valid author"
@@ -3015,6 +3082,13 @@ def validate_book_payload(data):
         category_id = int(category_id)
 
         if category_id <= 0:
+            raise ValueError
+
+        # The category must exist in THIS school (same reason as author).
+        if not BookCategory.query.filter(
+            BookCategory.id == category_id,
+            BookCategory.school_id == current_school_id(),
+        ).first():
             raise ValueError
 
     except (TypeError, ValueError):
@@ -3227,7 +3301,10 @@ class LibraryBookListAPI(MethodView):
                 request.args.get("sort_direction") or "desc"
             ).lower()
 
-            query = Book.query.filter(Book.is_deleted.is_(False))
+            query = Book.query.filter(
+                Book.is_deleted.is_(False),
+                Book.school_id == current_school_id(),
+            )
 
             if search:
                 search_term = f"%{search}%"
@@ -3466,6 +3543,7 @@ class LibraryBookListAPI(MethodView):
 
             if book_data["isbn"]:
                 existing_isbn = Book.query.filter(
+                    Book.school_id == current_school_id(),
                     func.lower(Book.isbn) == book_data["isbn"].lower(),
                     Book.is_deleted.is_(False),
                 ).first()
@@ -3500,6 +3578,7 @@ class LibraryBookListAPI(MethodView):
             )
 
             book = Book(
+                school_id=current_school_id(),
                 title=book_data["title"],
                 author_id=book_data["author_id"],
                 # Maintain old readable field.
@@ -3693,10 +3772,7 @@ class StudentLibraryAPI(MethodView):
                 400,
             )
 
-        student = db.session.get(
-            Student,
-            student_id,
-        )
+        student = scoped_get(Student, student_id)
 
         if not student:
             return (
@@ -3778,10 +3854,7 @@ class LibraryStudentFinePaymentAPI(MethodView):
         if access_error:
             return access_error
 
-        student = db.session.get(
-            Student,
-            student_id,
-        )
+        student = scoped_get(Student, student_id)
 
         if not student:
             return (
@@ -3822,7 +3895,8 @@ class LibraryStudentFinePaymentAPI(MethodView):
                 issue_id = int(issue_id)
 
                 issue = BookIssue.query.filter(
-                    BookIssue.id == issue_id,
+                    BookIssue.school_id == current_school_id(),
+            BookIssue.id == issue_id,
                     BookIssue.student_id == student_id,
                 ).first()
 
@@ -3866,6 +3940,7 @@ class LibraryStudentFinePaymentAPI(MethodView):
             )
 
         payment = LibraryFinePayment(
+            school_id=current_school_id(),
             student_id=student_id,
             book_issue_id=(issue.id if issue else None),
             amount=amount,
@@ -4467,6 +4542,7 @@ class LibraryBookDetailAPI(MethodView):
             return access_error
 
         book = Book.query.filter(
+            Book.school_id == current_school_id(),
             Book.id == book_id,
             Book.is_deleted.is_(False),
         ).first()
@@ -4500,6 +4576,7 @@ class LibraryBookDetailAPI(MethodView):
             return access_error
 
         book = Book.query.filter(
+            Book.school_id == current_school_id(),
             Book.id == book_id,
             Book.is_deleted.is_(False),
         ).first()
@@ -4566,6 +4643,7 @@ class LibraryBookDetailAPI(MethodView):
 
             if book_data["isbn"]:
                 existing_isbn = Book.query.filter(
+                    Book.school_id == current_school_id(),
                     func.lower(Book.isbn) == book_data["isbn"].lower(),
                     Book.id != book.id,
                     Book.is_deleted.is_(False),
@@ -4664,6 +4742,7 @@ class LibraryBookDetailAPI(MethodView):
             return access_error
 
         book = Book.query.filter(
+            Book.school_id == current_school_id(),
             Book.id == book_id,
             Book.is_deleted.is_(False),
         ).first()
@@ -4740,6 +4819,7 @@ class LibraryBookStatusAPI(MethodView):
             return access_error
 
         book = Book.query.filter(
+            Book.school_id == current_school_id(),
             Book.id == book_id,
             Book.is_deleted.is_(False),
         ).first()
@@ -5393,10 +5473,7 @@ def serialize_circulation_issue(
     )
 
     member = (
-        db.session.get(
-            member_model,
-            member_id,
-        )
+        scoped_get(member_model, member_id)
         if member_model and member_id
         else None
     )
@@ -6150,10 +6227,7 @@ class LibraryTeacherDetailsAPI(MethodView):
         if access_error:
             return access_error
 
-        teacher = db.session.get(
-            Teacher,
-            teacher_id,
-        )
+        teacher = scoped_get(Teacher, teacher_id)
 
         if not teacher:
             return (
@@ -6236,10 +6310,7 @@ class LibraryTeacherFinePaymentAPI(MethodView):
         if access_error:
             return access_error
 
-        teacher = db.session.get(
-            Teacher,
-            teacher_id,
-        )
+        teacher = scoped_get(Teacher, teacher_id)
 
         if not teacher:
             return (
@@ -6324,6 +6395,7 @@ class LibraryTeacherFinePaymentAPI(MethodView):
             )
 
         payment = TeacherLibraryFinePayment(
+            school_id=current_school_id(),
             teacher_id=teacher_id,
             book_issue_id=(issue.id if issue else None),
             amount=amount,
@@ -6937,7 +7009,7 @@ class LibraryCirculationAPI(MethodView):
                     )
                     continue
 
-                query = issue_model.query
+                query = issue_model.query.filter(issue_model.school_id == current_school_id())
 
                 if parsed_date_from:
                     query = query.filter(issue_model.issue_date >= parsed_date_from)
@@ -7415,10 +7487,7 @@ class LibraryCirculationAPI(MethodView):
                 errors["member_type"] = "Invalid member type"
 
             else:
-                member = db.session.get(
-                    member_model,
-                    member_id,
-                )
+                member = scoped_get(member_model, member_id)
 
                 if not member:
                     errors["member_id"] = "Selected member " "not found"
@@ -7447,7 +7516,8 @@ class LibraryCirculationAPI(MethodView):
         if book_id:
             book = (
                 Book.query.filter(
-                    Book.id == book_id,
+                    Book.school_id == current_school_id(),
+            Book.id == book_id,
                     Book.is_deleted.is_(False),
                 )
                 .with_for_update()
@@ -7529,6 +7599,8 @@ class LibraryCirculationAPI(MethodView):
             )
 
         issue_data = {
+
+            "school_id": current_school_id(),
             member_field: member.id,
             "book_id": book.id,
             "issue_date": issue_date,
@@ -7800,7 +7872,7 @@ class LibraryReturnBookAPI(MethodView):
             )
 
         issue = (
-            issue_model.query.filter(issue_model.id == issue_id)
+            issue_model.query.filter(issue_model.school_id == current_school_id(), issue_model.id == issue_id)
             .with_for_update()
             .first()
         )
@@ -7990,6 +8062,8 @@ class LibraryReturnBookAPI(MethodView):
                 payment_status = "Collected" if fine_action == "collect" else "Waived"
 
                 payment_data = {
+
+                    "school_id": current_school_id(),
                     payment_member_field: (member_id),
                     "book_issue_id": (issue.id),
                     "amount": fine_amount,
@@ -8520,7 +8594,7 @@ class LibraryCirculationReturnAPI(MethodView):
         issue_model = get_issue_model(member_type)
 
         issue = (
-            issue_model.query.filter(issue_model.id == issue_id)
+            issue_model.query.filter(issue_model.school_id == current_school_id(), issue_model.id == issue_id)
             .with_for_update()
             .first()
         )
@@ -8809,10 +8883,7 @@ def serialize_library_fine(
     )
 
     member = (
-        db.session.get(
-            member_model,
-            member_id,
-        )
+        scoped_get(member_model, member_id)
         if member_id
         else None
     )
@@ -9221,7 +9292,7 @@ class LibraryFinesAPI(MethodView):
 
                 issue_model = configuration["issue_model"]
 
-                query = issue_model.query
+                query = issue_model.query.filter(issue_model.school_id == current_school_id())
 
                 # Only include records that
                 # actually generated a fine.
@@ -9625,7 +9696,7 @@ class LibraryFineActionAPI(MethodView):
         issue_member_field = configuration["member_field"]
 
         issue = (
-            issue_model.query.filter(issue_model.id == issue_id)
+            issue_model.query.filter(issue_model.school_id == current_school_id(), issue_model.id == issue_id)
             .with_for_update()
             .first()
         )
@@ -9759,6 +9830,8 @@ class LibraryFineActionAPI(MethodView):
         )
 
         payment_data = {
+
+            "school_id": current_school_id(),
             payment_member_field: (member_id),
             "book_issue_id": issue.id,
             "amount": amount,
@@ -10016,7 +10089,7 @@ class LibraryTransactionsAPI(MethodView):
 
                 payment_model = configuration["payment_model"]
 
-                query = payment_model.query
+                query = payment_model.query.filter(payment_model.school_id == current_school_id())
 
                 if parsed_date_from:
                     start_datetime = datetime.combine(
@@ -10561,7 +10634,7 @@ class LibraryReportsAPI(MethodView):
                 if issue_model is None:
                     continue
 
-                query = issue_model.query
+                query = issue_model.query.filter(issue_model.school_id == current_school_id())
 
                 if parsed_date_from:
                     query = query.filter(issue_model.issue_date >= parsed_date_from)
@@ -10877,7 +10950,7 @@ class LibraryReportsAPI(MethodView):
 
                 issue_model = configuration["issue_model"]
 
-                query = issue_model.query
+                query = issue_model.query.filter(issue_model.school_id == current_school_id())
 
                 if parsed_date_from:
                     query = query.filter(issue_model.issue_date >= parsed_date_from)
@@ -11271,7 +11344,7 @@ class LibraryDashboardAPI(MethodView):
                 if issue_model is None:
                     continue
 
-                issues = issue_model.query.order_by(issue_model.id.desc()).all()
+                issues = issue_model.query.filter(issue_model.school_id == current_school_id()).order_by(issue_model.id.desc()).all()
 
                 for issue in issues:
                     circulation_rows.append(
@@ -11356,7 +11429,7 @@ class LibraryDashboardAPI(MethodView):
 
                 issue_model = configuration["issue_model"]
 
-                issues = issue_model.query.all()
+                issues = issue_model.query.filter(issue_model.school_id == current_school_id()).all()
 
                 for issue in issues:
                     fine = serialize_library_fine(
@@ -11546,7 +11619,7 @@ class LibraryDashboardAPI(MethodView):
                 member_field = configuration["payment_member_field"]
 
                 payments = (
-                    payment_model.query.order_by(payment_model.collected_at.desc())
+                    payment_model.query.filter(payment_model.school_id == current_school_id()).order_by(payment_model.collected_at.desc())
                     .limit(10)
                     .all()
                 )
@@ -11559,10 +11632,7 @@ class LibraryDashboardAPI(MethodView):
                     )
 
                     member = (
-                        db.session.get(
-                            member_model,
-                            member_id,
-                        )
+                        scoped_get(member_model, member_id)
                         if member_id
                         else None
                     )

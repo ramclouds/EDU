@@ -29,20 +29,6 @@ def _current_school_id():
 
 
 class StudentEnrollmentOptionsAPI(MethodView):
-    """
-    Feeds the "Enroll Student" form's Batch/Division/Section/Class
-    dropdowns.
-
-    BUG FIX: this used to auto-create a batch plus a hardcoded set of
-    divisions ("1st".."10th") and sections ("A".."D") on every single
-    GET request - a read request silently writing to the database, and
-    worse, injecting made-up grade/section names that could collide
-    with whatever the school actually configured via Academic Setup
-    (Divisions & Sections / Academic Years). This now only reads
-    what's already been configured there. If nothing has been set up
-    yet, the frontend shows a clear "set up Academic Setup first"
-    prompt instead of silently fabricating data.
-    """
 
     @permission_required("academic", "view")
     def get(self):

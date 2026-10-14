@@ -14,6 +14,16 @@ import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
 import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
 import { useAdminManagement } from "../controllers/AdminSide/useAdminManagement";
 import CreateAdminModal from "../components/CreateAdminModal";
+import {
+  StaffSection,
+  NoticesSection,
+  FeesSection,
+  PayrollSection,
+  ReportsSection,
+  AnalyticsSection,
+  ParentsSection,
+  EventsSection,
+} from "../components/SuperAdminSections";
 import { useAssets } from "../controllers/Assets/useAssets";
 import { useLeaveManagement } from "../controllers/academic/useLeaveManagement";
 import { useStudentEnrollment } from "../controllers/Academic/useStudentEnrollment";
@@ -4307,6 +4317,15 @@ function AdminDashboard() {
             </div>
           </section>
         )}
+
+        {activeSection === "staff" && <StaffSection />}
+        {activeSection === "notices" && <NoticesSection />}
+        {activeSection === "fees" && <FeesSection />}
+        {activeSection === "payroll" && <PayrollSection />}
+        {activeSection === "reports" && <ReportsSection />}
+        {activeSection === "analytics" && <AnalyticsSection />}
+        {activeSection === "parents" && <ParentsSection />}
+        {activeSection === "events" && <EventsSection />}
 
         {activeSection === "settings" && (
           <SettingsPanel

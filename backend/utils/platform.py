@@ -1,37 +1,34 @@
-"""
-Platform / multi-tenancy layer.
-
-Introduces the concept of a School (tenant) and a Developer (platform
-owner — you, the person selling this to multiple schools). Every school
-gets a unique `school_code` that its own Admins/Teachers/Students/Staff
-use to log in, so the same running instance of this app can serve many
-schools while keeping their data apart.
-
-This is Phase 1 of the multi-tenancy retrofit: it establishes the School
-entity, the Developer role, and school_id on the identity tables
-(Admin/Teacher/Student/NonTeachingStaff) — the layer that gates who can
-log into which school. It deliberately does NOT yet touch the ~70
-remaining domain tables (classes, attendance, exams, library, hostel,
-payroll, timetable, notifications, RBAC roles, ...) — those still need
-school_id added and every query scoped by it, table-by-table, as a
-follow-up. Until that's done, a school's *identity/login* is isolated,
-but records in those other tables are not yet — do not treat this as
-complete tenant isolation.
-"""
-
 import logging
 import secrets
 import string
 import uuid
 from datetime import datetime, timedelta
 
-from flask import jsonify, request
+import math
+import os
+
+from flask import current_app, jsonify, request
+from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
 
 from utils.auth import Admin, Student, Teacher, TOKEN_EXPIRY_HOURS, bcrypt, db
 
 logger = logging.getLogger(__name__)
+
+SCHOOL_PLANS = ("Trial", "Basic", "Pro", "Enterprise")
+
+
+def parse_subscription_end(value):
+    if not isinstance(value, str):
+        return None
+    try:
+        day = datetime.strptime(value.strip(), "%Y-%m-%d")
+    except ValueError:
+        return None
+    end = day.replace(hour=23, minute=59, second=59)
+    return end if end > datetime.utcnow() else None
 
 
 # =========================================================
@@ -44,6 +41,10 @@ class School(db.Model):
 
     # Human-entered at login by every user belonging to this school.
     school_code = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    # Name of this school's database. Derived from TENANT_DB_PREFIX and the
+    # school code at creation. Recorded so operators can see and manage the
+    # tenant's database; see migrations for the physical-database caveat.
+    database_name = db.Column(db.String(64), unique=True, nullable=True, index=True)
     name = db.Column(db.String(200), nullable=False)
 
     contact_email = db.Column(db.String(120))
@@ -70,15 +71,25 @@ class School(db.Model):
     trial_ends_at = db.Column(db.DateTime)
     subscription_ends_at = db.Column(db.DateTime)
 
-    # Soft-delete/archive rather than hard-delete — a school's data
-    # (and its customer relationship) is too costly to lose to a
-    # misclick.
     is_archived = db.Column(db.Boolean, default=False, nullable=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def refresh_status(self, now=None):
+
+        now = now or datetime.utcnow()
+        if self.is_archived or self.status in ("Suspended", "Expired"):
+            return False
+        if self.status == "Trial" and self.trial_ends_at and now > self.trial_ends_at:
+            self.status = "Expired"
+            return True
+        if self.status == "Active" and self.subscription_ends_at and now > self.subscription_ends_at:
+            self.status = "Expired"
+            return True
+        return False
+
     def is_login_allowed(self):
-        if self.is_archived or self.status == "Suspended":
+        if self.is_archived or self.status in ("Suspended", "Expired"):
             return False
         if self.status == "Trial" and self.trial_ends_at:
             if datetime.utcnow() > self.trial_ends_at:
@@ -92,6 +103,7 @@ class School(db.Model):
         data = {
             "id": self.id,
             "school_code": self.school_code,
+            "database_name": self.database_name,
             "name": self.name,
             "contact_email": self.contact_email,
             "contact_phone": self.contact_phone,
@@ -113,8 +125,9 @@ class School(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
         if include_counts:
+            # Only enrolled (Active) students count toward the plan limit.
             data["student_count"] = Student.query.filter_by(
-                school_id=self.id
+                school_id=self.id, status="Active"
             ).count()
             data["staff_count"] = (
                 Admin.query.filter_by(school_id=self.id).count()
@@ -123,9 +136,18 @@ class School(db.Model):
         return data
 
 
+def refresh_all_schools():
+    """Persist any Trial/Active schools whose dates have passed as Expired."""
+    changed = False
+    for s in School.query.all():
+        if s.refresh_status():
+            changed = True
+    if changed:
+        db.session.commit()
+
+
 def generate_school_code():
-    """SCH-XXXXXX, retried until unique. Short enough to type at login,
-    long enough (36^6 ≈ 2.2B combinations) that codes aren't guessable."""
+
     alphabet = string.ascii_uppercase + string.digits
     for _ in range(20):
         code = "SCH-" + "".join(secrets.choice(alphabet) for _ in range(6))
@@ -138,12 +160,6 @@ def generate_school_code():
 # DEVELOPER (PLATFORM OWNER)
 # =========================================================
 class Developer(db.Model):
-    """The platform owner / product seller — you. Not tied to any
-    school; sits above the whole RBAC system, which is itself scoped
-    per-school. Deliberately a separate table/login from Admin so a
-    school's own Super Admin can never accidentally end up with
-    platform-wide reach."""
-
     __tablename__ = "developers"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -177,10 +193,6 @@ class Developer(db.Model):
 
 
 def developer_required(view_func):
-    """Auth guard for platform-owner-only endpoints. Deliberately
-    separate from utils.auth_middleware.login_required, which resolves
-    Admin/Teacher/Student/Staff — a Developer token must never satisfy a
-    school-scoped endpoint, and vice versa."""
 
     from functools import wraps
 
@@ -275,13 +287,12 @@ class SchoolListCreateAPI(MethodView):
     decorators = [developer_required]
 
     def get(self):
+        refresh_all_schools()
         schools = School.query.order_by(School.created_at.desc()).all()
         return jsonify([s.to_dict(include_counts=True) for s in schools]), 200
 
     def post(self):
-        """Creates a school AND its first Super Admin in one step, so
-        onboarding a paying customer needs no manual DB work — you get
-        a school_code + that admin's login to hand to the customer."""
+
         data = request.get_json(silent=True) or {}
 
         name = (data.get("name") or "").strip()
@@ -327,6 +338,7 @@ class SchoolListCreateAPI(MethodView):
                     else None
                 ),
             )
+            school.database_name = tenant_database_name(school.school_code)
             db.session.add(school)
             db.session.flush()  # get school.id before creating the admin
 
@@ -352,6 +364,7 @@ class SchoolListCreateAPI(MethodView):
             )
             db.session.add(first_admin)
             db.session.commit()
+            audit("school.create", school=school, detail=f"plan={school.plan}")
 
             return (
                 jsonify(
@@ -380,7 +393,9 @@ class SchoolDetailAPI(MethodView):
         school = School.query.get(school_id)
         if not school:
             return jsonify({"error": "School not found"}), 404
-        return jsonify(school.to_dict(include_counts=True)), 200
+        if school.refresh_status():
+            db.session.commit()
+        return jsonify(school_detail(school)), 200
 
     def put(self, school_id):
         school = School.query.get(school_id)
@@ -403,6 +418,7 @@ class SchoolDetailAPI(MethodView):
 
         try:
             db.session.commit()
+            audit("school.update", school=school, detail=", ".join(sorted(k for k in data.keys() if k in {"name","contact_email","contact_phone","address","logo_url","plan","max_students","max_staff"})))
             return jsonify({"message": "School updated", "school": school.to_dict()}), 200
         except SQLAlchemyError:
             db.session.rollback()
@@ -411,10 +427,6 @@ class SchoolDetailAPI(MethodView):
 
 
 class SchoolStatusAPI(MethodView):
-    """Suspend / reactivate / archive a school. Split from the general
-    update endpoint since this is the single most consequential action
-    a Developer can take (it locks every user at that school out) and
-    deserves its own explicit, auditable action."""
 
     decorators = [developer_required]
 
@@ -426,25 +438,43 @@ class SchoolStatusAPI(MethodView):
         data = request.get_json(silent=True) or {}
         action = data.get("action")
 
-        if action not in ("suspend", "reactivate", "archive"):
-            return (
-                jsonify(
-                    {"error": "action must be one of: suspend, reactivate, archive"}
-                ),
-                400,
-            )
+        if action not in ("suspend", "reactivate", "archive", "activate"):
+            return jsonify({"error": "action must be one of: suspend, reactivate, archive, activate"}), 400
 
+        now = datetime.utcnow()
         if action == "suspend":
             school.status = "Suspended"
-        elif action == "reactivate":
-            school.status = "Active"
-            school.is_archived = False
         elif action == "archive":
             school.is_archived = True
             school.status = "Suspended"
+        elif action == "reactivate":
+            # Restore the status the school can legitimately have. A school
+            # whose trial or subscription has ended cannot be reactivated
+            # into Active, which would let it run without paying.
+            if school.subscription_ends_at:
+                if now > school.subscription_ends_at:
+                    return jsonify({"error": "The subscription ended on %s. Activate a subscription with a future end date instead." % school.subscription_ends_at.date().isoformat()}), 400
+                school.status = "Active"
+            elif school.trial_ends_at and now <= school.trial_ends_at:
+                school.status = "Trial"
+            else:
+                return jsonify({"error": "The trial has ended. Extend the trial or activate a subscription."}), 400
+            school.is_archived = False
+        elif action == "activate":
+            end = parse_subscription_end(data.get("subscription_ends_at"))
+            if end is None:
+                return jsonify({"error": "subscription_ends_at must be a date (YYYY-MM-DD) in the future"}), 400
+            plan = data.get("plan") or school.plan
+            if plan not in SCHOOL_PLANS:
+                return jsonify({"error": "plan must be one of: " + ", ".join(SCHOOL_PLANS)}), 400
+            school.plan = plan
+            school.subscription_ends_at = end
+            school.status = "Active"
+            school.is_archived = False
 
         try:
             db.session.commit()
+            audit(f"school.{action}", school=school, detail=(f"plan={school.plan} ends={school.subscription_ends_at.date().isoformat()}" if action == "activate" else None))
             logger.info(
                 "School %s (%s) -> %s by developer_id=%s",
                 school.school_code,
@@ -463,11 +493,13 @@ class PlatformStatsAPI(MethodView):
     decorators = [developer_required]
 
     def get(self):
+        refresh_all_schools()
         total_schools = School.query.filter_by(is_archived=False).count()
+        expired_schools = School.query.filter_by(status="Expired").count()
         active_schools = School.query.filter_by(status="Active").count()
         trial_schools = School.query.filter_by(status="Trial").count()
         suspended_schools = School.query.filter_by(status="Suspended").count()
-        total_students = Student.query.count()
+        total_students = Student.query.filter_by(status="Active").count()
         total_staff = Admin.query.count() + Teacher.query.count()
 
         return (
@@ -477,9 +509,256 @@ class PlatformStatsAPI(MethodView):
                     "active_schools": active_schools,
                     "trial_schools": trial_schools,
                     "suspended_schools": suspended_schools,
+                    "expired_schools": expired_schools,
                     "total_students": total_students,
                     "total_staff": total_staff,
                 }
             ),
             200,
         )
+
+
+# =========================================================
+# DEVELOPER AUDIT LOG
+# Every platform-level action a developer takes is recorded here, so there is
+# a trail for support, billing disputes and accountability.
+# =========================================================
+class DeveloperAuditLog(db.Model):
+    __tablename__ = "developer_audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    developer_id = db.Column(db.Integer, index=True)
+    developer_username = db.Column(db.String(50))
+    action = db.Column(db.String(60), nullable=False, index=True)
+    school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True)
+    school_name = db.Column(db.String(200))
+    detail = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "developer": self.developer_username,
+            "action": self.action,
+            "school_id": self.school_id,
+            "school_name": self.school_name,
+            "detail": self.detail,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+def audit(action, school=None, detail=None):
+
+    try:
+        dev = getattr(request, "developer", None)
+        entry = DeveloperAuditLog(
+            developer_id=getattr(dev, "id", None),
+            developer_username=getattr(dev, "username", None),
+            action=action,
+            school_id=getattr(school, "id", None),
+            school_name=getattr(school, "name", None),
+            detail=detail,
+        )
+        db.session.add(entry)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Failed to write developer audit entry: %s", action)
+
+
+def tenant_database_name(school_code):
+    """e.g. TENANT_DB_PREFIX=edu, code SCH-A1B2C3 -> edu_sch_a1b2c3."""
+    prefix = (os.getenv("TENANT_DB_PREFIX") or "edu").strip().lower()
+    suffix = school_code.lower().replace("-", "_")
+    return f"{prefix}_{suffix}"[:64]
+
+
+def school_detail(school):
+    """The full view of one school for the developer's detail panel."""
+    from utils.Notifications import ActivityLog  # local: avoids import cycle
+
+    data = school.to_dict(include_counts=True)
+
+    admins = Admin.query.filter_by(school_id=school.id, is_deleted=False).all()
+    data["admins"] = [
+        {
+            "id": a.id,
+            "name": f"{a.first_name or ''} {a.last_name or ''}".strip(),
+            "username": a.username,
+            "email": a.email,
+            "admin_type": a.admin_type,
+            "role": a.role,
+            "status": a.status,
+        }
+        for a in admins
+    ]
+
+    now = datetime.utcnow()
+
+    if school.status == "Trial" and school.trial_ends_at:
+        remaining = (school.trial_ends_at - now).total_seconds()
+        data["trial_days_left"] = max(0, math.ceil(remaining / 86400))
+    else:
+        data["trial_days_left"] = None
+    data["login_allowed"] = school.is_login_allowed()
+
+    students_used = data.get("student_count") or 0
+    staff_used = data.get("staff_count") or 0
+    data["usage"] = {
+        "students_pct": round(100 * students_used / school.max_students, 1) if school.max_students else None,
+        "staff_pct": round(100 * staff_used / school.max_staff, 1) if school.max_staff else None,
+    }
+    data["near_student_limit"] = bool(
+        school.max_students and students_used >= 0.9 * school.max_students
+    )
+
+    data["recent_activity_count"] = ActivityLog.query.filter_by(school_id=school.id).count()
+    return data
+
+
+class PlatformInfoAPI(MethodView):
+    """Where this deployment's database lives, and whether it answers.
+    The password is never returned."""
+
+    decorators = [developer_required]
+
+    def get(self):
+        uri = current_app.config.get("SQLALCHEMY_DATABASE_URI") or ""
+        try:
+            url = make_url(uri)
+            database = {
+                "engine": url.get_backend_name(),
+                "name": url.database,
+                "host": url.host,
+                "port": url.port,
+                "user": url.username,
+                "dsn": url.render_as_string(hide_password=True),
+            }
+        except Exception:
+            database = {"engine": None, "name": None, "host": None, "port": None,
+                        "user": None, "dsn": "unparseable"}
+
+        try:
+            db.session.execute(text("SELECT 1"))
+            database["reachable"] = True
+        except SQLAlchemyError:
+            db.session.rollback()
+            database["reachable"] = False
+
+        return jsonify({
+            "database": database,
+            "tenant_db_prefix": (os.getenv("TENANT_DB_PREFIX") or "edu").strip().lower(),
+            "app": {
+                "env": os.getenv("FLASK_ENV", "development"),
+                "token_expiry_hours": TOKEN_EXPIRY_HOURS,
+                "cors_origins": os.getenv("CORS_ORIGINS", "http://localhost:5173"),
+            },
+            "totals": {
+                "schools": School.query.count(),
+                "developers": Developer.query.count(),
+                "students": Student.query.count(),
+                "staff": Admin.query.count() + Teacher.query.count(),
+            },
+        }), 200
+
+
+class SchoolActivityAPI(MethodView):
+    decorators = [developer_required]
+
+    def get(self, school_id):
+        from utils.Notifications import ActivityLog  # local: avoids import cycle
+
+        school = School.query.get(school_id)
+        if not school:
+            return jsonify({"error": "School not found"}), 404
+        limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+        rows = (
+            ActivityLog.query.filter_by(school_id=school.id)
+            .order_by(ActivityLog.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return jsonify({"success": True, "activity": [
+            {
+                "id": r.id,
+                "role": r.role,
+                "action": r.action,
+                "description": r.description,
+                "time": r.created_at.isoformat() if r.created_at else None,
+            } for r in rows
+        ]}), 200
+
+
+class ExtendTrialAPI(MethodView):
+    decorators = [developer_required]
+
+    def post(self, school_id):
+        school = School.query.get(school_id)
+        if not school:
+            return jsonify({"error": "School not found"}), 404
+        data = request.get_json(silent=True) or {}
+        try:
+            days = int(data.get("days"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "days must be a whole number"}), 400
+        if not 1 <= days <= 365:
+            return jsonify({"error": "days must be between 1 and 365"}), 400
+
+        if school.subscription_ends_at and school.status == "Expired":
+            return jsonify({"error": "This school's subscription has ended. Activate a subscription instead of extending the trial."}), 400
+        now = datetime.utcnow()
+        base = school.trial_ends_at if school.trial_ends_at and school.trial_ends_at > now else now
+        school.trial_ends_at = base + timedelta(days=days)
+        if school.status == "Expired":
+            school.status = "Trial"
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500
+        audit("school.extend_trial", school=school, detail=f"+{days} days")
+        return jsonify({"message": f"Trial extended by {days} days", "school": school_detail(school)}), 200
+
+
+class ResetAdminPasswordAPI(MethodView):
+    """Support action: set a new password for one of a school's admins.
+    The password itself is never written to the audit log."""
+
+    decorators = [developer_required]
+
+    def post(self, school_id):
+        school = School.query.get(school_id)
+        if not school:
+            return jsonify({"error": "School not found"}), 404
+        data = request.get_json(silent=True) or {}
+        new_password = data.get("new_password") or ""
+        if len(new_password) < 8:
+            return jsonify({"error": "new_password must be at least 8 characters"}), 400
+        admin = Admin.query.filter_by(id=data.get("admin_id"), school_id=school.id).first()
+        if not admin:
+            return jsonify({"error": "Admin not found in this school"}), 404
+
+        admin.password = bcrypt.generate_password_hash(new_password).decode("utf-8")
+        admin.auth_token = None
+        admin.token_expires_at = None
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500
+        audit("school.reset_admin_password", school=school, detail=f"admin={admin.username}")
+        return jsonify({"message": "Password reset. The admin has been signed out everywhere."}), 200
+
+
+class DeveloperAuditAPI(MethodView):
+    decorators = [developer_required]
+
+    def get(self):
+        limit = min(max(int(request.args.get("limit", 100)), 1), 500)
+        school_id = request.args.get("school_id", type=int)
+        query = DeveloperAuditLog.query
+        if school_id:
+            query = query.filter_by(school_id=school_id)
+        rows = query.order_by(DeveloperAuditLog.created_at.desc()).limit(limit).all()
+        return jsonify({"success": True, "entries": [r.to_dict() for r in rows]}), 200
+

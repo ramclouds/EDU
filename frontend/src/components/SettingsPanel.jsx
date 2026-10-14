@@ -1,23 +1,5 @@
 import { useState } from "react";
 
-/**
- * Shared Settings section for every dashboard.
- *
- * The "Settings" sidebar item existed in every dashboard's menu already
- * (key: "settings", icon: bi-gear) but there was no
- * `activeSection === "settings"` block anywhere to render — clicking it
- * did nothing. This fills that gap with real, working functionality
- * built on top of state each dashboard already has (no new backend
- * endpoints invented, no decorative "coming soon" left behind):
- *
- *   - Appearance: the dashboard's existing dark-mode toggle (useDashboardUI)
- *   - Security: opens the existing change-password modal
- *   - Session: the existing logout handler
- *   - Account: read-only summary of who's signed in
- *
- * One component, used by all 7 dashboards, so the section looks and
- * behaves identically everywhere rather than being reimplemented 7 times.
- */
 export default function SettingsPanel({
   user = {},
   darkMode,

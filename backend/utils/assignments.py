@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 import traceback
 from sqlalchemy import text
 
-from utils.auth import db, Student
+from utils.auth import db, Admin, Student
 from utils.auth_middleware import login_required
 from utils.studentDetails import (
     StudentAcademicRecord,
@@ -18,7 +18,7 @@ from utils.studentDetails import (
     Section,
 )
 
-from utils.teacherDetails import TeacherClass, Subject
+from utils.teacherDetails import Teacher, TeacherClass, Subject
 from utils.tenancy import (
     caller_can_access_student,
     caller_can_access_teacher,
@@ -730,6 +730,9 @@ class GradeAssignmentAPI(MethodView):
     @login_required
     def put(self, submission_id):
 
+        if not isinstance(request.user, (Admin, Teacher)):
+            return jsonify({"error": "Only staff can grade"}), 403
+
         data = request.form if request.form else request.get_json(silent=True) or {}
 
         # AssignmentSubmission has no school_id of its own — previously
@@ -749,6 +752,9 @@ class GradeAssignmentAPI(MethodView):
 
         if not sub:
             return jsonify({"error": "Submission not found"}), 404
+        _asg = Assignment.query.get(sub.assignment_id)
+        if isinstance(request.user, Teacher) and _asg and _asg.created_by != request.user.id:
+            return jsonify({"error": "You can only grade assignments you created"}), 403
 
         sub.marks_obtained = data.get("marks")
         sub.feedback = data.get("feedback")
@@ -1004,6 +1010,8 @@ class ForceResubmitAPI(MethodView):
 
     @login_required
     def post(self, submission_id):
+        if not isinstance(request.user, (Admin, Teacher)):
+            return jsonify({"error": "Only staff can reset submissions"}), 403
         try:
             sub = (
                 AssignmentSubmission.query.join(
@@ -1018,6 +1026,9 @@ class ForceResubmitAPI(MethodView):
 
             if not sub:
                 return jsonify({"error": "Submission not found"}), 404
+            _asg = Assignment.query.get(sub.assignment_id)
+            if isinstance(request.user, Teacher) and _asg and _asg.created_by != request.user.id:
+                return jsonify({"error": "You can only reset submissions for your own assignments"}), 403
 
             # 🔥 Update status to recheck
             sub.status = "Needs Resubmission"

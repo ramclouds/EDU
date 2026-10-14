@@ -21,13 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def _is_admin(user):
-    """True for any admin-class account.
 
-    The Admin.role column holds 'admin' or 'super_admin', and a Super
-    Admin is still an admin. Comparing role == "admin" locked Super Admins
-    out of every leave-approval and leave-overview screen, so this helper
-    is the one place that decides it.
-    """
     return getattr(user, "role", None) in ("admin", "super_admin")
 
 # Teacher
@@ -550,6 +544,10 @@ class UpdateLeaveStatus(MethodView):
             ).first()
 
             if not balance:
+                # Set the defaults explicitly. Column defaults apply at
+                # flush, so on a brand-new balance the attributes are
+                # still None when the balance check below runs, and
+                # "None < int" raised a 500 on a teacher's first approval.
                 balance = TeacherLeaveBalance(
                     teacher_id=leave.teacher_id,
                     casual_leave=10,

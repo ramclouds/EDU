@@ -208,15 +208,7 @@ class Notification(db.Model):
 
 
 def recipient_school_id(user_id, role, fallback=None):
-    """School a notification recipient belongs to, read from their own row.
 
-    A notification can be addressed to someone other than the caller, so
-    the caller's school is the wrong answer in general. Look the recipient
-    up by (role, id); if no row matches, fall back to the given school
-    (normally the sender's) so a sender can still reach a legacy row with
-    no school. Returns None when neither can be determined, which keeps
-    legacy single-school installs working.
-    """
     if user_id is None:
         return fallback
 
@@ -326,6 +318,7 @@ def get_notification_current_admin():
     if not current_user:
         return None
 
+    # Super Admins are admins too: their role is stored as "super_admin".
     if (
         str(
             getattr(
@@ -334,7 +327,7 @@ def get_notification_current_admin():
                 "",
             )
         ).lower()
-        != "admin"
+        not in ("admin", "super_admin")
     ):
         return None
 

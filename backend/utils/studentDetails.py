@@ -4,7 +4,8 @@ from sqlalchemy import or_
 from flask import jsonify, request
 from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
-from utils.auth import db, Student
+from utils.auth import db
+from utils.tenancy import caller_can_access_student, Student
 from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import permission_required
 
@@ -145,7 +146,12 @@ class StudentDetails(MethodView):
             except (ValueError, TypeError):
                 return jsonify({"error": "Student id must be an integer"}), 400
 
-            student = Student.query.get(id)
+            # OWNERSHIP: a student reads their own profile; school staff read
+            # students at their own school. Previously any logged-in user of any
+            # school could read any student's full profile by id.
+            allowed, student = caller_can_access_student(id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
 
             if not student:
                 return jsonify({"error": "Student not found"}), 404
@@ -366,6 +372,10 @@ class ChangePassword(MethodView):
             new_password = data.get("new_password")
             confirm_password = data.get("confirm_password")
 
+            _caller = getattr(request, "user", None)
+            if not (isinstance(_caller, Student) and _caller.id == id):
+                return jsonify({"error": "You can only change your own password"}), 403
+
             # ================= REQUIRED FIELDS =================
             if not all([current_password, new_password, confirm_password]):
                 return jsonify({"error": "All fields are required"}), 400
@@ -447,21 +457,7 @@ def _student_summary(
 
 
 class AdminStudentsListAPI(MethodView):
-    """
-    Roster for the Academic Admin's Students section. Lists every
-    student together with their current class (if assigned), and
-    supports searching by name/student ID/mobile plus filtering by
-    class or "unassigned" (enrolled account but no current class
-    record - shouldn't normally happen, but worth surfacing rather
-    than silently hiding).
-    """
 
-    # BUG FIX: this was gated on the "academic" module, but neither the
-    # Academic Admin nor the Accounts Admin default role is granted
-    # "academic" (they're granted the "students" module - see
-    # DEFAULT_ROLES in rolePermissionManagement.py). That meant this
-    # roster endpoint 403'd for every non-super-admin caller. "students"
-    # is the correct module for a student roster.
     @permission_required("students", "view")
     def get(self):
         try:

@@ -4,7 +4,7 @@ from sqlalchemy import func, extract, case, and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 from math import ceil
 from sqlalchemy.orm import joinedload
-from utils.auth import db, Student
+from utils.auth import db, Admin, Student
 from utils.auth_middleware import login_required, get_current_user
 from utils.rolePermissionManagement import permission_required
 from utils.studentDetails import StudentAcademicRecord, AcademicClass, Division, Section
@@ -454,6 +454,11 @@ class AttendanceMarkAPI(MethodView):
             if not current_user:
                 return jsonify({"error": "Unauthorized"}), 401
 
+            # Marking attendance is a staff action. Previously any logged-in
+            # user, including a student, could mark a class's attendance.
+            if not isinstance(current_user, (Admin, Teacher)):
+                return jsonify({"error": "Only staff can mark attendance"}), 403
+
             data = request.get_json(silent=True)
             if not data:
                 return jsonify({"error": "JSON body required"}), 400
@@ -466,6 +471,12 @@ class AttendanceMarkAPI(MethodView):
 
             if not academic_class_id:
                 return jsonify({"error": "academic_class_id required"}), 400
+
+            # A teacher marks only the classes they are assigned to.
+            if isinstance(current_user, Teacher) and not TeacherClass.query.filter_by(
+                teacher_id=current_user.id, academic_class_id=academic_class_id
+            ).first():
+                return jsonify({"error": "You are not assigned to this class"}), 403
 
             if not date:
                 return jsonify({"error": "date required"}), 400
@@ -1492,22 +1503,6 @@ class UpdateAttendanceStatusAPI(MethodView):
 # MARK ALL ATTENDANCE API
 # =========================================================
 class MarkAllAttendanceAPI(MethodView):
-    """
-    BUG FIX: this previously required the caller to already know an
-    AttendanceSession's numeric id (`session_id` in the request body)
-    and 404'd with "Session not found" otherwise - but no session
-    exists yet the first time attendance is marked for a class on a
-    given day, and the frontend never had a session id to send in the
-    first place (it only knows academic_class_id + date). Every
-    "Mark All" click was therefore guaranteed to fail with a
-    session-related error, regardless of what class was selected.
-
-    Now mirrors the same get-or-create session pattern already used
-    by UpdateAttendanceStatusAPI (single-record marking), and marks
-    every student currently enrolled in the class - not just students
-    who already happened to have an attendance row.
-    """
-
     @permission_required("academic", "edit")
     def post(self):
 
