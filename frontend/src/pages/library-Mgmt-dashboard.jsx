@@ -20,6 +20,11 @@ import { useLibraryReports } from "../controllers/Library/useLibraryReports";
 import { useLibraryDashboard } from "../controllers/Library/useLibraryDashboard";
 import { useLibraryNotifications } from "../controllers/Library/useLibraryNotifications";
 import { useLibraryPermission } from "../controllers/Library/useLibraryPermission";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
+
+const SEARCH_SECTIONS = [{ key: "add-book", label: "Add book" }, { key: "authors", label: "Authors" }, { key: "book", label: "Book" }, { key: "categories", label: "Categories" }, { key: "dashboard", label: "Dashboard" }, { key: "fines", label: "Fines" }, { key: "issued-books", label: "Issued books" }, { key: "members", label: "Members" }, { key: "notifications", label: "Notifications" }, { key: "profile", label: "Profile" }, { key: "reports", label: "Reports" }, { key: "return-books", label: "Return books" }, { key: "settings", label: "Settings" }, { key: "students", label: "Students" }, { key: "teachers", label: "Teachers" }, { key: "transactions", label: "Transactions" }];
 
 const BookDetailItem = ({ label, value }) => {
   const displayValue =
@@ -703,9 +708,9 @@ function AdminDashboard() {
       ${sidebarExpanded ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
     `}
         >
-          <i
+          <SchoolLogo
             className="bi bi-mortarboard text-purple-600 text-xl"
-            title={!sidebarExpanded ? APP_NAME : ""}
+            title={!sidebarExpanded ? schoolDisplayName() : ""}
           />
 
           <span
@@ -714,7 +719,7 @@ function AdminDashboard() {
         ${sidebarExpanded ? "opacity-100 max-w-[180px] ml-2" : "opacity-0 max-w-0 ml-0"}
       `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
@@ -842,12 +847,12 @@ function AdminDashboard() {
         >
           {sidebarExpanded ? (
             <span className="whitespace-nowrap transition-all duration-300">
-              {APP_NAME} © {APP_YEAR}
+              <SchoolName /> © {APP_YEAR}
             </span>
           ) : (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             />
           )}
         </div>
@@ -913,7 +918,7 @@ function AdminDashboard() {
               <div className="flex shrink-0 items-center gap-2 md:hidden">
                 <i className="bi bi-mortarboard text-lg text-indigo-600" />
                 <span className="max-w-[145px] truncate text-sm font-bold text-indigo-600">
-                  {APP_NAME}
+                  <SchoolName />
                 </span>
               </div>
 
@@ -942,18 +947,7 @@ function AdminDashboard() {
               <div className="relative hidden w-full max-w-xl flex-1 px-2 md:block">
                 <i className="bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-gray-200 bg-white/70 py-2.5 pl-10 pr-4
-            text-sm text-gray-800 shadow-sm outline-none backdrop-blur-md
-            transition-all duration-300 placeholder:text-gray-400
-            hover:shadow-md focus:bg-white focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-700/70 dark:text-white
-            dark:placeholder:text-gray-400 dark:focus:bg-slate-700"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT ACTIONS */}
@@ -1206,16 +1200,7 @@ function AdminDashboard() {
               <div className="relative">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 pl-11
-            text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-                  placeholder="Search anything here..."
-                  autoFocus
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
             </div>
           )}

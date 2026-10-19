@@ -1,3 +1,4 @@
+# Create a platform developer account (the login for the Developer conso
 import sys
 
 from app import create_app

@@ -16,7 +16,6 @@ class Notification(db.Model):
     __tablename__ = "notifications"
 
     # Scoped per school. Nullable so rows written before multi-tenancy
-    # (and legacy single-school installs) keep working as school_id None.
     school_id = db.Column(
         db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
@@ -208,7 +207,7 @@ class Notification(db.Model):
 
 
 def recipient_school_id(user_id, role, fallback=None):
-
+    # School a notification recipient belongs to, read from their own row
     if user_id is None:
         return fallback
 
@@ -403,9 +402,6 @@ class MarkNotificationReadAPI(MethodView):
         current_user = get_current_user()
 
         # 🐛 BUGFIX: only filtered by user_id, not role. user_id is not
-        # guaranteed unique *across* roles (a student and a teacher could
-        # both have id=7), so a user could accidentally mark — or with the
-        # delete endpoint below, delete — another role's notification.
         notification = Notification.query.filter_by(
             id=notification_id,
             user_id=current_user.id,
@@ -432,10 +428,6 @@ class MarkAllNotificationsReadAPI(MethodView):
         current_user = get_current_user()
 
         # 🐛 BUGFIX: missing role filter (see note above) and no
-        # synchronize_session setting — SQLAlchemy's default
-        # ("evaluate") can raise on some bulk UPDATE filters. Also
-        # scope the update to unread rows only, since that's all this
-        # endpoint needs to touch.
         Notification.query.filter_by(
             user_id=current_user.id,
             role=current_user.role,
@@ -721,15 +713,12 @@ class LibraryNotificationsAPI(MethodView):
             normalized_user_id = None
 
         # App notifications can be marked Sent
-        # immediately because they are stored
-        # in the notification system itself.
         if channel == "App" and scheduled_at is None:
             delivery_status = "Sent"
             sent_at = datetime.utcnow()
 
         else:
             # External channels need an actual
-            # Email/SMS/WhatsApp provider worker.
             delivery_status = "Pending"
             sent_at = None
 

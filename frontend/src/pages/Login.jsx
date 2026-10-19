@@ -1,228 +1,181 @@
-import { Link } from "react-router-dom";
 import { useLogin } from "../controllers/Auth/useLogin";
-import { APP_NAME, APP_TAGLINE, APP_YEAR } from "../config/appConfig";
+import { APP_NAME, APP_TAGLINE, SUPPORT_EMAIL } from "../config/appConfig";
+
+const input =
+  "mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 placeholder:text-gray-400 dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100 dark:placeholder:text-gray-500";
+const primaryBtn =
+  "w-full rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 py-2.5 text-sm font-medium text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60";
 
 export default function Login() {
   const {
     identifier,
     setIdentifier,
-
     password,
     setPassword,
-
     schoolCode,
     setSchoolCode,
-
     resetEmail,
     setResetEmail,
-
     loading,
     showPassword,
     setShowPassword,
-
     showForgotModal,
     setShowForgotModal,
-
     login,
     handleForgotPassword,
   } = useLogin();
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* NAVBAR */}
-      <div className="flex flex-col sm:flex-row justify-between items-center px-4 sm:px-8 py-4 bg-white border-b gap-3 sm:gap-0">
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-white to-indigo-50 text-gray-800 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 dark:text-gray-100">
+      {/* Top bar */}
+      <header className="flex flex-col gap-3 border-b border-gray-100 bg-white/80 px-4 py-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-slate-700 dark:bg-slate-800/80">
         <div className="flex items-center gap-3">
-          <div className="bg-purple-600 text-white p-2 rounded-lg">
-            <i className="bi bi-book"></i>
+          <div className="rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 p-2 text-white shadow-md">
+            <i className="bi bi-book" />
           </div>
-
           <div>
-            <div className="font-semibold text-gray-800 text-lg sm:text-base">
-              {APP_NAME}
-            </div>
-            <div className="text-xs text-gray-500">{APP_TAGLINE}</div>
+            <div className="font-semibold text-gray-900 dark:text-gray-100">{APP_NAME}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">{APP_TAGLINE}</div>
           </div>
         </div>
-
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
           Need help?{" "}
-          <span className="text-purple-600 cursor-pointer">Support</span>
+          {SUPPORT_EMAIL ? (
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-indigo-600 hover:underline dark:text-indigo-300">Contact support</a>
+          ) : (
+            <span>ask your school administrator</span>
+          )}
         </div>
-      </div>
+      </header>
 
-      {/* MAIN */}
-      <div className="flex flex-1 items-center justify-center px-4 sm:px-6 py-10">
-        <div className="flex flex-col lg:flex-row items-center gap-10 max-w-6xl w-full">
-          {/* LEFT PANEL */}
-          <div className="flex-1 bg-gradient-to-br from-purple-50 via-white to-blue-50 p-10 rounded-3xl hidden lg:block">
-            <h1 className="text-4xl font-bold text-gray-900 leading-tight">
+      {/* Main */}
+      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
+        <div className="flex w-full max-w-6xl flex-col items-center gap-10 lg:flex-row">
+          {/* Intro panel */}
+          <section className="hidden flex-1 rounded-3xl border border-gray-100 bg-white p-10 shadow-sm lg:block dark:border-slate-700 dark:bg-slate-800">
+            <h1 className="text-4xl font-bold leading-tight text-gray-900 dark:text-gray-100">
               Welcome to <br />
-              <span className="text-purple-600">{APP_NAME}</span>
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">{APP_NAME}</span>
             </h1>
-
-            <p className="text-gray-600 mt-6 max-w-md">
-              Streamline your school operations with our comprehensive
-              management platform.
+            <p className="mt-6 max-w-md text-gray-600 dark:text-gray-400">
+              One secure system for running the whole school: academics, attendance, fees, library, hostel and communication.
             </p>
-
-            <div className="mt-10 space-y-6">
-              <Feature
-                icon="bi-people-fill"
-                title="Student Management"
-                desc="Track attendance, grades and academic progress effortlessly."
-              />
-
-              <Feature
-                icon="bi-easel-fill"
-                title="Teacher Portal"
-                desc="Manage classes, assignments and communication."
-              />
-
-              <Feature
-                icon="bi-bar-chart-fill"
-                title="Analytics & Reports"
-                desc="Powerful insights with detailed performance reports."
-              />
+            <div className="mt-8 grid gap-5 sm:grid-cols-2">
+              <Feature icon="bi-mortarboard-fill" title="Academics & exams" desc="Classes, subjects, marks, verified results and report cards." />
+              <Feature icon="bi-calendar-check-fill" title="Attendance & timetable" desc="Daily attendance for students and staff, and class timetables." />
+              <Feature icon="bi-journal-text" title="Assignments" desc="Teachers set work, students submit it and see their marks." />
+              <Feature icon="bi-cash-coin" title="Fees & payroll" desc="Fee collection, pending dues, payslips and expenses." />
+              <Feature icon="bi-book-half" title="Library & hostel" desc="Book lending, fines, room allotment and hostel requests." />
+              <Feature icon="bi-megaphone-fill" title="Notices & events" desc="School notices, the school calendar and notifications." />
             </div>
-          </div>
+            <div className="mt-8 rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-200">
+              <p className="font-semibold">Who signs in here</p>
+              <p className="mt-1">Super Admins, admin staff, teachers and students. Each person sees only what their role allows, and each school&apos;s information stays private.</p>
+            </div>
+          </section>
 
-          {/* LOGIN CARD */}
-          <div className="w-full sm:max-w-md bg-white p-8 rounded-2xl shadow-xl border">
-            <h2 className="text-2xl font-semibold text-center">Sign In</h2>
+          {/* Sign-in card */}
+          <section className="w-full rounded-2xl border border-gray-100 bg-white p-8 shadow-xl sm:max-w-md dark:border-slate-700 dark:bg-slate-800">
+            <h2 className="text-center text-2xl font-semibold text-gray-900 dark:text-gray-100">Sign In</h2>
+            <p className="mb-6 mt-2 text-center text-sm text-gray-500 dark:text-gray-400">Sign in to continue to your portal</p>
 
-            <p className="text-sm text-gray-500 text-center mt-2 mb-6">
-              Sign in to continue to your portal
-            </p>
-
-            {/* SCHOOL CODE (multi-school) */}
             <div className="mb-4">
-              <label className="text-sm font-medium">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 School code{" "}
-                <span className="text-gray-400 font-normal">
-                  (leave blank if your school hasn't been given one)
-                </span>
+                <span className="font-normal text-gray-400">(leave blank if your school hasn't been given one)</span>
               </label>
-
               <input
                 type="text"
                 value={schoolCode}
                 onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
                 placeholder="e.g. SCH-A1B2C3"
-                className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50 uppercase placeholder:normal-case"
+                className={`${input} uppercase placeholder:normal-case`}
               />
             </div>
 
-            {/* EMAIL OR USERNAME */}
             <div className="mb-4">
-              <label className="text-sm font-medium">Email</label>
-
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email or username</label>
               <input
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Enter email"
-                className="w-full mt-1 px-3 py-2 border rounded-lg bg-gray-50"
+                placeholder="Enter email or username"
+                className={input}
               />
             </div>
 
-            {/* PASSWORD */}
-            <div className="mb-4">
-              <div className="flex justify-between text-sm">
-                <label className="font-medium">Password</label>
-
-                <span
+            <div className="mb-6">
+              <div className="flex items-center justify-between text-sm">
+                <label className="font-medium text-gray-700 dark:text-gray-300">Password</label>
+                <button
+                  type="button"
                   onClick={() => setShowForgotModal(true)}
-                  className="text-purple-600 cursor-pointer hover:underline"
+                  className="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
                 >
-                  Forgot Password?
-                </span>
+                  Forgot password?
+                </button>
               </div>
-
-              <div className="relative mt-1">
+              <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg bg-gray-50"
+                  className={`${input} pr-10`}
                 />
-
-                <span
+                <button
+                  type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-400 hover:text-gray-600"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-200"
                 >
-                  {showPassword ? (
-                    <i className="bi bi-eye-slash-fill"></i>
-                  ) : (
-                    <i className="bi bi-eye-fill"></i>
-                  )}
-                </span>
+                  <i className={showPassword ? "bi bi-eye-slash-fill" : "bi bi-eye-fill"} />
+                </button>
               </div>
             </div>
 
-            {/* LOGIN BUTTON */}
-            <button
-              onClick={login}
-              disabled={loading}
-              className="w-full py-2 rounded-lg text-white font-medium bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 transition disabled:opacity-60"
-            >
-              {loading ? "Signing in..." : "Sign In"}
+            <button onClick={login} disabled={loading} className={primaryBtn}>
+              {loading ? "Signing in…" : "Sign In"}
             </button>
 
-            <div className="text-sm text-center mt-6 text-gray-600">
-              New to {APP_NAME}?{" "}
-              <Link
-                to="/signup"
-                className="text-purple-600 font-medium hover:underline"
-              >
-                Request Access
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* FORGOT PASSWORD MODAL */}
-      {showForgotModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-[100]">
-          <div className="bg-white w-full max-w-md p-6 rounded-2xl shadow-2xl relative">
-            <button
-              onClick={() => setShowForgotModal(false)}
-              className="absolute top-3 right-3 text-gray-400"
-            >
-              ✕
-            </button>
-
-            <h3 className="text-xl font-semibold mb-2">Forgot Password</h3>
-
-            <p className="text-sm text-gray-500 mb-4">
-              Enter your email to receive reset link
+            <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+              New to {APP_NAME}? Your school administrator creates your account and gives you your login.
             </p>
+          </section>
+        </div>
+      </main>
 
+      {/* Forgot password */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-2xl border border-gray-100 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              aria-label="Close"
+              className="absolute right-3 top-3 text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-200"
+            >
+              <i className="bi bi-x-lg" />
+            </button>
+            <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-gray-100">Forgot Password</h3>
+            <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">Enter your email to receive a reset link</p>
             <input
               type="email"
               placeholder="Enter your email"
               value={resetEmail}
               onChange={(e) => setResetEmail(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg bg-gray-50 mb-4"
+              className={`${input} mb-4 mt-0`}
             />
-
-            <button
-              onClick={handleForgotPassword}
-              className="w-full py-2 rounded-lg text-white font-medium bg-gradient-to-r from-purple-600 to-indigo-600"
-            >
-              Send Reset Link
-            </button>
+            <button onClick={handleForgotPassword} className={primaryBtn}>Send Reset Link</button>
           </div>
         </div>
       )}
 
-      {/* FOOTER */}
-      <footer className="bg-white border-t">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center text-sm text-gray-600">
+      {/* Footer */}
+      <footer className="border-t border-gray-100 bg-white dark:border-slate-700 dark:bg-slate-800">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
           <div>
-            © {APP_YEAR} <span className="font-medium">{APP_NAME}</span>. All
-            Rights Reserved
+            © {new Date().getFullYear()} <span className="font-medium text-gray-800 dark:text-gray-200">{APP_NAME}</span>. All rights reserved.
           </div>
         </div>
       </footer>
@@ -233,14 +186,12 @@ export default function Login() {
 function Feature({ icon, title, desc }) {
   return (
     <div className="flex items-start gap-4">
-      <div className="bg-purple-100 text-purple-600 p-3 rounded-lg">
-        <i className={`bi ${icon}`}></i>
+      <div className="rounded-lg bg-indigo-50 p-3 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+        <i className={`bi ${icon}`} />
       </div>
-
       <div>
-        <div className="font-semibold text-gray-800">{title}</div>
-
-        <div className="text-sm text-gray-500">{desc}</div>
+        <div className="font-semibold text-gray-800 dark:text-gray-100">{title}</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">{desc}</div>
       </div>
     </div>
   );

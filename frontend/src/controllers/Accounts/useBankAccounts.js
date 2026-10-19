@@ -13,14 +13,7 @@ const EMPTY_ACCOUNT_FORM = {
   notes: "",
 };
 
-/**
- * Accounts Admin > Bank Accounts section.
- *
- * Each account's balance is computed server-side from opening_balance
- * plus every linked Income/Expense transaction, so this hook just
- * displays whatever GET /api/accounts/bank-accounts returns rather
- * than tracking balance locally.
- */
+// Accounts Admin > Bank Accounts section
 export function useBankAccounts({ fetchWithAuth, showToast }) {
   const [accounts, setAccounts] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);

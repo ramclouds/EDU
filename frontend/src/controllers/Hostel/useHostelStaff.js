@@ -145,9 +145,7 @@ export function useHostelStaff({ activeSection, fetchWithAuth, showToast }) {
         loadStaff({ filters: next });
     }, [loadStaff]);
 
-    // ============================================================
     // STAFF CRUD
-    // ============================================================
     const openCreateStaffModal = useCallback(() => {
         setStaffForm({ ...EMPTY_STAFF_FORM });
         setStaffModalOpen(true);

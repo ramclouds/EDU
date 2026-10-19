@@ -42,8 +42,6 @@ class Exam(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     # Denormalized (see AcademicClass.school_id) — the (class, year, name)
-    # unique constraint below is already effectively per-school because
-    # academic_class_id belongs to exactly one school.
     school_id = db.Column(
         db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
@@ -734,6 +732,7 @@ class TeacherSubjectsAPI(MethodView):
             logger.exception(e)
             return jsonify({"error": "Failed to load subjects"}), 500
 
+
 # ========================= TEACHER CLASSES =========================
 class TeacherClassesAPI(MethodView):
 
@@ -865,13 +864,12 @@ class SaveTeacherMarksAPI(MethodView):
             exam_name = data.get("examType")
 
             # Saving marks is a staff action. The previous check also allowed
-            # the student to write their own marks.
             if not isinstance(request.user, (Admin, Teacher)):
                 return jsonify({"error": "Only staff can save marks"}), 403
 
             school_id = _current_school_id()
 
-            # MARKSGF
+            # MARKS
             internal = float(data.get("internal", 0))
             external = float(data.get("external", 0))
             oral = float(data.get("oral", 0))
@@ -1723,17 +1721,7 @@ class TeacherAnalyticsPDFAPI(MethodView):
             return jsonify({"error": "Failed to generate analytics PDF"}), 500
 
 
-# ============================================================
 # ADMIN EXAM & RESULT CONTROL CENTER APIs
-# Supports admin dashboard JSX:
-# - KPI cards
-# - class progress cards
-# - detailed subject status
-# - verify all data
-# - bulk edit marks
-# - publish now / schedule publish
-# - export all reports PDF
-# ============================================================
 
 PASS_MARK_PERCENTAGE = 35
 
@@ -2106,12 +2094,7 @@ class AdminExamReportsPDFAPI(MethodView):
             return jsonify({"error": "Failed to export admin exam report"}), 500
 
 
-# ============================================================
 # PRODUCTION OVERRIDES - REAL WORLD ADMIN EXAM RESULT SYSTEM
-# (The stale first-draft versions of these classes were removed - this
-# is now the only definition of each.)
-# They keep your existing DB tables but return richer, frontend-ready data.
-# ============================================================
 
 EXAM_STATUS_FLOW = [
     "Draft",
@@ -3253,14 +3236,7 @@ class AdminExamReportCardsPDFAPI(MethodView):
             return jsonify({"error": "Failed to generate report cards"}), 500
 
 
-# ============================================================
 # ACADEMIC SETUP APIs
-# Classes, Divisions, Sections and Batches - the building blocks
-# every other academic module (subjects, timetable, attendance,
-# exams) is linked to via AcademicClass. Batch + Division + Section
-# are simple lookup tables; AcademicClass is the combination of the
-# three that students/teachers actually get assigned to.
-# ============================================================
 
 
 def _clean_text(value):
@@ -3638,8 +3614,6 @@ class AdminBatchSetCurrentAPI(MethodView):
 
 
 # ---- Drill-down: everything happening inside one academic year ----
-# This is what powers "check old batch academic data" - grade-by-grade
-# breakdown, student counts, and totals for any batch, past or present.
 class AdminBatchOverviewAPI(MethodView):
     @permission_required("academic", "view")
     def get(self, batch_id):
@@ -3727,11 +3701,6 @@ class AdminBatchOverviewAPI(MethodView):
 
 
 # ---- Rollover: copy last year's grade/section structure into a new
-# academic year, so admins don't have to recreate "Class 10 - A", "Class
-# 10 - B" etc. by hand every year. Only copies the Division+Section
-# combinations - never touches students, so it's always a safe, additive
-# action (existing classes in the target batch are left untouched and
-# duplicates are silently skipped).
 class AdminBatchRolloverAPI(MethodView):
     @permission_required("academic", "create")
     def post(self, batch_id):
@@ -4230,10 +4199,6 @@ class AdminSectionDetailAPI(MethodView):
 
 
 # ========================= CLASSES =========================
-# A "Class" (AcademicClass) is the link between a Batch, a Division
-# and a Section - e.g. Batch "2025-26" + Division "Class 10" +
-# Section "A". This is what students/teachers/exams/timetable
-# actually attach to.
 class AdminAcademicClassesAPI(MethodView):
     @permission_required("academic", "view")
     def get(self):
@@ -4576,8 +4541,6 @@ class AdminAcademicClassDetailAPI(MethodView):
 
 
 # ========================= COMBINED OPTIONS =========================
-# Feeds the Batch/Division/Section dropdowns on the "Add Class" form
-# and any other academic-setup UI in one round trip.
 class AdminAcademicSetupOptionsAPI(MethodView):
     @permission_required("academic", "view")
     def get(self):

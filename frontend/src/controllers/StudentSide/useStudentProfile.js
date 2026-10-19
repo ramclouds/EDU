@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { BASE_URL } from "../../config/appConfig";
-// Was a locally hardcoded "http://localhost:5000/api" here, separate from
-// (and always in sync with, by luck) the shared appConfig — now uses the
-// one env-driven source of truth so it actually follows VITE_API_BASE_URL.
+// Was a locally hardcoded "http://localhost:5000/api" here, separate fro
 
 export function useStudentProfile({ fetchWithAuth }) {
     // 👤 PROFILE

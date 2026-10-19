@@ -12,15 +12,7 @@ const EMPTY_FILTERS = {
   status: "",
 };
 
-/**
- * Accounts Admin > Pending Fees section.
- *
- * School-wide list of every Pending/Partial/Overdue installment
- * (GET /api/accounts/fees/pending). Each row carries the owning
- * student's id, so clicking one can open the exact same fee modal
- * used in the Students section (useStudentFeeDetails) - that's the
- * "link between this and the Students section" the dashboard needs.
- */
+// Accounts Admin > Pending Fees section
 export function usePendingFees({ fetchWithAuth, showToast }) {
   const [pendingFees, setPendingFees] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
@@ -92,11 +84,6 @@ export function usePendingFees({ fetchWithAuth, showToast }) {
   }, [appliedFilters]);
 
   // Fires the "due date alert" workflow: sends one reminder
-  // notification per student who has a due-soon or overdue balance
-  // (POST /api/accounts/fees/send-reminders). There's no scheduler in
-  // this app, so this button click IS the trigger - point a daily
-  // cron/task scheduler at that same URL for a fully automatic
-  // version instead of a manual click.
   const sendReminders = useCallback(
     async (daysAhead = 3) => {
       if (!fetchWithAuth) return false;

@@ -8,9 +8,7 @@ import {
 
 import { BASE_URL } from "../../config/appConfig";
 
-/* =========================================================
-   CONSTANTS
-========================================================= */
+// CONSTANTS
 
 export const RBAC_ACTIONS = [
   "view",
@@ -169,9 +167,7 @@ const EMPTY_STATS = {
   temporary_access_users: 0,
 };
 
-/* =========================================================
-   HELPER FUNCTIONS
-========================================================= */
+// HELPER FUNCTIONS
 
 const buildUserKey = (
   userType,
@@ -404,18 +400,14 @@ const createApiError = async (
   return error;
 };
 
-/* =========================================================
-   MAIN HOOK
-========================================================= */
+// MAIN HOOK
 
 export function useRolePermissionManagement({
   activeSection,
   fetchWithAuth,
   showToast,
 } = {}) {
-  /* =======================================================
-     STABLE EXTERNAL FUNCTION REFERENCES
-  ======================================================= */
+  // STABLE EXTERNAL FUNCTION REFERENCES
 
   const mountedRef = useRef(false);
 
@@ -429,9 +421,7 @@ export function useRolePermissionManagement({
     EMPTY_USER_FILTERS,
   );
 
-  /* =======================================================
-     REQUEST GUARDS
-  ======================================================= */
+  // REQUEST GUARDS
 
   const bootstrapLoadedRef =
     useRef(false);
@@ -451,9 +441,7 @@ export function useRolePermissionManagement({
   const userAccessRequestIdRef =
     useRef(0);
 
-  /* =======================================================
-     MAIN DATA
-  ======================================================= */
+  // MAIN DATA
 
   const [
     rbacModules,
@@ -475,9 +463,7 @@ export function useRolePermissionManagement({
     setRbacStats,
   ] = useState(EMPTY_STATS);
 
-  /* =======================================================
-     SELECTED ROLE AND USER
-  ======================================================= */
+  // SELECTED ROLE AND USER
 
   const [
     rbacSelectedRoleId,
@@ -494,9 +480,7 @@ export function useRolePermissionManagement({
     setRbacSelectedUserAccess,
   ] = useState(null);
 
-  /* =======================================================
-     FORMS
-  ======================================================= */
+  // FORMS
 
   const [
     rbacRoleForm,
@@ -527,9 +511,7 @@ export function useRolePermissionManagement({
     EMPTY_TEMPORARY_ACCESS_FORM,
   );
 
-  /* =======================================================
-     MODALS
-  ======================================================= */
+  // MODALS
 
   const [
     rbacRoleModalOpen,
@@ -546,9 +528,7 @@ export function useRolePermissionManagement({
     setRbacUserAccessModalOpen,
   ] = useState(false);
 
-  /* =======================================================
-     LOADING STATES
-  ======================================================= */
+  // LOADING STATES
 
   const [
     rbacLoading,
@@ -590,9 +570,7 @@ export function useRolePermissionManagement({
     setRbacDeletingRole,
   ] = useState(false);
 
-  /* =======================================================
-     KEEP PROPS INSIDE STABLE REFS
-  ======================================================= */
+  // KEEP PROPS INSIDE STABLE REFS
 
   useEffect(() => {
     fetchWithAuthRef.current =
@@ -609,9 +587,7 @@ export function useRolePermissionManagement({
       rbacUserFilters;
   }, [rbacUserFilters]);
 
-  /* =======================================================
-     MOUNT STATUS
-  ======================================================= */
+  // MOUNT STATUS
 
   useEffect(() => {
     mountedRef.current = true;
@@ -627,9 +603,7 @@ export function useRolePermissionManagement({
     };
   }, []);
 
-  /* =======================================================
-     DERIVED VALUES
-  ======================================================= */
+  // DERIVED VALUES
 
   const rbacSelectedRole =
     useMemo(() => {
@@ -789,9 +763,7 @@ export function useRolePermissionManagement({
       rbacTemporaryAccessForm,
     ]);
 
-  /* =======================================================
-     TOAST HELPER
-  ======================================================= */
+  // TOAST HELPER
 
   const showRbacToast =
     useCallback(
@@ -818,9 +790,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     API REQUEST HELPER
-  ======================================================= */
+  // API REQUEST HELPER
 
   const rbacApiRequest =
     useCallback(
@@ -832,8 +802,6 @@ export function useRolePermissionManagement({
           fetchWithAuthRef.current;
 
         // Preserve the existing fetchWithAuth contract. When the parent
-        // dashboard does not pass it, use the same stored auth token only
-        // for RBAC requests instead of breaking the complete section.
         const authenticatedFetch =
           typeof externalAuthenticatedFetch === "function"
             ? externalAuthenticatedFetch
@@ -906,9 +874,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     LOCAL STAT UPDATE
-  ======================================================= */
+  // LOCAL STAT UPDATE
 
   const updateRbacRoleStats =
     useCallback(
@@ -932,9 +898,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     BOOTSTRAP
-  ======================================================= */
+  // BOOTSTRAP
 
   const loadRbacRolePermissionBootstrap =
     useCallback(
@@ -1087,9 +1051,7 @@ export function useRolePermissionManagement({
       ],
     );
 
-  /* =======================================================
-     LOAD ROLES
-  ======================================================= */
+  // LOAD ROLES
 
   const loadRbacRoles =
     useCallback(
@@ -1192,9 +1154,7 @@ export function useRolePermissionManagement({
       ],
     );
 
-  /* =======================================================
-     ROLE SELECTION
-  ======================================================= */
+  // ROLE SELECTION
 
   const selectRbacRole =
     useCallback(
@@ -1214,9 +1174,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     ROLE MODAL
-  ======================================================= */
+  // ROLE MODAL
 
   const openRbacCreateRoleModal =
     useCallback(
@@ -1323,9 +1281,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     SAVE ROLE
-  ======================================================= */
+  // SAVE ROLE
 
   const saveRbacRole =
     useCallback(async () => {
@@ -1456,9 +1412,7 @@ export function useRolePermissionManagement({
       showRbacToast,
     ]);
 
-  /* =======================================================
-     DELETE ROLE
-  ======================================================= */
+  // DELETE ROLE
 
   const openRbacDeleteRoleModal =
     useCallback((role) => {
@@ -1568,9 +1522,7 @@ export function useRolePermissionManagement({
       showRbacToast,
     ]);
 
-  /* =======================================================
-     SYNC SELECTED ROLE PERMISSIONS
-  ======================================================= */
+  // SYNC SELECTED ROLE PERMISSIONS
 
   useEffect(() => {
     if (!rbacSelectedRole) {
@@ -1595,9 +1547,7 @@ export function useRolePermissionManagement({
     rbacSelectedRole,
   ]);
 
-  /* =======================================================
-     ROLE PERMISSION ACTIONS
-  ======================================================= */
+  // ROLE PERMISSION ACTIONS
 
   const toggleRbacRolePermission =
     useCallback(
@@ -1750,16 +1700,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     DASHBOARD-PAGE PERMISSIONS (ROLE LEVEL)
-     ---------------------------------------------------------
-     Thin view over rbacRolePermissionForm that speaks in terms
-     of whole dashboard pages (Read / Write / No Access) instead
-     of individual view/create/edit/delete checkboxes per
-     module. Saving still goes through the existing
-     saveRbacRolePermissions()/RBACRolePermissionAPI flow, so no
-     backend changes are required to support this view.
-  ======================================================= */
+  // DASHBOARD-PAGE PERMISSIONS (ROLE LEVEL)
 
   const rbacDashboardPermissionForm =
     useMemo(
@@ -1882,9 +1823,7 @@ export function useRolePermissionManagement({
       showRbacToast,
     ]);
 
-  /* =======================================================
-     USER FILTERS
-  ======================================================= */
+  // USER FILTERS
 
   const updateRbacUserFilter =
     useCallback(
@@ -1941,9 +1880,7 @@ export function useRolePermissionManagement({
       return resetFilters;
     }, []);
 
-  /* =======================================================
-     LOAD USERS
-  ======================================================= */
+  // LOAD USERS
 
   const loadRbacUsers =
     useCallback(
@@ -2145,9 +2082,7 @@ export function useRolePermissionManagement({
       ],
     );
 
-  /* =======================================================
-     LOAD SELECTED USER ACCESS
-  ======================================================= */
+  // LOAD SELECTED USER ACCESS
 
   const loadRbacUserAccess =
     useCallback(
@@ -2295,9 +2230,7 @@ export function useRolePermissionManagement({
       ],
     );
 
-  /* =======================================================
-     SELECT USER AND OPEN POPUP
-  ======================================================= */
+  // SELECT USER AND OPEN POPUP
 
   const selectRbacUser =
     useCallback(
@@ -2397,9 +2330,7 @@ export function useRolePermissionManagement({
       );
     }, [rbacSavingUserAccess]);
 
-  /* =======================================================
-     TEMPORARY ACCESS FORM
-  ======================================================= */
+  // TEMPORARY ACCESS FORM
 
   const updateRbacTemporaryAccessForm =
     useCallback(
@@ -2472,9 +2403,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     ASSIGN ROLE TO USER
-  ======================================================= */
+  // ASSIGN ROLE TO USER
 
   const assignRbacRoleToUser =
     useCallback(
@@ -2607,9 +2536,7 @@ export function useRolePermissionManagement({
       ],
     );
 
-  /* =======================================================
-     USER PERMISSION OVERRIDE
-  ======================================================= */
+  // USER PERMISSION OVERRIDE
 
   const setRbacUserPermissionOverride =
     useCallback(
@@ -2744,15 +2671,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     DASHBOARD-PAGE PERMISSIONS (PER-USER OVERRIDE)
-     ---------------------------------------------------------
-     Same idea as rbacDashboardPermissionForm, but for one
-     individual user's overrides on top of their role - e.g.
-     "give this one Accounts Admin temporary access to the
-     Hostel dashboard". "Inherit" clears the override so the
-     user simply follows their role again.
-  ======================================================= */
+  // DASHBOARD-PAGE PERMISSIONS (PER-USER OVERRIDE)
 
   const rbacDashboardOverrideForm =
     useMemo(
@@ -2833,9 +2752,7 @@ export function useRolePermissionManagement({
       [],
     );
 
-  /* =======================================================
-     SAVE USER PERMISSION OVERRIDES
-  ======================================================= */
+  // SAVE USER PERMISSION OVERRIDES
 
   const saveRbacUserOverrides =
     useCallback(async () => {
@@ -3135,9 +3052,7 @@ export function useRolePermissionManagement({
       showRbacToast,
     ]);
 
-  /* =======================================================
-     RESET USER PERMISSIONS TO ROLE
-  ======================================================= */
+  // RESET USER PERMISSIONS TO ROLE
 
   const resetRbacUserOverrides =
     useCallback(async () => {
@@ -3287,9 +3202,7 @@ export function useRolePermissionManagement({
       showRbacToast,
     ]);
 
-  /* =======================================================
-     PERMISSION DISPLAY HELPERS
-  ======================================================= */
+  // PERMISSION DISPLAY HELPERS
 
   const getRbacEffectivePermission =
     useCallback(
@@ -3387,11 +3300,7 @@ export function useRolePermissionManagement({
       ],
     );
 
-  /* =======================================================
-     ACTIVE SECTION EFFECT
-
-     Stable refs and bootstrap lock prevent repeated requests.
-  ======================================================= */
+  // ACTIVE SECTION EFFECT
 
   useEffect(() => {
     if (
@@ -3408,12 +3317,7 @@ export function useRolePermissionManagement({
     loadRbacRolePermissionBootstrap,
   ]);
 
-  /* =======================================================
-     LOAD USERS AFTER BOOTSTRAP OR FILTER CHANGE
-
-     Search text is not included. Search runs when user clicks
-     Apply Filter or presses Enter.
-  ======================================================= */
+  // LOAD USERS AFTER BOOTSTRAP OR FILTER CHANGE
 
   useEffect(() => {
     if (
@@ -3439,9 +3343,7 @@ export function useRolePermissionManagement({
     loadRbacUsers,
   ]);
 
-  /* =======================================================
-     FULL REFRESH
-  ======================================================= */
+  // FULL REFRESH
 
   const refreshRbacRolePermissionManagement =
     useCallback(async () => {
@@ -3469,9 +3371,7 @@ export function useRolePermissionManagement({
       loadRbacUsers,
     ]);
 
-  /* =======================================================
-     RETURN
-  ======================================================= */
+  // RETURN
 
   return {
     /* Constants */

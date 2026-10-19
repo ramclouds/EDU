@@ -23,7 +23,6 @@ class StudentAcademicRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # Denormalized (see AcademicClass.school_id's comment) — set from the
-    # enrolling admin, not derived via join.
     school_id = db.Column(
         db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
@@ -48,9 +47,6 @@ class AcademicClass(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # Denormalized copy of the owning Batch/Division/Section's school_id
-    # (set from the request's current admin, not derived via join) so
-    # every query here can filter by school_id directly instead of
-    # joining through batches every time.
     school_id = db.Column(
         db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
@@ -80,9 +76,6 @@ class Batch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # ================= TENANCY ================= (see Admin.school_id
-    # in utils/auth.py). batch_name was globally unique before this,
-    # which meant two different schools could never both have a
-    # "2024-2025" batch — changed to unique-per-school below.
     school_id = db.Column(
         db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
@@ -91,10 +84,6 @@ class Batch(db.Model):
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
     # Marks the school's active academic year. Only one Batch should have
-    # this set to True at a time - enforced in application code (see
-    # AdminBatchSetCurrentAPI in utils/academic.py), not at the DB level.
-    # Migration for the existing `batches` table:
-    #   ALTER TABLE batches ADD COLUMN is_current BOOLEAN NOT NULL DEFAULT FALSE;
     is_current = db.Column(db.Boolean, nullable=False, server_default="0")
     created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
 
@@ -147,8 +136,6 @@ class StudentDetails(MethodView):
                 return jsonify({"error": "Student id must be an integer"}), 400
 
             # OWNERSHIP: a student reads their own profile; school staff read
-            # students at their own school. Previously any logged-in user of any
-            # school could read any student's full profile by id.
             allowed, student = caller_can_access_student(id)
             if not allowed:
                 return jsonify({"error": "Forbidden"}), 403
@@ -244,11 +231,6 @@ class UpdateStudentProfile(MethodView):
                 return jsonify({"error": "Student id must be an integer"}), 400
 
             # SECURITY: this had no authorization check at all beyond a
-            # valid token of ANY kind — any logged-in student, teacher,
-            # or admin from ANY school could edit ANY student's profile
-            # by passing an arbitrary id. The route (/api/student/update/
-            # <id>) is a self-service endpoint, so restrict it to the
-            # student editing their own record.
             caller = getattr(request, "user", None)
             if not isinstance(caller, Student) or caller.id != id:
                 return jsonify({"error": "Forbidden"}), 403
@@ -283,7 +265,6 @@ class UpdateStudentProfile(MethodView):
                         return jsonify({"error": "Mobile number already in use"}), 400
 
             # ================= SAFE UPDATE =================
-            # BASIC
             student.first_name = data.get("first_name", student.first_name)
             student.last_name = data.get("last_name", student.last_name)
             student.middle_name = data.get("middle_name", student.middle_name)
@@ -429,9 +410,7 @@ class ChangePassword(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# ============================================================
 # STUDENT ROSTER (Academic Admin's Students section)
-# ============================================================
 def _student_summary(
     student, record=None, academic=None, division=None, section=None, batch=None
 ):
@@ -457,7 +436,9 @@ def _student_summary(
 
 
 class AdminStudentsListAPI(MethodView):
+    # Roster for the Academic Admin's Students section. Lists every
 
+    # BUG FIX: this was gated on the "academic" module, but neither the
     @permission_required("students", "view")
     def get(self):
         try:

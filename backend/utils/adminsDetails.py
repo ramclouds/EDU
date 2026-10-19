@@ -96,7 +96,7 @@ SUPER_ADMIN_RIGHTS = [
 
 # NORMALIZATION HELPERS
 def normalize_list(value):
-
+    # Convert comma-separated string, JSON-like list, tuple or set
 
     if value is None:
         return []
@@ -116,9 +116,7 @@ def normalize_list(value):
 
 
 def normalize_permissions(value):
-    """
-    Convert permission values to lowercase and remove duplicates.
-    """
+    # Convert permission values to lowercase and remove duplicates
 
     permissions = []
 
@@ -132,9 +130,7 @@ def normalize_permissions(value):
 
 
 def normalize_rights(value):
-    """
-    Return only supported action rights.
-    """
+    # Return only supported action rights
 
     rights = []
 
@@ -148,9 +144,7 @@ def normalize_rights(value):
 
 
 def list_to_csv(values):
-    """
-    Convert a list into a comma-separated database value.
-    """
+    # Convert a list into a comma-separated database value
 
     return ",".join(str(item).strip() for item in values if str(item).strip())
 
@@ -178,6 +172,7 @@ def get_expected_dashboard_permission(admin_type):
 
 # ACCESS RESOLVER
 def _rbac_dashboard_rights(admin, config):
+    # Ask the real RBAC system (Role & Permission Management) whether this
 
     if not config:
         return None
@@ -200,6 +195,7 @@ def _rbac_dashboard_rights(admin, config):
 
 
 def _rbac_all_dashboard_access(admin):
+    # Every dashboard (key/label/route/can_view/can_write) this admin
 
     try:
         from utils.rolePermissionManagement import list_dashboard_access_for_user
@@ -211,6 +207,7 @@ def _rbac_all_dashboard_access(admin):
 
 
 def resolve_admin_access(admin):
+    # Build dashboard access and CRUD rights for an admin
 
     admin_type = str(admin.admin_type or "").strip()
 
@@ -269,7 +266,6 @@ def resolve_admin_access(admin):
             can_write_flag = rbac_rights["can_write"]
             rights = ["read"] + (["write", "edit", "delete"] if can_write_flag else [])
             # A dashboard the admin has no view access to should not be
-            # reported as "assigned" - keeps nav/redirect logic honest.
             if not can_read:
                 dashboard_permissions = []
                 allowed_modules = []
@@ -278,6 +274,7 @@ def resolve_admin_access(admin):
             can_write_flag = "write" in stored_rights
             rights = stored_rights
 
+        # BUG FIX: merge in every OTHER dashboard RBAC says this admin
         rbac_all_access = _rbac_all_dashboard_access(admin)
 
         dashboard_access_detail = rbac_all_access or []
@@ -350,9 +347,7 @@ def resolve_admin_access(admin):
 
 # PERMISSION CHECK HELPERS
 def admin_has_right(admin, right):
-    """
-    Check whether an admin has a given CRUD right.
-    """
+    # Check whether an admin has a given CRUD right
 
     if is_super_admin(admin):
         return True
@@ -366,9 +361,7 @@ def admin_has_right(admin, right):
 
 
 def admin_has_dashboard_permission(admin, permission):
-    """
-    Check whether an admin can access a dashboard.
-    """
+    # Check whether an admin can access a dashboard
 
     if is_super_admin(admin):
         return True
@@ -491,9 +484,7 @@ def admin_to_dict(admin):
 
 # REQUEST HELPERS
 def parse_date(date_value):
-    """
-    Safely parse YYYY-MM-DD values.
-    """
+    # Safely parse YYYY-MM-DD values
 
     if not date_value:
         return None
@@ -512,6 +503,7 @@ def parse_date(date_value):
 
 
 def normalize_admin_access_fields(data, existing_admin=None):
+    # Normalize permissions and access_level before saving
 
     normalized_data = dict(data or {})
 
@@ -588,8 +580,6 @@ class AdminDetails(MethodView):
                 return jsonify({"error": "Admin not found"}), 404
 
             # OWNERSHIP: an admin reads their own profile; any other admin reads
-            # only admins at their own school. Previously any logged-in user of
-            # any school could read any admin's full profile by id.
             caller = getattr(request, "user", None)
             is_self = isinstance(caller, Admin) and caller.id == admin.id
             same_school = (
@@ -954,10 +944,9 @@ class ChangeAdminPassword(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # LIST ADMINS (Super Admin only)
-# =========================================================
 class AdminListAPI(MethodView):
+    # Powers the Super Admin dashboard's admin-management section —
 
     decorators = [super_admin_required]
 
@@ -977,10 +966,9 @@ class AdminListAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # CREATE ADMIN (Super Admin only)
-# =========================================================
 class CreateAdminAPI(MethodView):
+    # Creates a new Admin account of any admin_type (Academic, Library,
 
     decorators = [super_admin_required]
 
@@ -1046,11 +1034,6 @@ class CreateAdminAPI(MethodView):
 
             current_user = get_current_user()
             # New admins belong to the same school as the Super Admin who
-            # created them (multi-tenant aware — see utils/platform.py).
-            # A Super Admin created before school_id existed (school_id is
-            # nullable) will produce school_id=None here too, which keeps
-            # the same unscoped/legacy behavior the rest of the app falls
-            # back to.
             school_id = getattr(current_user, "school_id", None)
 
             hashed_password = bcrypt.hashpw(
@@ -1078,13 +1061,6 @@ class CreateAdminAPI(MethodView):
             db.session.flush()  # need new_admin.id before creating the role link
 
             # Without this, the admin can log in (the dashboard-routing
-            # check has a looser owner_admin_type fallback) but every
-            # actual data request gets 403 Permission Denied, because
-            # permission_required checks effective_permissions, which is
-            # empty with no role assigned — the dashboard would render
-            # its shell and then immediately bounce back to login as
-            # every initial data fetch failed. Reproduced and confirmed
-            # via a full login test before this fix.
             role_code = admin_type.lower().replace(" ", "-")
             default_role = RBACRole.query.filter_by(
                 code=role_code, school_id=None
@@ -1100,8 +1076,6 @@ class CreateAdminAPI(MethodView):
                 )
             else:
                 # Only happens if seed_rbac_defaults() was never run for
-                # this admin_type — log it loudly rather than silently
-                # shipping an admin who can log in but do nothing.
                 logger.warning(
                     "No default RBAC role found for admin_type=%s "
                     "(role_code=%s) — created admin %s will have no "

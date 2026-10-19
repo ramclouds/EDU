@@ -18,13 +18,7 @@ const EMPTY_INCOME_FORM = {
   bank_account_id: "",
 };
 
-/**
- * Accounts Admin > Income section.
- *
- * Mirrors useExpenses.js but scoped to entry_type=Income, reusing the
- * same general ledger endpoints. Owns its own add-income form state,
- * including which bank account (if any) the money landed in.
- */
+// Accounts Admin > Income section
 export function useIncome({ fetchWithAuth, showToast }) {
   const [incomes, setIncomes] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);

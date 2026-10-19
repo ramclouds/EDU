@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDeveloperDashboard } from "../controllers/Developer/useDeveloperDashboard";
-import { APP_NAME } from "../config/appConfig";
+import { APP_NAME, FILE_BASE_URL } from "../config/appConfig";
 import "../css/dashboard.css";
 
 const STATUS_STYLES = {
@@ -19,7 +19,6 @@ const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : "—");
 const fmtDateTime = (iso) => (iso ? new Date(iso).toLocaleString() : "—");
 
 // Days until a trial ends, for the list view (the server computes the
-// authoritative figure on the detail view).
 function trialDaysLeft(s) {
   if (s.status !== "Trial" || !s.trial_ends_at) return null;
   const ms = new Date(s.trial_ends_at).getTime() - Date.now();
@@ -75,9 +74,10 @@ function CreateSchoolModal({ onClose, onCreate, creating, prefix }) {
     admin_first_name: "", admin_last_name: "", admin_email: "", admin_password: "",
   });
   const update = (f) => (e) => setForm((s) => ({ ...s, [f]: e.target.value }));
+  const [logoFile, setLogoFile] = useState(null);
   const submit = async (e) => {
     e.preventDefault();
-    const r = await onCreate({ ...form, max_students: Number(form.max_students), max_staff: Number(form.max_staff) });
+    const r = await onCreate({ ...form, max_students: Number(form.max_students), max_staff: Number(form.max_staff) }, logoFile);
     if (r) onClose();
   };
   return (
@@ -113,6 +113,9 @@ function CreateSchoolModal({ onClose, onCreate, creating, prefix }) {
               <input type="number" min="1" className={input} value={form.max_staff} onChange={update("max_staff")} />
             </label>
           </div>
+          <label className="sm:col-span-2 text-sm font-medium">School logo (optional, PNG, JPG or WEBP, up to 2 MB)
+            <input type="file" accept="image/png,image/jpeg,image/webp" className={input} onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+          </label>
           <p className="sm:col-span-2 mt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">First Super Admin</p>
           <label className="text-sm font-medium">First name
             <input required className={input} value={form.admin_first_name} onChange={update("admin_first_name")} />
@@ -133,6 +136,36 @@ function CreateSchoolModal({ onClose, onCreate, creating, prefix }) {
         </form>
       </div>
     </div>
+  );
+}
+
+function SchoolLogoManager({ detail, api, busy, onChanged }) {
+  const [file, setFile] = useState(null);
+  const logo = detail.logo_url ? `${FILE_BASE_URL}${detail.logo_url}` : null;
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">School logo</h3>
+      <div className="flex items-center gap-4">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-50 dark:border-slate-700 dark:bg-slate-900">
+          {logo ? <img src={logo} alt={detail.name} className="h-full w-full object-contain" /> : <i className="bi bi-image text-2xl text-gray-400" />}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <input type="file" accept="image/png,image/jpeg,image/webp" className={input} onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={busy || !file} className={primary}
+              onClick={async () => { if (await api.uploadSchoolLogo(detail.id, file)) { setFile(null); onChanged(); } }}>
+              Upload logo
+            </button>
+            {logo && (
+              <button type="button" disabled={busy} className={btn}
+                onClick={async () => { if (await api.removeSchoolLogo(detail.id)) onChanged(); }}>
+                Remove logo
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -206,6 +239,7 @@ function SchoolDetail({ schoolId, listRow, api, onClose, onChanged }) {
         <div className="space-y-5 p-5">
           {tab === "overview" && (
             <>
+              <SchoolLogoManager detail={detail} api={api} busy={busy} onChanged={() => { reload(); onChanged(); }} />
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[detail.status] || ""}`}>{detail.status}</span>
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs dark:bg-slate-700 dark:text-gray-200">{detail.plan}</span>

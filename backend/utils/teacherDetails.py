@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def _can_access_teacher(teacher_id):
-
+    # BUG FIX: these endpoints previously had no ownership check at all
     current_user = get_current_user()
     current_user_type = get_current_user_type()
 
@@ -314,10 +314,6 @@ class ChangeTeacherPassword(MethodView):
             id = int(id)
 
             # This endpoint requires knowing the current password, so
-            # it's self-service only - a teacher changing their own
-            # password. Admin-initiated password resets go through
-            # AdminTeacherPasswordAPI (utils/TeacherManagement.py),
-            # which doesn't require the old password.
             current_user = get_current_user()
             current_user_type = get_current_user_type()
             if not (

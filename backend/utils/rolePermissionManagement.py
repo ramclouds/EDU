@@ -152,14 +152,6 @@ DEFAULT_ROLES = [
         "modules": [
             "dashboard",
             # "academic" is the academic-admin-dashboard's own
-            # DASHBOARD_REGISTRY module_code — without it here, an
-            # Academic Admin with this role assigned gets 403
-            # DASHBOARD_ACCESS_DENIED on their own dashboard the moment
-            # any role is assigned (the owner_admin_type fallback in
-            # get_user_dashboard_access only applies when NO role is
-            # assigned yet). Every other admin type's default role
-            # already includes its own module_code (library/accounts/
-            # hostel/hr) — this was the one left out.
             "academic",
             "students",
             "teachers",
@@ -220,9 +212,6 @@ DEFAULT_ROLES = [
             "dashboard",
             "students",
             # "teachers" doubles as the staff-directory module: it's what
-            # gates the combined teaching + non-teaching + admin staff
-            # list the Accounts dashboard's Staff section needs for
-            # payroll/salary work (see staffDirectory.AdminStaffListAPI).
             "teachers",
             "fees",
             "accounts",
@@ -360,7 +349,7 @@ def _dashboard_rights_from_actions(action_map):
 
 
 def get_user_dashboard_access(user, dashboard_entry):
-
+    # Resolve {can_view, can_write} for one dashboard entry for a given
 
     if not dashboard_entry:
         return {"can_view": False, "can_write": False}
@@ -404,14 +393,6 @@ def get_user_dashboard_access(user, dashboard_entry):
         return {"can_view": False, "can_write": False}
 
     # BUG FIX: a brand-new admin has no RBACUserRole row yet (nobody has
-    # opened Role & Permission Management for them). Previously this was
-    # indistinguishable from "explicitly assigned a role with zero
-    # permissions", so a legitimate admin_type owner (e.g. Academic Admin)
-    # could never log in to their own dashboard until a Super Admin
-    # manually assigned them a role - see the DASHBOARD_ACCESS_DENIED
-    # gate in Login.post(). If there's no role assignment at all AND
-    # this admin_type owns this dashboard, grant baseline access instead
-    # of locking the account out of its own dashboard.
     if access["role"] is None and dashboard_entry.get("owner_admin_type") == getattr(
         user, "admin_type", None
     ):
@@ -423,6 +404,7 @@ def get_user_dashboard_access(user, dashboard_entry):
 
 
 def list_dashboard_access_for_user(user):
+    # Return every dashboard the user may see, each with can_view
 
     results = []
 
@@ -446,6 +428,7 @@ def list_dashboard_access_for_user(user):
 
 
 def get_home_dashboard_for_user(user):
+    # Resolve the dashboard a user should land on right after login,
 
     if isinstance(user, Student):
         return DASHBOARD_BY_KEY["student-dashboard"]
@@ -532,17 +515,6 @@ class RBACRole(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # NULL = a system default role, shared as a template across every
-    # school (e.g. "academic-admin", seeded by seed_rbac_defaults()).
-    # A real value = a custom role a school created for itself, visible
-    # and usable only by that school. `code` was globally unique before
-    # this, which would have blocked two different schools from both
-    # having a custom role coded "department-head" — uniqueness for
-    # custom roles is now enforced at the application level (see
-    # RBACRoleListCreateAPI) as (school_id, code) instead of a single
-    # global DB constraint, since the 6 system roles still need to stay
-    # globally unique among themselves (school_id IS NULL for all of
-    # them, so a DB-level composite unique index wouldn't reliably catch
-    # collisions there under standard SQL NULL semantics).
     school_id = db.Column(
         db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
@@ -1224,17 +1196,6 @@ def build_user_access(user_type, user_id):
     ]
 
     # A Super Admin always passes user_has_permission()/permission_required
-    # below regardless of role or module — that check short-circuits on
-    # is_super_admin_user() before it ever looks at effective_permissions.
-    # But effective_permissions is also what the FRONTEND reads (straight
-    # out of localStorage) to decide whether to show a module as
-    # read-only, with no equivalent is-super-admin check of its own. Any
-    # Super Admin without an explicit role/override granting a module
-    # full marks — e.g. the very first Super Admin created by the
-    # Developer's school-onboarding flow, who gets no RBACUserRole at
-    # all — would see every OTHER dashboard's "Read-only access" banner,
-    # even though the backend would actually have allowed the write.
-    # Keep them consistent by granting every module here too.
     is_super_admin = is_super_admin_user(user)
 
     effective_permissions = {}
@@ -1343,6 +1304,7 @@ def permission_required(module_code, action="view"):
 
 # DATABASE SEED
 def seed_rbac_defaults():
+    # Run once after db.create_all() or through a Flask CLI command
 
     try:
         module_lookup = {}
@@ -1431,7 +1393,6 @@ class RBACBootstrapAPI(MethodView):
     def get(self):
         try:
             # Self-heal older/production databases where RBAC tables exist but
-            # default module rows were never inserted. This is safe to repeat.
             if RBACModule.query.count() == 0:
                 seeded = seed_rbac_defaults()
                 if not seeded:
@@ -1485,8 +1446,6 @@ class RBACBootstrapAPI(MethodView):
             )
 
             # Overrides are keyed by (user_type, user_id) with no school
-            # column of their own, so scope them through the users they
-            # point at rather than counting every school's overrides.
             my_users_filter = _override_belongs_to_my_school()
 
             users_with_overrides = (
@@ -1569,7 +1528,7 @@ class RBACBootstrapAPI(MethodView):
 
 # ROLE CRUD API
 def _override_belongs_to_my_school():
-
+    # SQL condition: this override row targets a user in the caller's
     school_id = _current_school_id()
     clauses = []
 
@@ -1592,7 +1551,7 @@ def _override_belongs_to_my_school():
 
 
 def _visible_roles_filter():
-
+    # System default roles (school_id IS NULL) plus this school's own
     return or_(
         RBACRole.school_id.is_(None),
         RBACRole.school_id == _current_school_id(),
@@ -1644,8 +1603,6 @@ class RBACRoleListAPI(MethodView):
             return jsonify({"error": "Invalid user type"}), 400
 
         # A code can't collide with a system role or with one of THIS
-        # school's own custom roles — another school's custom role with
-        # the same code is irrelevant and must not block creation.
         if RBACRole.query.filter(
             RBACRole.code == code, _visible_roles_filter()
         ).first():
@@ -1727,7 +1684,7 @@ def _get_visible_role(role_id):
 
 
 def _role_is_editable(role):
-
+    # System roles (school_id NULL) are shared by every school, so a
     return role.school_id == _current_school_id()
 
 
@@ -1910,9 +1867,6 @@ class RBACRolePermissionAPI(MethodView):
             return jsonify({"error": "Role not found"}), 404
 
         # Editing a shared system role's permission matrix would change
-        # what every school's admins can do at once (and
-        # seed_rbac_defaults() would silently revert it on the next
-        # restart) — only a school's own custom roles are editable here.
         if not _role_is_editable(role):
             return jsonify({"error": _SYSTEM_ROLE_READONLY_ERROR}), 403
 
@@ -2025,7 +1979,7 @@ class RBACRolePermissionAPI(MethodView):
 
 # USER LIST API
 def _get_user_in_my_school(user_type, user_id):
-
+    # Look up a user by (type, id), but only if they belong to the
     model = get_user_model(user_type)
 
     if not model:
@@ -2073,7 +2027,6 @@ class RBACUserListAPI(MethodView):
             model = get_user_model(user_type)
 
             # Staff is optional in some installations. Skip only the missing
-            # optional model while still returning Admin/Teacher/Student rows.
             if not model:
                 continue
 

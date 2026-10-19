@@ -9,14 +9,7 @@ const EMPTY_STATEMENT = {
 
 const EMPTY_PREVIOUS = { label: "", net_profit: 0, total_revenue: 0, total_expense: 0 };
 
-/**
- * Accounts Admin > Profit & Loss section.
- *
- * Backed by GET /api/accounts/profit-loss: a classic P&L for one
- * month - revenue (fees + other income by category), expenses
- * (payroll + other expenses by category), net profit/loss, and the
- * previous month's totals for a quick comparison.
- */
+// Accounts Admin > Profit & Loss section
 export function useProfitLoss({ fetchWithAuth, showToast }) {
   const [statement, setStatement] = useState(EMPTY_STATEMENT);
   const [previousPeriod, setPreviousPeriod] = useState(EMPTY_PREVIOUS);

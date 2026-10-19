@@ -1,3 +1,5 @@
+# Shared multi-tenancy helpers
+
 from flask import request
 
 from utils.auth import Admin, Student, Teacher
@@ -8,7 +10,7 @@ def current_school_id():
 
 
 def caller_can_access_student(student_id):
-
+    # (allowed, student). Allowed when the caller IS this student, or is
     try:
         student_id = int(student_id)
     except (TypeError, ValueError):
@@ -30,7 +32,7 @@ def caller_can_access_student(student_id):
 
 
 def caller_can_access_teacher(teacher_id):
-
+    # (allowed, teacher). Allowed when the caller IS this teacher, or is
     try:
         teacher_id = int(teacher_id)
     except (TypeError, ValueError):

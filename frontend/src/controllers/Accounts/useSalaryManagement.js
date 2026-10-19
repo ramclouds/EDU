@@ -16,16 +16,7 @@ export const SALARY_CATEGORY_TABS = [
   { value: "admin", label: "Admin Staff" },
 ];
 
-/**
- * Accounts Admin > Salary Management section.
- *
- * Whole-roster view (GET /api/accounts/payroll/staff) of every
- * teacher/non-teaching-staff/admin with their salary setup status.
- * Clicking a row opens the same per-person salary modal
- * (useStaffSalaryDetails) as the Staff section, so this is purely a
- * "who still needs a salary structure" worklist, not a separate data
- * entry surface.
- */
+// Accounts Admin > Salary Management section
 export function useSalaryManagement({ fetchWithAuth, showToast }) {
   const [staff, setStaff] = useState([]);
   const [stats, setStats] = useState(EMPTY_STATS);

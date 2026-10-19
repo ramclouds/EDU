@@ -10,16 +10,7 @@ const EMPTY_FILTERS = {
   days: 30,
 };
 
-/**
- * Super Admin > Activity Logs section (inside the Accounts dashboard).
- *
- * Backed by GET /api/accounts/activity-logs, which is backend-gated to
- * Super Admin only - see _require_super_admin() in utils/accounts.py.
- * An Accounts Admin cannot read this back even if they somehow reach
- * this component, so the frontend hiding the sidebar entry (see
- * isSuperAdmin in the dashboard component) is a UX nicety, not the
- * actual security boundary.
- */
+// Super Admin > Activity Logs section (inside the Accounts dashboard)
 export function useAccountsActivityLogs({ fetchWithAuth, showToast, enabled }) {
   const [logs, setLogs] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);

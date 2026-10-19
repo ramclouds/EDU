@@ -30,9 +30,6 @@ export function useAdminDashboard(activeSection, setActiveSection) {
         ...(announcements || []).map(n => ({
             ...n,
             // 🐛 BUGFIX: notices come back from the API with a
-            // `description` field, not `message`. The bell dropdown and
-            // toast both read `item.message`, so notice text was always
-            // rendering blank. Fall back through both field names.
             message: n.message || n.description || "",
             source: "notice",
             time: n.date || n.created_at || new Date().toISOString()
@@ -160,9 +157,6 @@ export function useAdminDashboard(activeSection, setActiveSection) {
     // AUTO FETCH
     useEffect(() => {
         // 🐛 BUGFIX: `loading` was initialized to `true` and never set to
-        // `false` anywhere in the original hook, so any UI relying on it
-        // would show a permanent loading state. Clear it once the first
-        // notifications fetch settles.
         fetchNotifications().finally(() => setLoading(false));
 
         const interval = setInterval(fetchNotifications, 15000); // refresh every 15 sec
@@ -260,9 +254,6 @@ export function useAdminDashboard(activeSection, setActiveSection) {
             } else {
                 if (!n.is_read) await markNotificationRead(n.id);
                 // 🐛 BUGFIX: sidebar/section key is "leave-requests", not
-                // "studentLeave" — the old value matched nothing, so
-                // clicking a leave notification just closed the dropdown
-                // and left the admin on whatever section they were on.
                 setActiveSection?.("leave-requests");
             }
         } catch (err) {
@@ -270,11 +261,7 @@ export function useAdminDashboard(activeSection, setActiveSection) {
         }
     };
 
-    // =================  NOTICES START =================
-    // 🐛 BUGFIX: fetchNotices used to be declared *inside* the effect, so
-    // there was no way to re-fetch after creating/editing/removing a
-    // notice — the list only ever refreshed on the 30s interval. Moved it
-    // out so create/update/delete can trigger an immediate refresh.
+    // NOTICES START
     const fetchNotices = async () => {
         const { user } = getAuth();
         if (!user) return;
@@ -313,7 +300,6 @@ export function useAdminDashboard(activeSection, setActiveSection) {
     }, []);
 
     // CREATE NOTICE (NEW — there was previously no way to publish an
-    // announcement from the dashboard at all)
     const createNotice = async (payload) => {
         setNoticeSubmitting(true);
         try {

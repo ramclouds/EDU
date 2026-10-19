@@ -113,9 +113,7 @@ export function useHostelMessMenu({ activeSection, fetchWithAuth, showToast }) {
         [notify, request],
     );
 
-    // ============================================================
     // EDIT ONE CELL
-    // ============================================================
     const openEntryModal = useCallback((dayOfWeek, mealType, existingEntry) => {
         setEntryForm({
             day_of_week: dayOfWeek,

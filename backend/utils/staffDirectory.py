@@ -106,6 +106,7 @@ def _staff_row(staff):
 
 
 class AdminStaffListAPI(MethodView):
+    # GET /api/admin/staff
 
     @permission_required("teachers", "view")
     def get(self):

@@ -37,6 +37,11 @@ import { useFinancialOverview } from "../controllers/Accounts/useFinancialOvervi
 import { useProfitLoss } from "../controllers/Accounts/useProfitLoss";
 import { useAccountsNotifications } from "../controllers/Accounts/useAccountsNotifications";
 import { useAccountsActivityLogs } from "../controllers/Accounts/useAccountsActivityLogs";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
+
+const SEARCH_SECTIONS = [{ key: "bank-accounts", label: "Bank accounts" }, { key: "dashboard", label: "Dashboard" }, { key: "expense-categories", label: "Expense categories" }, { key: "expense-list", label: "Expense list" }, { key: "fee-collection", label: "Fee collection" }, { key: "fee-reports", label: "Fee reports" }, { key: "fee-structure", label: "Fee structure" }, { key: "financial-reports", label: "Financial reports" }, { key: "income", label: "Income" }, { key: "logs", label: "Logs" }, { key: "notifications", label: "Notifications" }, { key: "payslips", label: "Payslips" }, { key: "pending-fees", label: "Pending fees" }, { key: "profile", label: "Profile" }, { key: "profit-loss", label: "Profit loss" }, { key: "salary-management", label: "Salary management" }, { key: "settings", label: "Settings" }, { key: "staff", label: "Staff" }, { key: "students", label: "Students" }, { key: "transactions", label: "Transactions" }];
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -477,9 +482,9 @@ function AdminDashboard() {
       ${sidebarExpanded ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
     `}
         >
-          <i
+          <SchoolLogo
             className="bi bi-calculator text-purple-600 text-xl"
-            title={!sidebarExpanded ? APP_NAME : ""}
+            title={!sidebarExpanded ? schoolDisplayName() : ""}
           />
 
           <span
@@ -488,7 +493,7 @@ function AdminDashboard() {
         ${sidebarExpanded ? "opacity-100 max-w-[180px] ml-2" : "opacity-0 max-w-0 ml-0"}
       `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
@@ -496,17 +501,13 @@ function AdminDashboard() {
         {/* ========================= ACCOUNTS ADMIN SIDEBAR NAV ========================= */}
         <nav className="h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-4 space-y-2 text-sm">
           {[
-            // =========================================================
             // MAIN
-            // =========================================================
             {
               title: "MAIN",
               items: [["dashboard", "bi-grid", "Dashboard"]],
             },
 
-            // =========================================================
             // USERS
-            // =========================================================
             {
               title: "USERS",
               items: [
@@ -515,9 +516,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // FEE MANAGEMENT
-            // =========================================================
             {
               title: "FEE MANAGEMENT",
               items: [
@@ -528,9 +527,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // EXPENSES & PAYROLL
-            // =========================================================
             {
               title: "EXPENSES & PAYROLL",
               items: [
@@ -541,9 +538,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // ACCOUNTS & BANKING
-            // =========================================================
             {
               title: "ACCOUNTS & BANKING",
               items: [
@@ -553,9 +548,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // REPORTS & COMMUNICATION
-            // =========================================================
             {
               title: "REPORTS & COMMUNICATION",
               items: [
@@ -565,18 +558,12 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // SYSTEM
-            // =========================================================
             {
               title: "SYSTEM",
               items: [
                 ["settings", "bi-gear", "Settings"],
                 // Activity Logs is Super Admin oversight of what the
-                // Accounts Admin has done - an Accounts Admin must
-                // never even see this exists, let alone open it, so
-                // it's left out of the array entirely rather than
-                // shown-but-blocked.
                 ...(isSuperAdmin
                   ? [["logs", "bi-shield-check", "Activity Logs"]]
                   : []),
@@ -650,12 +637,12 @@ function AdminDashboard() {
         >
           {sidebarExpanded ? (
             <span className="whitespace-nowrap transition-all duration-300">
-              {APP_NAME} © {APP_YEAR}
+              <SchoolName /> © {APP_YEAR}
             </span>
           ) : (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             />
           )}
         </div>
@@ -721,7 +708,7 @@ function AdminDashboard() {
               <div className="flex shrink-0 items-center gap-2 md:hidden">
                 <i className="bi bi-mortarboard text-lg text-indigo-600" />
                 <span className="max-w-[145px] truncate text-sm font-bold text-indigo-600">
-                  {APP_NAME}
+                  <SchoolName />
                 </span>
               </div>
 
@@ -750,18 +737,7 @@ function AdminDashboard() {
               <div className="relative hidden w-full max-w-xl flex-1 px-2 md:block">
                 <i className="bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-gray-200 bg-white/70 py-2.5 pl-10 pr-4
-            text-sm text-gray-800 shadow-sm outline-none backdrop-blur-md
-            transition-all duration-300 placeholder:text-gray-400
-            hover:shadow-md focus:bg-white focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-700/70 dark:text-white
-            dark:placeholder:text-gray-400 dark:focus:bg-slate-700"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT ACTIONS */}
@@ -983,16 +959,7 @@ function AdminDashboard() {
               <div className="relative">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 pl-11
-            text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-                  placeholder="Search anything here..."
-                  autoFocus
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
             </div>
           )}

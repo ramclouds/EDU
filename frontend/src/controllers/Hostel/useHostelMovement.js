@@ -141,9 +141,7 @@ export function useHostelMovement({ activeSection, fetchWithAuth, showToast }) {
         loadMovements({ filters: next });
     }, [loadMovements]);
 
-    // ============================================================
     // NEW CHECK-OUT
-    // ============================================================
     const openCheckoutModal = useCallback(() => {
         setCheckoutForm({ ...EMPTY_CHECKOUT_FORM });
         setStudentSearch("");
@@ -224,9 +222,7 @@ export function useHostelMovement({ activeSection, fetchWithAuth, showToast }) {
         }
     }, [canWriteHostel, checkoutForm, loadMovements, notify, request]);
 
-    // ============================================================
     // CHECK-IN
-    // ============================================================
     const checkInMovement = useCallback(
         async (movement) => {
             if (!canWriteHostel) {

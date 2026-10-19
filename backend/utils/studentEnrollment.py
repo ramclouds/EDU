@@ -29,6 +29,7 @@ def _current_school_id():
 
 
 class StudentEnrollmentOptionsAPI(MethodView):
+    # Feeds the "Enroll Student" form's Batch/Division/Section/Class
 
     @permission_required("academic", "view")
     def get(self):
@@ -117,8 +118,6 @@ class StudentEnrollmentPreviewAPI(MethodView):
 
             if academic_class_id:
                 # Confirm the class actually belongs to this school before
-                # using it for anything — otherwise a crafted request could
-                # probe another school's roll-number sequence.
                 owned_class = AcademicClass.query.filter_by(
                     id=academic_class_id, school_id=_current_school_id()
                 ).first()

@@ -13,15 +13,7 @@ const EMPTY_SUMMARY = {
   net: 0,
 };
 
-/**
- * Accounts Admin > Financial Reports section.
- *
- * Backed by GET /api/accounts/financial-overview - the honest "Net
- * Balance" figure that the dashboard home page can't give on its own,
- * because it combines fee collections (a separate table) with the
- * general Income/Expense ledger and payroll, rather than just the
- * ledger alone.
- */
+// Accounts Admin > Financial Reports section
 export function useFinancialOverview({ fetchWithAuth, showToast }) {
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [trend, setTrend] = useState([]);

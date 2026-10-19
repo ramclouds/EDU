@@ -24,13 +24,7 @@ const EMPTY_REPORT = {
     movement: { currently_outside: 0 },
 };
 
-/**
- * Drives the "Reports & Analytics" dashboard section: one aggregated
- * snapshot across occupancy, fees, complaints/maintenance, attendance
- * and movement. Reuses the same /admin/hostel/reports endpoint that
- * computes everything from the same helpers each individual section
- * already trusts, so nothing here can quietly disagree with those.
- */
+// Drives the "Reports & Analytics" dashboard section: one aggregated
 export function useHostelReports({ activeSection, fetchWithAuth, showToast }) {
     const fetchRef = useRef(fetchWithAuth);
     const toastRef = useRef(showToast);

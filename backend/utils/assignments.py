@@ -25,18 +25,14 @@ from utils.tenancy import (
     current_school_id as _current_school_id,
 )
 
-# =============================
 # CONFIG
-# =============================
 ALLOWED_EXTENSIONS = {"pdf", "doc", "docx"}
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 UPLOAD_BASE = os.path.abspath(os.path.join(BASE_DIR, "..", "Submitted_Assignments"))
 
 
-# =============================
 # MODELS
-# =============================
 class Assignment(db.Model):
     __tablename__ = "assignments"
 
@@ -136,9 +132,7 @@ class AssignmentFile(db.Model):
     file_url = db.Column(db.Text, nullable=False)
 
 
-# =============================
 # HELPERS
-# =============================
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -195,9 +189,7 @@ def create_folder_structure(info):
     return folder_path, folder_name
 
 
-# =============================
 # SUBMIT ASSIGNMENT API
-# =============================
 class SubmitAssignmentAPI(MethodView):
 
     @login_required
@@ -304,9 +296,7 @@ class SubmitAssignmentAPI(MethodView):
             return jsonify({"error": "Upload failed"}), 500
 
 
-# =============================
 # GET STUDENT ASSIGNMENTS API
-# =============================
 class GetStudentAssignmentsAPI(MethodView):
 
     @login_required
@@ -466,12 +456,6 @@ class CreateAssignmentAPI(MethodView):
 
         try:
             # Without this, a teacher at a DIFFERENT school who happened
-            # to know (or guess) another school's teacher_id + a real
-            # academic_class_id/subject_id combination for that teacher
-            # could create an assignment impersonating them — the
-            # TeacherClass check below only verifies the combo exists
-            # somewhere, not that the caller IS that teacher (or admin
-            # staff at the same school).
             caller_allowed, _ = caller_can_access_teacher(teacher_id)
             if not caller_allowed:
                 return jsonify({"error": "Forbidden"}), 403
@@ -736,9 +720,6 @@ class GradeAssignmentAPI(MethodView):
         data = request.form if request.form else request.get_json(silent=True) or {}
 
         # AssignmentSubmission has no school_id of its own — previously
-        # this also had no not-found check at all (sub could be None and
-        # crash) and no ownership check (any teacher from any school
-        # could grade/overwrite any submission by id).
         sub = (
             AssignmentSubmission.query.join(
                 Assignment, Assignment.id == AssignmentSubmission.assignment_id
@@ -781,9 +762,6 @@ class GradeAssignmentAPI(MethodView):
 
 
 # Add Edit/Delete for assignments
-# =============================
-# UPDATE ASSIGNMENT API
-# =============================
 class UpdateAssignmentAPI(MethodView):
 
     @login_required
@@ -791,14 +769,7 @@ class UpdateAssignmentAPI(MethodView):
 
         try:
 
-            # =============================
             # AUTH CHECK
-            # =============================
-            # The old check only compared the URL's teacher_id against
-            # assignment.created_by — both attacker-controlled, so a
-            # matching pair (if guessed/known) passed regardless of who
-            # was actually calling. Now verifies the CALLER really is
-            # that teacher (or admin staff at the same school).
             caller_allowed, _ = caller_can_access_teacher(teacher_id)
             if not caller_allowed:
                 return jsonify({"error": "Forbidden"}), 403
@@ -813,9 +784,7 @@ class UpdateAssignmentAPI(MethodView):
             if assignment.created_by != teacher_id:
                 return jsonify({"error": "Unauthorized"}), 403
 
-            # =============================
             # SUPPORT FORM-DATA + JSON
-            # =============================
             data = request.form if request.form else request.get_json(silent=True) or {}
 
             print("========== UPDATE ASSIGNMENT ==========")
@@ -823,9 +792,7 @@ class UpdateAssignmentAPI(MethodView):
             print("FILES:", request.files)
             print("JSON:", request.get_json(silent=True))
 
-            # =============================
             # UPDATE FIELDS
-            # =============================
 
             assignment.title = data.get("title", assignment.title)
 
@@ -858,9 +825,7 @@ class UpdateAssignmentAPI(MethodView):
 
                 assignment.total_marks = int(data.get("total_marks"))
 
-            # =============================
             # OPTIONAL FILE UPDATE
-            # =============================
 
             file = request.files.get("file")
 
@@ -882,9 +847,7 @@ class UpdateAssignmentAPI(MethodView):
                 # save new file
                 file.save(file_path)
 
-                # =============================
                 # DELETE OLD FILES
-                # =============================
 
                 old_files = AssignmentFile.query.filter_by(
                     assignment_id=assignment.id
@@ -906,9 +869,7 @@ class UpdateAssignmentAPI(MethodView):
 
                     db.session.delete(old)
 
-                # =============================
                 # SAVE NEW FILE RECORD
-                # =============================
 
                 db.session.add(
                     AssignmentFile(
@@ -918,9 +879,7 @@ class UpdateAssignmentAPI(MethodView):
                     )
                 )
 
-            # =============================
             # COMMIT
-            # =============================
 
             db.session.commit()
 
@@ -963,9 +922,7 @@ class DeleteAssignmentAPI(MethodView):
             if assignment.created_by != teacher_id:
                 return jsonify({"error": "Unauthorized"}), 403
 
-            # =============================
             # 🔥 DELETE FILES FROM DISK
-            # =============================
 
             # 1. Assignment files (teacher uploads)
             for f in assignment.files:
@@ -988,9 +945,7 @@ class DeleteAssignmentAPI(MethodView):
                         if os.path.exists(file_path):
                             os.remove(file_path)
 
-            # =============================
             # 🔥 DELETE DB (CASCADE)
-            # =============================
             db.session.delete(assignment)
             db.session.commit()
 
@@ -1003,9 +958,7 @@ class DeleteAssignmentAPI(MethodView):
             return jsonify({"error": "Delete failed", "details": str(e)}), 500
 
 
-# =============================
 # RECHECK / FORCE RESUBMIT API
-# =============================
 class ForceResubmitAPI(MethodView):
 
     @login_required
@@ -1037,7 +990,6 @@ class ForceResubmitAPI(MethodView):
             sub.marks_obtained = None
 
             # optional: keep feedback OR reset
-            # sub.feedback = None
 
             db.session.commit()
 

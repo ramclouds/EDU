@@ -1,25 +1,4 @@
-"""
-ACCOUNTS MODULE
-
-Everything the Accounts Admin dashboard needs that isn't already covered
-by studentDetails.py / teacherDetails.py / adminsDetails.py / staffDirectory.py:
-
-  - Student fees: installments, payments, pending/overdue tracking
-  - Staff payroll: salary structure, monthly payslips, payment history
-  - A general ledger for other income/expense (donations, rent, utilities,
-    maintenance, etc.) that doesn't belong to either of the above
-
-Staff (teacher / non-teaching staff / admin) are addressed generically
-via (record_type, record_id) - the same "teacher" | "staff" | "admin"
-tags used in utils/staffDirectory.py - since salary structures and
-payslips apply identically to all three and there's no single staff
-table to foreign-key against.
-
-Structured the same way as utils/hostel.py: plain MethodView classes,
-@login_required + a manual authorize_accounts_admin() permission check
-(so read/write/edit can be checked per-action rather than per-endpoint),
-module-level serializers, SQLAlchemy models defined right here.
-"""
+# ACCOUNTS MODULE
 
 from datetime import date, datetime, timedelta
 import re
@@ -41,14 +20,6 @@ from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import user_has_permission
 
 # Reuse the app's one real per-user notification system rather than
-# inventing a second one - see utils/Notifications.py's Notification
-# model. Sending a notification is best-effort: if it fails, the
-# triggering action (payment recorded, payslip paid, etc.) must still
-# succeed, so every call site below wraps this in its own try/except
-# via _notify_user() rather than letting a notification error roll
-# back the real transaction. ActivityLog/log_activity power the
-# Activity Logs section (Super Admin oversight of what the Accounts
-# Admin has done).
 from utils.Notifications import (
     Notification,
     ActivityLog,
@@ -102,7 +73,7 @@ def current_school_id():
 
 
 def scoped_get(model, pk):
-
+    # Look up a row by primary key, but only if it belongs to the caller's
     if pk is None:
         return None
     try:
@@ -113,7 +84,7 @@ def scoped_get(model, pk):
 
 
 def authorize_accounts_admin(required_right="read"):
-
+    # Same shape as hostel.py's authorize_hostel_admin(), checked against
     current_user = getattr(request, "user", None)
 
     if not isinstance(current_user, Admin):
@@ -207,7 +178,7 @@ def _student_class_details(student_id):
 
 
 def _resolve_staff_person(record_type, record_id):
-
+    # Look up a teacher / non-teaching staff / admin by (record_type, id)
     record_type = str(record_type or "").strip().lower()
 
     if record_type == "teacher":
@@ -270,7 +241,7 @@ def _resolve_staff_person(record_type, record_id):
 
 
 def _all_staff_persons():
-
+    # Every teacher + non-teaching staff + admin as the same identity
     people = []
 
     for teacher in Teacher.query.all():
@@ -287,7 +258,7 @@ def _all_staff_persons():
 
 
 def _students_in_batch(batch_id):
-
+    # All students whose current academic record places them in the
     if batch_id is None:
         return Student.query.filter(Student.status == "Active").all()
 
@@ -306,7 +277,7 @@ def _students_in_batch(batch_id):
 
 
 def _refresh_overdue_installments():
-
+    # Flip any Pending/Partial installment whose due date has passed
     today = date.today()
     stale = FeeInstallment.query.filter(FeeInstallment.school_id == current_school_id(), 
         FeeInstallment.status.in_(["Pending", "Partial"]),
@@ -321,7 +292,7 @@ def _refresh_overdue_installments():
 
 
 def _notify_user(user_id, role, title, message, notif_type, **extra):
-
+    # Best-effort: create one row in the app's real notification inbox
     try:
         notification = Notification(
             school_id=recipient_school_id(user_id, role),
@@ -376,9 +347,6 @@ def _notify_staff(record_type, record_id, title, message, notif_type):
     elif record_type == "staff":
         extra["staff_id"] = record_id
     # role="admin" recipients don't have a dedicated FK column on
-    # Notification (only student_id/teacher_id/staff_id exist) -
-    # user_id + role="admin" is still enough for NotificationsAPI.get
-    # to find it, since that endpoint filters on exactly those two.
 
     _notify_user(
         user_id=record_id,
@@ -388,12 +356,16 @@ def _notify_staff(record_type, record_id, title, message, notif_type):
         notif_type=notif_type,
         **extra,
     )
+
+
+# ============================= AUDIT / OVERSIGHT ======================
+
+# Actions large/destructive enough to also interrupt a Super Admin
 LARGE_EXPENSE_ALERT_THRESHOLD = 50000  # ₹ - tune to whatever counts as "large" for this school
 
 
 def _log_accounts_activity(current_user, action, description):
-    """Record one audit trail row for something the Accounts Admin did.
-    Best-effort (log_activity already has its own try/except+commit)."""
+    # Record one audit trail row for something the Accounts Admin did
     if not current_user:
         return
     log_activity(
@@ -413,7 +385,7 @@ def _super_admin_ids():
 
 
 def _alert_super_admins(current_user, action, description):
-
+    # For risky/destructive actions: log it AND push a real-time
     _log_accounts_activity(current_user, action, description)
 
     actor_name = _clean_str(
@@ -432,6 +404,8 @@ def _alert_super_admins(current_user, action, description):
 
 # ============================= MODELS =============================
 class FeeStructure(db.Model):
+    # A reusable fee template - e.g. "Class 10 Term 1 Tuition, due
+
     __tablename__ = "fee_structures"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -470,6 +444,7 @@ class FeeStructure(db.Model):
 
 
 class FeeInstallment(db.Model):
+    # One fee due for one student - a term fee, an admission fee, a bus
 
     __tablename__ = "fee_installments"
 
@@ -482,6 +457,7 @@ class FeeInstallment(db.Model):
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
     )
 
+    # Set when this installment was generated by "Apply" on a
     source_structure_id = db.Column(
         db.Integer, db.ForeignKey("fee_structures.id", ondelete="SET NULL")
     )
@@ -533,7 +509,7 @@ class FeeInstallment(db.Model):
         return round(max(self.net_payable() - float(self.paid_amount or 0), 0), 2)
 
     def refresh_status(self):
-
+        # Recompute status from paid_amount vs due date. Called after
         if self.status == "Waived":
             return
 
@@ -550,7 +526,7 @@ class FeeInstallment(db.Model):
 
 
 class FeePayment(db.Model):
-
+    # A single payment transaction. Usually linked to one installment,
 
     __tablename__ = "fee_payments"
 
@@ -567,8 +543,6 @@ class FeePayment(db.Model):
     )
 
     # Unique per school, not globally: two schools must be able to issue
-    # receipt 0001 each. (The old global unique would have made the second
-    # school's first payment fail.)
     receipt_number = db.Column(db.String(40), nullable=False)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
 
@@ -592,6 +566,7 @@ class FeePayment(db.Model):
 
 
 class SalaryStructure(db.Model):
+    # Versioned pay structure for a staff member. Editing salary
 
     __tablename__ = "salary_structures"
 
@@ -646,6 +621,8 @@ class SalaryStructure(db.Model):
 
 
 class Payslip(db.Model):
+    # One generated payslip for one staff member for one month. Snapshots
+
     __tablename__ = "payslips"
     __table_args__ = (
         db.UniqueConstraint(
@@ -693,9 +670,7 @@ class Payslip(db.Model):
 
 
 class AccountsTransaction(db.Model):
-    """General ledger line for money in/out that isn't student fees or
-    staff payroll - donations, rent income, utility bills, maintenance,
-    supplies, etc."""
+    # General ledger line for money in/out that isn't student fees or
 
     __tablename__ = "accounts_transactions"
 
@@ -716,6 +691,7 @@ class AccountsTransaction(db.Model):
     reference_no = db.Column(db.String(100))
     description = db.Column(db.String(255))
 
+    # Which bank account this money moved through, if any - null means
     bank_account_id = db.Column(
         db.Integer, db.ForeignKey("bank_accounts.id", ondelete="SET NULL")
     )
@@ -725,6 +701,7 @@ class AccountsTransaction(db.Model):
 
 
 class BankAccount(db.Model):
+    # A school bank account. Balance isn't stored directly - it's
 
     __tablename__ = "bank_accounts"
 
@@ -753,6 +730,7 @@ class BankAccount(db.Model):
 
 
 class ExpenseCategory(db.Model):
+    # A managed expense category (Utilities, Maintenance, Supplies,
 
     __tablename__ = "expense_categories"
 
@@ -936,17 +914,9 @@ def serialize_expense_category(category, spent=None):
     return row
 
 
-# =====================================================================
 # STUDENT FEES
-# =====================================================================
 class StudentFeeOverviewAPI(MethodView):
-    """
-    GET /api/accounts/students/<student_id>/fees
-
-    Everything the "click on a student name" modal needs in one call:
-    identity + contact + parent info + class placement + every
-    installment + full payment history + a rolled-up summary.
-    """
+    # GET /api/accounts/students/<student_id>/fees
 
     @login_required
     def get(self, student_id):
@@ -1386,6 +1356,8 @@ class FeePaymentDetailAPI(MethodView):
 
 
 class FeeDashboardSummaryAPI(MethodView):
+    # GET /api/accounts/fees/summary
+
     @login_required
     def get(self):
         _, access_error = authorize_accounts_admin("read")
@@ -1458,10 +1430,9 @@ class FeeDashboardSummaryAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # STAFF PAYROLL
-# =====================================================================
 class StaffSalaryOverviewAPI(MethodView):
+    # GET /api/accounts/staff/<record_type>/<record_id>/salary
 
     @login_required
     def get(self, record_type, record_id):
@@ -1555,6 +1526,7 @@ class SalaryStructureAPI(MethodView):
             if basic is None or basic <= 0:
                 return jsonify({"success": False, "error": "A valid basic salary is required"}), 400
 
+            # Supersede any previous current structure rather than
             SalaryStructure.query.filter(SalaryStructure.school_id == current_school_id(), 
                 record_type=record_type, record_id=record_id, is_current=True
             ).update({"is_current": False})
@@ -1624,8 +1596,7 @@ class PayslipListAPI(MethodView):
 
     @login_required
     def post(self, record_type, record_id):
-        """Generate this month's (or a specified month's) payslip from
-        the staff member's current salary structure."""
+        # Generate this month's (or a specified month's) payslip from
         current_user, access_error = authorize_accounts_admin("write")
         if access_error:
             return access_error
@@ -1788,6 +1759,7 @@ class PayslipDetailAPI(MethodView):
                     ),
                 )
 
+            # Only fire on the Pending/Processing -> Paid transition, not
             if new_status == "Paid" and not was_already_paid:
                 period_label = date(payslip.year, payslip.month, 1).strftime("%B %Y")
                 _notify_staff(
@@ -1859,9 +1831,7 @@ class PayrollSummaryAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # GENERAL LEDGER (other income / expense)
-# =====================================================================
 class AccountsTransactionListAPI(MethodView):
     """GET/POST /api/accounts/transactions"""
 
@@ -2074,10 +2044,9 @@ class AccountsTransactionDetailAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # BATCH OPTIONS (for the Fee Structure "apply to a batch" dropdown)
-# =====================================================================
 class AccountsBatchOptionsAPI(MethodView):
+    # GET /api/accounts/batches
 
     @login_required
     def get(self):
@@ -2107,9 +2076,7 @@ class AccountsBatchOptionsAPI(MethodView):
         )
 
 
-# =====================================================================
 # FEE STRUCTURE TEMPLATES (bulk billing)
-# =====================================================================
 class FeeStructureListAPI(MethodView):
     """GET/POST /api/accounts/fee-structures"""
 
@@ -2308,6 +2275,7 @@ class FeeStructureDetailAPI(MethodView):
 
 
 class FeeStructureApplyAPI(MethodView):
+    # POST /api/accounts/fee-structures/<structure_id>/apply
 
     @login_required
     def post(self, structure_id):
@@ -2392,11 +2360,10 @@ class FeeStructureApplyAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # PENDING FEES (school-wide view across every student)
-# =====================================================================
 class PendingFeesListAPI(MethodView):
-\
+    # GET /api/accounts/fees/pending
+
     @login_required
     def get(self):
         _, access_error = authorize_accounts_admin("read")
@@ -2488,6 +2455,7 @@ class PendingFeesListAPI(MethodView):
 
 
 class SendFeeRemindersAPI(MethodView):
+    # POST /api/accounts/fees/send-reminders
 
     @login_required
     def post(self):
@@ -2585,10 +2553,9 @@ class SendFeeRemindersAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # FEE REPORTS (aggregate views across every student)
-# =====================================================================
 class FeeReportsAPI(MethodView):
+    # GET /api/accounts/fees/reports
 
     @login_required
     def get(self):
@@ -2801,9 +2768,7 @@ class FeeReportsAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # EXPENSE CATEGORIES
-# =====================================================================
 class ExpenseCategoryListAPI(MethodView):
     """GET/POST /api/accounts/expense-categories"""
 
@@ -2993,10 +2958,9 @@ class ExpenseCategoryDetailAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # SALARY MANAGEMENT (whole-roster payroll view)
-# =====================================================================
 class PayrollStaffListAPI(MethodView):
+    # GET /api/accounts/payroll/staff
 
     @login_required
     def get(self):
@@ -3060,10 +3024,9 @@ class PayrollStaffListAPI(MethodView):
         )
 
 
-# =====================================================================
 # PAYSLIPS (whole-roster view + bulk payroll run)
-# =====================================================================
 class PayslipsAllListAPI(MethodView):
+    # GET /api/accounts/payslips
 
     @login_required
     def get(self):
@@ -3130,6 +3093,7 @@ class PayslipsAllListAPI(MethodView):
 
 
 class RunPayrollAPI(MethodView):
+    # POST /api/accounts/payroll/run
 
     @login_required
     def post(self):
@@ -3221,11 +3185,9 @@ class RunPayrollAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # BANK ACCOUNTS
-# =====================================================================
 def _bank_account_balance(account):
-
+    # opening_balance + every Income linked to this account - every
     income = (
         db.session.query(func.coalesce(func.sum(AccountsTransaction.amount), 0))
         .filter(
@@ -3473,10 +3435,10 @@ class BankAccountDetailAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # FINANCIAL REPORTS (fees + payroll + general ledger, combined)
-# =====================================================================
 class FinancialOverviewAPI(MethodView):
+    # GET /api/accounts/financial-overview?month=&year
+
     @login_required
     def get(self):
         _, access_error = authorize_accounts_admin("read")
@@ -3640,14 +3602,7 @@ class FinancialOverviewAPI(MethodView):
 
 
 class ProfitLossAPI(MethodView):
-    """
-    GET /api/accounts/profit-loss?month=&year=
-
-    A classic P&L statement for one month: revenue broken into fee
-    collections + other income by category, expenses broken into
-    payroll + other expenses by category, and the net result - plus
-    the same figures for the previous month for a quick delta.
-    """
+    # GET /api/accounts/profit-loss?month=&year
 
     @login_required
     def get(self):
@@ -3764,14 +3719,9 @@ class ProfitLossAPI(MethodView):
             return jsonify({"success": False, "error": "Database error"}), 500
 
 
-# =====================================================================
 # ACTIVITY LOGS (Super Admin oversight of the Accounts Admin)
-# =====================================================================
 def _require_super_admin():
-    """Stricter than authorize_accounts_admin(): being a Super Admin is
-    the ONLY thing that passes here, not "has the accounts module
-    permission". An Accounts Admin - even one with full read/write/edit
-    on every accounts module - must never be able to read this back."""
+    # Stricter than authorize_accounts_admin(): being a Super Admin is
     current_user = getattr(request, "user", None)
 
     if not isinstance(current_user, Admin):
@@ -3797,6 +3747,7 @@ def _require_super_admin():
 
 
 class AccountsActivityLogsAPI(MethodView):
+    # GET /api/accounts/activity-logs
 
     @login_required
     def get(self):

@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ==== CORE ====
-from utils.auth import Login, Logout, SignUp, db, bcrypt
+from utils.auth import Login, Logout, db, bcrypt
 from utils.auth_middleware import login_required
 from utils.platform import (
     PlatformInfoAPI,
@@ -263,6 +263,9 @@ from utils.hostel import (
 )
 
 from utils.school_overview import ParentsAPI, EventsAPI, EventDetailAPI
+from utils.school_dashboard import SchoolOverviewAPI
+from utils.global_search import GlobalSearchAPI
+from utils.school_branding import SchoolLogoAPI, SchoolLogoServeAPI, SchoolMeAPI
 from utils.announcement import (
     CreateNoticeAPI,
     StudentNoticeAPI,
@@ -373,8 +376,6 @@ def create_app():
     bcrypt.init_app(app)
 
     # ==== CORS ====
-    # Comma-separated list of allowed origins, e.g.
-    # CORS_ORIGINS=https://app.example.com,https://admin.example.com
     cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173")
     cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
 
@@ -406,9 +407,6 @@ def create_app():
     # AUTH
     app.add_url_rule("/api/login", view_func=Login.as_view("login"), methods=["POST"])
 
-    app.add_url_rule(
-        "/api/signup", view_func=SignUp.as_view("signup"), methods=["POST"]
-    )
 
     app.add_url_rule(
         "/api/logout",
@@ -473,9 +471,7 @@ def create_app():
         methods=["POST"],
     )
 
-    # =========================================================
     # RBAC ROUTES
-    # =========================================================
 
     app.add_url_rule(
         "/api/rbac/bootstrap",
@@ -752,6 +748,31 @@ def create_app():
 
     # ================= PARENTS & EVENTS (Super Admin sections) =================
     app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/logo",
+        view_func=SchoolLogoAPI.as_view("developer_school_logo"),
+        methods=["POST", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/school-logo/<int:school_id>",
+        view_func=SchoolLogoServeAPI.as_view("school_logo"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/school/me",
+        view_func=SchoolMeAPI.as_view("school_me"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/search",
+        view_func=GlobalSearchAPI.as_view("global_search"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/admin/school-overview",
+        view_func=SchoolOverviewAPI.as_view("admin_school_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
         "/api/admin/parents",
         view_func=ParentsAPI.as_view("admin_parents"),
         methods=["GET"],
@@ -905,7 +926,6 @@ def create_app():
     )
 
     # ==== TEACHER ATTENDANCE ====
-    # 1️⃣ Get teacher assigned classes
     app.add_url_rule(
         "/api/teacher/classes/<int:teacher_id>",
         view_func=TeacherAssignedClassesAPI.as_view("teacher_classes"),
@@ -1255,9 +1275,7 @@ def create_app():
         methods=["GET"],
     )
 
-    # =========================================================
     # LIBRARY CATEGORY MANAGEMENT
-    # =========================================================
 
     app.add_url_rule(
         "/api/admin/library/categories",
@@ -1283,9 +1301,7 @@ def create_app():
         methods=["GET", "OPTIONS"],
     )
 
-    # =========================================================
     # LIBRARY AUTHOR MANAGEMENT
-    # =========================================================
     app.add_url_rule(
         "/api/admin/library/authors",
         view_func=LibraryAuthorListAPI.as_view("library_author_list_api"),
@@ -1310,9 +1326,7 @@ def create_app():
         methods=["GET", "OPTIONS"],
     )
 
-    # =========================================================
     # LIBRARY BOOK MANAGEMENT
-    # =========================================================
     app.add_url_rule(
         "/api/admin/library/books",
         view_func=LibraryBookListAPI.as_view("library_book_list_api"),
@@ -1908,7 +1922,6 @@ def create_app():
     )
 
     # STUDENT ROSTER (Academic Admin Students section, Accounts Admin
-    # Students section)
     app.add_url_rule(
         "/api/admin/students",
         view_func=AdminStudentsListAPI.as_view("admin_students_list"),
@@ -1916,7 +1929,6 @@ def create_app():
     )
 
     # STAFF DIRECTORY (Accounts Admin Staff section - teachers +
-    # non-teaching staff + admins combined)
     app.add_url_rule(
         "/api/admin/staff",
         view_func=AdminStaffListAPI.as_view("admin_staff_list"),
@@ -2155,7 +2167,7 @@ def create_app():
     TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
 
     def _safe_send(base_folder, filename):
-
+        # Resolve filename under base_folder and refuse to serve anything
         base_abs = os.path.abspath(base_folder)
         full_path = os.path.abspath(os.path.join(base_abs, filename))
 
@@ -2230,6 +2242,7 @@ def create_app():
     def internal_error(e):
         return jsonify({"error": "Internal server error"}), 500
 
+    # RBAC INITIALIZATION
     with app.app_context():
         try:
             seed_rbac_defaults()
@@ -2247,7 +2260,8 @@ if __name__ == "__main__":
 
     with app.app_context():
         if is_dev:
-
+            # Dev convenience only. Production schema changes must go
             db.create_all()
 
+    # debug=True enables the Werkzeug interactive debugger, which allows
     app.run(host="0.0.0.0", port=5000, debug=is_dev)

@@ -18,7 +18,6 @@ class Notice(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     # Notices belong to the school that published them. Before this, every
-    # school's notices were visible to every other school.
     school_id = db.Column(
         db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
     )
@@ -126,10 +125,6 @@ def serialize_notice(n, is_read=False):
         "title": n.title,
         "description": n.description,
         # BUGFIX: frontend (adminDashboard.js) reads `item.message` when
-        # rendering the combined notification/notice list in the bell
-        # dropdown. Notices never had a `message` key, so notice text
-        # silently disappeared there. Keep both keys so old and new
-        # frontend code paths keep working.
         "message": n.description,
         "category": n.category,
         "priority": n.priority,
@@ -198,10 +193,6 @@ class CreateNoticeAPI(MethodView):
             role_name = user.__class__.__name__
 
             # 🐛 BUGFIX: previously any logged-in user (including Students)
-            # could hit this endpoint and create a notice — it only ever
-            # *labeled* the creator, it never actually checked who was
-            # allowed to create one. Only Admins/Teachers may publish
-            # announcements.
             if role_name not in ("Admin", "Teacher"):
                 return (
                     jsonify(
@@ -562,8 +553,6 @@ class MarkNoticeReadAPI(MethodView):
 
 
 # ================= UPDATE NOTICE =================
-# Was previously missing entirely — the Announcements UI had no way to
-# edit a published notice (fix a typo, change priority, extend expiry).
 class UpdateNoticeAPI(MethodView):
 
     @login_required
@@ -667,9 +656,6 @@ class UpdateNoticeAPI(MethodView):
 
 
 # ================= DELETE / DEACTIVATE NOTICE =================
-# Soft-delete only: sets is_active=False rather than removing the row,
-# so existing NoticeRead history isn't orphaned and the notice simply
-# stops appearing in Student/Teacher/Admin feeds.
 class DeleteNoticeAPI(MethodView):
 
     @login_required
@@ -719,6 +705,8 @@ class DeleteNoticeAPI(MethodView):
 
 # ================= MANAGE (all notices this school published) =================
 class AdminNoticeManageAPI(MethodView):
+    # Every active notice for the caller's school, whatever its audience
+
     @login_required
     def get(self):
         try:

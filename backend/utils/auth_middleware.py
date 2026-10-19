@@ -59,7 +59,6 @@ def login_required(function):
             expires_at = getattr(user, "token_expires_at", None)
             if expires_at is not None and datetime.utcnow() > expires_at:
                 # Session expired — revoke it so the stale token can't be
-                # reused, rather than leaving it dangling in the database.
                 user.auth_token = None
                 user.token_expires_at = None
                 db.session.commit()
@@ -69,7 +68,6 @@ def login_required(function):
                 return jsonify({"error": "Account inactive"}), 403
 
             # Sliding expiry: any authenticated activity extends the
-            # session instead of forcing a re-login mid-task.
             if hasattr(user, "token_expires_at"):
                 user.token_expires_at = datetime.utcnow() + timedelta(
                     hours=TOKEN_EXPIRY_HOURS

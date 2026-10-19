@@ -12,13 +12,6 @@ export const ADMIN_TYPES = [
 ];
 
 // Deliberately does NOT take fetchWithAuth as a parameter and instead
-// reads the token directly (matching useLibraryOverview.js's pattern).
-// fetchWithAuth in this codebase's dashboard hooks is a plain function,
-// not wrapped in useCallback, so it's a new reference every render —
-// depending on it here caused fetchAdmins -> useEffect -> setState ->
-// re-render -> new fetchWithAuth -> fetchAdmins changes again -> infinite
-// loop ("Maximum update depth exceeded", /api/admin/list firing
-// continuously). Building a self-contained fetch avoids that entirely.
 function authHeaders() {
   return {
     "Content-Type": "application/json",

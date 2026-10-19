@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BASE_URL } from "../../config/appConfig";
 
-/**
- * Accounts Admin > Fee Structure section.
- *
- * Manages reusable billing templates (GET/POST /api/accounts/fee-structures,
- * PUT/DELETE .../<id>) and the bulk "Apply" action
- * (POST .../<id>/apply) that generates a FeeInstallment for every
- * student in the template's batch - which is what actually links this
- * section to Students/Pending Fees: applying a structure is what makes
- * new rows show up there.
- */
+// Accounts Admin > Fee Structure section
 export function useFeeStructures({ fetchWithAuth, showToast }) {
   const [structures, setStructures] = useState([]);
   const [batches, setBatches] = useState([]);

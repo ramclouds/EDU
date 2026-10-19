@@ -7,17 +7,7 @@ const EMPTY_SUMMARY = {
   collected_this_month: 0,
 };
 
-/**
- * Accounts Admin > Fee Collection section.
- *
- * Top-of-page stats + a recent-payments feed (GET /api/accounts/fees/summary),
- * plus a "find a student to collect from" quick search that reuses the
- * same roster endpoint the Students section uses
- * (GET /api/admin/students) - the actual payment recording happens in
- * the shared student fee modal (useStudentFeeDetails), so this hook
- * only needs to find the student, not talk to the payments endpoint
- * itself.
- */
+// Accounts Admin > Fee Collection section
 export function useFeeCollection({ fetchWithAuth, showToast }) {
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [recentPayments, setRecentPayments] = useState([]);

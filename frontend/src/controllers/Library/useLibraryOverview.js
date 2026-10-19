@@ -27,16 +27,7 @@ const EMPTY_STATS = {
   fine_waived: 0,
 };
 
-/**
- * Real-time library overview for the Super Admin dashboard.
- *
- * Usage:
- *   const {
- *     stats, occupancyRate, issueTrend, revenueTrend,
- *     recentActivity, overdueAlerts, recentBooks,
- *     loading, refreshing, error, lastUpdated, refresh,
- *   } = useLibraryOverview();
- */
+// Real-time library overview for the Super Admin dashboard
 export function useLibraryOverview({ autoRefresh = true } = {}) {
   const navigate = useNavigate();
 
@@ -53,8 +44,6 @@ export function useLibraryOverview({ autoRefresh = true } = {}) {
   const [lastUpdated, setLastUpdated] = useState(null);
 
   // Tracks whether we've completed the first successful/failed fetch,
-  // so subsequent polls show a lightweight "refreshing" state instead
-  // of re-triggering the full-page loading skeleton.
   const hasLoadedOnce = useRef(false);
 
   const fetchOverview = useCallback(async () => {

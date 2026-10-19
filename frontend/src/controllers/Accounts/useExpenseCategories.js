@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BASE_URL } from "../../config/appConfig";
 
-/**
- * Accounts Admin > Expense Categories section.
- *
- * Manages the category list used by the Expenses form
- * (GET/POST /api/accounts/expense-categories, PUT/DELETE .../<id>).
- * Each category comes back with this month's spend against it, so a
- * budget can be tracked instead of categories being free-text with no
- * oversight.
- */
+// Accounts Admin > Expense Categories section
 export function useExpenseCategories({ fetchWithAuth, showToast }) {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);

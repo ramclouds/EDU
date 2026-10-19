@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_time(value):
+    # Accept 'HH:MM' or 'HH:MM:SS' and return a datetime.time
     if isinstance(value, time):
         return value
     if not isinstance(value, str):
@@ -208,9 +209,6 @@ class TimetableLectureAPI(MethodView):
             return jsonify({"error": str(exc) if isinstance(exc, ValueError) else "start_time and end_time are required"}), 400
 
         # Every referenced row must belong to the caller's school. Without
-        # this, a timetable could place one school's teacher into another
-        # school's class, and the conflict checks below (which were global)
-        # would let one school's entries block another's.
         if not Teacher.query.filter_by(id=teacher_id, school_id=school_id).first():
             return jsonify({"error": "Teacher not found"}), 404
         if not AcademicClass.query.filter_by(
@@ -409,8 +407,6 @@ class StudentTimetableAPI(MethodView):
                 return jsonify({"error": "Student id must be an integer"}), 400
 
             # A student may view their own timetable; staff may view any
-            # student at their own school. Anyone else gets 403 — previously
-            # any logged-in user could read any student's timetable by id.
             allowed, _ = caller_can_access_student(student_id)
             if not allowed:
                 return jsonify({"error": "Forbidden"}), 403

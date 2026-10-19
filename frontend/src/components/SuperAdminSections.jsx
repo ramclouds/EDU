@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../config/appConfig";
 
+// Shared plumbing
+
 function authHeaders(json = false) {
   const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
   if (json) headers["Content-Type"] = "application/json";
@@ -131,9 +133,7 @@ function Panel({ loading, error, children }) {
   return children;
 }
 
-/* =========================================================
-   STAFF  — /api/admin/staff
-========================================================= */
+// STAFF — /api/admin/staff
 export function StaffSection() {
   const { data, loading, error } = useSectionData("/admin/staff");
   const [search, setSearch] = useState("");
@@ -184,10 +184,7 @@ export function StaffSection() {
   );
 }
 
-/* =========================================================
-   NOTICES  — /api/announcements/manage, POST /api/announcements,
-              DELETE /api/announcements/<id>
-========================================================= */
+// NOTICES — /api/announcements/manage, POST /api/announcements,
 const AUDIENCES = ["All", "Students", "Teachers", "Admins", "Staff"];
 const CATEGORIES = ["Academic", "Examination", "Holiday", "Event", "General"];
 const PRIORITIES = ["High", "Medium", "Low"];
@@ -308,9 +305,7 @@ export function NoticesSection() {
   );
 }
 
-/* =========================================================
-   FEES  — /api/accounts/fees/summary, /fee-structures, /fees/pending
-========================================================= */
+// FEES — /api/accounts/fees/summary, /fee-structures, /fees/pending
 export function FeesSection() {
   const summary = useSectionData("/accounts/fees/summary");
   const structures = useSectionData("/accounts/fee-structures");
@@ -426,9 +421,7 @@ export function FeesSection() {
   );
 }
 
-/* =========================================================
-   PAYROLL  — /api/accounts/payroll/summary, /payroll/staff
-========================================================= */
+// PAYROLL — /api/accounts/payroll/summary, /payroll/staff
 export function PayrollSection() {
   const summary = useSectionData("/accounts/payroll/summary");
   const staff = useSectionData("/accounts/payroll/staff");
@@ -493,9 +486,7 @@ export function PayrollSection() {
   );
 }
 
-/* =========================================================
-   REPORTS  — /api/accounts/financial-overview
-========================================================= */
+// REPORTS — /api/accounts/financial-overview
 export function ReportsSection() {
   const { data, loading, error } = useSectionData("/accounts/financial-overview");
   const s = data?.summary || {};
@@ -528,9 +519,7 @@ export function ReportsSection() {
   );
 }
 
-/* =========================================================
-   ANALYTICS  — students stats, today's attendance, exam dashboard
-========================================================= */
+// ANALYTICS — students stats, today's attendance, exam dashboard
 export function AnalyticsSection() {
   const today = new Date().toISOString().slice(0, 10);
   const students = useSectionData("/admin/students");
@@ -574,9 +563,7 @@ export function AnalyticsSection() {
   );
 }
 
-/* =========================================================
-   PARENTS  — /api/admin/parents (guardian details on each student)
-========================================================= */
+// PARENTS — /api/admin/parents (guardian details on each student)
 export function ParentsSection() {
   const [search, setSearch] = useState("");
   const path = `/admin/parents${search ? `?search=${encodeURIComponent(search)}` : ""}`;
@@ -622,9 +609,7 @@ export function ParentsSection() {
   );
 }
 
-/* =========================================================
-   EVENTS  — /api/admin/events (GET, POST) and /api/admin/events/<id> (DELETE)
-========================================================= */
+// EVENTS — /api/admin/events (GET, POST) and /api/admin/events/<id> (DEL
 const EVENT_CATEGORIES = ["Academic", "Sports", "Cultural", "Holiday", "Meeting", "Other"];
 
 export function EventsSection() {
@@ -721,6 +706,207 @@ export function EventsSection() {
             ]}
           />
         </Panel>
+      </div>
+    </section>
+  );
+}
+
+// SCHOOL OVERVIEW — the Super Admin's Dashboard section
+const LEVEL_STYLE = {
+  warning: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300",
+  info: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300",
+};
+const STATUS_BADGE = {
+  Active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  Trial: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  Suspended: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+  Expired: "bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300",
+};
+
+function Bar({ percent }) {
+  const w = Math.max(0, Math.min(100, percent || 0));
+  return (
+    <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-slate-700">
+      <div className="h-2 rounded-full bg-indigo-500" style={{ width: `${w}%` }} />
+    </div>
+  );
+}
+
+function AreaCard({ title, icon, children }) {
+  return (
+    <div className={card + " p-5"}>
+      <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-800 dark:text-gray-100">
+        <i className={`bi ${icon} text-indigo-500`} />
+        {title}
+      </h3>
+      <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">{children}</div>
+    </div>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span>{label}</span>
+      <span className="font-semibold text-gray-800 dark:text-gray-100">{value ?? "—"}</span>
+    </div>
+  );
+}
+
+export function SchoolOverviewSection() {
+  const { data, loading, error, reload } = useSectionData("/admin/school-overview");
+
+  // Refresh every minute so the figures stay current while the page is open.
+  useEffect(() => {
+    const id = setInterval(reload, 60000);
+    return () => clearInterval(id);
+  }, [reload]);
+
+  if (loading && !data) {
+    return <div className={`${card} p-10 text-center text-gray-400`}>Loading school overview…</div>;
+  }
+  if (error && !data) {
+    return (
+      <div className={`${card} p-10 text-center text-red-500`}>
+        {error}
+        <div className="mt-4">
+          <button type="button" onClick={reload} className={primaryBtn}>Try again</button>
+        </div>
+      </div>
+    );
+  }
+
+  const o = data.overview;
+  const s = o.school || {};
+  const pct = (n) => (n === null || n === undefined ? "—" : `${n}%`);
+  const updated = o.generated_at ? new Date(o.generated_at + "Z").toLocaleTimeString() : "";
+
+  return (
+    <section className="space-y-6">
+      {/* header */}
+      <div className={`${card} flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between`}>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{s.name || "Your school"}</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <span className="font-mono">{s.school_code}</span>
+            <span>· Plan {s.plan}</span>
+            {s.status && <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[s.status] || ""}`}>{s.status}</span>}
+            {s.trial_days_left !== null && s.trial_days_left !== undefined && <span>· {s.trial_days_left} trial day(s) left</span>}
+            {s.subscription_ends_at && <span>· paid until {s.subscription_ends_at}</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <span>Updated {updated}</span>
+          <button type="button" onClick={reload} className={primaryBtn}><i className="bi bi-arrow-clockwise mr-1" />Refresh</button>
+        </div>
+      </div>
+
+      {/* alerts */}
+      {o.alerts.length > 0 && (
+        <div className="space-y-2">
+          {o.alerts.map((a, i) => (
+            <div key={i} className={`rounded-xl border px-4 py-3 text-sm ${LEVEL_STYLE[a.level] || LEVEL_STYLE.info}`}>
+              <i className={`bi ${a.level === "warning" ? "bi-exclamation-triangle" : "bi-info-circle"} mr-2`} />
+              {a.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* headline numbers */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="Active students" value={o.people.students_active} />
+        <Stat label="Active teachers" value={o.people.teachers_active} />
+        <Stat label="Attendance today" value={pct(o.attendance_today.students.percent_present)} />
+        <Stat label="Fees collected this month" value={money(o.fees.collected_this_month)} />
+      </div>
+
+      {/* area cards */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        <AreaCard title="People" icon="bi-people">
+          <Row label="Students (active / total)" value={`${o.people.students_active} / ${o.people.students_total}`} />
+          <Row label="Teachers (active / total)" value={`${o.people.teachers_active} / ${o.people.teachers_total}`} />
+          <Row label="Non-teaching staff (active)" value={o.people.staff_active} />
+          <Row label="Admins (active)" value={o.people.admins_active} />
+          {s.max_students ? <Bar percent={(100 * o.people.students_active) / s.max_students} /> : null}
+          {s.max_students ? <p className="text-xs text-gray-400">{o.people.students_active} of {s.max_students} student places used</p> : null}
+        </AreaCard>
+
+        <AreaCard title="Attendance today" icon="bi-calendar-check">
+          <Row label="Students marked" value={o.attendance_today.students.marked} />
+          <Row label="Present / absent / late" value={`${o.attendance_today.students.present} / ${o.attendance_today.students.absent} / ${o.attendance_today.students.late}`} />
+          <Row label="Teachers marked" value={o.attendance_today.teachers.marked} />
+          <Row label="Teachers present / absent" value={`${o.attendance_today.teachers.present} / ${o.attendance_today.teachers.absent}`} />
+        </AreaCard>
+
+        <AreaCard title="Fees" icon="bi-cash-coin">
+          <Row label="Collected this month" value={money(o.fees.collected_this_month)} />
+          <Row label="Still outstanding" value={money(o.fees.outstanding)} />
+          <Row label="Overdue instalments" value={o.fees.overdue_instalments} />
+        </AreaCard>
+
+        <AreaCard title="Payroll (this month)" icon="bi-wallet2">
+          <Row label="Payslips created" value={o.payroll.payslips_this_month} />
+          <Row label="Paid" value={`${o.payroll.paid_count} · ${money(o.payroll.paid_amount)}`} />
+          <Row label="Pending" value={`${o.payroll.pending_count} · ${money(o.payroll.pending_amount)}`} />
+        </AreaCard>
+
+        <AreaCard title="Academics" icon="bi-mortarboard">
+          <Row label="Current batch" value={o.academics.current_batch} />
+          <Row label="Classes / subjects" value={`${o.academics.classes} / ${o.academics.subjects}`} />
+          <Row label="Exams (published / total)" value={`${o.academics.exams_published} / ${o.academics.exams_total}`} />
+          <Row label="Awaiting verification" value={o.academics.exams_awaiting_verification} />
+        </AreaCard>
+
+        <AreaCard title="Library" icon="bi-book">
+          <Row label="Titles / copies" value={`${o.library.titles} / ${o.library.copies}`} />
+          <Row label="Books issued now" value={o.library.issued_now} />
+          <Row label="Overdue" value={o.library.overdue} />
+          <Row label="Due in 3 days" value={o.library.due_in_3_days} />
+        </AreaCard>
+
+        <AreaCard title="Hostel" icon="bi-building">
+          <Row label="Active hostels" value={o.hostel.hostels} />
+          <Row label="Beds occupied / total" value={`${o.hostel.beds_occupied} / ${o.hostel.beds_total}`} />
+          <Bar percent={o.hostel.occupancy_percent} />
+          <Row label="Leave requests pending" value={o.hostel.leave_requests_pending} />
+          <Row label="Open complaints / maintenance" value={`${o.hostel.complaints_open} / ${o.hostel.maintenance_open}`} />
+        </AreaCard>
+
+        <AreaCard title="Leave requests" icon="bi-calendar-x">
+          <Row label="Teachers waiting" value={o.leave.teacher_pending} />
+          <Row label="Students waiting" value={o.leave.student_pending} />
+        </AreaCard>
+
+        <AreaCard title="Notices, events and work" icon="bi-megaphone">
+          <Row label="Active notices" value={o.communication.active_notices} />
+          <Row label="Notices in the last 7 days" value={o.communication.notices_last_7_days} />
+          <Row label="Events in the next 30 days" value={o.communication.events_next_30_days} />
+          <Row label="Assignments due in 7 days" value={o.communication.assignments_due_7_days} />
+          <Row label="Timetable lectures" value={o.communication.timetable_lectures} />
+          {o.communication.next_events.length > 0 && (
+            <ul className="mt-2 space-y-1 border-t border-gray-100 pt-2 dark:border-slate-700">
+              {o.communication.next_events.map((e, i) => (
+                <li key={i} className="flex justify-between"><span>{e.title}</span><span className="text-gray-400">{e.date}</span></li>
+              ))}
+            </ul>
+          )}
+        </AreaCard>
+
+        <AreaCard title="Assets" icon="bi-box-seam">
+          <Row label="Total assets" value={o.assets.total} />
+          {Object.entries(o.assets.by_status).map(([k, v]) => <Row key={k} label={k} value={v} />)}
+        </AreaCard>
+
+        <AreaCard title="Recent activity" icon="bi-clock-history">
+          {o.recent_activity.length === 0 && <p className="text-gray-400">No activity yet.</p>}
+          {o.recent_activity.map((a, i) => (
+            <div key={i} className="border-b border-gray-50 pb-2 last:border-0 dark:border-slate-700/50">
+              <p className="text-gray-700 dark:text-gray-200">{a.description || a.action}</p>
+              <p className="text-xs text-gray-400">{a.role} · {a.time ? new Date(a.time + "Z").toLocaleString() : ""}</p>
+            </div>
+          ))}
+        </AreaCard>
       </div>
     </section>
   );

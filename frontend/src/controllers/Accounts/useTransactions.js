@@ -10,15 +10,7 @@ const EMPTY_FILTERS = {
   bank_account_id: "",
 };
 
-/**
- * Accounts Admin > Transactions section.
- *
- * The master ledger view - every AccountsTransaction (Income and
- * Expense together), filterable by type, month/year and bank account.
- * Creation happens in the dedicated Income/Expenses sections; this
- * section is for reviewing and reconciling, so it only needs
- * read + delete.
- */
+// Accounts Admin > Transactions section
 export function useTransactions({ fetchWithAuth, showToast }) {
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);

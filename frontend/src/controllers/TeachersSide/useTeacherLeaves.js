@@ -6,17 +6,13 @@ export function useTeacherLeaves({
   fetchWithAuth,
   showToast,
 }) {
-  // =========================
   // COMMON LEAVE STATE
-  // =========================
   const [leaveLoading, setLeaveLoading] = useState(false);
 
   const [leaveFilter, setLeaveFilter] = useState("all");
   const [leaveSearch, setLeaveSearch] = useState("");
 
-  // =========================
   // STUDENT LEAVES
-  // =========================
   const [allStudentLeaves, setAllStudentLeaves] = useState([]);
 
   const fetchAllStudentLeaves = async () => {
@@ -109,9 +105,7 @@ export function useTeacherLeaves({
     });
 
 
-  // =========================
   // TEACHER LEAVES
-  // =========================
   const [leaveBalance, setLeaveBalance] = useState({
     casual_leave: 0,
     sick_leave: 0,

@@ -102,7 +102,7 @@ def current_school_id():
 
 
 def scoped_get(model, pk):
-
+    # Load a library row by primary key, only if it belongs to the caller's
     if pk is None:
         return None
     try:
@@ -1949,6 +1949,8 @@ def get_student_full_name(student):
 
 
 def get_student_academic_details(student):
+    # Load the student's current academic assignment from
+
     academic_record = (
         db.session.query(StudentAcademicRecord)
         .filter(
@@ -3067,7 +3069,6 @@ def validate_book_payload(data):
             raise ValueError
 
         # The author must exist in THIS school. A positive integer alone
-        # let a book be filed under another school's author.
         if not BookAuthor.query.filter(
             BookAuthor.id == author_id,
             BookAuthor.school_id == current_school_id(),
@@ -6519,9 +6520,6 @@ class LibraryMemberDetailsAPI(MethodView):
             ]
 
             # Admins have no dedicated fine-payment ledger (unlike
-            # students/teachers/staff), so nothing is ever recorded as
-            # paid or waived - pending_fine is the full calculated fine
-            # across all of this admin's issues.
             admin_pending_fine = sum(
                 float(row.get("pending_fine", row.get("fine_amount", 0)) or 0)
                 for row in admin_issue_rows
@@ -6919,7 +6917,6 @@ class LibraryCirculationAPI(MethodView):
             issue_rows = []
 
             # Select one member type when filtered.
-            # Otherwise load all supported member types.
             selected_types = (
                 [member_type_filter]
                 if member_type_filter in LIBRARY_MEMBER_TYPES
@@ -6996,12 +6993,10 @@ class LibraryCirculationAPI(MethodView):
                 )
 
             # Load circulation records from all
-            # supported issue tables.
             for member_type in selected_types:
                 issue_model = get_issue_model(member_type)
 
                 # Protect against an unsupported or
-                # missing issue model.
                 if issue_model is None:
                     logger.warning(
                         "No issue model configured " "for member type: %s",
@@ -7121,7 +7116,6 @@ class LibraryCirculationAPI(MethodView):
                 output = io.StringIO()
 
                 # Add BOM so Microsoft Excel displays
-                # Unicode characters correctly.
                 output.write("\ufeff")
 
                 writer = csv.writer(output)
@@ -7571,7 +7565,6 @@ class LibraryCirculationAPI(MethodView):
                 )
 
             # Prevent issuing books to a member
-            # who already has an overdue book.
             overdue_issue = issue_model.query.filter(
                 member_column == member.id,
                 issue_model.return_date.is_(None),
@@ -9295,7 +9288,6 @@ class LibraryFinesAPI(MethodView):
                 query = issue_model.query.filter(issue_model.school_id == current_school_id())
 
                 # Only include records that
-                # actually generated a fine.
                 query = query.filter(
                     issue_model.due_date
                     < func.coalesce(
@@ -10407,7 +10399,6 @@ class LibraryTransactionsAPI(MethodView):
             )
 
             # Pending fines are calculated from
-            # current issue records, not payment rows.
             pending_fine_amount = Decimal("0")
 
             for member_type in selected_member_types:
@@ -10788,7 +10779,6 @@ class LibraryReportsAPI(MethodView):
             )
 
             # MEMBER DISTRIBUTION
-            # Based on circulation records after filters.
 
             member_distribution_map = {
                 "student": 0,
@@ -10841,7 +10831,6 @@ class LibraryReportsAPI(MethodView):
             total_active_members = sum(item["value"] for item in member_distribution)
 
             # ISSUE TREND
-            # Group by calendar date.
 
             trend_map = {}
 
@@ -10919,9 +10908,6 @@ class LibraryReportsAPI(MethodView):
             )[:5]
 
             # FINE ANALYTICS
-            # Admin is intentionally excluded because the
-            # current fine-payment system supports
-            # student/teacher/staff.
 
             total_fine_generated = Decimal("0")
 
@@ -11051,7 +11037,6 @@ class LibraryReportsAPI(MethodView):
             ]
 
             # CSV EXPORT
-            # Exports ALL matching report rows before paging.
 
             if export_format == "csv":
 

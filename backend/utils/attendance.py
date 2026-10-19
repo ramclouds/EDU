@@ -205,9 +205,7 @@ class AttendanceRecord(db.Model):
     )
 
 
-# =========================================================
 # STUDENT ATTENDANCE SUMMARY API
-# =========================================================
 class StudentAttendanceAPI(MethodView):
 
     @login_required
@@ -217,10 +215,6 @@ class StudentAttendanceAPI(MethodView):
             student_id = int(student_id)
 
             # Called both by a student viewing their own attendance and by
-            # an admin/teacher viewing a specific student's record, so
-            # the rule is "self, or staff at the same school" — see
-            # utils/tenancy.py. Previously there was no check at all
-            # beyond @login_required.
             allowed, target_student = caller_can_access_student(student_id)
 
             if not allowed:
@@ -347,9 +341,7 @@ class StudentAttendanceAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # TEACHER ASSIGNED CLASSES
-# =========================================================
 class TeacherAssignedClassesAPI(MethodView):
 
     @login_required
@@ -392,9 +384,7 @@ class TeacherAssignedClassesAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # STUDENTS BY CLASS
-# =========================================================
 class StudentsByClassAPI(MethodView):
 
     @login_required
@@ -442,9 +432,7 @@ class StudentsByClassAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # MARK ATTENDANCE API
-# =========================================================
 class AttendanceMarkAPI(MethodView):
     @login_required
     def post(self):
@@ -455,7 +443,6 @@ class AttendanceMarkAPI(MethodView):
                 return jsonify({"error": "Unauthorized"}), 401
 
             # Marking attendance is a staff action. Previously any logged-in
-            # user, including a student, could mark a class's attendance.
             if not isinstance(current_user, (Admin, Teacher)):
                 return jsonify({"error": "Only staff can mark attendance"}), 403
 
@@ -580,9 +567,7 @@ class AttendanceMarkAPI(MethodView):
             return jsonify({"error": "Internal server error"}), 500
 
 
-# =========================================================
 # GET ATTENDANCE BY DATE
-# =========================================================
 class GetAttendanceByDateAPI(MethodView):
     @login_required
     def get(self):
@@ -628,9 +613,7 @@ class GetAttendanceByDateAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # PDF DOWNLOAD API
-# =========================================================
 class DownloadAttendancePDF(MethodView):
 
     @login_required
@@ -697,9 +680,7 @@ class DownloadAttendancePDF(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # DOWNLOAD MONTHLY ATTENDANCE REPORT (TEACHER SIDE)
-# =========================================================
 class DownloadTeacherAttendanceReportAPI(MethodView):
 
     @login_required
@@ -707,9 +688,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
 
         try:
 
-            # =====================================================
             # QUERY PARAMS
-            # =====================================================
 
             academic_class_id = request.args.get("academic_class_id", type=int)
 
@@ -721,9 +700,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
 
             teacher_id = request.args.get("teacher_id", type=int)
 
-            # =====================================================
             # VALIDATION
-            # =====================================================
 
             if not academic_class_id:
                 return jsonify({"error": "academic_class_id required"}), 400
@@ -737,9 +714,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
             if not year:
                 return jsonify({"error": "year required"}), 400
 
-            # =====================================================
             # FETCH CLASS + SUBJECT
-            # =====================================================
 
             academic_class = AcademicClass.query.get(academic_class_id)
 
@@ -752,9 +727,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
 
             class_name = f"{division.division_name} " f"{section.section_name}"
 
-            # =====================================================
             # FETCH SESSIONS
-            # =====================================================
 
             sessions = (
                 AttendanceSession.query.filter(
@@ -775,9 +748,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
 
             session_ids = [s.id for s in sessions]
 
-            # =====================================================
             # FETCH RECORDS
-            # =====================================================
 
             records = (
                 db.session.query(AttendanceRecord, AttendanceSession, Student)
@@ -791,9 +762,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
                 .all()
             )
 
-            # =====================================================
             # GENERATE PDF
-            # =====================================================
 
             buffer = io.BytesIO()
 
@@ -810,9 +779,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
 
             elements = []
 
-            # =====================================================
             # HEADER
-            # =====================================================
 
             title = Paragraph(
                 f"""
@@ -826,9 +793,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
             elements.append(title)
             elements.append(Spacer(1, 20))
 
-            # =====================================================
             # TABLE
-            # =====================================================
 
             data = [["Date", "Roll No", "Student Name", "Status", "Remarks"]]
 
@@ -871,9 +836,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
 
             elements.append(table)
 
-            # =====================================================
             # BUILD PDF
-            # =====================================================
 
             doc.build(elements)
 
@@ -895,9 +858,7 @@ class DownloadTeacherAttendanceReportAPI(MethodView):
             return jsonify({"error": "Failed to generate report"}), 500
 
 
-# =========================================================
 # ATTENDANCE FILTER OPTIONS API
-# =========================================================
 class AttendanceFilterOptionsAPI(MethodView):
 
     @permission_required("academic", "view")
@@ -958,9 +919,7 @@ class AttendanceFilterOptionsAPI(MethodView):
             return jsonify({"error": "Failed to load filters"}), 500
 
 
-# =========================================================
 # ADMIN ATTENDANCE STATS API
-# =========================================================
 class AdminAttendanceStatsAPI(MethodView):
 
     @permission_required("academic", "view")
@@ -976,9 +935,7 @@ class AdminAttendanceStatsAPI(MethodView):
 
             attendance_date = datetime.strptime(date, "%Y-%m-%d").date()
 
-            # =====================================================
             # STUDENT ATTENDANCE
-            # =====================================================
 
             if role == "students":
 
@@ -1015,9 +972,7 @@ class AdminAttendanceStatsAPI(MethodView):
                     200,
                 )
 
-            # =====================================================
             # TEACHER ATTENDANCE
-            # =====================================================
 
             teacher_query = TeacherAttendance.query.filter(
                 TeacherAttendance.attendance_date == attendance_date,
@@ -1053,9 +1008,7 @@ class AdminAttendanceStatsAPI(MethodView):
             return jsonify({"error": "Failed to fetch attendance stats"}), 500
 
 
-# =========================================================
 # ADMIN ATTENDANCE LIST API
-# =========================================================
 class AdminAttendanceListAPI(MethodView):
 
     @permission_required("academic", "view")
@@ -1080,9 +1033,7 @@ class AdminAttendanceListAPI(MethodView):
 
             offset = (page - 1) * limit
 
-            # =====================================================
             # STUDENTS
-            # =====================================================
 
             if role == "students":
 
@@ -1207,9 +1158,7 @@ class AdminAttendanceListAPI(MethodView):
                     200,
                 )
 
-            # =====================================================
             # TEACHERS
-            # =====================================================
             if not date:
                 return jsonify({"error": "date required"}), 400
 
@@ -1306,9 +1255,7 @@ class AdminAttendanceListAPI(MethodView):
             return jsonify({"error": "Failed to fetch attendance"}), 500
 
 
-# =========================================================
 # UPDATE ATTENDANCE STATUS API
-# =========================================================
 class UpdateAttendanceStatusAPI(MethodView):
 
     @permission_required("academic", "edit")
@@ -1338,9 +1285,7 @@ class UpdateAttendanceStatusAPI(MethodView):
             if status not in VALID_STATUS:
                 return jsonify({"error": "Invalid status"}), 400
 
-            # ==========================================
             # STUDENT ATTENDANCE
-            # ==========================================
             if role == "students":
 
                 if record_id:
@@ -1421,9 +1366,7 @@ class UpdateAttendanceStatusAPI(MethodView):
 
                     db.session.add(record)
 
-            # ==========================================
             # TEACHER ATTENDANCE
-            # ==========================================
             else:
 
                 if record_id:
@@ -1496,13 +1439,10 @@ class UpdateAttendanceStatusAPI(MethodView):
             return jsonify({"error": "Failed to update attendance"}), 500
 
 
-# =========================================================
 # MARK ALL ATTENDANCE API
-# =========================================================
-# =========================================================
-# MARK ALL ATTENDANCE API
-# =========================================================
 class MarkAllAttendanceAPI(MethodView):
+    # BUG FIX: this previously required the caller to already know an
+
     @permission_required("academic", "edit")
     def post(self):
 
@@ -1540,9 +1480,7 @@ class MarkAllAttendanceAPI(MethodView):
                     400,
                 )
 
-            # =====================================================
             # STUDENTS
-            # =====================================================
             if role == "students":
 
                 academic_class_id = data.get("academic_class_id") or data.get(
@@ -1637,9 +1575,7 @@ class MarkAllAttendanceAPI(MethodView):
                     200,
                 )
 
-            # =====================================================
             # TEACHERS
-            # =====================================================
             teachers = Teacher.query.filter_by(
                 status="Active", school_id=_current_school_id()
             ).all()

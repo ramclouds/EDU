@@ -28,16 +28,7 @@ const EMPTY_PAYMENT_FORM = {
   remarks: "",
 };
 
-/**
- * Backs the "click on a student name" modal in the Accounts dashboard's
- * Students section: full profile + fee installments + payment history,
- * the actions to add an installment and record a payment against it
- * (both gated by canWriteAccounts at the call site), and all of that
- * form's local UI state (which installment form is open, which
- * installment is mid-payment, the form field values themselves) - kept
- * here rather than in the dashboard component so the component only
- * has to wire onChange/onClick to what this hook already exposes.
- */
+// Backs the "click on a student name" modal in the Accounts dashboard's
 export function useStudentFeeDetails({ fetchWithAuth, showToast }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -71,7 +62,6 @@ export function useStudentFeeDetails({ fetchWithAuth, showToast }) {
   }, []);
 
   // Toggle the inline "Record Payment" form open for a given
-  // installment, pre-filling the amount with its outstanding balance.
   const togglePayment = useCallback(
     (installment) => {
       setPayingInstallmentId((current) =>
@@ -198,7 +188,6 @@ export function useStudentFeeDetails({ fetchWithAuth, showToast }) {
   );
 
   // Submit handlers - these own the "call the API, then reset/hide the
-  // form on success" flow that used to live in the dashboard component.
   const submitInstallment = useCallback(async () => {
     if (!student) return false;
     const ok = await addInstallment(student.id, installmentForm);

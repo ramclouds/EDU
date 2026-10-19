@@ -45,7 +45,6 @@ export function useAcademicPermission() {
 
   useEffect(() => {
     // Picks up permission changes made in another tab (e.g. Super
-    // Admin revokes access while this tab is open).
     const onStorage = (event) => {
       if (
         !event ||

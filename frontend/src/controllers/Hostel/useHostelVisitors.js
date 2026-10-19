@@ -145,9 +145,7 @@ export function useHostelVisitors({ activeSection, fetchWithAuth, showToast }) {
         loadVisitors({ filters: next });
     }, [loadVisitors]);
 
-    // ============================================================
     // NEW VISITOR MODAL
-    // ============================================================
     const openVisitorModal = useCallback(() => {
         setVisitorForm({ ...EMPTY_VISITOR_FORM });
         setStudentSearch("");
@@ -176,9 +174,6 @@ export function useHostelVisitors({ activeSection, fetchWithAuth, showToast }) {
                 }
 
                 // Reuses the same student-search endpoint the Beds
-                // section's Allocate modal uses - any enrolled student can
-                // receive a visitor, not just unallocated ones, so we
-                // don't filter by hostel allocation here.
                 const data = await request(
                     `${BASE_URL}/admin/hostel/students/unallocated?${params.toString()}`,
                 );
@@ -234,9 +229,7 @@ export function useHostelVisitors({ activeSection, fetchWithAuth, showToast }) {
         }
     }, [canWriteHostel, loadVisitors, notify, request, visitorForm]);
 
-    // ============================================================
     // WORKFLOW ACTIONS
-    // ============================================================
     const approveVisitor = useCallback(
         async (visitor) => {
             if (!canWriteHostel) {

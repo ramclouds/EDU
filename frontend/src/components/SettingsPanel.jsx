@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+// Shared Settings section for every dashboard
 export default function SettingsPanel({
   user = {},
   darkMode,

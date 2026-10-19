@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../config/appConfig";
 
-// A separate localStorage key from the school-side "token", so a developer
-// session and a school user's session can never clobber each other.
+// A separate localStorage key from the school-side "token", so a develop
 const DEV_TOKEN_KEY = "dev_token";
 
 export function useDeveloperDashboard() {
@@ -155,7 +154,7 @@ export function useDeveloperDashboard() {
     [call],
   );
 
-  const createSchool = async (payload) => {
+  const createSchool = async (payload, logoFile = null) => {
     setCreating(true);
     const r = await call("POST", "/schools", payload);
     setCreating(false);
@@ -164,6 +163,7 @@ export function useDeveloperDashboard() {
       return null;
     }
     toast.success(`School created — code ${r.body.school.school_code}`);
+    if (logoFile) await uploadSchoolLogo(r.body.school.id, logoFile);
     await refreshAll();
     return r.body;
   };
@@ -216,6 +216,36 @@ export function useDeveloperDashboard() {
     return true;
   };
 
+  const uploadSchoolLogo = async (schoolId, file) => {
+    const form = new FormData();
+    form.append("logo", file);
+    const res = await fetch(`${BASE_URL}/developer/schools/${schoolId}/logo`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: form,
+    });
+    if (handleUnauthorized(res.status)) return false;
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(body.error || "Logo upload failed");
+      return false;
+    }
+    toast.success("Logo saved");
+    await refreshAll();
+    return true;
+  };
+
+  const removeSchoolLogo = async (schoolId) => {
+    const r = await call("DELETE", `/schools/${schoolId}/logo`);
+    if (!r.ok) {
+      if (!r.unauthorized) toast.error(r.error || "Could not remove logo");
+      return false;
+    }
+    toast.success("Logo removed");
+    await refreshAll();
+    return true;
+  };
+
   const resetAdminPassword = async (schoolId, adminId, newPassword) => {
     const r = await call("POST", `/schools/${schoolId}/reset-admin-password`, {
       admin_id: adminId,
@@ -246,6 +276,8 @@ export function useDeveloperDashboard() {
     updateSchool,
     extendTrial,
     resetAdminPassword,
+    uploadSchoolLogo,
+    removeSchoolLogo,
     activateSubscription,
     loadSchoolDetail,
     loadActivity,

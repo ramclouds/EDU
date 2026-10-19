@@ -9,16 +9,7 @@ const EMPTY_FILTERS = {
   status: "",
 };
 
-/**
- * Accounts Admin > Payslips section.
- *
- * Roster-wide payslip list (GET /api/accounts/payslips) plus the "Run
- * Payroll" bulk action (POST /api/accounts/payroll/run) that generates
- * a payslip for everyone with a salary structure who doesn't already
- * have one for the selected month. Marking a payslip paid reuses
- * markPayslipPaid from useStaffSalaryDetails at the call site, so
- * there's one source of truth for that action across the dashboard.
- */
+// Accounts Admin > Payslips section
 export function usePayslips({ fetchWithAuth, showToast }) {
   const [payslips, setPayslips] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);

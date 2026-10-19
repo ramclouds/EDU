@@ -1,12 +1,11 @@
-export const APP_NAME = "School ABC";
+export const APP_NAME = "Ramclouds LLP";
 export const APP_TAGLINE = "School Management System";
-export const APP_YEAR = "2025";
+export const APP_YEAR = "2026";
 export const APP_FAVICON = "/graduation.png";
+// Shown on the login page; leave blank to hide the mailto link.
+export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || "";
 
-// Was hardcoded to http://localhost:5000 — meaning every dashboard, every
-// API call, and every uploaded-file link would have pointed at localhost
-// even in a production build. Now reads from the build-time env var
-// (see .env.example) and falls back to localhost only for local dev.
+// Was hardcoded to http://localhost:5000 — meaning every dashboard, ever
 const API_ROOT =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 

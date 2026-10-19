@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def _is_admin(user):
-
+    # True for any admin-class account
     return getattr(user, "role", None) in ("admin", "super_admin")
 
 # Teacher
@@ -218,9 +218,6 @@ class ApplyStudentLeave(MethodView):
             ).first()
 
             # Notify teachers at THIS student's school only. The previous
-            # Teacher.query.all() sent every student's leave request to
-            # every teacher on the platform. The "fallback" re-ran the same
-            # unscoped query, so it never added anything; removed.
             teachers = Teacher.query.filter_by(school_id=current_user.school_id).all()
 
             # 🔔 CREATE NOTIFICATIONS
@@ -425,8 +422,6 @@ class UpdateStudentLeaveStatus(MethodView):
                 return jsonify({"error": "Invalid status"}), 400
 
             # Only staff at the leave's own school may act on it. A leave
-            # from another school is reported as not found, not forbidden,
-            # so the response never reveals that the id exists.
             leave = StudentLeave.query.filter_by(
                 id=leave_id, school_id=_current_school_id()
             ).first()
@@ -545,9 +540,6 @@ class UpdateLeaveStatus(MethodView):
 
             if not balance:
                 # Set the defaults explicitly. Column defaults apply at
-                # flush, so on a brand-new balance the attributes are
-                # still None when the balance check below runs, and
-                # "None < int" raised a 500 on a teacher's first approval.
                 balance = TeacherLeaveBalance(
                     teacher_id=leave.teacher_id,
                     casual_leave=10,

@@ -990,7 +990,7 @@ def get_student_room_info(student_id):
 
 # ============================= RBAC (READ / WRITE) =============================
 def get_fee_payment_summary(fee):
-
+    # The real, always-correct status/balance for a fee invoice, derived
 
     paid = sum(float(p.amount) for p in fee.payments)
     amount = float(fee.amount or 0)
@@ -1130,7 +1130,7 @@ def current_school_id():
 
 
 def scoped_get(model, pk):
-
+    # Load a hostel row by primary key, only if it belongs to the caller's
     if pk is None:
         return None
     try:
@@ -7618,7 +7618,6 @@ class HostelFeeListAPI(MethodView):
             status = _clean_str(request.args.get("status"))
             fee_type = _clean_str(request.args.get("fee_type"))
             # "dues_only=true" is what the Pending Dues section uses -
-            # anything with balance > 0.
             dues_only = _clean_str(request.args.get("dues_only")).lower() == "true"
 
             query = HostelFee.query.filter(HostelFee.school_id == current_school_id())
@@ -7739,8 +7738,7 @@ class HostelFeeDetailAPI(MethodView):
 
 # ============================= PAYMENTS =============================
 class HostelFeePaymentListAPI(MethodView):
-    """Payment transaction history, and recording a new payment
-    against a fee invoice."""
+    # Payment transaction history, and recording a new payment
 
     @login_required
     def get(self):

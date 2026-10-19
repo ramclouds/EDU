@@ -29,9 +29,7 @@ export function useTeacherTimetable({
         useState([]);
 
 
-    // ----------------------------
     // AUTH HELPER
-    // ----------------------------
     const getAuth = () => {
         try {
             return {
@@ -49,9 +47,7 @@ export function useTeacherTimetable({
     };
 
 
-    // ============================
     // FETCH TEACHER TIMETABLE
-    // ============================
     useEffect(() => {
 
         if (activeSection !== "timetable" &&
@@ -98,9 +94,7 @@ export function useTeacherTimetable({
     }, [activeSection]);
 
 
-    // ============================
     // DOWNLOAD TIMETABLE PDF
-    // ============================
     const downloadTeacherTimetablePDF = async () => {
 
         try {
@@ -181,9 +175,7 @@ export function useTeacherTimetable({
     };
 
 
-    // ============================
     // CLASS FILTER OPTIONS
-    // ============================
     const classOptions = useMemo(() => {
 
         const set = new Set();
@@ -206,9 +198,7 @@ export function useTeacherTimetable({
     }, [teacherTimetable]);
 
 
-    // ============================
     // SUBJECT FILTER OPTIONS
-    // ============================
     const subjectOptions = useMemo(() => {
 
         const set = new Set();
@@ -231,9 +221,7 @@ export function useTeacherTimetable({
     }, [teacherTimetable]);
 
 
-    // ============================
     // TODAY DAY NAME
-    // ============================
     const todayDayName = useMemo(() => {
 
         return new Date().toLocaleDateString(
@@ -246,9 +234,7 @@ export function useTeacherTimetable({
     }, []);
 
 
-    // ============================
     // TODAY SCHEDULE
-    // ============================
     useEffect(() => {
 
         const todayEntries =
@@ -274,9 +260,7 @@ export function useTeacherTimetable({
         todayDayName
     ]);
 
-    // ============================
     // FILTERED TIMETABLE
-    // ============================
     const filteredTimetable = useMemo(() => {
 
         const filtered = {};

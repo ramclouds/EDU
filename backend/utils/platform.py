@@ -1,3 +1,5 @@
+# Platform / multi-tenancy layer
+
 import logging
 import secrets
 import string
@@ -21,6 +23,7 @@ SCHOOL_PLANS = ("Trial", "Basic", "Pro", "Enterprise")
 
 
 def parse_subscription_end(value):
+    """'YYYY-MM-DD' -> end of that day (UTC), or None if invalid or not in the future."""
     if not isinstance(value, str):
         return None
     try:
@@ -31,9 +34,7 @@ def parse_subscription_end(value):
     return end if end > datetime.utcnow() else None
 
 
-# =========================================================
 # SCHOOL (TENANT)
-# =========================================================
 class School(db.Model):
     __tablename__ = "schools"
 
@@ -42,8 +43,6 @@ class School(db.Model):
     # Human-entered at login by every user belonging to this school.
     school_code = db.Column(db.String(20), unique=True, nullable=False, index=True)
     # Name of this school's database. Derived from TENANT_DB_PREFIX and the
-    # school code at creation. Recorded so operators can see and manage the
-    # tenant's database; see migrations for the physical-database caveat.
     database_name = db.Column(db.String(64), unique=True, nullable=True, index=True)
     name = db.Column(db.String(200), nullable=False)
 
@@ -64,19 +63,19 @@ class School(db.Model):
     )
 
     # Usage limits — enforced at enrollment time (Phase 2), tracked here
-    # so plan upgrades are just a number change.
     max_students = db.Column(db.Integer, default=200)
     max_staff = db.Column(db.Integer, default=30)
 
     trial_ends_at = db.Column(db.DateTime)
     subscription_ends_at = db.Column(db.DateTime)
 
+    # Soft-delete/archive rather than hard-delete — a school's data
     is_archived = db.Column(db.Boolean, default=False, nullable=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def refresh_status(self, now=None):
-
+        # Mark a Trial or Active school as Expired once its date has passed
         now = now or datetime.utcnow()
         if self.is_archived or self.status in ("Suspended", "Expired"):
             return False
@@ -147,7 +146,7 @@ def refresh_all_schools():
 
 
 def generate_school_code():
-
+    # SCH-XXXXXX, retried until unique. Short enough to type at login,
     alphabet = string.ascii_uppercase + string.digits
     for _ in range(20):
         code = "SCH-" + "".join(secrets.choice(alphabet) for _ in range(6))
@@ -156,10 +155,10 @@ def generate_school_code():
     raise RuntimeError("Could not generate a unique school code")
 
 
-# =========================================================
 # DEVELOPER (PLATFORM OWNER)
-# =========================================================
 class Developer(db.Model):
+    # The platform owner / product seller — you. Not tied to any
+
     __tablename__ = "developers"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -193,6 +192,7 @@ class Developer(db.Model):
 
 
 def developer_required(view_func):
+    # Auth guard for platform-owner-only endpoints. Deliberately
 
     from functools import wraps
 
@@ -280,9 +280,7 @@ class DeveloperLogout(MethodView):
             return jsonify({"error": "Unable to log out"}), 500
 
 
-# =========================================================
 # SCHOOL MANAGEMENT (Developer-only)
-# =========================================================
 class SchoolListCreateAPI(MethodView):
     decorators = [developer_required]
 
@@ -292,7 +290,7 @@ class SchoolListCreateAPI(MethodView):
         return jsonify([s.to_dict(include_counts=True) for s in schools]), 200
 
     def post(self):
-
+        # Creates a school AND its first Super Admin in one step, so
         data = request.get_json(silent=True) or {}
 
         name = (data.get("name") or "").strip()
@@ -355,9 +353,6 @@ class SchoolListCreateAPI(MethodView):
                 ),
                 school_id=school.id,
                 # The auto-created first admin is that school's Super
-                # Admin — full access to set up the rest of their staff.
-                # admin_type has no column default and is NOT NULL, so
-                # this must be set explicitly or the insert fails.
                 role="super_admin",
                 admin_type="Super Admin",
                 status="Active",
@@ -427,6 +422,7 @@ class SchoolDetailAPI(MethodView):
 
 
 class SchoolStatusAPI(MethodView):
+    # Suspend / reactivate / archive a school. Split from the general
 
     decorators = [developer_required]
 
@@ -449,8 +445,6 @@ class SchoolStatusAPI(MethodView):
             school.status = "Suspended"
         elif action == "reactivate":
             # Restore the status the school can legitimately have. A school
-            # whose trial or subscription has ended cannot be reactivated
-            # into Active, which would let it run without paying.
             if school.subscription_ends_at:
                 if now > school.subscription_ends_at:
                     return jsonify({"error": "The subscription ended on %s. Activate a subscription with a future end date instead." % school.subscription_ends_at.date().isoformat()}), 400
@@ -518,11 +512,7 @@ class PlatformStatsAPI(MethodView):
         )
 
 
-# =========================================================
 # DEVELOPER AUDIT LOG
-# Every platform-level action a developer takes is recorded here, so there is
-# a trail for support, billing disputes and accountability.
-# =========================================================
 class DeveloperAuditLog(db.Model):
     __tablename__ = "developer_audit_logs"
 
@@ -548,7 +538,7 @@ class DeveloperAuditLog(db.Model):
 
 
 def audit(action, school=None, detail=None):
-
+    # Record a developer action. Never raises: an audit failure must not
     try:
         dev = getattr(request, "developer", None)
         entry = DeveloperAuditLog(
@@ -594,7 +584,7 @@ def school_detail(school):
     ]
 
     now = datetime.utcnow()
-
+    # Round UP: a trial that ends in 13 days and 23 hours still has 14 days
     if school.status == "Trial" and school.trial_ends_at:
         remaining = (school.trial_ends_at - now).total_seconds()
         data["trial_days_left"] = max(0, math.ceil(remaining / 86400))
@@ -617,8 +607,7 @@ def school_detail(school):
 
 
 class PlatformInfoAPI(MethodView):
-    """Where this deployment's database lives, and whether it answers.
-    The password is never returned."""
+    # Where this deployment's database lives, and whether it answers
 
     decorators = [developer_required]
 
@@ -721,8 +710,7 @@ class ExtendTrialAPI(MethodView):
 
 
 class ResetAdminPasswordAPI(MethodView):
-    """Support action: set a new password for one of a school's admins.
-    The password itself is never written to the audit log."""
+    # Support action: set a new password for one of a school's admins
 
     decorators = [developer_required]
 

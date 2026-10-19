@@ -23,15 +23,7 @@ export const STAFF_CATEGORY_TABS = [
   { value: "admin", label: "Admin Staff" },
 ];
 
-/**
- * Accounts Admin > Staff section.
- *
- * Backed by GET /api/admin/staff (utils/staffDirectory.py
- * AdminStaffListAPI), which merges Teacher + NonTeachingStaff (aka
- * "Staff") + Admin into one roster - everyone on payroll who isn't a
- * student. Read-only directory; editing a person still happens through
- * their own type-specific management screen.
- */
+// Accounts Admin > Staff section
 export function useAccountsStaff({ fetchWithAuth, showToast }) {
   const [staff, setStaff] = useState([]);
   const [stats, setStats] = useState(EMPTY_STATS);

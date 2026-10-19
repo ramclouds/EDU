@@ -15,15 +15,10 @@ db = SQLAlchemy()
 logger = logging.getLogger(__name__)
 
 # Sliding session expiry for the opaque auth_token issued at login.
-# Overridable via TOKEN_EXPIRY_HOURS in the environment. The middleware
-# refreshes this on every authenticated request, so an active user stays
-# logged in, but an idle/leaked token stops working after this window.
 TOKEN_EXPIRY_HOURS = float(os.getenv("TOKEN_EXPIRY_HOURS", "12"))
 
 
-# ===========================
 # PRODUCTION READY ADMIN MODEL
-# ===========================
 class Admin(db.Model):
     __tablename__ = "admins"
 
@@ -33,10 +28,6 @@ class Admin(db.Model):
     user_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
 
     # ================= TENANCY =================
-    # Which school this admin belongs to. Nullable for now so existing
-    # single-school installs keep working unmigrated; a follow-up data
-    # migration should backfill this for every existing row once a
-    # School record exists for them (see utils/platform.py).
     school_id = db.Column(db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True)
 
     # ================= PERSONAL =================
@@ -382,9 +373,7 @@ class Teacher(db.Model):
     created_at = db.Column(db.DateTime)
 
 
-# ===========================
 # LOGIN CLASS
-# ===========================
 class Login(MethodView):
 
     def post(self):
@@ -401,8 +390,6 @@ class Login(MethodView):
                 return jsonify({"error": "Email/Username and password required"}), 400
 
             # ================= SCHOOL RESOLUTION (multi-tenant) =================
-            # Local import: utils.platform imports from this module, so a
-            # module-level import here would be circular.
             from utils.platform import School
 
             school = None
@@ -427,10 +414,6 @@ class Login(MethodView):
                         403,
                     )
             # If no school_code was sent, we fall back to an unscoped lookup
-            # below — kept for installs that haven't been onboarded as a
-            # School yet (school_id is still NULL on their rows). Once every
-            # school is created via the Developer dashboard, school_code
-            # should become a required field here.
             school_filter = {"school_id": school.id} if school else {}
 
             user = (
@@ -465,7 +448,6 @@ class Login(MethodView):
                 return jsonify({"error": "Account inactive"}), 403
 
             # Load effective RBAC access without changing the existing
-            # custom token, dashboard, role, or authentication behaviour.
             rbac_access = None
             dashboard_entry = None
             dashboard_rights = {"can_view": True, "can_write": True}
@@ -495,7 +477,6 @@ class Login(MethodView):
                 rbac_access = build_user_access(rbac_user_type, user.id)
 
                 # The dashboard a user with this role/admin_type is meant
-                # to land on, and whether they actually have access to it.
                 dashboard_entry = get_home_dashboard_for_user(user)
                 dashboard_rights = get_user_dashboard_access(user, dashboard_entry)
 
@@ -521,7 +502,6 @@ class Login(MethodView):
                     )
 
             # Generate token only after the dashboard-access check passes,
-            # so a denied login never receives a usable session token.
             token = str(uuid.uuid4())
             user.auth_token = token
             user.token_expires_at = datetime.utcnow() + timedelta(
@@ -579,11 +559,20 @@ class Login(MethodView):
                 logger.exception("Unable to load dashboard access during login")
                 dashboard_access = []
 
+            try:
+                from utils.school_branding import school_public
+                from utils.platform import School as _School
+                school_info = school_public(_School.query.get(user.school_id)) if getattr(user, "school_id", None) else None
+            except Exception:
+                logger.exception("Unable to load school details during login")
+                school_info = None
+
             return (
                 jsonify(
                     {
                         "token": token,
                         "role": user.role,
+                        "school": school_info,
                         "dashboard": dashboard,
                         "rbac": rbac_access,
                         "dashboard_access": dashboard_access,
@@ -626,6 +615,7 @@ class Login(MethodView):
 
 
 class Logout(MethodView):
+    # Invalidates the caller's current session token server-side
 
     def post(self):
         from utils.auth_middleware import get_current_user
@@ -645,9 +635,7 @@ class Logout(MethodView):
             return jsonify({"error": "Unable to log out"}), 500
 
 
-# ==================================
 # NON-TEACHING STAFF MODEL
-# ==================================
 class NonTeachingStaff(db.Model):
     __tablename__ = "non_teaching_staff"
 
@@ -1021,22 +1009,11 @@ class NonTeachingStaff(db.Model):
         }
 
 
-# ===========================
 # BUG FIX: auth_middleware.py and rolePermissionManagement.py both do
-# `from utils.auth import Staff` wrapped in try/except ImportError, and
-# silently fall back to Staff = None if it fails. There was never a
-# class literally named "Staff" here (it's "NonTeachingStaff"), so that
-# import ALWAYS failed - meaning non-teaching staff could never log in
-# (login_required's _find_user_by_token skipped their table entirely)
-# and every RBAC permission check for staff users silently evaluated to
-# "no access". This alias makes that import succeed.
-# ===========================
 Staff = NonTeachingStaff
 
 
-# ===========================
 # AUTO ID GENERATORS
-# ===========================
 def generate_student_id():
     try:
         last_student = Student.query.order_by(Student.id.desc()).first()
@@ -1120,215 +1097,4 @@ def generate_staff_user_id():
         return "STFUSR" f"{int(datetime.utcnow().timestamp())}"
 
 
-# ===========================
 # SIGNUP CLASS
-# ===========================
-class SignUp(MethodView):
-
-    def post(self):
-        try:
-            data = request.get_json()
-            if not data:
-                return jsonify({"error": "Invalid JSON payload"}), 400
-
-            email = data.get("email")
-            password = data.get("password")
-            role = data.get("role")
-
-            if not email or not password or not role:
-                return jsonify({"error": "Email, password, and role required"}), 400
-
-            email_regex = r"^[\w\.-]+@[\w\.-]+\.\w+$"
-            if not re.match(email_regex, email):
-                return jsonify({"error": "Invalid email format"}), 400
-
-            if len(password) < 6:
-                return jsonify({"error": "Password must be at least 6 characters"}), 400
-
-            # Check if email exists in correct table
-            if role == "student":
-                if Student.query.filter_by(email=email).first():
-                    return jsonify({"error": "Email already registered"}), 400
-
-            elif role == "teacher":
-                if Teacher.query.filter_by(email=email).first():
-                    return jsonify({"error": "Email already registered"}), 400
-
-            elif role == "admin":
-                if Admin.query.filter_by(email=email).first():
-                    return jsonify({"error": "Email already registered"}), 400
-
-            else:
-                return jsonify({"error": "Invalid role"}), 400
-
-            hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
-
-            if role == "student":
-                student_id = generate_student_id()
-                user_id = generate_user_id()
-
-                dob = data.get("date_of_birth")
-                admission = data.get("admission_date")
-                date_of_birth = (
-                    datetime.strptime(dob, "%Y-%m-%d").date() if dob else None
-                )
-                admission_date = (
-                    datetime.strptime(admission, "%Y-%m-%d").date()
-                    if admission
-                    else None
-                )
-
-                new_user = Student(
-                    student_id=student_id,
-                    user_id=user_id,
-                    first_name=data.get("first_name"),
-                    last_name=data.get("last_name"),
-                    middle_name=data.get("middle_name"),
-                    email=email,
-                    mobile=data.get("mobile"),
-                    father_name=data.get("father_name"),
-                    father_mobile=data.get("father_mobile"),
-                    mother_name=data.get("mother_name"),
-                    mother_mobile=data.get("mother_mobile"),
-                    emergency_contact_name=data.get("emergency_contact_name"),
-                    emergency_contact_number=data.get("emergency_contact_number"),
-                    blood_group=data.get("blood_group"),
-                    medical_conditions=data.get("medical_conditions"),
-                    allergies=data.get("allergies"),
-                    gender=data.get("gender"),
-                    date_of_birth=date_of_birth,
-                    address=data.get("address"),
-                    admission_date=admission_date,
-                    role=role,
-                    password=hashed_password,
-                )
-
-                db.session.add(new_user)
-                db.session.commit()
-                return (
-                    jsonify(
-                        {
-                            "message": "Student registered successfully",
-                            "student_id": student_id,
-                            "user_id": user_id,
-                        }
-                    ),
-                    201,
-                )
-
-            elif role == "teacher":
-                teacher_id = (
-                    f"TCH{int(datetime.utcnow().timestamp())}"  # simple auto-id
-                )
-                user_id = f"USR{int(datetime.utcnow().timestamp())}"
-
-                dob = data.get("date_of_birth")
-                date_of_birth = (
-                    datetime.strptime(dob, "%Y-%m-%d").date() if dob else None
-                )
-                joining_date = (
-                    datetime.strptime(data.get("joining_date"), "%Y-%m-%d").date()
-                    if data.get("joining_date")
-                    else None
-                )
-
-                new_user = Teacher(
-                    teacher_id=teacher_id,
-                    user_id=user_id,
-                    first_name=data.get("first_name"),
-                    middle_name=data.get("middle_name"),
-                    last_name=data.get("last_name"),
-                    email=email,
-                    mobile=data.get("mobile"),
-                    gender=data.get("gender"),
-                    date_of_birth=date_of_birth,
-                    address=data.get("address"),
-                    joining_date=joining_date,
-                    role=role,
-                    password=hashed_password,
-                )
-                db.session.add(new_user)
-                db.session.commit()
-                return (
-                    jsonify(
-                        {
-                            "message": "Teacher registered successfully",
-                            "teacher_id": teacher_id,
-                            "user_id": user_id,
-                        }
-                    ),
-                    201,
-                )
-
-            elif role == "admin":
-                admin_id = generate_admin_id()
-                user_id = generate_user_id()
-
-                dob = data.get("date_of_birth")
-                joining = data.get("joining_date")
-
-                date_of_birth = (
-                    datetime.strptime(dob, "%Y-%m-%d").date() if dob else None
-                )
-
-                joining_date = (
-                    datetime.strptime(joining, "%Y-%m-%d").date() if joining else None
-                )
-
-                new_user = Admin(
-                    admin_id=admin_id,
-                    user_id=user_id,
-                    first_name=data.get("first_name"),
-                    middle_name=data.get("middle_name"),
-                    last_name=data.get("last_name"),
-                    email=email,
-                    mobile=data.get("mobile"),
-                    username=data.get("username"),
-                    gender=data.get("gender"),
-                    date_of_birth=date_of_birth,
-                    blood_group=data.get("blood_group"),
-                    address=data.get("address"),
-                    city=data.get("city"),
-                    state=data.get("state"),
-                    pincode=data.get("pincode"),
-                    admin_type=data.get("admin_type"),
-                    designation=data.get("designation"),
-                    department=data.get("department"),
-                    qualification=data.get("qualification"),
-                    specialization=data.get("specialization"),
-                    experience_years=data.get("experience_years"),
-                    joining_date=joining_date,
-                    employment_type=data.get("employment_type"),
-                    shift=data.get("shift"),
-                    salary=data.get("salary"),
-                    medical_condition=data.get("medical_condition"),
-                    emergency_name=data.get("emergency_name"),
-                    emergency_relation=data.get("emergency_relation"),
-                    emergency_phone=data.get("emergency_phone"),
-                    role="admin",
-                    password=hashed_password,
-                )
-
-                db.session.add(new_user)
-                db.session.commit()
-
-            return (
-                jsonify(
-                    {
-                        "message": "Admin registered successfully",
-                        "admin_id": admin_id,
-                        "user_id": user_id,
-                    }
-                ),
-                201,
-            )
-
-        except SQLAlchemyError as db_err:
-            logger.error(f"Database error: {db_err}")
-            db.session.rollback()
-            return jsonify({"error": "Database error occurred"}), 500
-
-        except Exception as e:
-            logger.exception(f"Signup error: {e}")
-            db.session.rollback()
-            return jsonify({"error": "Something went wrong"}), 500

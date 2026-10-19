@@ -10,29 +10,10 @@ const EMPTY_FORM = {
 };
 
 // The real Notice model (utils/announcement.py) - what POST
-// /api/announcements actually accepts. Academic dashboard's existing
-// Notifications section posts {title, message, priority, target_role},
-// none of which match: the API wants "description" (not "message"),
-// "audience" with values like "Students"/"Teachers" (not "target_role"
-// with "students"/"teachers"), and a required "notice_date" that
-// was never being sent at all - so that flow 422s against the real
-// backend. Fixed here so Accounts' version actually works.
 const AUDIENCE_OPTIONS = ["All", "Students", "Teachers", "Admins", "Staff"];
 const CATEGORY_OPTIONS = ["General", "Academic", "Examination", "Holiday", "Event"];
 
-/**
- * Accounts Admin > Notifications section.
- *
- * This does NOT introduce a new notification system - the actual
- * inbox (notifications, announcements, unread counts, mark-read) is
- * already fetched by useAdminDashboard() (see utils/Notifications.py /
- * GET /api/notifications), the same hook every admin dashboard in this
- * app already calls. This hook only owns the "compose and send a new
- * notification" form and its local UI state (which filter tab is
- * active, the search box), posting to POST /api/announcements
- * (utils/announcement.py's CreateNoticeAPI) with the payload shape
- * that endpoint actually validates.
- */
+// Accounts Admin > Notifications section
 export function useAccountsNotifications({ fetchWithAuth, showToast }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);

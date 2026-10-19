@@ -28,15 +28,7 @@ const emptyPayslipForm = () => ({
   remarks: "",
 });
 
-/**
- * Backs the "click on a staff name" modal in the Accounts dashboard's
- * Staff, Salary Management and Payslips sections: identity + salary
- * structure + payslip history, the actions to save a salary structure,
- * generate a payslip, and mark one paid (all gated by canWriteAccounts
- * at the call site), and all of that form's local UI state - kept here
- * rather than in the dashboard component so the component only has to
- * wire onChange/onClick to what this hook already exposes.
- */
+// Backs the "click on a staff name" modal in the Accounts dashboard's
 export function useStaffSalaryDetails({ fetchWithAuth, showToast }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -205,7 +197,6 @@ export function useStaffSalaryDetails({ fetchWithAuth, showToast }) {
   );
 
   // Pre-fill the edit form from the currently loaded structure (or
-  // blank defaults if none exists yet) and show it.
   const openSalaryEditForm = useCallback(() => {
     if (salaryStructure) {
       setSalaryForm({
