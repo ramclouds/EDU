@@ -68,10 +68,10 @@ export default function Login() {
               <Feature icon="bi-book-half" title="Library & hostel" desc="Book lending, fines, room allotment and hostel requests." />
               <Feature icon="bi-megaphone-fill" title="Notices & events" desc="School notices, the school calendar and notifications." />
             </div>
-            <div className="mt-8 rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-200">
+            {/* <div className="mt-8 rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900 dark:bg-indigo-500/10 dark:text-indigo-200">
               <p className="font-semibold">Who signs in here</p>
               <p className="mt-1">Super Admins, admin staff, teachers and students. Each person sees only what their role allows, and each school&apos;s information stays private.</p>
-            </div>
+            </div> */}
           </section>
 
           {/* Sign-in card */}
