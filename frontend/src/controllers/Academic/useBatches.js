@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../config/appConfig";
 
 // Backend: utils/academic.py -> AdminBatchesAPI / AdminBatchDetailAPI /
-// AdminBatchSetCurrentAPI / AdminBatchOverviewAPI / AdminBatchRolloverAPI
 const BATCHES_ENDPOINT = `${BASE_URL}/admin/academic/batches`;
 
 const EMPTY_STATS = { total: 0, in_use: 0, current_batch: null };

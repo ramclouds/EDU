@@ -18,19 +18,15 @@ logger = logging.getLogger(__name__)
 
 
 def _can_access_teacher(teacher_id):
-    """
-    BUG FIX: these endpoints previously had no ownership check at all -
-    any logged-in account (another teacher, a student) could view or
-    edit any teacher's profile, including changing their password,
-    just by guessing an id in the URL. Now: a teacher may only access
-    their own record; any admin may access any teacher (Academic
-    Admin oversight, Super Admin, etc).
-    """
+    # BUG FIX: these endpoints previously had no ownership check at all
     current_user = get_current_user()
     current_user_type = get_current_user_type()
 
     if current_user_type == "admin":
-        return True
+        target = Teacher.query.get(teacher_id)
+        return target is not None and (
+            getattr(current_user, "school_id", None) == target.school_id
+        )
 
     if (
         current_user_type == "teacher"
@@ -187,6 +183,7 @@ class TeacherDetails(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
@@ -305,6 +302,7 @@ class UpdateTeacherProfile(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
@@ -316,10 +314,6 @@ class ChangeTeacherPassword(MethodView):
             id = int(id)
 
             # This endpoint requires knowing the current password, so
-            # it's self-service only - a teacher changing their own
-            # password. Admin-initiated password resets go through
-            # AdminTeacherPasswordAPI (utils/TeacherManagement.py),
-            # which doesn't require the old password.
             current_user = get_current_user()
             current_user_type = get_current_user_type()
             if not (
@@ -365,4 +359,5 @@ class ChangeTeacherPassword(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500

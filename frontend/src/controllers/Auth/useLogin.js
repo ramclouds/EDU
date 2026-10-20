@@ -1,13 +1,16 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { BASE_URL } from "../../config/appConfig";
 import {
   clearStoredDashboardAccess,
   storeDashboardAccess,
 } from "./useDashboardAccess";
+import { setSchoolProfile } from "../../lib/schoolProfile";
 
 export function useLogin() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [schoolCode, setSchoolCode] = useState("");
   const [resetEmail, setResetEmail] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -15,14 +18,12 @@ export function useLogin() {
   const [showForgotModal, setShowForgotModal] = useState(false);
 
   // Shown as an inline banner on the login page instead of (or in
-  // addition to) the blocking alert, so the "no dashboard access"
-  // message stays visible and readable rather than flashing by.
   const [loginNotice, setLoginNotice] = useState(null);
 
   // ================= LOGIN =================
   const login = async () => {
     if (!identifier || !password) {
-      alert("Please fill all fields");
+      toast.error("Please fill all fields");
       return;
     }
 
@@ -40,6 +41,8 @@ export function useLogin() {
           body: JSON.stringify({
             identifier,
             password,
+            // Optional: only schools onboarded through the Developer
+            school_code: schoolCode || undefined,
           }),
         }
       );
@@ -48,9 +51,6 @@ export function useLogin() {
 
       if (!response.ok) {
         // The backend blocks login (and issues no token) whenever the
-        // account's own dashboard has not been granted to it, e.g. a
-        // Library Admin whose "library" dashboard access was revoked
-        // or was never assigned by a Super Admin.
         if (data.error_code === "DASHBOARD_ACCESS_DENIED") {
           setLoginNotice({
             type: "error",
@@ -58,8 +58,14 @@ export function useLogin() {
               data.error ||
               "Your account does not have access to any dashboard yet. Please contact a Super Administrator.",
           });
+        } else if (data.error_code === "SCHOOL_ACCESS_DENIED") {
+          // The school itself is suspended or its trial/subscription
+          setLoginNotice({
+            type: "error",
+            message: data.error || "This school's account is not active.",
+          });
         } else {
-          alert(data.error || "Login failed");
+          toast.error(data.error || "Login failed");
         }
 
         return;
@@ -68,6 +74,7 @@ export function useLogin() {
       // ================= STORE AUTH =================
 
       localStorage.setItem("token", data.token);
+      setSchoolProfile(data.school ?? null);
       localStorage.setItem("role", data.role);
       localStorage.setItem(
         "user",
@@ -83,18 +90,14 @@ export function useLogin() {
         localStorage.removeItem("admin_type");
       }
 
-      // ================= DASHBOARD ACCESS =================
-      // List of dashboards this user may open, each flagged with
-      // can_view / can_write. Drives the sidebar nav and route guards.
+      // DASHBOARD ACCESS
       if (Array.isArray(data.dashboard_access)) {
         storeDashboardAccess(data.dashboard_access);
       } else {
         clearStoredDashboardAccess();
       }
 
-      // ================= RBAC ACCESS SYNC =================
-      // Keep the existing login and redirect logic unchanged.
-      // RBAC failure must never block a valid login.
+      // RBAC ACCESS SYNC
       try {
         let rbacAccess = data.rbac || null;
 
@@ -158,7 +161,7 @@ export function useLogin() {
         return;
       }
 
-      if (data.role === "admin") {
+      if (data.role === "admin" || data.role === "super_admin") {
         const adminRoutes = {
           "Super Admin": "/super-admin-dashboard",
           "Library Admin": "/library-admin-dashboard",
@@ -183,13 +186,11 @@ export function useLogin() {
       }
 
       // The backend always sends `data.dashboard`, so in practice we
-      // never get here - this only fires if the backend response is
-      // missing both `dashboard` and a role we recognise.
-      alert("No dashboard route configured");
+      toast.error("No dashboard route configured");
 
     } catch (error) {
       console.error(error);
-      alert("Server error");
+      toast.error("Server error");
     } finally {
       setLoading(false);
     }
@@ -200,7 +201,7 @@ export function useLogin() {
   const handleForgotPassword = async () => {
 
     if (!resetEmail) {
-      alert("Please enter your email");
+      toast.error("Please enter your email");
       return;
     }
 
@@ -223,13 +224,13 @@ export function useLogin() {
 
       if (response.ok) {
 
-        alert("Password reset link sent");
+        toast.success("Password reset link sent");
         setShowForgotModal(false);
         setResetEmail("");
 
       } else {
 
-        alert(data.error);
+        toast.error(data.error || "Something went wrong");
 
       }
 
@@ -237,7 +238,7 @@ export function useLogin() {
 
       console.error(error);
 
-      alert("Server error");
+      toast.error("Server error");
 
     }
   };

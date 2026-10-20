@@ -117,12 +117,15 @@ class MyClasses(MethodView):
             user_id = int(user_id)
 
             # ================= ADMIN: SHOW ALL CLASSES =================
-            if role == "admin":
+            if role in ("admin", "super_admin"):
                 admin = Admin.query.get(user_id)
                 if not admin:
                     return jsonify({"error": "Admin not found"}), 404
 
-                academic_classes = AcademicClass.query.order_by(
+                # Only this school's classes. The unscoped query listed every
+                academic_classes = AcademicClass.query.filter(
+                    AcademicClass.school_id == admin.school_id
+                ).order_by(
                     AcademicClass.batch_id.asc(),
                     AcademicClass.division_id.asc(),
                     AcademicClass.section_id.asc(),
@@ -176,7 +179,7 @@ class MyClasses(MethodView):
 
         except Exception as e:
             logger.exception("MyClasses API failed")
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # Backward compatible old teacher route

@@ -11,6 +11,7 @@ from utils.rolePermissionManagement import permission_required
 from utils.teacherDetails import TeacherClass
 from utils.studentDetails import AcademicClass, Batch, Division, Section
 from utils.subjects import Subject
+from utils.tenancy import current_school_id as _current_school_id
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,7 @@ def serialize_teacher(t, include_assignments=True):
     return data
 
 
-def replace_teacher_assignments(teacher_id, assignments):
+def replace_teacher_assignments(teacher_id, assignments, school_id):
     TeacherClass.query.filter_by(teacher_id=teacher_id).delete()
 
     for item in assignments or []:
@@ -115,10 +116,12 @@ def replace_teacher_assignments(teacher_id, assignments):
         if not academic_class_id or not subject_id:
             continue
 
-        if not AcademicClass.query.get(academic_class_id):
+        if not AcademicClass.query.filter_by(
+            id=academic_class_id, school_id=school_id
+        ).first():
             raise ValueError(f"Invalid academic_class_id: {academic_class_id}")
 
-        if not Subject.query.get(subject_id):
+        if not Subject.query.filter_by(id=subject_id, school_id=school_id).first():
             raise ValueError(f"Invalid subject_id: {subject_id}")
 
         db.session.add(
@@ -134,8 +137,9 @@ class AdminTeacherOptionsAPI(MethodView):
     @permission_required("academic", "view")
     def get(self):
         try:
+            school_id = _current_school_id()
             academic_classes = []
-            for ac in AcademicClass.query.all():
+            for ac in AcademicClass.query.filter_by(school_id=school_id).all():
                 batch = Batch.query.get(ac.batch_id)
                 division = Division.query.get(ac.division_id)
                 section = Section.query.get(ac.section_id)
@@ -163,25 +167,27 @@ class AdminTeacherOptionsAPI(MethodView):
                         "academic_classes": academic_classes,
                         "subjects": [
                             {"id": s.id, "subject_name": s.subject_name}
-                            for s in Subject.query.order_by(
-                                Subject.subject_name.asc()
-                            ).all()
+                            for s in Subject.query.filter_by(school_id=school_id)
+                            .order_by(Subject.subject_name.asc())
+                            .all()
                         ],
                         "batches": [
                             {"id": b.id, "batch_name": b.batch_name}
-                            for b in Batch.query.order_by(Batch.batch_name.asc()).all()
+                            for b in Batch.query.filter_by(school_id=school_id)
+                            .order_by(Batch.batch_name.asc())
+                            .all()
                         ],
                         "divisions": [
                             {"id": d.id, "division_name": d.division_name}
-                            for d in Division.query.order_by(
-                                Division.division_name.asc()
-                            ).all()
+                            for d in Division.query.filter_by(school_id=school_id)
+                            .order_by(Division.division_name.asc())
+                            .all()
                         ],
                         "sections": [
                             {"id": s.id, "section_name": s.section_name}
-                            for s in Section.query.order_by(
-                                Section.section_name.asc()
-                            ).all()
+                            for s in Section.query.filter_by(school_id=school_id)
+                            .order_by(Section.section_name.asc())
+                            .all()
                         ],
                     }
                 ),
@@ -199,8 +205,9 @@ class AdminTeachersAPI(MethodView):
         try:
             q = request.args.get("q", "").strip()
             status = request.args.get("status", "").strip()
+            school_id = _current_school_id()
 
-            query = Teacher.query
+            query = Teacher.query.filter(Teacher.school_id == school_id)
 
             if q:
                 like = f"%{q}%"
@@ -227,12 +234,16 @@ class AdminTeachersAPI(MethodView):
                         "teachers": [serialize_teacher(t) for t in teachers],
                         "total": len(teachers),
                         "stats": {
-                            "total": Teacher.query.count(),
+                            "total": Teacher.query.filter(
+                                Teacher.school_id == school_id
+                            ).count(),
                             "active": Teacher.query.filter(
-                                Teacher.status == "Active"
+                                Teacher.school_id == school_id,
+                                Teacher.status == "Active",
                             ).count(),
                             "inactive": Teacher.query.filter(
-                                Teacher.status != "Active"
+                                Teacher.school_id == school_id,
+                                Teacher.status != "Active",
                             ).count(),
                         },
                     }
@@ -267,6 +278,7 @@ class AdminTeachersAPI(MethodView):
             teacher_id = data.get("teacher_id") or next_teacher_id()
             username = data.get("username") or teacher_id.lower()
             password = data.get("password") or "Teacher@123"
+            school_id = _current_school_id()
 
             if Teacher.query.filter_by(username=username).first():
                 return jsonify({"error": "Username already exists"}), 400
@@ -274,6 +286,7 @@ class AdminTeachersAPI(MethodView):
             teacher = Teacher(
                 teacher_id=teacher_id,
                 user_id=int(datetime.utcnow().timestamp()),
+                school_id=school_id,
                 first_name=data.get("first_name"),
                 middle_name=data.get("middle_name"),
                 last_name=data.get("last_name"),
@@ -308,7 +321,9 @@ class AdminTeachersAPI(MethodView):
             db.session.add(teacher)
             db.session.flush()
 
-            replace_teacher_assignments(teacher.id, data.get("assignments", []))
+            replace_teacher_assignments(
+                teacher.id, data.get("assignments", []), school_id
+            )
 
             db.session.commit()
 
@@ -343,7 +358,9 @@ class AdminTeachersAPI(MethodView):
 class AdminTeacherDetailAPI(MethodView):
     @permission_required("academic", "view")
     def get(self, teacher_id):
-        teacher = Teacher.query.get(teacher_id)
+        teacher = Teacher.query.filter_by(
+            id=teacher_id, school_id=_current_school_id()
+        ).first()
         if not teacher:
             return jsonify({"error": "Teacher not found"}), 404
         return jsonify({"teacher": serialize_teacher(teacher)}), 200
@@ -351,7 +368,10 @@ class AdminTeacherDetailAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, teacher_id):
         try:
-            teacher = Teacher.query.get(teacher_id)
+            school_id = _current_school_id()
+            teacher = Teacher.query.filter_by(
+                id=teacher_id, school_id=school_id
+            ).first()
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
 
@@ -423,7 +443,9 @@ class AdminTeacherDetailAPI(MethodView):
                 ).decode("utf-8")
 
             if "assignments" in data:
-                replace_teacher_assignments(teacher.id, data.get("assignments", []))
+                replace_teacher_assignments(
+                    teacher.id, data.get("assignments", []), school_id
+                )
 
             db.session.commit()
 
@@ -454,7 +476,9 @@ class AdminTeacherDetailAPI(MethodView):
     @permission_required("academic", "delete")
     def delete(self, teacher_id):
         try:
-            teacher = Teacher.query.get(teacher_id)
+            teacher = Teacher.query.filter_by(
+                id=teacher_id, school_id=_current_school_id()
+            ).first()
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
 
@@ -474,12 +498,17 @@ class AdminTeacherAssignmentsAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, teacher_id):
         try:
-            teacher = Teacher.query.get(teacher_id)
+            school_id = _current_school_id()
+            teacher = Teacher.query.filter_by(
+                id=teacher_id, school_id=school_id
+            ).first()
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
 
             data = request.get_json() or {}
-            replace_teacher_assignments(teacher_id, data.get("assignments", []))
+            replace_teacher_assignments(
+                teacher_id, data.get("assignments", []), school_id
+            )
             db.session.commit()
 
             return (
@@ -506,7 +535,9 @@ class AdminTeacherPasswordAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, teacher_id):
         try:
-            teacher = Teacher.query.get(teacher_id)
+            teacher = Teacher.query.filter_by(
+                id=teacher_id, school_id=_current_school_id()
+            ).first()
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
 
@@ -531,7 +562,9 @@ class AdminTeacherStatusAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, teacher_id):
         try:
-            teacher = Teacher.query.get(teacher_id)
+            teacher = Teacher.query.filter_by(
+                id=teacher_id, school_id=_current_school_id()
+            ).first()
             if not teacher:
                 return jsonify({"error": "Teacher not found"}), 404
 

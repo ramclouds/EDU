@@ -54,10 +54,7 @@
     background-color: #1e293b !important;
 }
 
-/* HEADER */
-.dark .bg-gradient-to-r {
-    background: #1e293b !important;
-}
+/* Previously: `.dark .bg-gradient-to-r { background: #1e293b !important; */
 
 /* BUTTON HOVER */
 .dark .hover\:bg-gray-100:hover {
@@ -69,9 +66,7 @@
 }
 
 
-/* =========================
-   SCROLLBAR
-========================= */
+/* SCROLLBAR */
 
 .no-scrollbar::-webkit-scrollbar {
     display: none;

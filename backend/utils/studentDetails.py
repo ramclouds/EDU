@@ -4,11 +4,16 @@ from sqlalchemy import or_
 from flask import jsonify, request
 from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
-from utils.auth import db, Student
+from utils.auth import db
+from utils.tenancy import caller_can_access_student, Student
 from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import permission_required
 
 logger = logging.getLogger(__name__)
+
+
+def _current_school_id():
+    return getattr(getattr(request, "user", None), "school_id", None)
 
 
 # MODELS
@@ -16,6 +21,11 @@ class StudentAcademicRecord(db.Model):
     __tablename__ = "student_academic_records"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    # Denormalized (see AcademicClass.school_id's comment) — set from the
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     student_id = db.Column(
         db.Integer, db.ForeignKey("students.id", ondelete="CASCADE"), nullable=False
@@ -35,6 +45,11 @@ class AcademicClass(db.Model):
     __tablename__ = "academic_classes"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    # Denormalized copy of the owning Batch/Division/Section's school_id
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     batch_id = db.Column(
         db.Integer, db.ForeignKey("batches.id", ondelete="CASCADE"), nullable=False
@@ -59,30 +74,52 @@ class Batch(db.Model):
     __tablename__ = "batches"
 
     id = db.Column(db.Integer, primary_key=True)
-    batch_name = db.Column(db.String(20), nullable=False, unique=True)
+
+    # ================= TENANCY ================= (see Admin.school_id
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
+    batch_name = db.Column(db.String(20), nullable=False)
     start_date = db.Column(db.Date)
     end_date = db.Column(db.Date)
     # Marks the school's active academic year. Only one Batch should have
-    # this set to True at a time - enforced in application code (see
-    # AdminBatchSetCurrentAPI in utils/academic.py), not at the DB level.
-    # Migration for the existing `batches` table:
-    #   ALTER TABLE batches ADD COLUMN is_current BOOLEAN NOT NULL DEFAULT FALSE;
     is_current = db.Column(db.Boolean, nullable=False, server_default="0")
     created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    __table_args__ = (
+        db.UniqueConstraint("school_id", "batch_name", name="uq_school_batch_name"),
+    )
 
 
 class Division(db.Model):
     __tablename__ = "divisions"
 
     id = db.Column(db.Integer, primary_key=True)
-    division_name = db.Column(db.String(20), nullable=False, unique=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+    division_name = db.Column(db.String(20), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "school_id", "division_name", name="uq_school_division_name"
+        ),
+    )
 
 
 class Section(db.Model):
     __tablename__ = "sections"
 
     id = db.Column(db.Integer, primary_key=True)
-    section_name = db.Column(db.String(10), nullable=False, unique=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+    section_name = db.Column(db.String(10), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("school_id", "section_name", name="uq_school_section_name"),
+    )
 
 
 # API
@@ -98,7 +135,10 @@ class StudentDetails(MethodView):
             except (ValueError, TypeError):
                 return jsonify({"error": "Student id must be an integer"}), 400
 
-            student = Student.query.get(id)
+            # OWNERSHIP: a student reads their own profile; school staff read
+            allowed, student = caller_can_access_student(id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
 
             if not student:
                 return jsonify({"error": "Student not found"}), 404
@@ -190,6 +230,11 @@ class UpdateStudentProfile(MethodView):
             except (ValueError, TypeError):
                 return jsonify({"error": "Student id must be an integer"}), 400
 
+            # SECURITY: this had no authorization check at all beyond a
+            caller = getattr(request, "user", None)
+            if not isinstance(caller, Student) or caller.id != id:
+                return jsonify({"error": "Forbidden"}), 403
+
             student = Student.query.get(id)
 
             if not student:
@@ -220,7 +265,6 @@ class UpdateStudentProfile(MethodView):
                         return jsonify({"error": "Mobile number already in use"}), 400
 
             # ================= SAFE UPDATE =================
-            # BASIC
             student.first_name = data.get("first_name", student.first_name)
             student.last_name = data.get("last_name", student.last_name)
             student.middle_name = data.get("middle_name", student.middle_name)
@@ -279,6 +323,7 @@ class UpdateStudentProfile(MethodView):
 
         except Exception as e:
             logger.exception(f"UpdateStudentProfile error: {e}")
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
@@ -307,6 +352,10 @@ class ChangePassword(MethodView):
             current_password = data.get("current_password")
             new_password = data.get("new_password")
             confirm_password = data.get("confirm_password")
+
+            _caller = getattr(request, "user", None)
+            if not (isinstance(_caller, Student) and _caller.id == id):
+                return jsonify({"error": "You can only change your own password"}), 403
 
             # ================= REQUIRED FIELDS =================
             if not all([current_password, new_password, confirm_password]):
@@ -357,12 +406,11 @@ class ChangePassword(MethodView):
 
         except Exception as e:
             logger.exception(f"ChangePassword error: {e}")
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# ============================================================
 # STUDENT ROSTER (Academic Admin's Students section)
-# ============================================================
 def _student_summary(
     student, record=None, academic=None, division=None, section=None, batch=None
 ):
@@ -388,16 +436,10 @@ def _student_summary(
 
 
 class AdminStudentsListAPI(MethodView):
-    """
-    Roster for the Academic Admin's Students section. Lists every
-    student together with their current class (if assigned), and
-    supports searching by name/student ID/mobile plus filtering by
-    class or "unassigned" (enrolled account but no current class
-    record - shouldn't normally happen, but worth surfacing rather
-    than silently hiding).
-    """
+    # Roster for the Academic Admin's Students section. Lists every
 
-    @permission_required("academic", "view")
+    # BUG FIX: this was gated on the "academic" module, but neither the
+    @permission_required("students", "view")
     def get(self):
         try:
             search = str(request.args.get("search") or "").strip()
@@ -407,7 +449,7 @@ class AdminStudentsListAPI(MethodView):
                 str(request.args.get("unassigned") or "").lower() == "true"
             )
 
-            query = Student.query
+            query = Student.query.filter(Student.school_id == _current_school_id())
 
             if search:
                 like = f"%{search}%"

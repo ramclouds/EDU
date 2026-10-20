@@ -4,15 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../config/appConfig";
 
 // Backend:
-//   GET  /api/admin/student/enrollment-options   -> StudentEnrollmentOptionsAPI (studentEnrollment.py)
-//   GET  /api/admin/student/enrollment-preview   -> StudentEnrollmentPreviewAPI (studentEnrollment.py)
-//   POST /api/admin/student/enroll               -> EnrollStudentAPI (studentEnrollment.py)
-//
-// NOTE: this hook used to also carry a full student roster + detail-view
-// (list/search/filter, GET /api/admin/students, GET /api/student/<id>).
-// That's been removed - the "My Classes" browse UI (useMyClass.js) now
-// owns roster browsing and student profile viewing. This hook is scoped
-// to just the Enroll Student flow.
 const ENROLLMENT_OPTIONS_ENDPOINT = `${BASE_URL}/admin/student/enrollment-options`;
 const ENROLLMENT_PREVIEW_ENDPOINT = `${BASE_URL}/admin/student/enrollment-preview`;
 const ENROLL_ENDPOINT = `${BASE_URL}/admin/student/enroll`;
@@ -146,7 +137,6 @@ export function useStudents() {
         });
 
         // Auto-fill the editable fields with the suggested values, but
-        // never overwrite something the admin already typed in manually.
         setEnrollForm((prev) => ({
           ...prev,
           student_id: prev.student_id || data.student_id || "",
@@ -226,8 +216,6 @@ export function useStudents() {
         payload.academic_class_id = Number(enrollForm.academic_class_id);
         payload.roll_number = enrollForm.roll_number || enrollPreview.roll_number;
         // Only send a password if the admin actually set one - leave it
-        // out entirely so the backend falls back to its own default
-        // (last 4 digits of mobile) rather than sending an empty string.
         if (!payload.password) delete payload.password;
 
         const response = await fetch(ENROLL_ENDPOINT, {

@@ -7,10 +7,10 @@ import {
   FILE_BASE_URL,
 } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
 import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
-import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import { useHostelPermission } from "../controllers/Hostel/useHostelPermission";
 import { useHostelBlocksFloors } from "../controllers/Hostel/useHostelBlocksFloors";
 import { useHostelRooms } from "../controllers/Hostel/useHostelRooms";
@@ -35,6 +35,11 @@ import { useHostelPayments } from "../controllers/Hostel/useHostelPayments";
 import { useHostelPendingDues } from "../controllers/Hostel/useHostelPendingDues";
 import { useHostelReports } from "../controllers/Hostel/useHostelReports";
 import { useHostelActivityLogs } from "../controllers/Hostel/useHostelActivityLogs";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
+
+const SEARCH_SECTIONS = [{ key: "activity-logs", label: "Activity logs" }, { key: "announcements", label: "Announcements" }, { key: "attendance", label: "Attendance" }, { key: "beds", label: "Beds" }, { key: "checkin-checkout", label: "Checkin checkout" }, { key: "complaints", label: "Complaints" }, { key: "dashboard", label: "Dashboard" }, { key: "fee-management", label: "Fee management" }, { key: "floors", label: "Floors" }, { key: "leave-requests", label: "Leave requests" }, { key: "maintenance", label: "Maintenance" }, { key: "meal-attendance", label: "Meal attendance" }, { key: "mess-menu", label: "Mess menu" }, { key: "notifications", label: "Notifications" }, { key: "payment", label: "Payment" }, { key: "pending-dues", label: "Pending dues" }, { key: "profile", label: "Profile" }, { key: "reports", label: "Reports" }, { key: "room-allotment", label: "Room allotment" }, { key: "rooms", label: "Rooms" }, { key: "settings", label: "Settings" }, { key: "staff", label: "Staff" }, { key: "students", label: "Students" }, { key: "visitors", label: "Visitors" }];
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -193,18 +198,7 @@ function AdminDashboard() {
   } = useAdminProfile({ fetchWithAuth, showToast });
 
   // Read vs Full Access for this whole dashboard, driven by Role &
-  // Permission Management on the Super Admin dashboard. Read Only ->
-  // can view/filter everywhere below, but every add/edit/delete/
-  // allocate/vacate action is hidden or blocked.
   const { canWriteHostel, hostelAccessLevel } = useHostelPermission();
-
-  // Every dashboard (including this one) this admin currently has
-  // access to - powers the "OTHER DASHBOARDS" sidebar links below.
-  const { dashboards: accessibleDashboards } = useDashboardAccess();
-
-  const otherAccessibleDashboards = (accessibleDashboards || []).filter(
-    (dashboard) => dashboard.key !== "hostel-admin-dashboard",
-  );
 
   // ================= FLOORS & BLOCKS SECTION HOOK =================
   const {
@@ -705,12 +699,7 @@ function AdminDashboard() {
     }
   }, []);
 
-  // ================= DASHBOARD OVERVIEW (LIVE DATA) =================
-  // The landing "dashboard" tab has no dedicated section-hook of its own —
-  // it's a live rollup of numbers each domain section already fetches
-  // (structure, reports, staff, visitors, leave requests, dues, activity
-  // logs). Pulling them together here means the dashboard always reflects
-  // real DB state instead of a static/mock summary.
+  // DASHBOARD OVERVIEW (LIVE DATA)
   const refreshDashboardOverview = (opts = {}) => {
     loadStructure(opts);
     loadReport();
@@ -830,9 +819,9 @@ function AdminDashboard() {
       ${sidebarExpanded ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
     `}
         >
-          <i
+          <SchoolLogo
             className="bi bi-mortarboard text-purple-600 text-xl"
-            title={!sidebarExpanded ? APP_NAME : ""}
+            title={!sidebarExpanded ? schoolDisplayName() : ""}
           />
 
           <span
@@ -841,7 +830,7 @@ function AdminDashboard() {
         ${sidebarExpanded ? "opacity-100 max-w-[180px] ml-2" : "opacity-0 max-w-0 ml-0"}
       `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
@@ -849,17 +838,13 @@ function AdminDashboard() {
         {/* ========================= HOSTEL ADMIN SIDEBAR NAV ========================= */}
         <nav className="h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-4 space-y-2 text-sm">
           {[
-            // =========================================================
             // MAIN
-            // =========================================================
             {
               title: "MAIN",
               items: [["dashboard", "bi-grid", "Dashboard"]],
             },
 
-            // =========================================================
             // HOSTEL SETUP / INFRASTRUCTURE
-            // =========================================================
             {
               title: "HOSTEL SETUP",
               items: [
@@ -869,9 +854,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // RESIDENTS
-            // =========================================================
             {
               title: "HOSTEL RESIDENTS",
               items: [
@@ -882,9 +865,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // DAILY OPERATIONS
-            // =========================================================
             {
               title: "DAILY OPERATIONS",
               items: [
@@ -894,9 +875,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // HOSTEL FEES
-            // =========================================================
             {
               title: "HOSTEL FEES",
               items: [
@@ -906,9 +885,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // MESS
-            // =========================================================
             {
               title: "MESS MANAGEMENT",
               items: [
@@ -917,9 +894,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // COMPLAINTS / MAINTENANCE
-            // =========================================================
             {
               title: "HOSTEL SUPPORT",
               items: [
@@ -931,9 +906,7 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // COMMUNICATION
-            // =========================================================
             {
               title: "COMMUNICATION",
               items: [
@@ -942,17 +915,13 @@ function AdminDashboard() {
               ],
             },
 
-            // =========================================================
             // REPORTS
-            // =========================================================
             {
               title: "REPORTS",
               items: [["reports", "bi-bar-chart-line", "Reports & Analytics"]],
             },
 
-            // =========================================================
             // SYSTEM
-            // =========================================================
             {
               title: "SYSTEM",
               items: [
@@ -1015,54 +984,6 @@ function AdminDashboard() {
             </div>
           ))}
 
-          {/* OTHER DASHBOARDS THIS ADMIN HAS BEEN GRANTED ACCESS TO */}
-          {otherAccessibleDashboards.length > 0 && (
-            <div>
-              {sidebarExpanded && (
-                <p className="text-xs text-gray-400 px-2 mt-4 mb-2 font-medium tracking-wide">
-                  OTHER DASHBOARDS
-                </p>
-              )}
-
-              {otherAccessibleDashboards.map((dashboard) => (
-                <button
-                  key={dashboard.key}
-                  type="button"
-                  title={!sidebarExpanded ? dashboard.label : ""}
-                  onClick={() => {
-                    navigate(dashboard.route);
-                    closeSidebarOnMobile();
-                  }}
-                  className={`relative flex w-full items-center rounded-xl py-3
-              transition-all duration-300 ease-in-out
-              ${
-                sidebarExpanded
-                  ? "gap-3 px-4 justify-start"
-                  : "justify-center px-0"
-              }
-              text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white`}
-                >
-                  <i className="bi bi-grid-3x3-gap-fill text-base shrink-0" />
-
-                  <span
-                    className={`whitespace-nowrap truncate overflow-hidden
-                transition-all duration-300 ease-in-out
-                ${
-                  sidebarExpanded
-                    ? "opacity-100 max-w-[190px]"
-                    : "opacity-0 max-w-0"
-                }`}
-                  >
-                    {dashboard.label}
-                  </span>
-
-                  {sidebarExpanded && (
-                    <i className="bi bi-box-arrow-up-right ml-auto shrink-0 text-xs opacity-60" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
         </nav>
         {/* FOOTER */}
         <div
@@ -1074,12 +995,12 @@ function AdminDashboard() {
         >
           {sidebarExpanded ? (
             <span className="whitespace-nowrap transition-all duration-300">
-              {APP_NAME} © {APP_YEAR}
+              <SchoolName /> © {APP_YEAR}
             </span>
           ) : (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             />
           )}
         </div>
@@ -1141,7 +1062,7 @@ function AdminDashboard() {
               <div className="flex shrink-0 items-center gap-2 md:hidden">
                 <i className="bi bi-mortarboard text-lg text-indigo-600" />
                 <span className="max-w-[145px] truncate text-sm font-bold text-indigo-600">
-                  {APP_NAME}
+                  <SchoolName />
                 </span>
               </div>
 
@@ -1167,18 +1088,7 @@ function AdminDashboard() {
               <div className="relative hidden w-full max-w-xl flex-1 px-2 md:block">
                 <i className="bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-gray-200 bg-white/70 py-2.5 pl-10 pr-4
-            text-sm text-gray-800 shadow-sm outline-none backdrop-blur-md
-            transition-all duration-300 placeholder:text-gray-400
-            hover:shadow-md focus:bg-white focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-700/70 dark:text-white
-            dark:placeholder:text-gray-400 dark:focus:bg-slate-700"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT ACTIONS */}
@@ -1445,16 +1355,7 @@ function AdminDashboard() {
               <div className="relative">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 pl-11
-            text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-                  placeholder="Search anything here..."
-                  autoFocus
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
             </div>
           )}
@@ -11050,6 +10951,16 @@ function AdminDashboard() {
         )}
 
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={admin}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
             {/* ================= PROFILE HEADER ================= */}
@@ -11523,7 +11434,7 @@ function AdminDashboard() {
         )}
         {/* ===================== PROFILE SECTION END ========================*/}
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100]">
             <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-800">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

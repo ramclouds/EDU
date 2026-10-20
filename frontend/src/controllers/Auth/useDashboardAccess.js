@@ -45,9 +45,7 @@ export function dashboardLabel(routeOrKey) {
   );
 }
 
-/* =========================================================
-   HOOK
-========================================================= */
+// HOOK
 
 export function useDashboardAccess() {
   const [dashboards, setDashboards] = useState(readStoredDashboardAccess());

@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* Z-INDEX SCALE — keep every new fixed/sticky element within this range */
+
+/* Matches the previous CDN config: `dark` class on <html> toggles dark mode. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Premium visual layer, applied once here so every dashboard picks it up */
+@theme {
+  /* Softer, layered "premium" shadows instead of the flat default ones */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 1px 0 rgb(15 23 42 / 0.03);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 12px 28px -6px rgb(15 23 42 / 0.12), 0 4px 10px -4px rgb(15 23 42 / 0.08);
+  --shadow-xl: 0 24px 48px -12px rgb(15 23 42 / 0.18), 0 8px 16px -8px rgb(15 23 42 / 0.1);
+}
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme(--color-slate-300) transparent;
+  }
+  .dark * {
+    scrollbar-color: theme(--color-slate-600) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: theme(--color-slate-300);
+    border-radius: 9999px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: theme(--color-slate-600);
+  }
+
+  :focus-visible {
+    outline: 2px solid theme(--color-indigo-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Every dashboard's sticky topbar carries z-40 exactly once (verified */
+  .sticky.z-40 {
+    margin-bottom: 1.25rem;
+  }
+
+  /* Subtle lift-on-hover for the standard card shape used across every */
+  .rounded-2xl.shadow-sm,
+  .rounded-2xl.shadow-md,
+  .rounded-3xl.shadow-sm,
+  .rounded-3xl.shadow-md {
+    transition:
+      box-shadow 200ms ease,
+      transform 200ms ease,
+      border-color 200ms ease;
+  }
+  .rounded-2xl.shadow-sm:hover,
+  .rounded-2xl.shadow-md:hover,
+  .rounded-3xl.shadow-sm:hover,
+  .rounded-3xl.shadow-md:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
+  /* Frosted-glass treatment for sticky/translucent headers that already */
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg {
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
+  }
+}

@@ -4,6 +4,11 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { APP_NAME, APP_FAVICON } from "./config/appConfig";
 
+// Tailwind is now compiled at build time via @tailwindcss/vite (see
+import "./css/theme.css";
+// Self-hosted from the bootstrap-icons npm package (already a dependency
+import "bootstrap-icons/font/bootstrap-icons.css";
+
 // TITLE
 document.title = APP_NAME;
 
@@ -27,5 +32,5 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <App />
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

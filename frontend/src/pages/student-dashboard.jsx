@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { APP_NAME, APP_YEAR, FILE_BASE_URL } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useStudentProfile } from "../controllers/StudentSide/useStudentProfile";
 import { useStudentDashboard } from "../controllers/StudentSide/studentDashboard";
 import { useDashboardUI } from "../controllers/useDashboardUI";
@@ -11,8 +12,13 @@ import { useStudentAttendance } from "../controllers/StudentSide/useStudentAtten
 import { useStudentExams } from "../controllers/Academic/useStudentExams";
 import { useStudentHostel } from "../controllers/Hostel/useStudentHostel";
 import { useStudentLibrary } from "../controllers/Library/useStudentLibrary";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
 
 // ================= HOSTEL: SMALL DISPLAY HELPERS =================
+const SEARCH_SECTIONS = [{ key: "announcements", label: "Announcements" }, { key: "assignments", label: "Assignments" }, { key: "attendance", label: "Attendance" }, { key: "dashboard", label: "Dashboard" }, { key: "exams", label: "Exams" }, { key: "leaves", label: "Leaves" }, { key: "library", label: "Library" }, { key: "profile", label: "Profile" }, { key: "settings", label: "Settings" }, { key: "studhostel", label: "Studhostel" }, { key: "timetable", label: "Timetable" }];
+
 function formatDate(value) {
   if (!value) return "-";
   const d = new Date(value);
@@ -417,7 +423,7 @@ function StudentDashboard() {
   ${sidebarOpen ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
 `}
         >
-          <i className="bi bi-mortarboard text-purple-600 text-xl"></i>
+          <SchoolLogo className="bi bi-mortarboard text-purple-600 text-xl"/>
 
           <span
             className={`font-bold text-lg text-purple-600 transition-all duration-200
@@ -425,7 +431,7 @@ function StudentDashboard() {
     md:${sidebarOpen ? "block" : "hidden"}
   `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
@@ -442,6 +448,7 @@ function StudentDashboard() {
             ["leaves", "bi-calendar-check", "My Leave"],
             ["announcements", "bi-bell", "Notices"],
             ["profile", "bi-person", "Profile"],
+            ["settings", "bi-gear", "Settings"],
           ].map(([key, icon, label]) => {
             const isActive = activeSection === key;
 
@@ -492,14 +499,14 @@ function StudentDashboard() {
     md:${sidebarOpen ? "block" : "hidden"}
   `}
           >
-            {APP_NAME} © {APP_YEAR}
+            <SchoolName /> © {APP_YEAR}
           </span>
 
           {/* Optional icon when collapsed */}
           {!sidebarOpen && (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             ></i>
           )}
         </div>
@@ -559,20 +566,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
               <div className="hidden md:flex w-1/2 relative group px-4">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-full
-        bg-white/70 dark:bg-slate-700/70
-        backdrop-blur-md border border-gray-200 dark:border-slate-600
-        text-gray-800 dark:text-white
-        placeholder-gray-400 dark:placeholder-gray-400
-        focus:bg-white dark:focus:bg-slate-700
-        outline-none focus:ring-2 focus:ring-indigo-500
-        shadow-sm hover:shadow-md transition-all duration-300"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT */}
@@ -679,16 +673,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         )}
                       </div>
 
-                      {/* <div
-                        className="p-3 text-center text-sm text-indigo-600 
-              hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer font-medium"
-                        onClick={() => {
-                          navigate("/teacher/announcement"); // ✅ better route
-                          setShowNotifications(false);
-                        }}
-                      >
-                        View All Notices →
-                      </div> */}
+                      {/* <div */}
                     </div>
                   )}
                 </div>
@@ -798,14 +783,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           {/* MOBILE SEARCH */}
           {mobileSearchOpen && (
             <div className="md:hidden px-4">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full px-5 py-3 rounded-full bg-white shadow-md 
-        outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Search anything here..."
-              />
+              <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
             </div>
           )}
         </div>
@@ -2752,7 +2730,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= RAISE COMPLAINT MODAL ================= */}
                 {showComplaintModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowComplaintModal(false)}
                   >
                     <div
@@ -2846,7 +2824,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= APPLY LEAVE MODAL ================= */}
                 {showLeaveModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowLeaveModal(false)}
                   >
                     <div
@@ -2964,7 +2942,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= ADD VISITOR MODAL ================= */}
                 {showVisitorModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowVisitorModal(false)}
                   >
                     <div
@@ -3933,7 +3911,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= BOOK DETAIL MODAL ================= */}
                 {libraryRecordModalOpen && selectedLibraryRecord && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={closeLibraryRecord}
                   >
                     <div
@@ -4343,6 +4321,16 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* ===================== NOTICES SECTION END ========================*/}
 
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={student}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="section p-4 sm:p-6 space-y-6 active">
             {/* PROFILE HEADER */}
@@ -4668,7 +4656,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* ===================== PROFILE SECTION END ========================*/}
 
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100]">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md border border-gray-100 dark:border-slate-700">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

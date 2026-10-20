@@ -5,6 +5,7 @@ from datetime import datetime
 
 from utils.auth import db, Student, Teacher, Admin
 from utils.auth_middleware import login_required
+from utils.tenancy import current_school_id
 
 import logging
 
@@ -16,6 +17,10 @@ class Notice(db.Model):
     __tablename__ = "announcements"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Notices belong to the school that published them. Before this, every
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=False)
 
@@ -120,10 +125,6 @@ def serialize_notice(n, is_read=False):
         "title": n.title,
         "description": n.description,
         # BUGFIX: frontend (adminDashboard.js) reads `item.message` when
-        # rendering the combined notification/notice list in the bell
-        # dropdown. Notices never had a `message` key, so notice text
-        # silently disappeared there. Keep both keys so old and new
-        # frontend code paths keep working.
         "message": n.description,
         "category": n.category,
         "priority": n.priority,
@@ -140,6 +141,13 @@ def serialize_notice(n, is_read=False):
     }
 
 
+NOTICE_AUDIENCES = ("All", "Students", "Teachers", "Admins", "Staff")
+NOTICE_CATEGORIES = (
+    "Academic", "Examination", "Holiday", "Event", "General",
+)
+NOTICE_PRIORITIES = ("High", "Medium", "Low")
+
+
 def validate_notice_data(data):
 
     required_fields = [
@@ -152,6 +160,14 @@ def validate_notice_data(data):
 
         if not data.get(field):
             return f"{field} is required"
+
+    # An unknown enum value used to reach the database and fail as a 500.
+    if data.get("audience", "All") not in NOTICE_AUDIENCES:
+        return "audience must be one of: " + ", ".join(NOTICE_AUDIENCES)
+    if data.get("category", "General") not in NOTICE_CATEGORIES:
+        return "category must be one of: " + ", ".join(NOTICE_CATEGORIES)
+    if data.get("priority", "Medium") not in NOTICE_PRIORITIES:
+        return "priority must be one of: " + ", ".join(NOTICE_PRIORITIES)
 
     return None
 
@@ -177,10 +193,6 @@ class CreateNoticeAPI(MethodView):
             role_name = user.__class__.__name__
 
             # 🐛 BUGFIX: previously any logged-in user (including Students)
-            # could hit this endpoint and create a notice — it only ever
-            # *labeled* the creator, it never actually checked who was
-            # allowed to create one. Only Admins/Teachers may publish
-            # announcements.
             if role_name not in ("Admin", "Teacher"):
                 return (
                     jsonify(
@@ -192,6 +204,7 @@ class CreateNoticeAPI(MethodView):
             creator_role = "admin" if role_name == "Admin" else "teacher"
 
             notice = Notice(
+                school_id=user.school_id,
                 title=data["title"].strip(),
                 description=data["description"].strip(),
                 category=data.get(
@@ -280,6 +293,7 @@ class StudentNoticeAPI(MethodView):
             limit = int(request.args.get("limit", 10))
 
             query = Notice.query.filter(
+                Notice.school_id == current_school_id(),
                 Notice.is_active == True,
                 Notice.audience.in_(["All", "Students"]),
             ).order_by(Notice.notice_date.desc())
@@ -343,6 +357,7 @@ class TeacherNoticeAPI(MethodView):
             limit = int(request.args.get("limit", 10))
 
             query = Notice.query.filter(
+                Notice.school_id == current_school_id(),
                 Notice.is_active == True,
                 Notice.audience.in_(["All", "Teachers"]),
             ).order_by(Notice.notice_date.desc())
@@ -406,6 +421,7 @@ class AdminNoticeAPI(MethodView):
             limit = int(request.args.get("limit", 10))
 
             query = Notice.query.filter(
+                Notice.school_id == current_school_id(),
                 Notice.is_active == True,
                 Notice.audience.in_(["All", "Admins"]),
             ).order_by(Notice.notice_date.desc())
@@ -464,6 +480,8 @@ class MarkNoticeReadAPI(MethodView):
         try:
 
             user = request.user
+            if int(user_id) != int(user.id):
+                return jsonify({"error": "You can only mark your own notices as read"}), 403
 
             # ================= STUDENT =================
             if user.__class__.__name__ == "Student":
@@ -535,8 +553,6 @@ class MarkNoticeReadAPI(MethodView):
 
 
 # ================= UPDATE NOTICE =================
-# Was previously missing entirely — the Announcements UI had no way to
-# edit a published notice (fix a typo, change priority, extend expiry).
 class UpdateNoticeAPI(MethodView):
 
     @login_required
@@ -553,7 +569,10 @@ class UpdateNoticeAPI(MethodView):
                     403,
                 )
 
-            notice = db.session.get(Notice, notice_id)
+            notice = Notice.query.filter_by(
+                id=notice_id,
+                school_id=current_school_id(),
+            ).first()
 
             if not notice:
                 return jsonify({"error": "Notice not found"}), 404
@@ -637,9 +656,6 @@ class UpdateNoticeAPI(MethodView):
 
 
 # ================= DELETE / DEACTIVATE NOTICE =================
-# Soft-delete only: sets is_active=False rather than removing the row,
-# so existing NoticeRead history isn't orphaned and the notice simply
-# stops appearing in Student/Teacher/Admin feeds.
 class DeleteNoticeAPI(MethodView):
 
     @login_required
@@ -656,7 +672,10 @@ class DeleteNoticeAPI(MethodView):
                     403,
                 )
 
-            notice = db.session.get(Notice, notice_id)
+            notice = Notice.query.filter_by(
+                id=notice_id,
+                school_id=current_school_id(),
+            ).first()
 
             if not notice:
                 return jsonify({"error": "Notice not found"}), 404
@@ -682,3 +701,34 @@ class DeleteNoticeAPI(MethodView):
             db.session.rollback()
             logger.exception(e)
             return jsonify({"error": "Failed to remove notice"}), 500
+
+
+# ================= MANAGE (all notices this school published) =================
+class AdminNoticeManageAPI(MethodView):
+    # Every active notice for the caller's school, whatever its audience
+
+    @login_required
+    def get(self):
+        try:
+            user = request.user
+
+            if user.__class__.__name__ != "Admin":
+                return jsonify({"error": "Only admins can manage notices"}), 403
+
+            notices = (
+                Notice.query.filter(
+                    Notice.school_id == current_school_id(),
+                    Notice.is_active == True,
+                )
+                .order_by(Notice.notice_date.desc(), Notice.id.desc())
+                .all()
+            )
+
+            return jsonify({"success": True, "notices": [serialize_notice(n) for n in notices]}), 200
+
+        except SQLAlchemyError:
+            logger.exception("Database error while listing managed notices")
+            return jsonify({"error": "Database error"}), 500
+        except Exception:
+            logger.exception("Unexpected error while listing managed notices")
+            return jsonify({"error": "Something went wrong"}), 500

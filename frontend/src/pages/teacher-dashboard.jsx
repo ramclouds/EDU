@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { APP_NAME, APP_YEAR } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useTeacherDashboard } from "../controllers/TeachersSide/teacherDashboard";
 import { useTeacherAssignments } from "../controllers/TeachersSide/useTeacherAssignments";
 import { useDashboardUI } from "../controllers/useDashboardUI";
@@ -13,6 +14,11 @@ import { useMyClasses } from "../controllers/Academic/useMyClass";
 import { useTeacherExamResult } from "../controllers/Academic/useTeacherExamResult";
 import { useAnalytics } from "../controllers/TeachersSide/useAnalytics";
 import { BASE_URL, FILE_BASE_URL } from "../config/appConfig";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
+
+const SEARCH_SECTIONS = [{ key: "analytics", label: "Analytics" }, { key: "announcements", label: "Announcements" }, { key: "assignments", label: "Assignments" }, { key: "attendance", label: "Attendance" }, { key: "classes", label: "Classes" }, { key: "dashboard", label: "Dashboard" }, { key: "exams", label: "Exams" }, { key: "profile", label: "Profile" }, { key: "settings", label: "Settings" }, { key: "timetable", label: "Timetable" }];
 
 function TeacherDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -355,10 +361,10 @@ function TeacherDashboard() {
     ${sidebarOpen ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
   `}
         >
-          <i
+          <SchoolLogo
             className="bi bi-mortarboard text-purple-600 text-xl"
-            title={!sidebarOpen ? APP_NAME : ""}
-          ></i>
+            title={!sidebarOpen ? schoolDisplayName() : ""}
+          />
 
           <span
             className={`font-bold text-lg text-purple-600 transition-all duration-200
@@ -366,7 +372,7 @@ function TeacherDashboard() {
       md:${sidebarOpen ? "block" : "hidden"}
     `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
@@ -506,13 +512,13 @@ function TeacherDashboard() {
       md:${sidebarOpen ? "block" : "hidden"}
     `}
           >
-            {APP_NAME} © {APP_YEAR}
+            <SchoolName /> © {APP_YEAR}
           </span>
 
           {!sidebarOpen && (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             ></i>
           )}
         </div>
@@ -573,20 +579,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
               <div className="hidden md:flex w-1/2 relative group px-4">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-full
-        bg-white/70 dark:bg-slate-700/70
-        backdrop-blur-md border border-gray-200 dark:border-slate-600
-        text-gray-800 dark:text-white
-        placeholder-gray-400 dark:placeholder-gray-400
-        focus:bg-white dark:focus:bg-slate-700
-        outline-none focus:ring-2 focus:ring-indigo-500
-        shadow-sm hover:shadow-md transition-all duration-300"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT */}
@@ -693,16 +686,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         )}
                       </div>
 
-                      {/* <div
-                        className="p-3 text-center text-sm text-indigo-600 
-              hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer font-medium"
-                        onClick={() => {
-                          navigate("/teacher/announcements "); // ✅ better route
-                          setShowNotifications(false);
-                        }}
-                      >
-                        View All Notices →
-                      </div> */}
+                      {/* <div */}
                     </div>
                   )}
                 </div>
@@ -812,14 +796,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           {/* MOBILE SEARCH */}
           {mobileSearchOpen && (
             <div className="md:hidden px-4">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full px-5 py-3 rounded-full bg-white shadow-md 
-        outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Search anything here..."
-              />
+              <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
             </div>
           )}
         </div>
@@ -1423,7 +1400,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         <div
           className={`${
             isClassDetailOpen ? "flex" : "hidden"
-          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-50 p-2 sm:p-4`}
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[100] p-2 sm:p-4`}
         >
           <div className="w-full max-w-6xl mx-auto bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 space-y-5 max-h-[95vh] overflow-hidden">
             {/* HEADER */}
@@ -2431,7 +2408,7 @@ bg-gray-50 dark:bg-slate-700
         )}
         {/* ASSIGNMENT DETAIL MODAL */}
         {selectedAssignment && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-2 sm:p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-2 sm:p-4">
             <div className="bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 w-full max-w-3xl rounded-t-3xl sm:rounded-3xl flex flex-col h-[95vh] sm:max-h-[90vh] overflow-hidden">
               {/* HEADER */}
               <div className="p-4 sm:p-5 border-b dark:border-slate-700 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
@@ -2658,7 +2635,7 @@ bg-gray-50 dark:bg-slate-700
         {showModal && (
           <div
             onClick={() => setShowModal(false)}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-2 sm:p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-2 sm:p-4"
           >
             <div
               onClick={(e) => e.stopPropagation()}
@@ -2871,7 +2848,7 @@ bg-gray-50 dark:bg-slate-700
                       "assignmentDraft",
                       JSON.stringify(assignmentForm),
                     );
-                    alert("Draft saved");
+                    showToast("Draft saved", "success");
                   }}
                   className="px-5 py-3 rounded-xl bg-gray-100 dark:bg-slate-700 text-sm"
                 >
@@ -3359,7 +3336,7 @@ bg-gray-50 dark:bg-slate-700
         )}
         {/*  COMPREHENSIVE PERFORMANCE MANAGEMENT REPORT CARD MODAL  */}
         {reportModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-slate-800 dark:text-gray-100 w-full max-w-6xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
               {/* HEADER */}
               <div className="flex justify-between items-center border-b pb-4 dark:border-slate-700">
@@ -4056,6 +4033,16 @@ bg-gray-50 dark:bg-slate-700
         )}
         {/*  ============================= TEACHER LEAVE SECTION END ============================= */}
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={teacher}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
             {/* PROFILE HEADER */}
@@ -4592,7 +4579,7 @@ bg-gray-50 dark:bg-slate-700
         )}
         {/* ===================== PROFILE SECTION END ========================*/}
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100] p-4">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md border border-gray-100 dark:border-slate-700">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

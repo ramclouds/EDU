@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import datetime
 
 import bcrypt
@@ -8,9 +9,23 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from utils.auth import Admin, db
-from utils.auth_middleware import login_required
+from utils.auth_middleware import login_required, get_current_user
+from utils.rolePermissionManagement import (
+    super_admin_required,
+    RBACRole,
+    RBACUserRole,
+)
 
 logger = logging.getLogger(__name__)
+
+ADMIN_TYPE_ENUM_VALUES = {
+    "Super Admin",
+    "Academic Admin",
+    "Library Admin",
+    "Accounts Admin",
+    "Hostel Admin",
+    "HR Admin",
+}
 
 
 # DASHBOARD PERMISSIONS
@@ -81,10 +96,7 @@ SUPER_ADMIN_RIGHTS = [
 
 # NORMALIZATION HELPERS
 def normalize_list(value):
-    """
-    Convert comma-separated string, JSON-like list, tuple or set
-    into a clean list of strings.
-    """
+    # Convert comma-separated string, JSON-like list, tuple or set
 
     if value is None:
         return []
@@ -104,9 +116,7 @@ def normalize_list(value):
 
 
 def normalize_permissions(value):
-    """
-    Convert permission values to lowercase and remove duplicates.
-    """
+    # Convert permission values to lowercase and remove duplicates
 
     permissions = []
 
@@ -120,9 +130,7 @@ def normalize_permissions(value):
 
 
 def normalize_rights(value):
-    """
-    Return only supported action rights.
-    """
+    # Return only supported action rights
 
     rights = []
 
@@ -136,9 +144,7 @@ def normalize_rights(value):
 
 
 def list_to_csv(values):
-    """
-    Convert a list into a comma-separated database value.
-    """
+    # Convert a list into a comma-separated database value
 
     return ",".join(str(item).strip() for item in values if str(item).strip())
 
@@ -166,12 +172,7 @@ def get_expected_dashboard_permission(admin_type):
 
 # ACCESS RESOLVER
 def _rbac_dashboard_rights(admin, config):
-    """
-    Ask the real RBAC system (Role & Permission Management) whether this
-    admin currently has view/write access to their own dashboard.
-    Returns None if RBAC lookup isn't available, so callers can fall
-    back to the legacy CSV-based fields.
-    """
+    # Ask the real RBAC system (Role & Permission Management) whether this
 
     if not config:
         return None
@@ -194,21 +195,7 @@ def _rbac_dashboard_rights(admin, config):
 
 
 def _rbac_all_dashboard_access(admin):
-    """
-    Every dashboard (key/label/route/can_view/can_write) this admin
-    currently has *view* access to via RBAC - not just the one dashboard
-    tied to their admin_type.
-
-    BUG FIX: a Super Admin can grant an admin extra dashboards beyond
-    their own via Role & Permission Management (e.g. a Library Admin
-    who is *also* given Hostel Dashboard access). resolve_admin_access()
-    used to only ever resolve the admin's own home dashboard, so that
-    second grant never showed up in the admin's profile/table and the
-    corresponding sidebar link never appeared on their own dashboard.
-
-    Returns None if RBAC lookup isn't available (caller falls back to
-    legacy behavior for that admin).
-    """
+    # Every dashboard (key/label/route/can_view/can_write) this admin
 
     try:
         from utils.rolePermissionManagement import list_dashboard_access_for_user
@@ -220,24 +207,7 @@ def _rbac_all_dashboard_access(admin):
 
 
 def resolve_admin_access(admin):
-    """
-    Build dashboard access and CRUD rights for an admin.
-
-    This is now a thin wrapper: the source of truth for "can this admin
-    open this dashboard, and can they edit or only view it" is the RBAC
-    Role & Permission Management system (see rolePermissionManagement.py
-    / DASHBOARD_REGISTRY). Legacy `permissions` / `modules_enabled` /
-    `access_level` columns on the Admin row are only used as a fallback
-    when no RBAC role/module mapping exists yet for that admin_type.
-
-    permissions:
-        Contains dashboard permission only.
-        Example: hr-admin-dashboard
-
-    access_level:
-        Contains operation rights.
-        Example: read,write,edit
-    """
+    # Build dashboard access and CRUD rights for an admin
 
     admin_type = str(admin.admin_type or "").strip()
 
@@ -296,7 +266,6 @@ def resolve_admin_access(admin):
             can_write_flag = rbac_rights["can_write"]
             rights = ["read"] + (["write", "edit", "delete"] if can_write_flag else [])
             # A dashboard the admin has no view access to should not be
-            # reported as "assigned" - keeps nav/redirect logic honest.
             if not can_read:
                 dashboard_permissions = []
                 allowed_modules = []
@@ -306,10 +275,6 @@ def resolve_admin_access(admin):
             rights = stored_rights
 
         # BUG FIX: merge in every OTHER dashboard RBAC says this admin
-        # can view (e.g. Super Admin additionally granted this Library
-        # Admin access to the Hostel Dashboard too). Without this, only
-        # the admin's own home dashboard ever showed up here, no matter
-        # what extra access was granted in Role & Permission Management.
         rbac_all_access = _rbac_all_dashboard_access(admin)
 
         dashboard_access_detail = rbac_all_access or []
@@ -382,9 +347,7 @@ def resolve_admin_access(admin):
 
 # PERMISSION CHECK HELPERS
 def admin_has_right(admin, right):
-    """
-    Check whether an admin has a given CRUD right.
-    """
+    # Check whether an admin has a given CRUD right
 
     if is_super_admin(admin):
         return True
@@ -398,9 +361,7 @@ def admin_has_right(admin, right):
 
 
 def admin_has_dashboard_permission(admin, permission):
-    """
-    Check whether an admin can access a dashboard.
-    """
+    # Check whether an admin can access a dashboard
 
     if is_super_admin(admin):
         return True
@@ -523,9 +484,7 @@ def admin_to_dict(admin):
 
 # REQUEST HELPERS
 def parse_date(date_value):
-    """
-    Safely parse YYYY-MM-DD values.
-    """
+    # Safely parse YYYY-MM-DD values
 
     if not date_value:
         return None
@@ -544,14 +503,7 @@ def parse_date(date_value):
 
 
 def normalize_admin_access_fields(data, existing_admin=None):
-    """
-    Normalize permissions and access_level before saving.
-
-    For known admin types:
-    - permissions becomes the dashboard permission
-    - modules_enabled becomes the dashboard permission
-    - access_level contains CRUD rights
-    """
+    # Normalize permissions and access_level before saving
 
     normalized_data = dict(data or {})
 
@@ -627,6 +579,16 @@ class AdminDetails(MethodView):
             if not admin:
                 return jsonify({"error": "Admin not found"}), 404
 
+            # OWNERSHIP: an admin reads their own profile; any other admin reads
+            caller = getattr(request, "user", None)
+            is_self = isinstance(caller, Admin) and caller.id == admin.id
+            same_school = (
+                caller is not None
+                and getattr(caller, "school_id", None) == admin.school_id
+            )
+            if not (is_self or same_school):
+                return jsonify({"error": "Forbidden"}), 403
+
             return jsonify(admin_to_dict(admin)), 200
 
         except (TypeError, ValueError):
@@ -667,11 +629,18 @@ class UpdateAdminProfile(MethodView):
 
             if not admin:
                 return jsonify({"error": "Admin not found"}), 404
+            from utils.tenancy import caller_can_manage_admin
+            if not caller_can_manage_admin(admin):
+                return jsonify({"error": "Forbidden"}), 403
 
             request_data = request.get_json(silent=True)
 
             if not request_data:
                 return jsonify({"error": "Invalid JSON"}), 400
+
+            # Privilege fields are never changed through a profile update.
+            for _priv in ("role", "admin_type", "permissions", "access_level", "modules_enabled", "school_id"):
+                request_data.pop(_priv, None)
 
             data = normalize_admin_access_fields(
                 request_data,
@@ -734,12 +703,8 @@ class UpdateAdminProfile(MethodView):
                 "country",
                 "pincode",
                 # Role
-                "role",
-                "admin_type",
                 "designation",
                 "department",
-                "permissions",
-                "access_level",
                 # Professional
                 "qualification",
                 "specialization",
@@ -756,7 +721,6 @@ class UpdateAdminProfile(MethodView):
                 # System control
                 "users_managed",
                 "active_sessions",
-                "modules_enabled",
                 # Finance
                 "fee_access",
                 "discount_authority",
@@ -861,7 +825,6 @@ class UpdateAdminProfile(MethodView):
 
             return jsonify({"error": "Something went wrong"}), 500
 
-
 # CHANGE ADMIN PASSWORD
 class ChangeAdminPassword(MethodView):
 
@@ -880,6 +843,10 @@ class ChangeAdminPassword(MethodView):
 
             if not admin:
                 return jsonify({"error": "Admin not found"}), 404
+            caller = getattr(request, "user", None)
+            if not (isinstance(caller, Admin) and caller.id == admin.id):
+                return jsonify({"error": "You can only change your own password"}), 403
+
 
             data = request.get_json(silent=True)
 
@@ -974,4 +941,175 @@ class ChangeAdminPassword(MethodView):
                 error,
             )
 
+            return jsonify({"error": "Something went wrong"}), 500
+
+
+# LIST ADMINS (Super Admin only)
+class AdminListAPI(MethodView):
+    # Powers the Super Admin dashboard's admin-management section —
+
+    decorators = [super_admin_required]
+
+    def get(self):
+        try:
+            admins = (
+                Admin.query.filter_by(is_deleted=False)
+                .order_by(Admin.created_at.desc())
+                .all()
+            )
+            return jsonify([admin_to_dict(a) for a in admins]), 200
+        except SQLAlchemyError as db_error:
+            logger.exception("Database error while listing admins: %s", db_error)
+            return jsonify({"error": "Database error"}), 500
+        except Exception as error:
+            logger.exception("Unexpected error listing admins: %s", error)
+            return jsonify({"error": "Something went wrong"}), 500
+
+
+# CREATE ADMIN (Super Admin only)
+class CreateAdminAPI(MethodView):
+    # Creates a new Admin account of any admin_type (Academic, Library,
+
+    decorators = [super_admin_required]
+
+    def post(self):
+        try:
+            data = request.get_json(silent=True) or {}
+
+            first_name = (data.get("first_name") or "").strip()
+            last_name = (data.get("last_name") or "").strip()
+            email = (data.get("email") or "").strip().lower()
+            admin_type = (data.get("admin_type") or "").strip()
+            password = data.get("password") or ""
+            username = (data.get("username") or "").strip()
+
+            missing = [
+                field
+                for field, val in [
+                    ("first_name", first_name),
+                    ("last_name", last_name),
+                    ("email", email),
+                    ("admin_type", admin_type),
+                    ("password", password),
+                ]
+                if not val
+            ]
+            if missing:
+                return (
+                    jsonify(
+                        {"error": f"Missing required fields: {', '.join(missing)}"}
+                    ),
+                    400,
+                )
+
+            if admin_type not in ADMIN_TYPE_ENUM_VALUES:
+                return (
+                    jsonify(
+                        {
+                            "error": (
+                                "admin_type must be one of: "
+                                + ", ".join(sorted(ADMIN_TYPE_ENUM_VALUES))
+                            )
+                        }
+                    ),
+                    400,
+                )
+
+            if len(password) < 8:
+                return (
+                    jsonify({"error": "Password must be at least 8 characters"}),
+                    400,
+                )
+
+            if Admin.query.filter_by(email=email).first():
+                return jsonify({"error": "Email already in use"}), 409
+
+            if not username:
+                username = email.split("@")[0]
+            base_username = username
+            suffix = 1
+            while Admin.query.filter_by(username=username).first():
+                suffix += 1
+                username = f"{base_username}{suffix}"
+
+            current_user = get_current_user()
+            # New admins belong to the same school as the Super Admin who
+            school_id = getattr(current_user, "school_id", None)
+
+            hashed_password = bcrypt.hashpw(
+                password.encode("utf-8"), bcrypt.gensalt()
+            ).decode("utf-8")
+
+            new_admin = Admin(
+                admin_id=f"ADM-{uuid.uuid4().hex[:10].upper()}",
+                user_id=uuid.uuid4().hex[:12],
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                username=username,
+                password=hashed_password,
+                admin_type=admin_type,
+                role="super_admin" if admin_type == "Super Admin" else "admin",
+                school_id=school_id,
+                status="Active",
+                designation=data.get("designation"),
+                department=data.get("department"),
+                mobile=data.get("mobile"),
+            )
+
+            db.session.add(new_admin)
+            db.session.flush()  # need new_admin.id before creating the role link
+
+            # Without this, the admin can log in (the dashboard-routing
+            role_code = admin_type.lower().replace(" ", "-")
+            default_role = RBACRole.query.filter_by(
+                code=role_code, school_id=None
+            ).first()
+            if default_role:
+                db.session.add(
+                    RBACUserRole(
+                        user_type="admin",
+                        user_id=new_admin.id,
+                        role_id=default_role.id,
+                        assigned_by=getattr(current_user, "email", "system"),
+                    )
+                )
+            else:
+                # Only happens if seed_rbac_defaults() was never run for
+                logger.warning(
+                    "No default RBAC role found for admin_type=%s "
+                    "(role_code=%s) — created admin %s will have no "
+                    "permissions until a role is assigned manually.",
+                    admin_type,
+                    role_code,
+                    email,
+                )
+
+            db.session.commit()
+
+            logger.info(
+                "Admin created: id=%s admin_type=%s by=%s",
+                new_admin.id,
+                admin_type,
+                getattr(current_user, "email", "?"),
+            )
+
+            return (
+                jsonify(
+                    {
+                        "message": "Admin created",
+                        "admin": admin_to_dict(new_admin),
+                        "login": {"username": username, "email": email},
+                    }
+                ),
+                201,
+            )
+
+        except SQLAlchemyError as db_error:
+            db.session.rollback()
+            logger.exception("Database error while creating admin: %s", db_error)
+            return jsonify({"error": "Database error"}), 500
+        except Exception as error:
+            db.session.rollback()
+            logger.exception("Unexpected error creating admin: %s", error)
             return jsonify({"error": "Something went wrong"}), 500

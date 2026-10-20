@@ -8,9 +8,7 @@ import {
 
 import { BASE_URL } from "../../config/appConfig";
 
-/* =========================================================
-   DASHBOARD PERMISSIONS
-========================================================= */
+// DASHBOARD PERMISSIONS
 
 const DASHBOARD_PERMISSIONS = {
     SUPER_ADMIN: "all-dashboards",
@@ -23,9 +21,7 @@ const DASHBOARD_PERMISSIONS = {
 
 const ALL_RIGHTS = ["read", "write", "edit"];
 
-/* =========================================================
-   ADMIN TYPE CONFIGURATION
-========================================================= */
+// ADMIN TYPE CONFIGURATION
 
 const ADMIN_TYPE_CONFIG = {
     "Academic Admin": {
@@ -64,9 +60,7 @@ const ADMIN_TYPE_CONFIG = {
     },
 };
 
-/* =========================================================
-   SAFE JSON PARSER
-========================================================= */
+// SAFE JSON PARSER
 
 const safeJson = (value, fallback = null) => {
     try {
@@ -76,9 +70,7 @@ const safeJson = (value, fallback = null) => {
     }
 };
 
-/* =========================================================
-   NORMALIZE STRING / ARRAY VALUES
-========================================================= */
+// NORMALIZE STRING / ARRAY VALUES
 
 const normalizeList = (value) => {
     if (!value) return [];
@@ -111,9 +103,7 @@ const normalizeList = (value) => {
     return [];
 };
 
-/* =========================================================
-   NORMALIZE PERMISSIONS
-========================================================= */
+// NORMALIZE PERMISSIONS
 
 const normalizePermissions = (value) => {
     return [
@@ -125,9 +115,7 @@ const normalizePermissions = (value) => {
     ];
 };
 
-/* =========================================================
-   NORMALIZE RIGHTS
-========================================================= */
+// NORMALIZE RIGHTS
 
 const normalizeRights = (value) => {
     return [
@@ -139,9 +127,7 @@ const normalizeRights = (value) => {
     ];
 };
 
-/* =========================================================
-   BUILD ADMIN ACCESS
-========================================================= */
+// BUILD ADMIN ACCESS
 
 const buildAccess = (admin = {}) => {
     const role = String(admin.role || "")
@@ -164,11 +150,7 @@ const buildAccess = (admin = {}) => {
         role === "super_admin" ||
         adminType === "Super Admin";
 
-    /*
-     * SUPER ADMIN
-     * Permission: all-dashboards
-     * Rights: read, write, edit
-     */
+    // SUPER ADMIN
     if (isSuperAdmin) {
         return {
             dashboardType: "super-admin-dashboard",
@@ -208,10 +190,7 @@ const buildAccess = (admin = {}) => {
 
     const config = ADMIN_TYPE_CONFIG[adminType];
 
-    /*
-     * KNOWN ADMIN TYPES:
-     * Academic, HR, Hostel, Library and Accounts
-     */
+    // KNOWN ADMIN TYPES:
     if (config) {
         const dashboardPermissions = [
             ...new Set([
@@ -220,12 +199,7 @@ const buildAccess = (admin = {}) => {
             ]),
         ];
 
-        /*
-         * modules_enabled may contain old values.
-         * Do not automatically use old module values as permissions.
-         *
-         * Only dashboard permission is used for dashboard access.
-         */
+        // modules_enabled may contain old values
         const allowedModules = [
             ...new Set([
                 config.permission,
@@ -266,10 +240,7 @@ const buildAccess = (admin = {}) => {
             canWrite,
             canEdit,
 
-            /*
-             * Delete can be connected separately later.
-             * Currently edit permission also controls delete.
-             */
+            // Delete can be connected separately later
             canDelete: canEdit,
 
             canAccess: (permissionName) => {
@@ -322,9 +293,7 @@ const buildAccess = (admin = {}) => {
         };
     }
 
-    /*
-     * FALLBACK ADMIN
-     */
+    // FALLBACK ADMIN
     const fallbackPermissions = [
         ...new Set([
             ...storedPermissions,
@@ -414,9 +383,7 @@ const buildAccess = (admin = {}) => {
     };
 };
 
-/* =========================================================
-   ADMIN PROFILE HOOK
-========================================================= */
+// ADMIN PROFILE HOOK
 
 export function useAdminProfile({
     fetchWithAuth,
@@ -458,9 +425,7 @@ export function useAdminProfile({
         [admin],
     );
 
-    /* =====================================================
-       TOAST
-    ===================================================== */
+    // TOAST
 
     const showToast = useCallback(
         (message, type = "success") => {
@@ -490,9 +455,7 @@ export function useAdminProfile({
         [externalToast],
     );
 
-    /* =====================================================
-       GET AUTH DATA
-    ===================================================== */
+    // GET AUTH DATA
 
     const getAuth = useCallback(() => {
         return {
@@ -504,9 +467,7 @@ export function useAdminProfile({
         };
     }, []);
 
-    /* =====================================================
-       UPDATE LOCAL STORAGE USER
-    ===================================================== */
+    // UPDATE LOCAL STORAGE USER
 
     const updateStoredUser = useCallback(
         (adminData = {}) => {
@@ -597,20 +558,27 @@ export function useAdminProfile({
         [],
     );
 
-    /* =====================================================
-       LOGOUT
-    ===================================================== */
+    // LOGOUT
 
     const handleLogout = useCallback(() => {
+        // Best-effort server-side revocation: the backend now issues a
+        const token = localStorage.getItem("token");
+        if (token) {
+            fetch(`${BASE_URL}/logout`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => {
+                // Ignore — local session is cleared regardless below.
+            });
+        }
+
         localStorage.removeItem("token");
         localStorage.removeItem("user");
 
         window.location.href = "/";
     }, []);
 
-    /* =====================================================
-       LOAD ADMIN PROFILE
-    ===================================================== */
+    // LOAD ADMIN PROFILE
 
     const loadAdminProfile = useCallback(async () => {
         const { user } = getAuth();
@@ -691,9 +659,7 @@ export function useAdminProfile({
         updateStoredUser,
     ]);
 
-    /* =====================================================
-       INITIAL LOAD
-    ===================================================== */
+    // INITIAL LOAD
 
     useEffect(() => {
         if (fetchedRef.current) return;
@@ -708,9 +674,7 @@ export function useAdminProfile({
         };
     }, [loadAdminProfile]);
 
-    /* =====================================================
-       PROFILE FORM CHANGE
-    ===================================================== */
+    // PROFILE FORM CHANGE
 
     const handleChange = useCallback((event) => {
         const {
@@ -729,9 +693,7 @@ export function useAdminProfile({
         }));
     }, []);
 
-    /* =====================================================
-       DIRECT FORM FIELD UPDATE
-    ===================================================== */
+    // DIRECT FORM FIELD UPDATE
 
     const updateFormField = useCallback(
         (name, value) => {
@@ -743,18 +705,14 @@ export function useAdminProfile({
         [],
     );
 
-    /* =====================================================
-       RESET PROFILE FORM
-    ===================================================== */
+    // RESET PROFILE FORM
 
     const resetForm = useCallback(() => {
         setFormData(admin);
         setEditMode(false);
     }, [admin]);
 
-    /* =====================================================
-       SAVE PROFILE
-    ===================================================== */
+    // SAVE PROFILE
 
     const handleSave = useCallback(async () => {
         if (!admin?.id) {
@@ -838,9 +796,7 @@ export function useAdminProfile({
         updateStoredUser,
     ]);
 
-    /* =====================================================
-       PASSWORD FORM CHANGE
-    ===================================================== */
+    // PASSWORD FORM CHANGE
 
     const handlePasswordChange = useCallback(
         (event) => {
@@ -854,9 +810,7 @@ export function useAdminProfile({
         [],
     );
 
-    /* =====================================================
-       RESET PASSWORD FORM
-    ===================================================== */
+    // RESET PASSWORD FORM
 
     const resetPasswordForm = useCallback(() => {
         setPasswordData({
@@ -866,18 +820,14 @@ export function useAdminProfile({
         });
     }, []);
 
-    /* =====================================================
-       CLOSE PASSWORD MODAL
-    ===================================================== */
+    // CLOSE PASSWORD MODAL
 
     const closePasswordModal = useCallback(() => {
         setPasswordModalOpen(false);
         resetPasswordForm();
     }, [resetPasswordForm]);
 
-    /* =====================================================
-       CHANGE PASSWORD
-    ===================================================== */
+    // CHANGE PASSWORD
 
     const handleChangePassword =
         useCallback(async () => {
@@ -1003,18 +953,14 @@ export function useAdminProfile({
             showToast,
         ]);
 
-    /* =====================================================
-       REFRESH PROFILE
-    ===================================================== */
+    // REFRESH PROFILE
 
     const refreshAdminProfile =
         useCallback(async () => {
             await loadAdminProfile();
         }, [loadAdminProfile]);
 
-    /* =====================================================
-       RETURN
-    ===================================================== */
+    // RETURN
 
     return {
         /* Profile */

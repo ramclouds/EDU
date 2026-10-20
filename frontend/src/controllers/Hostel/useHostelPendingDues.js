@@ -15,12 +15,7 @@ const EMPTY_STATS = {
     overdue_count: 0,
 };
 
-/**
- * Drives the "Pending Dues" dashboard section: every fee invoice with
- * an outstanding balance, worst-overdue-first. Reuses the same
- * /admin/hostel/fees endpoint as Fee Management (dues_only=true) so
- * this view can never disagree with the numbers shown there.
- */
+// Drives the "Pending Dues" dashboard section: every fee invoice with
 export function useHostelPendingDues({ activeSection, fetchWithAuth, showToast }) {
     const fetchRef = useRef(fetchWithAuth);
     const toastRef = useRef(showToast);
@@ -101,7 +96,6 @@ export function useHostelPendingDues({ activeSection, fetchWithAuth, showToast }
                 const rows = Array.isArray(data.fees) ? data.fees : [];
 
                 // Worst-overdue-first: overdue invoices at the top, then by
-                // largest outstanding balance.
                 rows.sort((a, b) => {
                     if (a.status === "Overdue" && b.status !== "Overdue") return -1;
                     if (b.status === "Overdue" && a.status !== "Overdue") return 1;

@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { BASE_URL } from "../../config/appConfig";
 
-// Backend: utils/academic.py -> AdminDivisionsAPI / AdminDivisionDetailAPI
-//                                AdminSectionsAPI / AdminSectionDetailAPI
+// Backend: utils/academic.py -> AdminDivisionsAPI / AdminDivisionDetailA
 const DIVISIONS_ENDPOINT = `${BASE_URL}/admin/academic/divisions`;
 const SECTIONS_ENDPOINT = `${BASE_URL}/admin/academic/sections`;
 

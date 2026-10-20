@@ -8,43 +8,42 @@ import {
   FILE_BASE_URL,
 } from "../config/appConfig";
 import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
 import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
+import { useAdminManagement } from "../controllers/AdminSide/useAdminManagement";
+import CreateAdminModal from "../components/CreateAdminModal";
+import {
+  SchoolOverviewSection,
+  StaffSection,
+  NoticesSection,
+  FeesSection,
+  PayrollSection,
+  ReportsSection,
+  AnalyticsSection,
+  ParentsSection,
+  EventsSection,
+} from "../components/SuperAdminSections";
 import { useAssets } from "../controllers/Assets/useAssets";
 import { useLeaveManagement } from "../controllers/academic/useLeaveManagement";
 import { useStudentEnrollment } from "../controllers/Academic/useStudentEnrollment";
 import { useRolePermissionManagement } from "../controllers/Auth/useRolePermissionManagement";
-import { useLibraryOverview } from "../controllers/Library/useLibraryOverview";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
+
+const SEARCH_SECTIONS = [{ key: "admissions", label: "Admissions" }, { key: "analytics", label: "Analytics" }, { key: "assets", label: "Assets" }, { key: "dashboard", label: "Dashboard" }, { key: "events", label: "Events" }, { key: "fees", label: "Fees" }, { key: "leave", label: "Leave" }, { key: "manage-admins", label: "Manage admins" }, { key: "notices", label: "Notices" }, { key: "parents", label: "Parents" }, { key: "payroll", label: "Payroll" }, { key: "profile", label: "Profile" }, { key: "reports", label: "Reports" }, { key: "roles", label: "Roles" }, { key: "security", label: "Security" }, { key: "settings", label: "Settings" }, { key: "staff", label: "Staff" }];
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
   const [noticeTab, setNoticeTab] = useState("announcements");
   const [activeSection, setActiveSection] = useState("dashboard");
   const [search, setSearch] = useState("");
+  const [showCreateAdminModal, setShowCreateAdminModal] = useState(false);
 
   // Which of the other admin dashboards this account may currently
-  // open - Super Admin normally sees all of them, but this stays
-  // driven by Role & Permission Management rather than assumed, so a
-  // future "restricted super admin" style role also works correctly.
   const { canView: canViewDashboard } = useDashboardAccess();
-
-  // Real-time library stats for the overview widget below - see
-  // controllers/Library/useLibraryOverview.js. Only fetched/rendered
-  // when this Super Admin actually has view access to the library
-  // dashboard, matching the same gate used for the sidebar link.
-  const {
-    stats: libraryStats,
-    occupancyRate: libraryOccupancyRate,
-    recentActivity: libraryRecentActivity,
-    overdueAlerts: libraryOverdueAlerts,
-    recentBooks: libraryRecentBooks,
-    loading: libraryOverviewLoading,
-    refreshing: libraryOverviewRefreshing,
-    error: libraryOverviewError,
-    lastUpdated: libraryOverviewUpdatedAt,
-    refresh: refreshLibraryOverview,
-  } = useLibraryOverview();
 
   // ================= DASHBOARD HOOK =================
   const {
@@ -105,6 +104,42 @@ function AdminDashboard() {
 
     toast,
   } = useAdminDashboard(activeSection);
+
+  // SECURITY & ACTIVITY LOGS
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [activityLogsLoading, setActivityLogsLoading] = useState(false);
+  const [activityLogsError, setActivityLogsError] = useState(null);
+
+  useEffect(() => {
+    if (activeSection !== "security") return;
+
+    let cancelled = false;
+    setActivityLogsLoading(true);
+    setActivityLogsError(null);
+
+    fetch(`${BASE_URL}/admin/activity-logs`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (cancelled) return;
+        if (ok) {
+          setActivityLogs(Array.isArray(data) ? data : []);
+        } else {
+          setActivityLogsError(data.error || "Failed to load activity logs");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setActivityLogsError("Failed to load activity logs");
+      })
+      .finally(() => {
+        if (!cancelled) setActivityLogsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection]);
 
   // ================= ENROLLMENT HOOK =================
   const {
@@ -275,6 +310,14 @@ function AdminDashboard() {
     handleLogout,
   } = useAdminProfile({ fetchWithAuth, showToast });
 
+  // ================= ADMIN MANAGEMENT (create/list admins) =================
+  const {
+    admins: allAdmins,
+    loading: adminsLoading,
+    creating: creatingAdmin,
+    createAdmin,
+  } = useAdminManagement();
+
   // ================= ASSETS HOOK =================
   const {
     // DATA
@@ -335,8 +378,6 @@ function AdminDashboard() {
   }, []);
 
   // Enrolling new students now happens from the Academic Dashboard - if
-  // this tab is ever selected (e.g. a stale default from the hook),
-  // land on Promote instead of showing a blank tab.
   useEffect(() => {
     if (enrollmentActiveTab === "enroll") {
       setEnrollmentActiveTab("promote");
@@ -373,9 +414,9 @@ function AdminDashboard() {
       ${sidebarExpanded ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
     `}
         >
-          <i
+          <SchoolLogo
             className="bi bi-mortarboard text-purple-600 text-xl"
-            title={!sidebarExpanded ? APP_NAME : ""}
+            title={!sidebarExpanded ? schoolDisplayName() : ""}
           />
 
           <span
@@ -384,7 +425,7 @@ function AdminDashboard() {
         ${sidebarExpanded ? "opacity-100 max-w-[180px] ml-2" : "opacity-0 max-w-0 ml-0"}
       `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
@@ -401,6 +442,7 @@ function AdminDashboard() {
             {
               title: "USER MANAGEMENT",
               items: [
+                ["manage-admins", "bi-person-gear", "Manage Admins"],
                 ["parents", "bi-people-fill", "Parents"],
                 ["roles", "bi-shield-lock", "Roles & Permissions"],
               ],
@@ -457,9 +499,6 @@ function AdminDashboard() {
             },
           ].map((section) => {
             // key -> dashboardRegistry key, used to check real access
-            // before showing a cross-dashboard nav link. Add new
-            // cross-dashboard links to this map (and to the backend +
-            // frontend dashboardRegistry) - nothing else needs to change.
             const DASHBOARD_LINK_TARGETS = {
               "library-dashboard": "library-admin-dashboard",
               "accounts-dashboard": "accounts-admin-dashboard",
@@ -619,12 +658,12 @@ function AdminDashboard() {
         >
           {sidebarExpanded ? (
             <span className="whitespace-nowrap transition-all duration-300">
-              {APP_NAME} © {APP_YEAR}
+              <SchoolName /> © {APP_YEAR}
             </span>
           ) : (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             />
           )}
         </div>
@@ -670,7 +709,7 @@ function AdminDashboard() {
               <div className="flex shrink-0 items-center gap-2 md:hidden">
                 <i className="bi bi-mortarboard text-lg text-indigo-600" />
                 <span className="max-w-[145px] truncate text-sm font-bold text-indigo-600">
-                  {APP_NAME}
+                  <SchoolName />
                 </span>
               </div>
 
@@ -696,18 +735,7 @@ function AdminDashboard() {
               <div className="relative hidden w-full max-w-xl flex-1 px-2 md:block">
                 <i className="bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-gray-200 bg-white/70 py-2.5 pl-10 pr-4
-            text-sm text-gray-800 shadow-sm outline-none backdrop-blur-md
-            transition-all duration-300 placeholder:text-gray-400
-            hover:shadow-md focus:bg-white focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-700/70 dark:text-white
-            dark:placeholder:text-gray-400 dark:focus:bg-slate-700"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT ACTIONS */}
@@ -929,404 +957,106 @@ function AdminDashboard() {
               <div className="relative">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 pl-11
-            text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-                  placeholder="Search anything here..."
-                  autoFocus
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
             </div>
           )}
         </div>
         {/* ===================== DASHBOARD SECTION START =========================== */}
-        {activeSection === "dashboard" && (
-          <section className="space-y-6">
-            {/* =====================================================
-        WELCOME HEADER
-    ====================================================== */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h1 className="text-xl font-bold text-slate-900">
-                Welcome back, Super Admin
-              </h1>
+        {activeSection === "dashboard" && <SchoolOverviewSection />}
 
-              <p className="mt-1 text-sm text-slate-500">
-                Here&apos;s a real-time snapshot of what&apos;s happening across
-                the school.
-              </p>
+        {activeSection === "manage-admins" && (
+          <section className="space-y-6">
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                  Manage Admins
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Create and view Academic, Library, Accounts, Hostel, HR,
+                  and Super Admin accounts.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateAdminModal(true)}
+                className="whitespace-nowrap rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:opacity-90"
+              >
+                <i className="bi bi-plus-lg mr-1"></i> New admin
+              </button>
             </div>
 
-            {/* =====================================================
-        LIBRARY OVERVIEW - real-time data via useLibraryOverview
-        (controllers/Library/useLibraryOverview.js -> GET
-        /api/admin/library/dashboard). Gated the same way as the
-        sidebar's Library link so it stays consistent if a
-        restricted Super Admin role is ever introduced.
-    ====================================================== */}
-            {canViewDashboard("library-admin-dashboard") && (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                      <i className="fas fa-book text-xl" />
-                    </div>
-
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-900">
-                        Library Overview
-                      </h2>
-
-                      <p className="mt-1 text-sm text-slate-500">
-                        {libraryOverviewUpdatedAt
-                          ? `Updated ${libraryOverviewUpdatedAt.toLocaleTimeString()}`
-                          : "Live circulation, inventory and fine stats."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={refreshLibraryOverview}
-                      disabled={
-                        libraryOverviewLoading || libraryOverviewRefreshing
-                      }
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <i
-                        className={`fas fa-sync-alt ${
-                          libraryOverviewRefreshing ? "animate-spin" : ""
-                        }`}
-                      />
-                      Refresh
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate("/library-admin-dashboard", {
-                          state: {
-                            from: "super-admin-dashboard",
-                            accessBy: "super_admin",
-                            activeSection: "dashboard",
-                          },
-                        })
-                      }
-                      className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                    >
-                      Open Library Dashboard
-                      <i className="fas fa-arrow-right" />
-                    </button>
-                  </div>
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {adminsLoading ? (
+                <div className="p-10 text-center text-gray-400">
+                  Loading…
                 </div>
-
-                <div className="p-5">
-                  {libraryOverviewLoading ? (
-                    <div className="flex min-h-[200px] items-center justify-center">
-                      <div className="text-center">
-                        <i className="fas fa-spinner animate-spin text-3xl text-indigo-600" />
-
-                        <p className="mt-3 text-sm font-medium text-slate-500">
-                          Loading library stats...
-                        </p>
-                      </div>
-                    </div>
-                  ) : libraryOverviewError ? (
-                    <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 text-center">
-                      <i className="fas fa-triangle-exclamation text-2xl text-rose-500" />
-
-                      <p className="text-sm font-medium text-rose-600">
-                        {libraryOverviewError}
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={refreshLibraryOverview}
-                        className="mt-1 text-sm font-semibold text-indigo-600 hover:underline"
-                      >
-                        Try again
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {/* =========================================
-                  STAT CARDS
-              ========================================== */}
-                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                        {[
-                          {
-                            label: "Titles",
-                            value: libraryStats.total_titles,
-                            icon: "fas fa-book",
-                            wrap: "bg-indigo-100 text-indigo-700",
-                          },
-                          {
-                            label: "Total Copies",
-                            value: libraryStats.total_copies,
-                            icon: "fas fa-layer-group",
-                            wrap: "bg-slate-100 text-slate-700",
-                          },
-                          {
-                            label: "Currently Issued",
-                            value: libraryStats.currently_issued,
-                            icon: "fas fa-right-from-bracket",
-                            wrap: "bg-amber-100 text-amber-700",
-                          },
-                          {
-                            label: "Available",
-                            value: libraryStats.available_copies,
-                            icon: "fas fa-circle-check",
-                            wrap: "bg-emerald-100 text-emerald-700",
-                          },
-                          {
-                            label: "Overdue",
-                            value: libraryStats.overdue_books,
-                            icon: "fas fa-triangle-exclamation",
-                            wrap: "bg-rose-100 text-rose-700",
-                          },
-                          {
-                            label: "Due Soon",
-                            value: libraryStats.due_soon,
-                            icon: "fas fa-clock",
-                            wrap: "bg-orange-100 text-orange-700",
-                          },
-                        ].map((card) => (
-                          <div
-                            key={card.label}
-                            className="rounded-xl border border-slate-200 p-4"
-                          >
-                            <div
-                              className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${card.wrap}`}
+              ) : allAdmins.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">
+                  No admin accounts yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-slate-700">
+                        <th className="px-5 py-3">Name</th>
+                        <th className="px-5 py-3">Email</th>
+                        <th className="px-5 py-3">Type</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3">Username</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allAdmins.map((a) => (
+                        <tr
+                          key={a.id}
+                          className="border-b border-gray-50 last:border-0 dark:border-slate-700/50"
+                        >
+                          <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">
+                            {a.first_name} {a.last_name}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {a.email}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {a.admin_type}
+                          </td>
+                          <td className="px-5 py-3">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                a.status === "Active"
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400"
+                              }`}
                             >
-                              <i className={`${card.icon} text-sm`} />
-                            </div>
-
-                            <p className="text-xl font-bold text-slate-900">
-                              {card.value ?? 0}
-                            </p>
-
-                            <p className="text-xs text-slate-500">
-                              {card.label}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* =========================================
-                  OCCUPANCY + FINE SUMMARY
-              ========================================== */}
-                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Copies In Circulation
-                          </p>
-
-                          <div className="mt-2 flex items-center gap-3">
-                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                              <div
-                                className="h-full rounded-full bg-indigo-600"
-                                style={{
-                                  width: `${Math.min(
-                                    libraryOccupancyRate,
-                                    100,
-                                  )}%`,
-                                }}
-                              />
-                            </div>
-
-                            <span className="text-sm font-bold text-slate-900">
-                              {libraryOccupancyRate}%
+                              {a.status}
                             </span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Fine Collected
-                          </p>
-
-                          <p className="mt-2 text-lg font-bold text-emerald-700">
-                            &#8377;
-                            {Number(libraryStats.fine_collected || 0).toFixed(
-                              2,
-                            )}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Fine Pending
-                          </p>
-
-                          <p className="mt-2 text-lg font-bold text-rose-700">
-                            &#8377;
-                            {Number(libraryStats.fine_pending || 0).toFixed(2)}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Fine Waived
-                          </p>
-
-                          <p className="mt-2 text-lg font-bold text-slate-700">
-                            &#8377;
-                            {Number(libraryStats.fine_waived || 0).toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* =========================================
-                  RECENT ACTIVITY + OVERDUE ALERTS
-              ========================================== */}
-                      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        <div className="rounded-xl border border-slate-200">
-                          <div className="border-b border-slate-200 p-4">
-                            <h3 className="text-sm font-bold text-slate-900">
-                              Recent Activity
-                            </h3>
-                          </div>
-
-                          <div className="max-h-72 overflow-y-auto p-2">
-                            {libraryRecentActivity.length === 0 ? (
-                              <p className="p-3 text-sm text-slate-400">
-                                No recent library activity.
-                              </p>
-                            ) : (
-                              libraryRecentActivity.map((activity) => (
-                                <div
-                                  key={activity.id}
-                                  className="flex items-start gap-3 rounded-lg p-3 hover:bg-slate-50"
-                                >
-                                  <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                                    <i
-                                      className={`text-xs ${
-                                        activity.type === "issue"
-                                          ? "fas fa-arrow-up text-amber-600"
-                                          : activity.type === "return"
-                                            ? "fas fa-arrow-down text-emerald-600"
-                                            : activity.type === "payment"
-                                              ? "fas fa-indian-rupee-sign text-emerald-600"
-                                              : "fas fa-hand-holding-dollar text-slate-500"
-                                      }`}
-                                    />
-                                  </div>
-
-                                  <div className="min-w-0">
-                                    <p className="truncate text-sm text-slate-700">
-                                      {activity.title}
-                                    </p>
-
-                                    {activity.date && (
-                                      <p className="text-xs text-slate-400">
-                                        {new Date(
-                                          activity.date,
-                                        ).toLocaleString()}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200">
-                          <div className="flex items-center justify-between border-b border-slate-200 p-4">
-                            <h3 className="text-sm font-bold text-slate-900">
-                              Overdue Alerts
-                            </h3>
-
-                            {libraryOverdueAlerts.length > 0 && (
-                              <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
-                                {libraryOverdueAlerts.length}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="max-h-72 overflow-y-auto p-2">
-                            {libraryOverdueAlerts.length === 0 ? (
-                              <p className="p-3 text-sm text-slate-400">
-                                No overdue books right now.
-                              </p>
-                            ) : (
-                              libraryOverdueAlerts.map((alert) => (
-                                <div
-                                  key={`${alert.member_type}-${alert.id}`}
-                                  className="flex items-center justify-between gap-3 rounded-lg p-3 hover:bg-slate-50"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium text-slate-700">
-                                      {alert.book_title}
-                                    </p>
-
-                                    <p className="truncate text-xs text-slate-400">
-                                      {alert.member_name}
-                                      {alert.member_code
-                                        ? ` (${alert.member_code})`
-                                        : ""}
-                                    </p>
-                                  </div>
-
-                                  <span className="shrink-0 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
-                                    {alert.overdue_days}d overdue
-                                  </span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* =========================================
-                  RECENTLY ADDED BOOKS
-              ========================================== */}
-                      {libraryRecentBooks.length > 0 && (
-                        <div className="mt-6">
-                          <h3 className="mb-3 text-sm font-bold text-slate-900">
-                            Recently Added Books
-                          </h3>
-
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                            {libraryRecentBooks.map((book) => (
-                              <div
-                                key={book.id}
-                                className="rounded-xl border border-slate-200 p-3"
-                              >
-                                <p className="truncate text-sm font-semibold text-slate-800">
-                                  {book.title}
-                                </p>
-
-                                <p className="truncate text-xs text-slate-400">
-                                  {book.author || "Unknown author"}
-                                </p>
-
-                                <p className="mt-2 text-xs text-slate-500">
-                                  {book.available_copies}/{book.total_copies}{" "}
-                                  available
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+                          </td>
+                          <td className="px-5 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">
+                            {a.username}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              )}
+            </div>
+
+            {showCreateAdminModal && (
+              <CreateAdminModal
+                onClose={() => setShowCreateAdminModal(false)}
+                onCreate={createAdmin}
+                creating={creatingAdmin}
+              />
             )}
           </section>
         )}
 
         {activeSection === "roles" && (
           <section className="space-y-6">
-            {/* =====================================================
-        SECTION HEADER
-    ====================================================== */}
+            {/* SECTION HEADER */}
             <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
@@ -1370,9 +1100,7 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* =====================================================
-        LOADING
-    ====================================================== */}
+            {/* LOADING */}
             {rbacLoading ? (
               <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="text-center">
@@ -1385,9 +1113,7 @@ function AdminDashboard() {
               </div>
             ) : (
               <>
-                {/* =================================================
-            CARD 1: ROLES AND PERMISSIONS
-        ================================================== */}
+                {/* CARD 1: ROLES AND PERMISSIONS */}
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   <div className="border-b border-slate-200 p-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1415,9 +1141,7 @@ function AdminDashboard() {
                   </div>
 
                   <div className="p-5">
-                    {/* =============================================
-                ROLE CARDS
-            ============================================== */}
+                    {/* ROLE CARDS */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {/* ADD ROLE CARD */}
                       <button
@@ -1515,9 +1239,7 @@ function AdminDashboard() {
                       })}
                     </div>
 
-                    {/* =============================================
-                SELECTED ROLE PERMISSION MATRIX
-            ============================================== */}
+                    {/* SELECTED ROLE PERMISSION MATRIX */}
                     {rbacSelectedRole ? (
                       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
                         <div className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -1773,9 +1495,7 @@ function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* =================================================
-            CARD 2: USER ROLE ASSIGNMENT
-        ================================================== */}
+                {/* CARD 2: USER ROLE ASSIGNMENT */}
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                   <div className="border-b border-slate-200 p-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -2055,9 +1775,7 @@ function AdminDashboard() {
               </>
             )}
 
-            {/* =====================================================
-        USER ACCESS POPUP
-    ====================================================== */}
+            {/* USER ACCESS POPUP */}
             {rbacUserAccessModalOpen && rbacSelectedUser && (
               <div
                 className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -2134,9 +1852,7 @@ function AdminDashboard() {
                     </div>
                   ) : (
                     <div className="overflow-y-auto p-5 sm:p-6">
-                      {/* ===========================================
-                  ROLE AND TEMPORARY ACCESS
-              ============================================ */}
+                      {/* ROLE AND TEMPORARY ACCESS */}
                       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                         {/* ASSIGN ROLE */}
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -2292,9 +2008,7 @@ function AdminDashboard() {
                         </div>
                       </div>
 
-                      {/* ===========================================
-                  PERMISSION OVERRIDES
-              ============================================ */}
+                      {/* PERMISSION OVERRIDES */}
                       <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
                         <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
@@ -2511,9 +2225,7 @@ function AdminDashboard() {
               </div>
             )}
 
-            {/* =====================================================
-        CREATE / EDIT ROLE MODAL
-    ====================================================== */}
+            {/* CREATE / EDIT ROLE MODAL */}
             {rbacRoleModalOpen && (
               <div
                 className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -2686,9 +2398,7 @@ function AdminDashboard() {
               </div>
             )}
 
-            {/* =====================================================
-        DELETE ROLE CONFIRMATION
-    ====================================================== */}
+            {/* DELETE ROLE CONFIRMATION */}
             {rbacDeleteRoleModalOpen && rbacSelectedRole && (
               <div
                 className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -3705,7 +3415,7 @@ function AdminDashboard() {
         {/* ============================= Asset Inventory END ============================= */}
         {/*  Add Asset Modal START  */}
         {isAddAssetModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 overflow-y-auto py-10">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 overflow-y-auto py-10">
             <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden animate-[fadeIn_.3s_ease]">
               {/* HEADER */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
@@ -4103,6 +3813,88 @@ function AdminDashboard() {
         )}
         {/* ============================= Add Asset Modal END ============================= */}
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "security" && (
+          <section className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                Security & Activity Logs
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                A record of actions taken across the school's dashboards.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {activityLogsLoading ? (
+                <div className="p-10 text-center text-gray-400">
+                  Loading…
+                </div>
+              ) : activityLogsError ? (
+                <div className="p-10 text-center text-red-500">
+                  {activityLogsError}
+                </div>
+              ) : activityLogs.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">
+                  No activity recorded yet.
+                </div>
+              ) : (
+                <div className="max-h-[70vh] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white dark:bg-slate-800">
+                      <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-slate-700">
+                        <th className="px-5 py-3">Time</th>
+                        <th className="px-5 py-3">Role</th>
+                        <th className="px-5 py-3">Action</th>
+                        <th className="px-5 py-3">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activityLogs.map((log) => (
+                        <tr
+                          key={log.id}
+                          className="border-b border-gray-50 last:border-0 dark:border-slate-700/50"
+                        >
+                          <td className="whitespace-nowrap px-5 py-3 text-gray-500 dark:text-gray-400">
+                            {log.time}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {log.role}
+                          </td>
+                          <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">
+                            {log.action}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {log.description}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeSection === "staff" && <StaffSection />}
+        {activeSection === "notices" && <NoticesSection />}
+        {activeSection === "fees" && <FeesSection />}
+        {activeSection === "payroll" && <PayrollSection />}
+        {activeSection === "reports" && <ReportsSection />}
+        {activeSection === "analytics" && <AnalyticsSection />}
+        {activeSection === "parents" && <ParentsSection />}
+        {activeSection === "events" && <EventsSection />}
+
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={admin}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
             {/* ================= PROFILE HEADER ================= */}
@@ -4564,7 +4356,7 @@ function AdminDashboard() {
         )}
         {/* ===================== PROFILE SECTION END ========================*/}
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100]">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md border border-gray-100 dark:border-slate-700">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

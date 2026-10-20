@@ -5,7 +5,7 @@ from functools import wraps
 
 from flask import jsonify, request
 from flask.views import MethodView
-from sqlalchemy import UniqueConstraint, or_
+from sqlalchemy import UniqueConstraint, and_, false, or_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from utils.auth import Admin, Student, Teacher, db
@@ -91,6 +91,12 @@ DEFAULT_MODULES = [
         "sort_order": 15,
     },
     {
+        "code": "assets",
+        "name": "Assets",
+        "category": "Operations",
+        "sort_order": 130,
+    },
+    {
         "code": "hostel",
         "name": "Hostel",
         "category": "Administration",
@@ -145,6 +151,8 @@ DEFAULT_ROLES = [
         "is_system": True,
         "modules": [
             "dashboard",
+            # "academic" is the academic-admin-dashboard's own
+            "academic",
             "students",
             "teachers",
             "admissions",
@@ -203,6 +211,8 @@ DEFAULT_ROLES = [
         "modules": [
             "dashboard",
             "students",
+            # "teachers" doubles as the staff-directory module: it's what
+            "teachers",
             "fees",
             "accounts",
             "reports",
@@ -339,10 +349,7 @@ def _dashboard_rights_from_actions(action_map):
 
 
 def get_user_dashboard_access(user, dashboard_entry):
-    """
-    Resolve {can_view, can_write} for one dashboard entry for a given
-    logged-in user (Admin / Teacher / Student / Staff instance).
-    """
+    # Resolve {can_view, can_write} for one dashboard entry for a given
 
     if not dashboard_entry:
         return {"can_view": False, "can_write": False}
@@ -386,17 +393,8 @@ def get_user_dashboard_access(user, dashboard_entry):
         return {"can_view": False, "can_write": False}
 
     # BUG FIX: a brand-new admin has no RBACUserRole row yet (nobody has
-    # opened Role & Permission Management for them). Previously this was
-    # indistinguishable from "explicitly assigned a role with zero
-    # permissions", so a legitimate admin_type owner (e.g. Academic Admin)
-    # could never log in to their own dashboard until a Super Admin
-    # manually assigned them a role - see the DASHBOARD_ACCESS_DENIED
-    # gate in Login.post(). If there's no role assignment at all AND
-    # this admin_type owns this dashboard, grant baseline access instead
-    # of locking the account out of its own dashboard.
-    if (
-        access["role"] is None
-        and dashboard_entry.get("owner_admin_type") == getattr(user, "admin_type", None)
+    if access["role"] is None and dashboard_entry.get("owner_admin_type") == getattr(
+        user, "admin_type", None
     ):
         return {"can_view": True, "can_write": True}
 
@@ -406,11 +404,7 @@ def get_user_dashboard_access(user, dashboard_entry):
 
 
 def list_dashboard_access_for_user(user):
-    """
-    Return every dashboard the user may see, each with can_view /
-    can_write flags - used to drive the login redirect, ProtectedRoute
-    guard and the sidebar navigation on the frontend.
-    """
+    # Return every dashboard the user may see, each with can_view
 
     results = []
 
@@ -434,11 +428,7 @@ def list_dashboard_access_for_user(user):
 
 
 def get_home_dashboard_for_user(user):
-    """
-    Resolve the dashboard a user should land on right after login,
-    based on their role/admin_type - independent of whether they
-    actually have access to it (callers must still check access).
-    """
+    # Resolve the dashboard a user should land on right after login,
 
     if isinstance(user, Student):
         return DASHBOARD_BY_KEY["student-dashboard"]
@@ -524,6 +514,11 @@ class RBACRole(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
+    # NULL = a system default role, shared as a template across every
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     name = db.Column(
         db.String(120),
         nullable=False,
@@ -531,7 +526,6 @@ class RBACRole(db.Model):
 
     code = db.Column(
         db.String(100),
-        unique=True,
         nullable=False,
         index=True,
     )
@@ -794,6 +788,10 @@ class RBACAuditLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     actor_type = db.Column(db.String(20))
     actor_id = db.Column(db.Integer)
 
@@ -966,6 +964,10 @@ def super_admin_required(function):
     return wrapper
 
 
+def _current_school_id():
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
 def write_audit_log(
     action,
     entity_type,
@@ -975,6 +977,7 @@ def write_audit_log(
     actor = get_actor_identity()
 
     log = RBACAuditLog(
+        school_id=getattr(getattr(request, "user", None), "school_id", None),
         actor_type=actor["type"],
         actor_id=actor["id"],
         action=action,
@@ -1192,10 +1195,18 @@ def build_user_access(user_type, user_id):
         if override.access_reason and override.access_reason.strip()
     ]
 
+    # A Super Admin always passes user_has_permission()/permission_required
+    is_super_admin = is_super_admin_user(user)
+
     effective_permissions = {}
 
     for module in modules:
         module_code = module.code
+
+        if is_super_admin:
+            effective_permissions[module_code] = empty_action_map(True)
+            continue
+
         base = role_permissions.get(module_code, empty_action_map(False))
         override = override_permissions.get(module_code, {})
 
@@ -1293,10 +1304,7 @@ def permission_required(module_code, action="view"):
 
 # DATABASE SEED
 def seed_rbac_defaults():
-    """
-    Run once after db.create_all() or through a Flask CLI command.
-    Safe to execute repeatedly.
-    """
+    # Run once after db.create_all() or through a Flask CLI command
 
     try:
         module_lookup = {}
@@ -1317,7 +1325,9 @@ def seed_rbac_defaults():
             module_lookup[module.code] = module
 
         for role_data in DEFAULT_ROLES:
-            role = RBACRole.query.filter_by(code=role_data["code"]).first()
+            role = RBACRole.query.filter_by(
+                code=role_data["code"], school_id=None
+            ).first()
 
             if not role:
                 role = RBACRole(
@@ -1383,7 +1393,6 @@ class RBACBootstrapAPI(MethodView):
     def get(self):
         try:
             # Self-heal older/production databases where RBAC tables exist but
-            # default module rows were never inserted. This is safe to repeat.
             if RBACModule.query.count() == 0:
                 seeded = seed_rbac_defaults()
                 if not seeded:
@@ -1407,16 +1416,26 @@ class RBACBootstrapAPI(MethodView):
                 .all()
             )
 
-            roles = RBACRole.query.order_by(
-                RBACRole.is_system.desc(),
-                RBACRole.name.asc(),
-            ).all()
+            roles = (
+                RBACRole.query.filter(_visible_roles_filter())
+                .order_by(
+                    RBACRole.is_system.desc(),
+                    RBACRole.name.asc(),
+                )
+                .all()
+            )
+
+            school_id = _current_school_id()
 
             total_users = (
-                Admin.query.filter_by(is_deleted=False).count()
-                + Teacher.query.count()
-                + Student.query.count()
-                + (Staff.query.count() if Staff is not None else 0)
+                Admin.query.filter_by(is_deleted=False, school_id=school_id).count()
+                + Teacher.query.filter_by(school_id=school_id).count()
+                + Student.query.filter_by(school_id=school_id).count()
+                + (
+                    Staff.query.filter_by(school_id=school_id).count()
+                    if Staff is not None
+                    else 0
+                )
             )
 
             now = datetime.utcnow()
@@ -1426,8 +1445,13 @@ class RBACBootstrapAPI(MethodView):
                 RBACUserPermissionOverride.expires_at > now,
             )
 
+            # Overrides are keyed by (user_type, user_id) with no school
+            my_users_filter = _override_belongs_to_my_school()
+
             users_with_overrides = (
-                RBACUserPermissionOverride.query.filter(active_override_filter)
+                RBACUserPermissionOverride.query.filter(
+                    active_override_filter, my_users_filter
+                )
                 .with_entities(
                     RBACUserPermissionOverride.user_type,
                     RBACUserPermissionOverride.user_id,
@@ -1440,6 +1464,7 @@ class RBACBootstrapAPI(MethodView):
                 RBACUserPermissionOverride.query.filter(
                     RBACUserPermissionOverride.is_temporary.is_(True),
                     RBACUserPermissionOverride.expires_at > now,
+                    my_users_filter,
                 )
                 .with_entities(
                     RBACUserPermissionOverride.user_type,
@@ -1502,11 +1527,42 @@ class RBACBootstrapAPI(MethodView):
 
 
 # ROLE CRUD API
+def _override_belongs_to_my_school():
+    # SQL condition: this override row targets a user in the caller's
+    school_id = _current_school_id()
+    clauses = []
+
+    for user_type in ("admin", "teacher", "student", "staff"):
+        model = get_user_model(user_type)
+
+        if not model:
+            continue
+
+        clauses.append(
+            and_(
+                RBACUserPermissionOverride.user_type == user_type,
+                RBACUserPermissionOverride.user_id.in_(
+                    db.session.query(model.id).filter(model.school_id == school_id)
+                ),
+            )
+        )
+
+    return or_(*clauses) if clauses else false()
+
+
+def _visible_roles_filter():
+    # System default roles (school_id IS NULL) plus this school's own
+    return or_(
+        RBACRole.school_id.is_(None),
+        RBACRole.school_id == _current_school_id(),
+    )
+
+
 class RBACRoleListAPI(MethodView):
     decorators = [super_admin_required]
 
     def get(self):
-        query = RBACRole.query
+        query = RBACRole.query.filter(_visible_roles_filter())
 
         user_type = normalize_user_type(request.args.get("user_type"))
 
@@ -1546,12 +1602,16 @@ class RBACRoleListAPI(MethodView):
         if not user_type:
             return jsonify({"error": "Invalid user type"}), 400
 
-        if RBACRole.query.filter_by(code=code).first():
+        # A code can't collide with a system role or with one of THIS
+        if RBACRole.query.filter(
+            RBACRole.code == code, _visible_roles_filter()
+        ).first():
             return jsonify({"error": "Role code already exists"}), 409
 
         actor = get_actor_identity()
 
         role = RBACRole(
+            school_id=_current_school_id(),
             name=name,
             code=code,
             description=description,
@@ -1616,11 +1676,29 @@ class RBACRoleListAPI(MethodView):
             return jsonify({"error": "Database error"}), 500
 
 
+def _get_visible_role(role_id):
+    """A role this school may see: a system role or its own custom role."""
+    return RBACRole.query.filter(
+        RBACRole.id == role_id, _visible_roles_filter()
+    ).first()
+
+
+def _role_is_editable(role):
+    # System roles (school_id NULL) are shared by every school, so a
+    return role.school_id == _current_school_id()
+
+
+_SYSTEM_ROLE_READONLY_ERROR = (
+    "This is a platform-managed system role shared by all schools and "
+    "cannot be modified. Create a custom role instead."
+)
+
+
 class RBACRoleDetailAPI(MethodView):
     decorators = [super_admin_required]
 
     def get(self, role_id):
-        role = RBACRole.query.get(role_id)
+        role = _get_visible_role(role_id)
 
         if not role:
             return jsonify({"error": "Role not found"}), 404
@@ -1628,10 +1706,13 @@ class RBACRoleDetailAPI(MethodView):
         return jsonify({"role": serialize_role(role)}), 200
 
     def put(self, role_id):
-        role = RBACRole.query.get(role_id)
+        role = _get_visible_role(role_id)
 
         if not role:
             return jsonify({"error": "Role not found"}), 404
+
+        if not _role_is_editable(role):
+            return jsonify({"error": _SYSTEM_ROLE_READONLY_ERROR}), 403
 
         data = request.get_json(silent=True) or {}
 
@@ -1653,6 +1734,7 @@ class RBACRoleDetailAPI(MethodView):
         duplicate = RBACRole.query.filter(
             RBACRole.code == code,
             RBACRole.id != role.id,
+            _visible_roles_filter(),
         ).first()
 
         if duplicate:
@@ -1714,10 +1796,13 @@ class RBACRoleDetailAPI(MethodView):
             return jsonify({"error": "Database error"}), 500
 
     def delete(self, role_id):
-        role = RBACRole.query.get(role_id)
+        role = _get_visible_role(role_id)
 
         if not role:
             return jsonify({"error": "Role not found"}), 404
+
+        if not _role_is_editable(role):
+            return jsonify({"error": _SYSTEM_ROLE_READONLY_ERROR}), 403
 
         if role.is_system:
             return (
@@ -1776,10 +1861,14 @@ class RBACRolePermissionAPI(MethodView):
     decorators = [super_admin_required]
 
     def put(self, role_id):
-        role = RBACRole.query.get(role_id)
+        role = _get_visible_role(role_id)
 
         if not role:
             return jsonify({"error": "Role not found"}), 404
+
+        # Editing a shared system role's permission matrix would change
+        if not _role_is_editable(role):
+            return jsonify({"error": _SYSTEM_ROLE_READONLY_ERROR}), 403
 
         data = request.get_json(silent=True) or {}
         permissions = data.get("permissions")
@@ -1889,6 +1978,23 @@ class RBACRolePermissionAPI(MethodView):
 
 
 # USER LIST API
+def _get_user_in_my_school(user_type, user_id):
+    # Look up a user by (type, id), but only if they belong to the
+    model = get_user_model(user_type)
+
+    if not model:
+        return None
+
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        return None
+
+    return model.query.filter_by(
+        id=user_id, school_id=_current_school_id()
+    ).first()
+
+
 class RBACUserListAPI(MethodView):
     decorators = [super_admin_required]
 
@@ -1921,11 +2027,10 @@ class RBACUserListAPI(MethodView):
             model = get_user_model(user_type)
 
             # Staff is optional in some installations. Skip only the missing
-            # optional model while still returning Admin/Teacher/Student rows.
             if not model:
                 continue
 
-            query = model.query
+            query = model.query.filter(model.school_id == _current_school_id())
 
             if user_type == "admin" and hasattr(model, "is_deleted"):
                 query = query.filter(Admin.is_deleted.is_(False))
@@ -2021,6 +2126,9 @@ class RBACUserAccessAPI(MethodView):
         if not user_type or user_type == "all":
             return jsonify({"error": "Invalid user type"}), 400
 
+        if not _get_user_in_my_school(user_type, user_id):
+            return jsonify({"error": "User not found"}), 404
+
         access = build_user_access(
             user_type,
             user_id,
@@ -2041,7 +2149,7 @@ class RBACUserRoleAPI(MethodView):
         if not user_type or user_type == "all":
             return jsonify({"error": "Invalid user type"}), 400
 
-        user = get_user(user_type, user_id)
+        user = _get_user_in_my_school(user_type, user_id)
 
         if not user:
             return jsonify({"error": "User not found"}), 404
@@ -2076,7 +2184,7 @@ class RBACUserRoleAPI(MethodView):
                 except (TypeError, ValueError):
                     return jsonify({"error": "Invalid role id"}), 400
 
-                role = RBACRole.query.get(role_id)
+                role = _get_visible_role(role_id)
 
                 if not role:
                     return jsonify({"error": "Role not found"}), 404
@@ -2153,7 +2261,7 @@ class RBACUserOverrideAPI(MethodView):
         if not user_type or user_type == "all":
             return jsonify({"error": "Invalid user type"}), 400
 
-        user = get_user(user_type, user_id)
+        user = _get_user_in_my_school(user_type, user_id)
 
         if not user:
             return jsonify({"error": "User not found"}), 404
@@ -2289,7 +2397,7 @@ class RBACUserOverrideAPI(MethodView):
         if not user_type or user_type == "all":
             return jsonify({"error": "Invalid user type"}), 400
 
-        user = get_user(user_type, user_id)
+        user = _get_user_in_my_school(user_type, user_id)
 
         if not user:
             return jsonify({"error": "User not found"}), 404

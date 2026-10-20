@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../config/appConfig";
 
 // Backend: utils/academic.py -> AdminAcademicClassesAPI /
-// AdminAcademicClassDetailAPI / AdminAcademicSetupOptionsAPI
 const CLASSES_ENDPOINT = `${BASE_URL}/admin/academic/classes`;
 const BATCHES_ENDPOINT = `${BASE_URL}/admin/academic/batches`;
 const OPTIONS_ENDPOINT = `${BASE_URL}/admin/academic/setup-options`;
@@ -63,8 +62,6 @@ export function useAcademicClasses() {
   const [classDeleteError, setClassDeleteError] = useState("");
 
   // Quick-create for Academic Year (Batch) right from inside the Add
-  // Class form, so a non-technical admin never has to leave the modal
-  // to go find a separate "Batches" page just to add "2025-26".
   const [newBatchOpen, setNewBatchOpen] = useState(false);
   const [newBatchName, setNewBatchName] = useState("");
   const [newBatchSaving, setNewBatchSaving] = useState(false);
@@ -294,7 +291,6 @@ export function useAcademicClasses() {
         }
 
         // Refresh dropdown options, then auto-select the one we just
-        // created so the admin can carry straight on filling the form.
         await loadOptions();
         setClassForm((prev) => ({
           ...prev,

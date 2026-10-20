@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload
 import logging
 
 from utils.auth import db, Admin, Student
+from utils.tenancy import caller_can_access_student
 from utils.auth_middleware import login_required, get_current_user
 from utils.rolePermissionManagement import user_has_permission
 from utils.studentDetails import (
@@ -107,9 +108,14 @@ def get_student_academic_details(student):
 class Hostel(db.Model):
     __tablename__ = "hostels"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(db.Integer, primary_key=True)
 
-    hostel_name = db.Column(db.String(100), nullable=False, unique=True)
+    # Unique per school (see uq_school_hostel_name in the migration).
+    hostel_name = db.Column(db.String(100), nullable=False)
 
     # NEW: useful admin-facing fields.
     hostel_type = db.Column(
@@ -135,6 +141,10 @@ class Hostel(db.Model):
 
 class HostelBlock(db.Model):
     __tablename__ = "hostel_blocks"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     __table_args__ = (
         db.UniqueConstraint("hostel_id", "block_name", name="uq_block_hostel_name"),
     )
@@ -170,6 +180,10 @@ class HostelBlock(db.Model):
 
 class HostelFloor(db.Model):
     __tablename__ = "hostel_floors"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     __table_args__ = (
         db.UniqueConstraint("block_id", "floor_number", name="uq_floor_block_number"),
     )
@@ -204,6 +218,10 @@ class HostelFloor(db.Model):
 
 class Room(db.Model):
     __tablename__ = "rooms"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     __table_args__ = (
         db.UniqueConstraint("floor_id", "room_number", name="uq_room_floor_number"),
     )
@@ -257,6 +275,10 @@ class Room(db.Model):
 
 class Bed(db.Model):
     __tablename__ = "beds"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     __table_args__ = (
         db.UniqueConstraint("room_id", "bed_number", name="uq_bed_room_number"),
     )
@@ -295,6 +317,10 @@ class Bed(db.Model):
 class Warden(db.Model):
     __tablename__ = "wardens"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(db.Integer, primary_key=True)
 
     first_name = db.Column(db.String(100))
@@ -307,6 +333,10 @@ class Warden(db.Model):
 
 class RoomWarden(db.Model):
     __tablename__ = "room_wardens"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -323,6 +353,10 @@ class RoomWarden(db.Model):
 
 class HostelAllocation(db.Model):
     __tablename__ = "hostel_allocations"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -347,6 +381,10 @@ class HostelAllocation(db.Model):
 class HostelFeeStructure(db.Model):
 
     __tablename__ = "hostel_fee_structures"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -386,6 +424,10 @@ class HostelFeeStructure(db.Model):
 
 class HostelFee(db.Model):
     __tablename__ = "hostel_fees"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -432,6 +474,10 @@ class HostelFee(db.Model):
 class HostelFeePayment(db.Model):
     __tablename__ = "hostel_fee_payments"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(db.Integer, primary_key=True)
 
     fee_id = db.Column(
@@ -457,6 +503,10 @@ class HostelFeePayment(db.Model):
 class HostelActivityLog(db.Model):
 
     __tablename__ = "hostel_activity_logs"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -488,6 +538,10 @@ class HostelActivityLog(db.Model):
 
 class HostelComplaint(db.Model):
     __tablename__ = "hostel_complaints"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -526,6 +580,10 @@ class HostelComplaint(db.Model):
 class HostelMaintenanceRequest(db.Model):
 
     __tablename__ = "hostel_maintenance_requests"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -577,9 +635,14 @@ class HostelStaff(db.Model):
 
     __tablename__ = "hostel_staff"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(db.Integer, primary_key=True)
 
-    staff_code = db.Column(db.String(20), unique=True, nullable=False)
+    # Unique per school (see uq_school_staff_code in the migration).
+    staff_code = db.Column(db.String(20), nullable=False)
 
     first_name = db.Column(db.String(100), nullable=False)
     middle_name = db.Column(db.String(100))
@@ -627,9 +690,14 @@ class HostelStaff(db.Model):
 class HostelVisitor(db.Model):
     __tablename__ = "hostel_visitors"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(db.Integer, primary_key=True)
 
-    visitor_code = db.Column(db.String(20), unique=True, nullable=False)
+    # Unique per school (see uq_school_visitor_code in the migration).
+    visitor_code = db.Column(db.String(20), nullable=False)
     visitor_name = db.Column(db.String(150), nullable=False)
     visitor_mobile = db.Column(db.String(15))
 
@@ -661,6 +729,10 @@ class HostelVisitor(db.Model):
 
 class HostelAttendance(db.Model):
     __tablename__ = "hostel_attendance"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     __table_args__ = (
         db.UniqueConstraint(
             "student_id", "attendance_date", name="uq_attendance_student_date"
@@ -696,6 +768,10 @@ class HostelMovement(db.Model):
 
     __tablename__ = "hostel_movements"
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     id = db.Column(db.Integer, primary_key=True)
 
     student_id = db.Column(
@@ -726,6 +802,10 @@ class HostelMovement(db.Model):
 class HostelLeaveRequest(db.Model):
 
     __tablename__ = "hostel_leave_requests"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -758,8 +838,14 @@ class HostelLeaveRequest(db.Model):
 
 class HostelMessMenu(db.Model):
     __tablename__ = "hostel_mess_menu"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     __table_args__ = (
-        db.UniqueConstraint("day_of_week", "meal_type", name="uq_mess_menu_day_meal"),
+        db.UniqueConstraint(
+            "school_id", "day_of_week", "meal_type", name="uq_mess_menu_day_meal"
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -793,6 +879,10 @@ class HostelMessMenu(db.Model):
 
 class HostelMealAttendance(db.Model):
     __tablename__ = "hostel_meal_attendance"
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     __table_args__ = (
         db.UniqueConstraint(
             "student_id",
@@ -882,7 +972,7 @@ def safe_full_name(first_name=None, middle_name=None, last_name=None):
 
 
 def get_student_room_info(student_id):
-    allocation = HostelAllocation.query.filter_by(
+    allocation = HostelAllocation.query.filter_by(school_id=current_school_id(), 
         student_id=student_id, is_active=True
     ).first()
 
@@ -900,11 +990,7 @@ def get_student_room_info(student_id):
 
 # ============================= RBAC (READ / WRITE) =============================
 def get_fee_payment_summary(fee):
-    """
-    The real, always-correct status/balance for a fee invoice, derived
-    live from its payments rather than trusting a manually-set status
-    column that could drift out of sync as installments come in.
-    """
+    # The real, always-correct status/balance for a fee invoice, derived
 
     paid = sum(float(p.amount) for p in fee.payments)
     amount = float(fee.amount or 0)
@@ -1017,6 +1103,7 @@ def log_hostel_activity(category, action, description):
 
     db.session.add(
         HostelActivityLog(
+            school_id=current_school_id(),
             admin_id=getattr(current_user, "id", None),
             admin_name=admin_name,
             category=category,
@@ -1035,6 +1122,22 @@ def serialize_activity_log(log):
         "description": log.description,
         "created_at": log.created_at.isoformat() if log.created_at else None,
     }
+
+
+def current_school_id():
+    """Caller's school. None for a legacy/unmigrated install (matches None)."""
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
+def scoped_get(model, pk):
+    # Load a hostel row by primary key, only if it belongs to the caller's
+    if pk is None:
+        return None
+    try:
+        pk = int(pk)
+    except (TypeError, ValueError):
+        return None
+    return model.query.filter_by(id=pk, school_id=current_school_id()).first()
 
 
 def authorize_hostel_admin(required_right="read"):
@@ -1186,7 +1289,7 @@ def serialize_bed(bed, include_occupant=True):
 
     if include_occupant and bed.status == "Occupied":
         allocation = (
-            HostelAllocation.query.filter_by(bed_id=bed.id, is_active=True)
+            HostelAllocation.query.filter_by(school_id=current_school_id(), bed_id=bed.id, is_active=True)
             .order_by(HostelAllocation.id.desc())
             .first()
         )
@@ -1245,11 +1348,11 @@ def serialize_room(room, include_beds=False):
         "created_at": (room.created_at.isoformat() if room.created_at else None),
     }
 
-    room_wardens = RoomWarden.query.filter_by(room_id=room.id).all()
+    room_wardens = RoomWarden.query.filter_by(school_id=current_school_id(), room_id=room.id).all()
     wardens = []
 
     for rw in room_wardens:
-        warden = Warden.query.get(rw.warden_id)
+        warden = scoped_get(Warden, rw.warden_id)
 
         if warden:
             wardens.append(
@@ -1281,7 +1384,7 @@ class StudentHostelDetails(MethodView):
 
         try:
             # ================= STUDENT =================
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return (
@@ -1295,7 +1398,7 @@ class StudentHostelDetails(MethodView):
                 )
 
             # ================= ALLOCATION =================
-            allocation = HostelAllocation.query.filter_by(
+            allocation = HostelAllocation.query.filter_by(school_id=current_school_id(), 
                 student_id=student.id,
                 is_active=True,
             ).first()
@@ -1320,7 +1423,7 @@ class StudentHostelDetails(MethodView):
                                 "roommates": [],
                                 "complaints": [
                                     serialize_complaint(c)
-                                    for c in HostelComplaint.query.filter_by(
+                                    for c in HostelComplaint.query.filter_by(school_id=current_school_id(), 
                                         student_id=student.id
                                     )
                                     .order_by(HostelComplaint.id.desc())
@@ -1348,7 +1451,7 @@ class StudentHostelDetails(MethodView):
                 )
 
             # ================= ROOM (via Bed) =================
-            bed = Bed.query.get(allocation.bed_id)
+            bed = scoped_get(Bed, allocation.bed_id)
             room = bed.room if bed else None
 
             if not room:
@@ -1363,17 +1466,17 @@ class StudentHostelDetails(MethodView):
             warden = None
 
             if room:
-                rw = RoomWarden.query.filter_by(room_id=room.id).first()
+                rw = RoomWarden.query.filter_by(school_id=current_school_id(), room_id=room.id).first()
 
             if rw:
-                warden = Warden.query.get(rw.warden_id)
+                warden = scoped_get(Warden, rw.warden_id)
 
             # ================= ROOMMATES =================
             roommates = []
 
             if room:
                 roommates_query = (
-                    HostelAllocation.query.join(Bed, HostelAllocation.bed_id == Bed.id)
+                    HostelAllocation.query.filter(HostelAllocation.school_id == current_school_id()).join(Bed, HostelAllocation.bed_id == Bed.id)
                     .filter(
                         Bed.room_id == room.id,
                         HostelAllocation.student_id != student.id,
@@ -1407,7 +1510,7 @@ class StudentHostelDetails(MethodView):
 
             # ================= COMPLAINTS =================
             complaints_query = (
-                HostelComplaint.query.filter_by(student_id=student.id)
+                HostelComplaint.query.filter_by(school_id=current_school_id(), student_id=student.id)
                 .order_by(HostelComplaint.id.desc())
                 .limit(10)
                 .all()
@@ -1416,7 +1519,7 @@ class StudentHostelDetails(MethodView):
             complaints = [serialize_complaint(c) for c in complaints_query]
 
             # ================= FEES (AGGREGATE) =================
-            fees_query = HostelFee.query.filter_by(student_id=student.id).all()
+            fees_query = HostelFee.query.filter_by(school_id=current_school_id(), student_id=student.id).all()
 
             total_amount = 0.0
             total_paid = 0.0
@@ -1456,16 +1559,16 @@ class StudentHostelDetails(MethodView):
             }
 
             # ================= TODAY'S ATTENDANCE =================
-            today_attendance = HostelAttendance.query.filter_by(
+            today_attendance = HostelAttendance.query.filter_by(school_id=current_school_id(), 
                 student_id=student.id, attendance_date=date.today()
             ).first()
 
             # ================= PENDING REQUEST COUNTS =================
-            pending_leave_count = HostelLeaveRequest.query.filter_by(
+            pending_leave_count = HostelLeaveRequest.query.filter_by(school_id=current_school_id(), 
                 student_id=student.id, status="Pending"
             ).count()
 
-            pending_visitor_count = HostelVisitor.query.filter_by(
+            pending_visitor_count = HostelVisitor.query.filter_by(school_id=current_school_id(), 
                 student_id=student.id, status="Pending"
             ).count()
 
@@ -1473,7 +1576,7 @@ class StudentHostelDetails(MethodView):
             response_data = {
                 "hostel_id": block.hostel_id if block else None,
                 "hostel_name": (
-                    Hostel.query.get(block.hostel_id).hostel_name
+                    scoped_get(Hostel, block.hostel_id).hostel_name
                     if block and block.hostel_id
                     else None
                 ),
@@ -1565,7 +1668,6 @@ class StudentHostelDetails(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1583,7 +1685,6 @@ class StudentHostelDetails(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1595,6 +1696,9 @@ class CreateHostelComplaint(MethodView):
 
     @login_required
     def post(self, student_id):
+        allowed, _ = caller_can_access_student(student_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
 
         try:
             data = request.get_json()
@@ -1640,7 +1744,7 @@ class CreateHostelComplaint(MethodView):
                 priority = "Medium"
 
             # ================= STUDENT CHECK =================
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return (
@@ -1654,12 +1758,13 @@ class CreateHostelComplaint(MethodView):
                 )
 
             # ================= ALLOCATION =================
-            allocation = HostelAllocation.query.filter_by(
+            allocation = HostelAllocation.query.filter_by(school_id=current_school_id(), 
                 student_id=student_id,
                 is_active=True,
             ).first()
 
             complaint = HostelComplaint(
+                school_id=current_school_id(),
                 student_id=student_id,
                 room_id=(
                     allocation.bed.room_id if allocation and allocation.bed else None
@@ -1695,7 +1800,6 @@ class CreateHostelComplaint(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1713,7 +1817,6 @@ class CreateHostelComplaint(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1727,13 +1830,13 @@ class StudentHostelFeesAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "message": "Student not found"}), 404
 
             fees = (
-                HostelFee.query.filter_by(student_id=student.id)
+                HostelFee.query.filter_by(school_id=current_school_id(), student_id=student.id)
                 .order_by(HostelFee.id.desc())
                 .all()
             )
@@ -1801,7 +1904,6 @@ class StudentHostelFeesAPI(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1815,7 +1917,6 @@ class StudentHostelFeesAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1827,14 +1928,17 @@ class StudentHostelLeaveRequestAPI(MethodView):
 
     @login_required
     def get(self, student_id):
+        allowed, _ = caller_can_access_student(student_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "message": "Student not found"}), 404
 
             leaves = (
-                HostelLeaveRequest.query.filter_by(student_id=student.id)
+                HostelLeaveRequest.query.filter_by(school_id=current_school_id(), student_id=student.id)
                 .order_by(HostelLeaveRequest.id.desc())
                 .all()
             )
@@ -1859,7 +1963,6 @@ class StudentHostelLeaveRequestAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1867,8 +1970,11 @@ class StudentHostelLeaveRequestAPI(MethodView):
 
     @login_required
     def post(self, student_id):
+        allowed, _ = caller_can_access_student(student_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "message": "Student not found"}), 404
@@ -1926,6 +2032,7 @@ class StudentHostelLeaveRequestAPI(MethodView):
                 )
 
             leave = HostelLeaveRequest(
+                school_id=current_school_id(),
                 student_id=student.id,
                 leave_type=leave_type,
                 from_date=from_date,
@@ -1958,7 +2065,6 @@ class StudentHostelLeaveRequestAPI(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1974,7 +2080,6 @@ class StudentHostelLeaveRequestAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -1985,8 +2090,11 @@ class StudentHostelLeaveRequestCancelAPI(MethodView):
 
     @login_required
     def delete(self, student_id, leave_id):
+        allowed, _ = caller_can_access_student(student_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
         try:
-            leave = HostelLeaveRequest.query.filter_by(
+            leave = HostelLeaveRequest.query.filter_by(school_id=current_school_id(), 
                 id=leave_id, student_id=student_id
             ).first()
 
@@ -2020,7 +2128,6 @@ class StudentHostelLeaveRequestCancelAPI(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2034,7 +2141,6 @@ class StudentHostelLeaveRequestCancelAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2046,14 +2152,17 @@ class StudentHostelVisitorAPI(MethodView):
 
     @login_required
     def get(self, student_id):
+        allowed, _ = caller_can_access_student(student_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "message": "Student not found"}), 404
 
             visitors = (
-                HostelVisitor.query.filter_by(student_id=student.id)
+                HostelVisitor.query.filter_by(school_id=current_school_id(), student_id=student.id)
                 .order_by(HostelVisitor.id.desc())
                 .all()
             )
@@ -2076,7 +2185,6 @@ class StudentHostelVisitorAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2084,8 +2192,11 @@ class StudentHostelVisitorAPI(MethodView):
 
     @login_required
     def post(self, student_id):
+        allowed, _ = caller_can_access_student(student_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "message": "Student not found"}), 404
@@ -2117,6 +2228,7 @@ class StudentHostelVisitorAPI(MethodView):
             )
 
             visitor = HostelVisitor(
+                school_id=current_school_id(),
                 visitor_code=visitor_code,
                 visitor_name=visitor_name,
                 visitor_mobile=visitor_mobile or None,
@@ -2150,7 +2262,6 @@ class StudentHostelVisitorAPI(MethodView):
                     {
                         "success": False,
                         "message": "Database error occurred",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2166,7 +2277,6 @@ class StudentHostelVisitorAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2190,7 +2300,7 @@ class StudentHostelMessMenuAPI(MethodView):
             ]
             meal_order = ["Breakfast", "Lunch", "Snacks", "Dinner"]
 
-            entries = HostelMessMenu.query.all()
+            entries = HostelMessMenu.query.filter(HostelMessMenu.school_id == current_school_id()).all()
 
             menu = {day: [] for day in day_order}
 
@@ -2233,7 +2343,6 @@ class StudentHostelMessMenuAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2246,13 +2355,13 @@ class StudentHostelAttendanceAPI(MethodView):
     @login_required
     def get(self, student_id):
         try:
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "message": "Student not found"}), 404
 
             records = (
-                HostelAttendance.query.filter_by(student_id=student.id)
+                HostelAttendance.query.filter_by(school_id=current_school_id(), student_id=student.id)
                 .order_by(HostelAttendance.attendance_date.desc())
                 .limit(30)
                 .all()
@@ -2313,7 +2422,6 @@ class StudentHostelAttendanceAPI(MethodView):
                     {
                         "success": False,
                         "message": "Something went wrong",
-                        "error": str(e),
                     }
                 ),
                 500,
@@ -2369,7 +2477,7 @@ class HostelListAPI(MethodView):
             return access_error
 
         try:
-            hostels = Hostel.query.order_by(Hostel.hostel_name.asc()).all()
+            hostels = Hostel.query.filter(Hostel.school_id == current_school_id()).order_by(Hostel.hostel_name.asc()).all()
 
             return (
                 jsonify(
@@ -2413,7 +2521,7 @@ class HostelListAPI(MethodView):
                     400,
                 )
 
-            if Hostel.query.filter(
+            if Hostel.query.filter(Hostel.school_id == current_school_id(), 
                 func.lower(Hostel.hostel_name) == hostel_name.lower()
             ).first():
                 return (
@@ -2435,6 +2543,7 @@ class HostelListAPI(MethodView):
                 )
 
             hostel = Hostel(
+                school_id=current_school_id(),
                 hostel_name=hostel_name,
                 hostel_type=hostel_type,
                 address=_clean_str(data.get("address")) or None,
@@ -2476,7 +2585,7 @@ class HostelDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        hostel = Hostel.query.get(hostel_id)
+        hostel = scoped_get(Hostel, hostel_id)
 
         if not hostel:
             return jsonify({"success": False, "error": "Hostel not found"}), 404
@@ -2498,7 +2607,7 @@ class HostelDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        hostel = Hostel.query.get(hostel_id)
+        hostel = scoped_get(Hostel, hostel_id)
 
         if not hostel:
             return jsonify({"success": False, "error": "Hostel not found"}), 404
@@ -2509,7 +2618,7 @@ class HostelDetailAPI(MethodView):
             hostel_name = _clean_str(data.get("hostel_name"))
 
             if hostel_name:
-                duplicate = Hostel.query.filter(
+                duplicate = Hostel.query.filter(Hostel.school_id == current_school_id(), 
                     func.lower(Hostel.hostel_name) == hostel_name.lower(),
                     Hostel.id != hostel.id,
                 ).first()
@@ -2580,7 +2689,7 @@ class HostelDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        hostel = Hostel.query.get(hostel_id)
+        hostel = scoped_get(Hostel, hostel_id)
 
         if not hostel:
             return jsonify({"success": False, "error": "Hostel not found"}), 404
@@ -2633,7 +2742,7 @@ class HostelBlockListAPI(MethodView):
         try:
             hostel_id = _parse_int(request.args.get("hostel_id"))
 
-            query = HostelBlock.query
+            query = HostelBlock.query.filter(HostelBlock.school_id == current_school_id())
 
             if hostel_id:
                 query = query.filter(HostelBlock.hostel_id == hostel_id)
@@ -2685,12 +2794,12 @@ class HostelBlockListAPI(MethodView):
                     400,
                 )
 
-            hostel = Hostel.query.get(hostel_id)
+            hostel = scoped_get(Hostel, hostel_id)
 
             if not hostel:
                 return jsonify({"success": False, "error": "Hostel not found"}), 404
 
-            if HostelBlock.query.filter(
+            if HostelBlock.query.filter(HostelBlock.school_id == current_school_id(), 
                 HostelBlock.hostel_id == hostel_id,
                 func.lower(HostelBlock.block_name) == block_name.lower(),
             ).first():
@@ -2705,6 +2814,7 @@ class HostelBlockListAPI(MethodView):
                 )
 
             block = HostelBlock(
+                school_id=current_school_id(),
                 hostel_id=hostel_id,
                 block_name=block_name,
                 description=_clean_str(data.get("description")) or None,
@@ -2746,7 +2856,7 @@ class HostelBlockDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        block = HostelBlock.query.get(block_id)
+        block = scoped_get(HostelBlock, block_id)
 
         if not block:
             return jsonify({"success": False, "error": "Block not found"}), 404
@@ -2760,7 +2870,7 @@ class HostelBlockDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        block = HostelBlock.query.get(block_id)
+        block = scoped_get(HostelBlock, block_id)
 
         if not block:
             return jsonify({"success": False, "error": "Block not found"}), 404
@@ -2771,7 +2881,7 @@ class HostelBlockDetailAPI(MethodView):
             block_name = _clean_str(data.get("block_name"))
 
             if block_name:
-                duplicate = HostelBlock.query.filter(
+                duplicate = HostelBlock.query.filter(HostelBlock.school_id == current_school_id(), 
                     HostelBlock.hostel_id == block.hostel_id,
                     func.lower(HostelBlock.block_name) == block_name.lower(),
                     HostelBlock.id != block.id,
@@ -2832,7 +2942,7 @@ class HostelBlockDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        block = HostelBlock.query.get(block_id)
+        block = scoped_get(HostelBlock, block_id)
 
         if not block:
             return jsonify({"success": False, "error": "Block not found"}), 404
@@ -2886,7 +2996,7 @@ class HostelFloorListAPI(MethodView):
             block_id = _parse_int(request.args.get("block_id"))
             hostel_id = _parse_int(request.args.get("hostel_id"))
 
-            query = HostelFloor.query
+            query = HostelFloor.query.filter(HostelFloor.school_id == current_school_id())
 
             if block_id:
                 query = query.filter(HostelFloor.block_id == block_id)
@@ -2942,12 +3052,12 @@ class HostelFloorListAPI(MethodView):
                     400,
                 )
 
-            block = HostelBlock.query.get(block_id)
+            block = scoped_get(HostelBlock, block_id)
 
             if not block:
                 return jsonify({"success": False, "error": "Block not found"}), 404
 
-            if HostelFloor.query.filter(
+            if HostelFloor.query.filter(HostelFloor.school_id == current_school_id(), 
                 HostelFloor.block_id == block_id,
                 HostelFloor.floor_number == floor_number,
             ).first():
@@ -2964,6 +3074,7 @@ class HostelFloorListAPI(MethodView):
                 )
 
             floor = HostelFloor(
+                school_id=current_school_id(),
                 block_id=block_id,
                 floor_number=floor_number,
                 floor_name=_clean_str(data.get("floor_name")) or None,
@@ -3005,7 +3116,7 @@ class HostelFloorDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        floor = HostelFloor.query.get(floor_id)
+        floor = scoped_get(HostelFloor, floor_id)
 
         if not floor:
             return jsonify({"success": False, "error": "Floor not found"}), 404
@@ -3019,7 +3130,7 @@ class HostelFloorDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        floor = HostelFloor.query.get(floor_id)
+        floor = scoped_get(HostelFloor, floor_id)
 
         if not floor:
             return jsonify({"success": False, "error": "Floor not found"}), 404
@@ -3036,7 +3147,7 @@ class HostelFloorDetailAPI(MethodView):
                         400,
                     )
 
-                duplicate = HostelFloor.query.filter(
+                duplicate = HostelFloor.query.filter(HostelFloor.school_id == current_school_id(), 
                     HostelFloor.block_id == floor.block_id,
                     HostelFloor.floor_number == floor_number,
                     HostelFloor.id != floor.id,
@@ -3099,7 +3210,7 @@ class HostelFloorDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        floor = HostelFloor.query.get(floor_id)
+        floor = scoped_get(HostelFloor, floor_id)
 
         if not floor:
             return jsonify({"success": False, "error": "Floor not found"}), 404
@@ -3161,7 +3272,7 @@ class HostelRoomListAPI(MethodView):
                 joinedload(Room.floor)
                 .joinedload(HostelFloor.block)
                 .joinedload(HostelBlock.hostel)
-            )
+            ).filter(Room.school_id == current_school_id())
 
             if floor_id:
                 query = query.filter(Room.floor_id == floor_id)
@@ -3231,7 +3342,7 @@ class HostelRoomListAPI(MethodView):
                     400,
                 )
 
-            floor = HostelFloor.query.get(floor_id)
+            floor = scoped_get(HostelFloor, floor_id)
 
             if not floor:
                 return jsonify({"success": False, "error": "Floor not found"}), 404
@@ -3239,7 +3350,7 @@ class HostelRoomListAPI(MethodView):
             if room_type not in {"Single", "Double", "Triple", "Dorm"}:
                 return jsonify({"success": False, "error": "Invalid room_type"}), 400
 
-            if Room.query.filter(
+            if Room.query.filter(Room.school_id == current_school_id(), 
                 Room.floor_id == floor_id,
                 func.lower(Room.room_number) == room_number.lower(),
             ).first():
@@ -3256,6 +3367,7 @@ class HostelRoomListAPI(MethodView):
             monthly_rent = _parse_decimal(data.get("monthly_rent"))
 
             room = Room(
+                school_id=current_school_id(),
                 floor_id=floor_id,
                 room_number=room_number,
                 room_type=room_type,
@@ -3275,6 +3387,7 @@ class HostelRoomListAPI(MethodView):
             for index in range(initial_bed_count):
                 db.session.add(
                     Bed(
+                        school_id=current_school_id(),
                         room_id=room.id,
                         bed_number=bed_labels[index],
                         status="Vacant",
@@ -3315,7 +3428,7 @@ class HostelRoomDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        room = Room.query.get(room_id)
+        room = scoped_get(Room, room_id)
 
         if not room:
             return jsonify({"success": False, "error": "Room not found"}), 404
@@ -3332,7 +3445,7 @@ class HostelRoomDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        room = Room.query.get(room_id)
+        room = scoped_get(Room, room_id)
 
         if not room:
             return jsonify({"success": False, "error": "Room not found"}), 404
@@ -3343,7 +3456,7 @@ class HostelRoomDetailAPI(MethodView):
             room_number = _clean_str(data.get("room_number"))
 
             if room_number:
-                duplicate = Room.query.filter(
+                duplicate = Room.query.filter(Room.school_id == current_school_id(), 
                     Room.floor_id == room.floor_id,
                     func.lower(Room.room_number) == room_number.lower(),
                     Room.id != room.id,
@@ -3392,7 +3505,7 @@ class HostelRoomDetailAPI(MethodView):
             if data.get("floor_id") is not None:
                 new_floor_id = _parse_int(data.get("floor_id"))
                 new_floor = (
-                    HostelFloor.query.get(new_floor_id) if new_floor_id else None
+                    scoped_get(HostelFloor, new_floor_id) if new_floor_id else None
                 )
 
                 if not new_floor:
@@ -3431,7 +3544,7 @@ class HostelRoomDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        room = Room.query.get(room_id)
+        room = scoped_get(Room, room_id)
 
         if not room:
             return jsonify({"success": False, "error": "Room not found"}), 404
@@ -3487,7 +3600,7 @@ class HostelBedListAPI(MethodView):
             block_id = _parse_int(request.args.get("block_id"))
             status = _clean_str(request.args.get("status"))
 
-            query = Bed.query
+            query = Bed.query.filter(Bed.school_id == current_school_id())
 
             if room_id:
                 query = query.filter(Bed.room_id == room_id)
@@ -3547,12 +3660,12 @@ class HostelBedListAPI(MethodView):
                     400,
                 )
 
-            room = Room.query.get(room_id)
+            room = scoped_get(Room, room_id)
 
             if not room:
                 return jsonify({"success": False, "error": "Room not found"}), 404
 
-            if Bed.query.filter(
+            if Bed.query.filter(Bed.school_id == current_school_id(), 
                 Bed.room_id == room_id,
                 func.lower(Bed.bed_number) == bed_number.lower(),
             ).first():
@@ -3572,6 +3685,7 @@ class HostelBedListAPI(MethodView):
                 return jsonify({"success": False, "error": "Invalid bed_type"}), 400
 
             bed = Bed(
+                school_id=current_school_id(),
                 room_id=room_id,
                 bed_number=bed_number,
                 bed_type=bed_type,
@@ -3613,7 +3727,7 @@ class HostelBedDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        bed = Bed.query.get(bed_id)
+        bed = scoped_get(Bed, bed_id)
 
         if not bed:
             return jsonify({"success": False, "error": "Bed not found"}), 404
@@ -3627,7 +3741,7 @@ class HostelBedDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        bed = Bed.query.get(bed_id)
+        bed = scoped_get(Bed, bed_id)
 
         if not bed:
             return jsonify({"success": False, "error": "Bed not found"}), 404
@@ -3638,7 +3752,7 @@ class HostelBedDetailAPI(MethodView):
             bed_number = _clean_str(data.get("bed_number"))
 
             if bed_number:
-                duplicate = Bed.query.filter(
+                duplicate = Bed.query.filter(Bed.school_id == current_school_id(), 
                     Bed.room_id == bed.room_id,
                     func.lower(Bed.bed_number) == bed_number.lower(),
                     Bed.id != bed.id,
@@ -3734,7 +3848,7 @@ class HostelBedDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        bed = Bed.query.get(bed_id)
+        bed = scoped_get(Bed, bed_id)
 
         if not bed:
             return jsonify({"success": False, "error": "Bed not found"}), 404
@@ -3781,7 +3895,7 @@ class HostelBedAllocateAPI(MethodView):
         if access_error:
             return access_error
 
-        bed = Bed.query.get(bed_id)
+        bed = scoped_get(Bed, bed_id)
 
         if not bed:
             return jsonify({"success": False, "error": "Bed not found"}), 404
@@ -3797,7 +3911,7 @@ class HostelBedAllocateAPI(MethodView):
                     400,
                 )
 
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
@@ -3813,7 +3927,7 @@ class HostelBedAllocateAPI(MethodView):
                     409,
                 )
 
-            existing_allocation = HostelAllocation.query.filter_by(
+            existing_allocation = HostelAllocation.query.filter_by(school_id=current_school_id(), 
                 student_id=student_id, is_active=True
             ).first()
 
@@ -3834,6 +3948,7 @@ class HostelBedAllocateAPI(MethodView):
             check_in_date = _parse_date(data.get("check_in_date")) or date.today()
 
             allocation = HostelAllocation(
+                school_id=current_school_id(),
                 student_id=student_id,
                 bed_id=bed.id,
                 check_in_date=check_in_date,
@@ -3886,7 +4001,7 @@ class HostelBedVacateAPI(MethodView):
         if access_error:
             return access_error
 
-        bed = Bed.query.get(bed_id)
+        bed = scoped_get(Bed, bed_id)
 
         if not bed:
             return jsonify({"success": False, "error": "Bed not found"}), 404
@@ -3894,7 +4009,7 @@ class HostelBedVacateAPI(MethodView):
         try:
             data = request.get_json(silent=True) or {}
 
-            allocation = HostelAllocation.query.filter_by(
+            allocation = HostelAllocation.query.filter_by(school_id=current_school_id(), 
                 bed_id=bed.id, is_active=True
             ).first()
 
@@ -3962,7 +4077,7 @@ class HostelStructureOverviewAPI(MethodView):
         try:
             hostel_id = _parse_int(request.args.get("hostel_id"))
 
-            hostels_query = Hostel.query
+            hostels_query = Hostel.query.filter(Hostel.school_id == current_school_id())
 
             if hostel_id:
                 hostels_query = hostels_query.filter(Hostel.id == hostel_id)
@@ -4069,7 +4184,7 @@ class HostelUnallocatedStudentsAPI(MethodView):
 
             allocated_student_ids = {
                 row.student_id
-                for row in HostelAllocation.query.filter_by(is_active=True).all()
+                for row in HostelAllocation.query.filter_by(school_id=current_school_id(), is_active=True).all()
             }
 
             query = Student.query
@@ -4153,7 +4268,7 @@ class HostelStudentSearchAPI(MethodView):
 
             active_allocations = {
                 row.student_id: row
-                for row in HostelAllocation.query.filter(
+                for row in HostelAllocation.query.filter(HostelAllocation.school_id == current_school_id(), 
                     HostelAllocation.student_id.in_([s.id for s in students]),
                     HostelAllocation.is_active == True,
                 ).all()
@@ -4205,7 +4320,7 @@ def serialize_allocation(allocation):
     block = floor.block if floor else None
     hostel = block.hostel if block else None
 
-    fee = HostelFee.query.filter_by(student_id=allocation.student_id).first()
+    fee = HostelFee.query.filter_by(school_id=current_school_id(), student_id=allocation.student_id).first()
     academic = get_student_academic_details(student) if student else None
 
     return {
@@ -4270,7 +4385,7 @@ class HostelAllocationListAPI(MethodView):
             status = _clean_str(request.args.get("status")) or "active"
 
             query = (
-                HostelAllocation.query.join(Bed, HostelAllocation.bed_id == Bed.id)
+                HostelAllocation.query.filter(HostelAllocation.school_id == current_school_id()).join(Bed, HostelAllocation.bed_id == Bed.id)
                 .join(Room, Bed.room_id == Room.id)
                 .join(HostelFloor, Room.floor_id == HostelFloor.id)
                 .join(HostelBlock, HostelFloor.block_id == HostelBlock.id)
@@ -4338,7 +4453,7 @@ class HostelAllocationCheckoutAPI(MethodView):
         if access_error:
             return access_error
 
-        allocation = HostelAllocation.query.get(allocation_id)
+        allocation = scoped_get(HostelAllocation, allocation_id)
 
         if not allocation:
             return jsonify({"success": False, "error": "Allocation not found"}), 404
@@ -4412,7 +4527,7 @@ class HostelAllocationTransferAPI(MethodView):
         if access_error:
             return access_error
 
-        allocation = HostelAllocation.query.get(allocation_id)
+        allocation = scoped_get(HostelAllocation, allocation_id)
 
         if not allocation:
             return jsonify({"success": False, "error": "Allocation not found"}), 404
@@ -4439,7 +4554,7 @@ class HostelAllocationTransferAPI(MethodView):
                     400,
                 )
 
-            new_bed = Bed.query.get(new_bed_id)
+            new_bed = scoped_get(Bed, new_bed_id)
 
             if not new_bed:
                 return jsonify({"success": False, "error": "Target bed not found"}), 404
@@ -4465,6 +4580,7 @@ class HostelAllocationTransferAPI(MethodView):
                 old_bed.status = "Vacant"
 
             new_allocation = HostelAllocation(
+                school_id=current_school_id(),
                 student_id=allocation.student_id,
                 bed_id=new_bed.id,
                 check_in_date=date.today(),
@@ -4542,7 +4658,7 @@ class HostelStaffListAPI(MethodView):
             block_id = _parse_int(request.args.get("block_id"))
             status = _clean_str(request.args.get("status"))
 
-            query = HostelStaff.query
+            query = HostelStaff.query.filter(HostelStaff.school_id == current_school_id())
 
             if role:
                 query = query.filter(HostelStaff.role == role)
@@ -4628,10 +4744,11 @@ class HostelStaffListAPI(MethodView):
 
             block_id = _parse_int(data.get("block_id"))
 
-            if block_id and not HostelBlock.query.get(block_id):
+            if block_id and not scoped_get(HostelBlock, block_id):
                 return jsonify({"success": False, "error": "Block not found"}), 404
 
             staff = HostelStaff(
+                school_id=current_school_id(),
                 staff_code="PENDING",
                 first_name=first_name,
                 middle_name=_clean_str(data.get("middle_name")) or None,
@@ -4691,7 +4808,7 @@ class HostelStaffDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        staff = HostelStaff.query.get(staff_id)
+        staff = scoped_get(HostelStaff, staff_id)
 
         if not staff:
             return jsonify({"success": False, "error": "Staff member not found"}), 404
@@ -4705,7 +4822,7 @@ class HostelStaffDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        staff = HostelStaff.query.get(staff_id)
+        staff = scoped_get(HostelStaff, staff_id)
 
         if not staff:
             return jsonify({"success": False, "error": "Staff member not found"}), 404
@@ -4756,7 +4873,7 @@ class HostelStaffDetailAPI(MethodView):
             if "block_id" in data:
                 block_id = _parse_int(data.get("block_id"))
 
-                if block_id and not HostelBlock.query.get(block_id):
+                if block_id and not scoped_get(HostelBlock, block_id):
                     return jsonify({"success": False, "error": "Block not found"}), 404
 
                 staff.block_id = block_id
@@ -4806,7 +4923,7 @@ class HostelStaffDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        staff = HostelStaff.query.get(staff_id)
+        staff = scoped_get(HostelStaff, staff_id)
 
         if not staff:
             return jsonify({"success": False, "error": "Staff member not found"}), 404
@@ -4847,7 +4964,7 @@ class HostelStaffDetailAPI(MethodView):
 def serialize_visitor(visitor):
     student = Student.query.get(visitor.student_id)
 
-    allocation = HostelAllocation.query.filter_by(
+    allocation = HostelAllocation.query.filter_by(school_id=current_school_id(), 
         student_id=visitor.student_id, is_active=True
     ).first()
 
@@ -4904,7 +5021,7 @@ class HostelVisitorListAPI(MethodView):
             status = _clean_str(request.args.get("status"))
             block_id = _parse_int(request.args.get("block_id"))
 
-            query = HostelVisitor.query
+            query = HostelVisitor.query.filter(HostelVisitor.school_id == current_school_id())
 
             if relation:
                 query = query.filter(HostelVisitor.relation == relation)
@@ -4918,7 +5035,7 @@ class HostelVisitorListAPI(MethodView):
 
             if block_id:
                 rows = [row for row in rows if row.get("block_name")]
-                block = HostelBlock.query.get(block_id)
+                block = scoped_get(HostelBlock, block_id)
                 if block:
                     rows = [
                         row for row in rows if row["block_name"] == block.block_name
@@ -4991,7 +5108,7 @@ class HostelVisitorListAPI(MethodView):
                     400,
                 )
 
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
@@ -5002,6 +5119,7 @@ class HostelVisitorListAPI(MethodView):
                 return jsonify({"success": False, "error": "Invalid relation"}), 400
 
             visitor = HostelVisitor(
+                school_id=current_school_id(),
                 visitor_code="PENDING",
                 visitor_name=visitor_name,
                 visitor_mobile=_clean_str(data.get("visitor_mobile")) or None,
@@ -5050,7 +5168,7 @@ class HostelVisitorDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        visitor = HostelVisitor.query.get(visitor_id)
+        visitor = scoped_get(HostelVisitor, visitor_id)
 
         if not visitor:
             return jsonify({"success": False, "error": "Visitor not found"}), 404
@@ -5064,7 +5182,7 @@ class HostelVisitorDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        visitor = HostelVisitor.query.get(visitor_id)
+        visitor = scoped_get(HostelVisitor, visitor_id)
 
         if not visitor:
             return jsonify({"success": False, "error": "Visitor not found"}), 404
@@ -5102,7 +5220,7 @@ class HostelVisitorApproveAPI(MethodView):
         if access_error:
             return access_error
 
-        visitor = HostelVisitor.query.get(visitor_id)
+        visitor = scoped_get(HostelVisitor, visitor_id)
 
         if not visitor:
             return jsonify({"success": False, "error": "Visitor not found"}), 404
@@ -5163,7 +5281,7 @@ class HostelVisitorRejectAPI(MethodView):
         if access_error:
             return access_error
 
-        visitor = HostelVisitor.query.get(visitor_id)
+        visitor = scoped_get(HostelVisitor, visitor_id)
 
         if not visitor:
             return jsonify({"success": False, "error": "Visitor not found"}), 404
@@ -5223,7 +5341,7 @@ class HostelVisitorCheckoutAPI(MethodView):
         if access_error:
             return access_error
 
-        visitor = HostelVisitor.query.get(visitor_id)
+        visitor = scoped_get(HostelVisitor, visitor_id)
 
         if not visitor:
             return jsonify({"success": False, "error": "Visitor not found"}), 404
@@ -5315,7 +5433,7 @@ class HostelAttendanceListAPI(MethodView):
             block_id = _parse_int(request.args.get("block_id"))
             status_filter = _clean_str(request.args.get("status"))
 
-            allocation_query = HostelAllocation.query.filter_by(is_active=True)
+            allocation_query = HostelAllocation.query.filter_by(school_id=current_school_id(), is_active=True)
 
             if block_id:
                 allocation_query = (
@@ -5338,7 +5456,7 @@ class HostelAttendanceListAPI(MethodView):
             existing_records = (
                 {
                     record.student_id: record
-                    for record in HostelAttendance.query.filter(
+                    for record in HostelAttendance.query.filter(HostelAttendance.school_id == current_school_id(), 
                         HostelAttendance.attendance_date == attendance_date,
                         HostelAttendance.student_id.in_(resident_student_ids),
                     ).all()
@@ -5424,17 +5542,18 @@ class HostelAttendanceMarkAPI(MethodView):
             if status not in {"Present", "Absent", "On Leave", "Late Entry"}:
                 return jsonify({"success": False, "error": "Invalid status"}), 400
 
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
 
-            record = HostelAttendance.query.filter_by(
+            record = HostelAttendance.query.filter_by(school_id=current_school_id(), 
                 student_id=student_id, attendance_date=attendance_date
             ).first()
 
             if not record:
                 record = HostelAttendance(
+                    school_id=current_school_id(),
                     student_id=student_id, attendance_date=attendance_date
                 )
                 db.session.add(record)
@@ -5531,7 +5650,7 @@ class HostelMovementListAPI(MethodView):
             status_filter = _clean_str(request.args.get("status"))
             movement_date = _parse_date(request.args.get("date"))
 
-            query = HostelMovement.query
+            query = HostelMovement.query.filter(HostelMovement.school_id == current_school_id())
 
             if movement_date:
                 query = query.filter(
@@ -5559,7 +5678,7 @@ class HostelMovementListAPI(MethodView):
                 rows = [row for row in rows if row["status"] == status_filter]
 
             stats = {
-                "inside": HostelAllocation.query.filter_by(is_active=True).count()
+                "inside": HostelAllocation.query.filter_by(school_id=current_school_id(), is_active=True).count()
                 - sum(1 for r in rows if r["status"] == "Outside Hostel"),
                 "checked_out": sum(1 for r in rows if r["status"] == "Outside Hostel"),
                 "late_entries": sum(1 for r in rows if r["status"] == "Late Entry"),
@@ -5599,12 +5718,12 @@ class HostelMovementListAPI(MethodView):
                     400,
                 )
 
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
 
-            existing_open = HostelMovement.query.filter(
+            existing_open = HostelMovement.query.filter(HostelMovement.school_id == current_school_id(), 
                 HostelMovement.student_id == student_id,
                 HostelMovement.check_in_time.is_(None),
             ).first()
@@ -5630,6 +5749,7 @@ class HostelMovementListAPI(MethodView):
                     expected_return_time = None
 
             movement = HostelMovement(
+                school_id=current_school_id(),
                 student_id=student_id,
                 check_out_time=datetime.utcnow(),
                 expected_return_time=expected_return_time,
@@ -5672,7 +5792,7 @@ class HostelMovementCheckInAPI(MethodView):
         if access_error:
             return access_error
 
-        movement = HostelMovement.query.get(movement_id)
+        movement = scoped_get(HostelMovement, movement_id)
 
         if not movement:
             return (
@@ -5762,7 +5882,7 @@ class HostelLeaveRequestListAPI(MethodView):
             search = _clean_str(request.args.get("search"))
             status_filter = _clean_str(request.args.get("status"))
 
-            query = HostelLeaveRequest.query
+            query = HostelLeaveRequest.query.filter(HostelLeaveRequest.school_id == current_school_id())
 
             if status_filter:
                 query = query.filter(HostelLeaveRequest.status == status_filter)
@@ -5849,12 +5969,13 @@ class HostelLeaveRequestListAPI(MethodView):
             }:
                 return jsonify({"success": False, "error": "Invalid leave_type"}), 400
 
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
 
             leave = HostelLeaveRequest(
+                school_id=current_school_id(),
                 student_id=student_id,
                 leave_type=leave_type,
                 from_date=from_date,
@@ -5898,7 +6019,7 @@ class HostelLeaveRequestDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        leave = HostelLeaveRequest.query.get(leave_id)
+        leave = scoped_get(HostelLeaveRequest, leave_id)
 
         if not leave:
             return jsonify({"success": False, "error": "Leave request not found"}), 404
@@ -5930,7 +6051,7 @@ class HostelLeaveRequestApproveAPI(MethodView):
         if access_error:
             return access_error
 
-        leave = HostelLeaveRequest.query.get(leave_id)
+        leave = scoped_get(HostelLeaveRequest, leave_id)
 
         if not leave:
             return jsonify({"success": False, "error": "Leave request not found"}), 404
@@ -5992,7 +6113,7 @@ class HostelLeaveRequestRejectAPI(MethodView):
         if access_error:
             return access_error
 
-        leave = HostelLeaveRequest.query.get(leave_id)
+        leave = scoped_get(HostelLeaveRequest, leave_id)
 
         if not leave:
             return jsonify({"success": False, "error": "Leave request not found"}), 404
@@ -6055,7 +6176,7 @@ class HostelLeaveRequestReturnAPI(MethodView):
         if access_error:
             return access_error
 
-        leave = HostelLeaveRequest.query.get(leave_id)
+        leave = scoped_get(HostelLeaveRequest, leave_id)
 
         if not leave:
             return jsonify({"success": False, "error": "Leave request not found"}), 404
@@ -6151,7 +6272,7 @@ class HostelMessMenuListAPI(MethodView):
         try:
             entries = {
                 (entry.day_of_week, entry.meal_type): entry
-                for entry in HostelMessMenu.query.all()
+                for entry in HostelMessMenu.query.filter(HostelMessMenu.school_id == current_school_id()).all()
             }
 
             grid = []
@@ -6227,12 +6348,12 @@ class HostelMessMenuListAPI(MethodView):
             if meal_type not in MEAL_ORDER:
                 return jsonify({"success": False, "error": "Invalid meal_type"}), 400
 
-            entry = HostelMessMenu.query.filter_by(
+            entry = HostelMessMenu.query.filter_by(school_id=current_school_id(), 
                 day_of_week=day_of_week, meal_type=meal_type
             ).first()
 
             if not entry:
-                entry = HostelMessMenu(day_of_week=day_of_week, meal_type=meal_type)
+                entry = HostelMessMenu(school_id=current_school_id(), day_of_week=day_of_week, meal_type=meal_type)
                 db.session.add(entry)
 
             entry.items = _clean_str(data.get("items")) or None
@@ -6272,7 +6393,7 @@ class HostelMessMenuDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        entry = HostelMessMenu.query.get(entry_id)
+        entry = scoped_get(HostelMessMenu, entry_id)
 
         if not entry:
             return jsonify({"success": False, "error": "Menu entry not found"}), 404
@@ -6340,7 +6461,7 @@ class HostelMealAttendanceListAPI(MethodView):
             if meal_type not in MEAL_ORDER:
                 meal_type = "Breakfast"
 
-            allocation_query = HostelAllocation.query.filter_by(is_active=True)
+            allocation_query = HostelAllocation.query.filter_by(school_id=current_school_id(), is_active=True)
 
             if block_id:
                 allocation_query = (
@@ -6363,7 +6484,7 @@ class HostelMealAttendanceListAPI(MethodView):
             existing_records = (
                 {
                     record.student_id: record
-                    for record in HostelMealAttendance.query.filter(
+                    for record in HostelMealAttendance.query.filter(HostelMealAttendance.school_id == current_school_id(), 
                         HostelMealAttendance.meal_date == meal_date,
                         HostelMealAttendance.meal_type == meal_type,
                         HostelMealAttendance.student_id.in_(resident_student_ids),
@@ -6453,17 +6574,18 @@ class HostelMealAttendanceMarkAPI(MethodView):
             if status not in {"Present", "Absent"}:
                 return jsonify({"success": False, "error": "Invalid status"}), 400
 
-            student = Student.query.get(student_id)
+            student = scoped_get(Student, student_id)
 
             if not student:
                 return jsonify({"success": False, "error": "Student not found"}), 404
 
-            record = HostelMealAttendance.query.filter_by(
+            record = HostelMealAttendance.query.filter_by(school_id=current_school_id(), 
                 student_id=student_id, meal_date=meal_date, meal_type=meal_type
             ).first()
 
             if not record:
                 record = HostelMealAttendance(
+                    school_id=current_school_id(),
                     student_id=student_id, meal_date=meal_date, meal_type=meal_type
                 )
                 db.session.add(record)
@@ -6518,12 +6640,12 @@ class HostelMealAttendanceBulkMarkAPI(MethodView):
 
             resident_student_ids = [
                 row.student_id
-                for row in HostelAllocation.query.filter_by(is_active=True).all()
+                for row in HostelAllocation.query.filter_by(school_id=current_school_id(), is_active=True).all()
             ]
 
             already_marked_ids = {
                 record.student_id
-                for record in HostelMealAttendance.query.filter(
+                for record in HostelMealAttendance.query.filter(HostelMealAttendance.school_id == current_school_id(), 
                     HostelMealAttendance.meal_date == meal_date,
                     HostelMealAttendance.meal_type == meal_type,
                     HostelMealAttendance.student_id.in_(resident_student_ids),
@@ -6538,6 +6660,7 @@ class HostelMealAttendanceBulkMarkAPI(MethodView):
 
                 db.session.add(
                     HostelMealAttendance(
+                        school_id=current_school_id(),
                         student_id=student_id,
                         meal_date=meal_date,
                         meal_type=meal_type,
@@ -6575,7 +6698,7 @@ class HostelMealAttendanceBulkMarkAPI(MethodView):
 # ============================= COMPLAINTS (ADMIN) =============================
 def serialize_complaint(complaint):
     student = Student.query.get(complaint.student_id) if complaint.student_id else None
-    room = Room.query.get(complaint.room_id) if complaint.room_id else None
+    room = scoped_get(Room, complaint.room_id) if complaint.room_id else None
     floor = room.floor if room else None
     block = floor.block if floor else None
 
@@ -6626,7 +6749,7 @@ class HostelComplaintListAPI(MethodView):
             category = _clean_str(request.args.get("category"))
             priority = _clean_str(request.args.get("priority"))
 
-            query = HostelComplaint.query
+            query = HostelComplaint.query.filter(HostelComplaint.school_id == current_school_id())
 
             if status:
                 query = query.filter(HostelComplaint.status == status)
@@ -6687,7 +6810,7 @@ class HostelComplaintUpdateAPI(MethodView):
         if access_error:
             return access_error
 
-        complaint = HostelComplaint.query.get(complaint_id)
+        complaint = scoped_get(HostelComplaint, complaint_id)
 
         if not complaint:
             return jsonify({"success": False, "error": "Complaint not found"}), 404
@@ -6777,7 +6900,7 @@ class HostelComplaintUpdateAPI(MethodView):
         if access_error:
             return access_error
 
-        complaint = HostelComplaint.query.get(complaint_id)
+        complaint = scoped_get(HostelComplaint, complaint_id)
 
         if not complaint:
             return jsonify({"success": False, "error": "Complaint not found"}), 404
@@ -6850,7 +6973,7 @@ class HostelMaintenanceListAPI(MethodView):
             category = _clean_str(request.args.get("category"))
             priority = _clean_str(request.args.get("priority"))
 
-            query = HostelMaintenanceRequest.query
+            query = HostelMaintenanceRequest.query.filter(HostelMaintenanceRequest.school_id == current_school_id())
 
             if status:
                 query = query.filter(HostelMaintenanceRequest.status == status)
@@ -6919,10 +7042,10 @@ class HostelMaintenanceListAPI(MethodView):
             room_id = _parse_int(data.get("room_id"))
             block_id = _parse_int(data.get("block_id"))
 
-            if room_id and not Room.query.get(room_id):
+            if room_id and not scoped_get(Room, room_id):
                 return jsonify({"success": False, "error": "Room not found"}), 404
 
-            if block_id and not HostelBlock.query.get(block_id):
+            if block_id and not scoped_get(HostelBlock, block_id):
                 return jsonify({"success": False, "error": "Block not found"}), 404
 
             category = _clean_str(data.get("category")) or "Other"
@@ -6944,13 +7067,14 @@ class HostelMaintenanceListAPI(MethodView):
 
             assigned_staff_id = _parse_int(data.get("assigned_staff_id"))
 
-            if assigned_staff_id and not HostelStaff.query.get(assigned_staff_id):
+            if assigned_staff_id and not scoped_get(HostelStaff, assigned_staff_id):
                 return (
                     jsonify({"success": False, "error": "Staff member not found"}),
                     404,
                 )
 
             maintenance_request = HostelMaintenanceRequest(
+                school_id=current_school_id(),
                 title=title,
                 description=_clean_str(data.get("description")) or None,
                 room_id=room_id,
@@ -7003,7 +7127,7 @@ class HostelMaintenanceDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        maintenance_request = HostelMaintenanceRequest.query.get(request_id)
+        maintenance_request = scoped_get(HostelMaintenanceRequest, request_id)
 
         if not maintenance_request:
             return (
@@ -7053,7 +7177,7 @@ class HostelMaintenanceDetailAPI(MethodView):
             if "assigned_staff_id" in data:
                 assigned_staff_id = _parse_int(data.get("assigned_staff_id"))
 
-                if assigned_staff_id and not HostelStaff.query.get(assigned_staff_id):
+                if assigned_staff_id and not scoped_get(HostelStaff, assigned_staff_id):
                     return (
                         jsonify({"success": False, "error": "Staff member not found"}),
                         404,
@@ -7120,7 +7244,7 @@ class HostelMaintenanceDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        maintenance_request = HostelMaintenanceRequest.query.get(request_id)
+        maintenance_request = scoped_get(HostelMaintenanceRequest, request_id)
 
         if not maintenance_request:
             return (
@@ -7163,7 +7287,7 @@ class HostelFeeStructureListAPI(MethodView):
             status = _clean_str(request.args.get("status"))
             fee_type = _clean_str(request.args.get("fee_type"))
 
-            query = HostelFeeStructure.query
+            query = HostelFeeStructure.query.filter(HostelFeeStructure.school_id == current_school_id())
 
             if status:
                 query = query.filter(HostelFeeStructure.status == status)
@@ -7227,10 +7351,11 @@ class HostelFeeStructureListAPI(MethodView):
 
             hostel_id = _parse_int(data.get("hostel_id"))
 
-            if hostel_id and not Hostel.query.get(hostel_id):
+            if hostel_id and not scoped_get(Hostel, hostel_id):
                 return jsonify({"success": False, "error": "Hostel not found"}), 404
 
             structure = HostelFeeStructure(
+                school_id=current_school_id(),
                 fee_type=fee_type,
                 hostel_id=hostel_id,
                 amount=amount,
@@ -7274,7 +7399,7 @@ class HostelFeeStructureDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        structure = HostelFeeStructure.query.get(structure_id)
+        structure = scoped_get(HostelFeeStructure, structure_id)
 
         if not structure:
             return jsonify({"success": False, "error": "Fee structure not found"}), 404
@@ -7314,7 +7439,7 @@ class HostelFeeStructureDetailAPI(MethodView):
             if data.get("hostel_id") is not None:
                 hostel_id = _parse_int(data.get("hostel_id"))
 
-                if hostel_id and not Hostel.query.get(hostel_id):
+                if hostel_id and not scoped_get(Hostel, hostel_id):
                     return jsonify({"success": False, "error": "Hostel not found"}), 404
 
                 structure.hostel_id = hostel_id
@@ -7364,7 +7489,7 @@ class HostelFeeStructureDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        structure = HostelFeeStructure.query.get(structure_id)
+        structure = scoped_get(HostelFeeStructure, structure_id)
 
         if not structure:
             return jsonify({"success": False, "error": "Fee structure not found"}), 404
@@ -7401,7 +7526,7 @@ class HostelFeeGenerateAPI(MethodView):
 
             structure_id = _parse_int(data.get("fee_structure_id"))
             structure = (
-                HostelFeeStructure.query.get(structure_id) if structure_id else None
+                scoped_get(HostelFeeStructure, structure_id) if structure_id else None
             )
 
             if not structure:
@@ -7412,7 +7537,7 @@ class HostelFeeGenerateAPI(MethodView):
 
             due_date = _parse_date(data.get("due_date"))
 
-            allocation_query = HostelAllocation.query.filter_by(is_active=True)
+            allocation_query = HostelAllocation.query.filter_by(school_id=current_school_id(), is_active=True)
 
             if structure.hostel_id:
                 allocation_query = (
@@ -7427,7 +7552,7 @@ class HostelFeeGenerateAPI(MethodView):
 
             existing_student_ids = {
                 fee.student_id
-                for fee in HostelFee.query.filter(
+                for fee in HostelFee.query.filter(HostelFee.school_id == current_school_id(), 
                     HostelFee.fee_structure_id == structure.id,
                     HostelFee.student_id.in_(student_ids) if student_ids else False,
                 ).all()
@@ -7438,6 +7563,7 @@ class HostelFeeGenerateAPI(MethodView):
             for student_id in student_ids - existing_student_ids:
                 db.session.add(
                     HostelFee(
+                        school_id=current_school_id(),
                         student_id=student_id,
                         fee_structure_id=structure.id,
                         fee_type=structure.fee_type,
@@ -7492,10 +7618,9 @@ class HostelFeeListAPI(MethodView):
             status = _clean_str(request.args.get("status"))
             fee_type = _clean_str(request.args.get("fee_type"))
             # "dues_only=true" is what the Pending Dues section uses -
-            # anything with balance > 0.
             dues_only = _clean_str(request.args.get("dues_only")).lower() == "true"
 
-            query = HostelFee.query
+            query = HostelFee.query.filter(HostelFee.school_id == current_school_id())
 
             if fee_type:
                 query = query.filter(HostelFee.fee_type == fee_type)
@@ -7552,7 +7677,7 @@ class HostelFeeDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        fee = HostelFee.query.get(fee_id)
+        fee = scoped_get(HostelFee, fee_id)
 
         if not fee:
             return jsonify({"success": False, "error": "Fee invoice not found"}), 404
@@ -7574,7 +7699,7 @@ class HostelFeeDetailAPI(MethodView):
         if access_error:
             return access_error
 
-        fee = HostelFee.query.get(fee_id)
+        fee = scoped_get(HostelFee, fee_id)
 
         if not fee:
             return jsonify({"success": False, "error": "Fee invoice not found"}), 404
@@ -7613,8 +7738,7 @@ class HostelFeeDetailAPI(MethodView):
 
 # ============================= PAYMENTS =============================
 class HostelFeePaymentListAPI(MethodView):
-    """Payment transaction history, and recording a new payment
-    against a fee invoice."""
+    # Payment transaction history, and recording a new payment
 
     @login_required
     def get(self):
@@ -7627,7 +7751,7 @@ class HostelFeePaymentListAPI(MethodView):
             search = _clean_str(request.args.get("search"))
             payment_method = _clean_str(request.args.get("payment_method"))
 
-            query = HostelFeePayment.query
+            query = HostelFeePayment.query.filter(HostelFeePayment.school_id == current_school_id())
 
             if payment_method:
                 query = query.filter(HostelFeePayment.payment_method == payment_method)
@@ -7676,7 +7800,7 @@ class HostelFeePaymentListAPI(MethodView):
             data = request.get_json(silent=True) or {}
 
             fee_id = _parse_int(data.get("fee_id"))
-            fee = HostelFee.query.get(fee_id) if fee_id else None
+            fee = scoped_get(HostelFee, fee_id) if fee_id else None
 
             if not fee:
                 return (
@@ -7724,6 +7848,7 @@ class HostelFeePaymentListAPI(MethodView):
                 )
 
             payment = HostelFeePayment(
+                school_id=current_school_id(),
                 fee_id=fee.id,
                 amount=amount,
                 payment_method=payment_method,
@@ -7789,7 +7914,7 @@ class HostelActivityLogListAPI(MethodView):
             limit = _parse_int(request.args.get("limit"), 200) or 200
             limit = min(max(limit, 1), 500)
 
-            query = HostelActivityLog.query
+            query = HostelActivityLog.query.filter(HostelActivityLog.school_id == current_school_id())
 
             if category:
                 query = query.filter(HostelActivityLog.category == category)
@@ -7843,10 +7968,10 @@ class HostelReportsAPI(MethodView):
 
         try:
             # ---- Occupancy ----
-            total_beds = Bed.query.count()
-            occupied_beds = Bed.query.filter(Bed.status == "Occupied").count()
-            vacant_beds = Bed.query.filter(Bed.status == "Vacant").count()
-            maintenance_beds = Bed.query.filter(Bed.status == "Maintenance").count()
+            total_beds = Bed.query.filter(Bed.school_id == current_school_id()).count()
+            occupied_beds = Bed.query.filter(Bed.school_id == current_school_id(), Bed.status == "Occupied").count()
+            vacant_beds = Bed.query.filter(Bed.school_id == current_school_id(), Bed.status == "Vacant").count()
+            maintenance_beds = Bed.query.filter(Bed.school_id == current_school_id(), Bed.status == "Maintenance").count()
 
             occupancy_rate = (
                 round((occupied_beds / total_beds) * 100, 1) if total_beds else 0
@@ -7854,9 +7979,9 @@ class HostelReportsAPI(MethodView):
 
             block_occupancy = []
 
-            for block in HostelBlock.query.order_by(HostelBlock.block_name).all():
+            for block in HostelBlock.query.filter(HostelBlock.school_id == current_school_id()).order_by(HostelBlock.block_name).all():
                 block_beds = (
-                    Bed.query.join(Room, Bed.room_id == Room.id)
+                    Bed.query.filter(Bed.school_id == current_school_id()).join(Room, Bed.room_id == Room.id)
                     .join(HostelFloor, Room.floor_id == HostelFloor.id)
                     .filter(HostelFloor.block_id == block.id)
                 )
@@ -7874,7 +7999,7 @@ class HostelReportsAPI(MethodView):
                     )
 
             # ---- Fees ----
-            all_fees = HostelFee.query.all()
+            all_fees = HostelFee.query.filter(HostelFee.school_id == current_school_id()).all()
             fee_summaries = [get_fee_payment_summary(fee) for fee in all_fees]
 
             total_invoiced = round(sum(float(fee.amount or 0) for fee in all_fees), 2)
@@ -7887,8 +8012,8 @@ class HostelReportsAPI(MethodView):
             )
 
             # ---- Complaints & Maintenance ----
-            complaint_total = HostelComplaint.query.count()
-            complaint_resolved = HostelComplaint.query.filter(
+            complaint_total = HostelComplaint.query.filter(HostelComplaint.school_id == current_school_id()).count()
+            complaint_resolved = HostelComplaint.query.filter(HostelComplaint.school_id == current_school_id(), 
                 HostelComplaint.status == "Resolved"
             ).count()
             complaint_resolution_rate = (
@@ -7897,8 +8022,8 @@ class HostelReportsAPI(MethodView):
                 else 0
             )
 
-            maintenance_total = HostelMaintenanceRequest.query.count()
-            maintenance_resolved = HostelMaintenanceRequest.query.filter(
+            maintenance_total = HostelMaintenanceRequest.query.filter(HostelMaintenanceRequest.school_id == current_school_id()).count()
+            maintenance_resolved = HostelMaintenanceRequest.query.filter(HostelMaintenanceRequest.school_id == current_school_id(), 
                 HostelMaintenanceRequest.status == "Resolved"
             ).count()
 
@@ -7908,7 +8033,7 @@ class HostelReportsAPI(MethodView):
             for offset in range(6, -1, -1):
                 day = date.today() - timedelta(days=offset)
 
-                day_records = HostelAttendance.query.filter(
+                day_records = HostelAttendance.query.filter(HostelAttendance.school_id == current_school_id(), 
                     HostelAttendance.attendance_date == day
                 ).all()
 
@@ -7925,12 +8050,12 @@ class HostelReportsAPI(MethodView):
                 )
 
             # ---- Movement ----
-            outside_now = HostelMovement.query.filter(
+            outside_now = HostelMovement.query.filter(HostelMovement.school_id == current_school_id(), 
                 HostelMovement.check_in_time.is_(None)
             ).count()
 
             # ---- Students ----
-            active_residents = HostelAllocation.query.filter_by(is_active=True).count()
+            active_residents = HostelAllocation.query.filter_by(school_id=current_school_id(), is_active=True).count()
 
             return (
                 jsonify(

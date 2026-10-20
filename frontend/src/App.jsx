@@ -1,14 +1,14 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 
 import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+import DeveloperLogin from "./pages/developer-login";
+import DeveloperDashboard from "./pages/developer-dashboard";
 
 import StudentDashboard from "./pages/student-dashboard";
 import TeacherDashboard from "./pages/teacher-dashboard";
 
-/* =========================
-   ADMIN DASHBOARDS
-========================= */
+// ADMIN DASHBOARDS
 
 import SuperMainAdminDashboard from "./pages/super-admin-dashboard";
 import LibraryAdminDashboard from "./pages/library-Mgmt-dashboard";
@@ -18,7 +18,6 @@ import HRAdminDashboard from "./pages/hr-Mgmt-dashboard";
 import AcademicAdminDashboard from "./pages/academic-Mgmt-dashboard";
 
 // Adjust this relative path to wherever useDashboardAccess.js ends up
-// living in your project (it sits next to useLogin.js in this patch).
 import { useDashboardAccess } from "./controllers/Auth/useDashboardAccess";
 
 function AccessCheckLoader() {
@@ -29,9 +28,7 @@ function AccessCheckLoader() {
   );
 }
 
-/* =========================
-   PROTECTED ROUTE
-========================= */
+// PROTECTED ROUTE
 
 function ProtectedRoute({ children, allowedRole, dashboardKey }) {
   const token = localStorage.getItem("token");
@@ -53,7 +50,14 @@ function ProtectedRoute({ children, allowedRole, dashboardKey }) {
     return <Navigate to="/" replace />;
   }
 
-  if (allowedRole && userRole !== allowedRole) {
+  // The backend stores a Super Admin's role as "super_admin". Every
+  const ADMIN_ROLES = ["admin", "super_admin"];
+  const roleMatches =
+    allowedRole === "admin"
+      ? ADMIN_ROLES.includes(userRole)
+      : userRole === allowedRole;
+
+  if (allowedRole && !roleMatches) {
     return <Navigate to="/" replace />;
   }
 
@@ -75,17 +79,19 @@ function ProtectedRoute({ children, allowedRole, dashboardKey }) {
   return children;
 }
 
-/* =========================
-   APP
-========================= */
+// APP
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      {/* react-hot-toast was already a dependency but its <Toaster/> */}
+      <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
+      <Routes>
       {/* ================= PUBLIC ================= */}
 
       <Route path="/" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+      <Route path="/developer/login" element={<DeveloperLogin />} />
+      <Route path="/developer/dashboard" element={<DeveloperDashboard />} />
 
       {/* ================= STUDENT ================= */}
 
@@ -193,6 +199,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-    </Routes>
+      </Routes>
+    </>
   );
 }

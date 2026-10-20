@@ -7,20 +7,23 @@ from sqlalchemy import or_
 
 from utils.auth import db
 from utils.auth_middleware import login_required
+from utils.rolePermissionManagement import permission_required
 
 logger = logging.getLogger(__name__)
 
-# =========================================================
 # ASSET MODEL
-# =========================================================
 class Asset(db.Model):
 
     __tablename__ = "assets"
 
     id = db.Column(db.BigInteger, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
-    asset_id = db.Column(db.String(50), unique=True, nullable=False)
-    asset_code = db.Column(db.String(50), unique=True, nullable=False)
+    # Unique per school (see migration: uq_school_asset_id, uq_school_asset_code).
+    asset_id = db.Column(db.String(50), nullable=False)
+    asset_code = db.Column(db.String(50), nullable=False)
 
     asset_name = db.Column(db.String(150), nullable=False)
     asset_description = db.Column(db.Text)
@@ -30,7 +33,8 @@ class Asset(db.Model):
 
     brand = db.Column(db.String(100))
     model_number = db.Column(db.String(100))
-    serial_number = db.Column(db.String(150), unique=True)
+    # Unique per school (see migration: uq_school_serial_number).
+    serial_number = db.Column(db.String(150))
 
     barcode = db.Column(db.String(150))
     qr_code = db.Column(db.String(255))
@@ -77,9 +81,7 @@ class Asset(db.Model):
 
     remarks = db.Column(db.Text)
 
-    # =========================================================
     # CATEGORY SPECIFIC FIELDS
-    # =========================================================
 
     # VEHICLES
     vehicle_number = db.Column(db.String(100))
@@ -125,14 +127,15 @@ class Asset(db.Model):
     )
 
 
-# =========================================================
 # ASSET HISTORY MODEL
-# =========================================================
 class AssetHistory(db.Model):
 
     __tablename__ = "asset_history"
 
     id = db.Column(db.BigInteger, primary_key=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
     asset_id = db.Column(db.String(100))
     asset_code = db.Column(db.String(100))
     action = db.Column(db.String(50))
@@ -144,9 +147,7 @@ class AssetHistory(db.Model):
     snapshot = db.Column(db.JSON)
 
 
-# =========================================================
 # SERIALIZER
-# =========================================================
 def asset_to_dict(asset):
 
     return {
@@ -237,12 +238,25 @@ def asset_to_dict(asset):
     }
 
 
-# =========================================================
 # SAVE HISTORY
-# =========================================================
+def current_school_id():
+    """Caller's school. None for a legacy/unmigrated install (matches None)."""
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
+def scoped_get_asset(pk):
+    # Load an asset by primary key, only if it belongs to the caller's
+    try:
+        pk = int(pk)
+    except (TypeError, ValueError):
+        return None
+    return Asset.query.filter_by(id=pk, school_id=current_school_id()).first()
+
+
 def create_asset_history(asset, action, performed_by=None):
 
     history = AssetHistory(
+        school_id=asset.school_id,
         asset_id=asset.asset_id,
         asset_code=asset.asset_code,
         action=action,
@@ -253,9 +267,7 @@ def create_asset_history(asset, action, performed_by=None):
     db.session.add(history)
 
 
-# =========================================================
 # DATE PARSER
-# =========================================================
 def parse_date(value):
 
     try:
@@ -266,12 +278,10 @@ def parse_date(value):
         return None
 
 
-# =========================================================
 # CREATE ASSET
-# =========================================================
 class CreateAssetAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "create")
     def post(self):
 
         try:
@@ -281,9 +291,7 @@ class CreateAssetAPI(MethodView):
             if not data:
                 return jsonify({"error": "Invalid JSON"}), 400
 
-            # =====================================================
             # SAFE VALUE PARSERS
-            # =====================================================
             def safe_float(value, default=0):
 
                 try:
@@ -303,9 +311,7 @@ class CreateAssetAPI(MethodView):
 
                 return str(value).strip()
 
-            # =====================================================
             # REQUIRED FIELDS
-            # =====================================================
             asset_id = safe_string(data.get("asset_id"))
             asset_code = safe_string(data.get("asset_code"))
             asset_name = safe_string(data.get("asset_name"))
@@ -325,19 +331,22 @@ class CreateAssetAPI(MethodView):
 
             serial_number = safe_string(data.get("serial_number"))
 
-            # =====================================================
             # DUPLICATE CHECK
-            # =====================================================
+            school_id = current_school_id()
             query = Asset.query.filter(
+                Asset.school_id == school_id,
                 or_(
                     Asset.asset_id == asset_id,
                     Asset.asset_code == asset_code,
-                )
+                ),
             )
 
             if serial_number:
                 query = query.union(
-                    Asset.query.filter(Asset.serial_number == serial_number)
+                    Asset.query.filter(
+                        Asset.school_id == school_id,
+                        Asset.serial_number == serial_number,
+                    )
                 )
 
             existing = query.first()
@@ -346,10 +355,9 @@ class CreateAssetAPI(MethodView):
 
                 return jsonify({"error": "Asset already exists"}), 400
 
-            # =====================================================
             # CREATE ASSET
-            # =====================================================
             asset = Asset(
+                school_id=school_id,
                 asset_id=asset_id,
                 asset_code=asset_code,
                 asset_name=asset_name,
@@ -476,19 +484,20 @@ class CreateAssetAPI(MethodView):
             )
 
 
-# =========================================================
 # GET ALL ASSETS
-# =========================================================
 class GetAssetsAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "view")
     def get(self):
 
         try:
 
             search = request.args.get("search")
 
-            query = Asset.query.filter_by(is_deleted=False)
+            query = Asset.query.filter_by(
+                is_deleted=False,
+                school_id=current_school_id(),
+            )
 
             if search:
 
@@ -511,12 +520,10 @@ class GetAssetsAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # GET SINGLE ASSET
-# =========================================================
 class AssetDetailsAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "view")
     def get(self, id):
 
         try:
@@ -524,6 +531,7 @@ class AssetDetailsAPI(MethodView):
             asset = Asset.query.filter_by(
                 id=id,
                 is_deleted=False,
+                school_id=current_school_id(),
             ).first()
 
             if not asset:
@@ -539,12 +547,10 @@ class AssetDetailsAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # UPDATE ASSET
-# =========================================================
 class UpdateAssetAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "edit")
     def put(self, id):
 
         try:
@@ -552,6 +558,7 @@ class UpdateAssetAPI(MethodView):
             asset = Asset.query.filter_by(
                 id=id,
                 is_deleted=False,
+                school_id=current_school_id(),
             ).first()
 
             if not asset:
@@ -564,9 +571,7 @@ class UpdateAssetAPI(MethodView):
 
                 return jsonify({"error": "Invalid JSON"}), 400
 
-            # =====================================================
             # SAFE HELPERS
-            # =====================================================
             def safe_float(value, default=0):
 
                 try:
@@ -586,9 +591,7 @@ class UpdateAssetAPI(MethodView):
 
                 return str(value).strip()
 
-            # =====================================================
             # ALLOWED FIELDS
-            # =====================================================
             allowed_fields = [
                 "asset_name",
                 "asset_description",
@@ -638,18 +641,14 @@ class UpdateAssetAPI(MethodView):
                 "updated_by",
             ]
 
-            # =====================================================
             # FLOAT FIELDS
-            # =====================================================
             float_fields = [
                 "purchase_cost",
                 "depreciation_rate",
                 "current_book_value",
             ]
 
-            # =====================================================
             # UPDATE NORMAL FIELDS
-            # =====================================================
             for field in allowed_fields:
 
                 if field in data:
@@ -682,9 +681,7 @@ class UpdateAssetAPI(MethodView):
                         value,
                     )
 
-            # =====================================================
             # DATE FIELDS
-            # =====================================================
             date_fields = [
                 "purchase_date",
                 "warranty_start_date",
@@ -706,12 +703,11 @@ class UpdateAssetAPI(MethodView):
                         parse_date(data.get(field)),
                     )
 
-            # =====================================================
             # CHECK DUPLICATE SERIAL NUMBER
-            # =====================================================
             if "serial_number" in data and asset.serial_number:
 
                 existing_serial = Asset.query.filter(
+                    Asset.school_id == asset.school_id,
                     Asset.serial_number == asset.serial_number,
                     Asset.id != asset.id,
                 ).first()
@@ -720,9 +716,7 @@ class UpdateAssetAPI(MethodView):
 
                     return jsonify({"error": "Serial number already exists"}), 400
 
-            # =====================================================
             # UPDATE TIMESTAMP
-            # =====================================================
             asset.updated_at = datetime.utcnow()
 
             create_asset_history(
@@ -774,12 +768,10 @@ class UpdateAssetAPI(MethodView):
             )
 
 
-# =========================================================
 # RESTORE ASSET
-# =========================================================
 class RestoreAssetAPI(MethodView):
 
-    @login_required
+    @permission_required("assets", "edit")
     def post(self, id):
 
         try:
@@ -787,6 +779,7 @@ class RestoreAssetAPI(MethodView):
             asset = Asset.query.filter_by(
                 id=id,
                 is_deleted=True,
+                school_id=current_school_id(),
             ).first()
 
             if not asset:
@@ -813,11 +806,9 @@ class RestoreAssetAPI(MethodView):
             return jsonify({"error": "Something went wrong"}), 500
 
 
-# =========================================================
 # DELETE ASSET
-# =========================================================
 class DeleteAssetAPI(MethodView):
-    @login_required
+    @permission_required("assets", "delete")
     def delete(self, id):
 
         try:
@@ -825,6 +816,7 @@ class DeleteAssetAPI(MethodView):
             asset = Asset.query.filter_by(
                 id=id,
                 is_deleted=False,
+                school_id=current_school_id(),
             ).first()
 
             if not asset:
@@ -862,11 +854,14 @@ class DeleteAssetAPI(MethodView):
 
 
 class GetDeletedAssetsAPI(MethodView):
-    @login_required
+    @permission_required("assets", "view")
     def get(self):
 
         assets = (
-            Asset.query.filter_by(is_deleted=True)
+            Asset.query.filter_by(
+                is_deleted=True,
+                school_id=current_school_id(),
+            )
             .order_by(Asset.updated_at.desc())
             .all()
         )
