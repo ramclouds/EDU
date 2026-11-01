@@ -43,6 +43,13 @@ const getMyClassesUrl = () => {
 const normalize = (v) => String(v ?? "").toLowerCase().trim();
 
 export function useMyClasses({ activeSection, fetchWithAuth, showToast }) {
+    // The page passes new function objects on every render. Keep the latest ones in refs, so
+    // the loader below keeps one identity and only the section change triggers a load.
+    const fetchRef = useRef(fetchWithAuth);
+    const toastRef = useRef(showToast);
+    fetchRef.current = fetchWithAuth;
+    toastRef.current = showToast;
+
     const [allClasses, setAllClasses] = useState([]);
     const [classesLoading, setClassesLoading] = useState(false);
 
@@ -57,12 +64,11 @@ export function useMyClasses({ activeSection, fetchWithAuth, showToast }) {
     const [isClassDetailOpen, setIsClassDetailOpen] = useState(false);
     const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
 
-    const initializedRef = useRef(false);
     const loadingRef = useRef(false);
 
     const apiFetch = useCallback(
         async (url, options = {}) => {
-            const fn = typeof fetchWithAuth === "function" ? fetchWithAuth : fetch;
+            const fn = typeof fetchRef.current === "function" ? fetchRef.current : fetch;
 
             const res = await fn(url, {
                 ...options,
@@ -80,7 +86,7 @@ export function useMyClasses({ activeSection, fetchWithAuth, showToast }) {
 
             return data;
         },
-        [fetchWithAuth],
+        [],
     );
 
     const loadMyClasses = useCallback(async () => {
@@ -98,19 +104,18 @@ export function useMyClasses({ activeSection, fetchWithAuth, showToast }) {
 
             setAllClasses(rows);
         } catch (err) {
-            showToast?.(err.message || "Failed to load classes", "error");
+            toastRef.current?.(err.message || "Failed to load classes", "error");
             setAllClasses([]);
         } finally {
             loadingRef.current = false;
             setClassesLoading(false);
         }
-    }, [apiFetch, showToast]);
+    }, [apiFetch]);
 
+    // The teacher's "My Classes" page is the "classes" section. Load it every time the page
+    // opens, so a class assigned since the last visit appears without a page refresh.
     useEffect(() => {
-        if (activeSection !== "students") return;
-        if (initializedRef.current) return;
-
-        initializedRef.current = true;
+        if (activeSection !== "classes" && activeSection !== "students") return;
         loadMyClasses();
     }, [activeSection, loadMyClasses]);
 

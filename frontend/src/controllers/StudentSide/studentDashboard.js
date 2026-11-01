@@ -14,18 +14,14 @@ export function useStudentDashboard(
   activeSection,
   setActiveSection,
 ) {
-  // =========================================================
   // REFS
-  // =========================================================
   const toastTimerRef =
     useRef(null);
 
   const notificationRunningRef =
     useRef(false);
 
-  // =========================================================
   // LOADING
-  // =========================================================
   const [
     loading,
     setLoading,
@@ -36,9 +32,7 @@ export function useStudentDashboard(
     setNoticeLoading,
   ] = useState(false);
 
-  // =========================================================
   // NOTIFICATIONS
-  // =========================================================
   const [
     notifications,
     setNotifications,
@@ -54,9 +48,7 @@ export function useStudentDashboard(
     setNotificationLoading,
   ] = useState(false);
 
-  // =========================================================
   // ANNOUNCEMENTS
-  // =========================================================
   const [
     announcements,
     setNotices,
@@ -76,9 +68,7 @@ export function useStudentDashboard(
     thisWeek: 0,
   });
 
-  // =========================================================
   // TOAST
-  // =========================================================
   const [
     toast,
     setToast,
@@ -120,9 +110,7 @@ export function useStudentDashboard(
       [],
     );
 
-  // =========================================================
   // AUTH
-  // =========================================================
   const getAuth =
     useCallback(() => {
       try {
@@ -138,7 +126,7 @@ export function useStudentDashboard(
 
           token:
             localStorage.getItem(
-              "token",
+              "signed_in",
             ),
         };
       } catch (error) {
@@ -156,14 +144,21 @@ export function useStudentDashboard(
 
   const logoutUser =
     useCallback(() => {
+      // Best-effort server-side session revocation (see useAdminProfile.js
+      const token = localStorage.getItem("signed_in");
+      if (token) {
+        fetch(`${BASE_URL}/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      }
+
       localStorage.clear();
 
       window.location.href = "/";
     }, []);
 
-  // =========================================================
   // AUTHENTICATED FETCH
-  // =========================================================
   const fetchWithAuth =
     useCallback(
       async (
@@ -189,10 +184,7 @@ export function useStudentDashboard(
             `Bearer ${token}`,
         };
 
-        /*
-         * Do not force Content-Type for FormData.
-         * Browser needs to generate multipart boundary.
-         */
+        // Do not force Content-Type for FormData
         if (
           options.body &&
           !(options.body
@@ -234,9 +226,7 @@ export function useStudentDashboard(
       ],
     );
 
-  // =========================================================
   // AUTH CHECK
-  // =========================================================
   useEffect(() => {
     const {
       user,
@@ -251,9 +241,7 @@ export function useStudentDashboard(
     logoutUser,
   ]);
 
-  // =========================================================
   // LOAD ANNOUNCEMENTS
-  // =========================================================
   const fetchAnnouncements =
     useCallback(
       async ({
@@ -340,13 +328,7 @@ export function useStudentDashboard(
       ],
     );
 
-  // =========================================================
   // DASHBOARD INITIAL DATA
-  //
-  // IMPORTANT:
-  // Library fetching is intentionally NOT here anymore.
-  // useStudentLibrary owns library data.
-  // =========================================================
   useEffect(() => {
     let cancelled = false;
 
@@ -379,9 +361,7 @@ export function useStudentDashboard(
     fetchAnnouncements,
   ]);
 
-  // =========================================================
   // ANNOUNCEMENTS TAB
-  // =========================================================
   useEffect(() => {
     if (
       activeSection !==
@@ -398,9 +378,7 @@ export function useStudentDashboard(
     fetchAnnouncements,
   ]);
 
-  // =========================================================
   // NOTIFICATIONS
-  // =========================================================
   const fetchNotifications =
     useCallback(
       async ({
@@ -519,31 +497,31 @@ export function useStudentDashboard(
       [fetchWithAuth],
     );
 
-  // Initial notification load + polling.
+  // Initial notification load, then a refresh every 30 seconds. Nothing is requested while
+  // the tab is hidden; the list refreshes as soon as the tab is shown again.
   useEffect(() => {
     fetchNotifications({
       silent: false,
     });
 
-    const interval =
-      setInterval(() => {
-        fetchNotifications({
-          silent: true,
-        });
-      }, 15000);
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications({ silent: true });
+      }
+    };
+
+    const interval = setInterval(refreshIfVisible, 30000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
 
     return () => {
-      clearInterval(
-        interval,
-      );
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
     };
   }, [
     fetchNotifications,
   ]);
 
-  // =========================================================
   // MARK NOTIFICATION READ
-  // =========================================================
   const markNotificationRead =
     useCallback(
       async (id) => {
@@ -609,9 +587,7 @@ export function useStudentDashboard(
       [fetchWithAuth],
     );
 
-  // =========================================================
   // MARK ANNOUNCEMENT READ
-  // =========================================================
   const markNoticeAsRead =
     useCallback(
       async (
@@ -688,9 +664,7 @@ export function useStudentDashboard(
       ],
     );
 
-  // =========================================================
   // MARK ALL NOTIFICATIONS READ
-  // =========================================================
   const markAllNotificationsRead =
     useCallback(
       async () => {
@@ -760,9 +734,7 @@ export function useStudentDashboard(
       ],
     );
 
-  // =========================================================
   // DELETE NOTIFICATION
-  // =========================================================
   const deleteNotification =
     useCallback(
       async (id) => {
@@ -844,9 +816,7 @@ export function useStudentDashboard(
       ],
     );
 
-  // =========================================================
   // COMBINED NOTIFICATION CENTER
-  // =========================================================
   const combinedNotifications =
     useMemo(
       () => [
@@ -952,9 +922,7 @@ export function useStudentDashboard(
       ],
     );
 
-  // =========================================================
   // NOTIFICATION CLICK
-  // =========================================================
   const handleNotificationClick =
     useCallback(
       async (item) => {
@@ -985,9 +953,7 @@ export function useStudentDashboard(
           );
         }
 
-        /*
-         * Library notifications should open Library.
-         */
+        // Library notifications should open Library
         if (
           [
             "overdue",
@@ -1006,10 +972,7 @@ export function useStudentDashboard(
           return;
         }
 
-        /*
-         * Generic notifications are shown in
-         * Announcements / Notifications center.
-         */
+        // Generic notifications are shown in
         setActiveSection(
           "announcements",
         );
@@ -1021,9 +984,7 @@ export function useStudentDashboard(
       ],
     );
 
-  // =========================================================
   // NOTICE STATS
-  // =========================================================
   useEffect(() => {
     if (
       activeSection !==
@@ -1092,9 +1053,7 @@ export function useStudentDashboard(
     announcements,
   ]);
 
-  // =========================================================
   // CLEANUP
-  // =========================================================
   useEffect(
     () => () => {
       if (
@@ -1108,9 +1067,7 @@ export function useStudentDashboard(
     [],
   );
 
-  // =========================================================
   // RETURN
-  // =========================================================
   return {
     loading,
     noticeLoading,

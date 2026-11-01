@@ -145,9 +145,7 @@ export function useHostelBlocksFloors({ activeSection, fetchWithAuth, showToast 
         setExpandedFloors((current) => ({ ...current, [floorId]: !current[floorId] }));
     }, []);
 
-    // ============================================================
     // HOSTEL CRUD
-    // ============================================================
     const openCreateHostelModal = useCallback(() => {
         setHostelForm({ ...EMPTY_HOSTEL_FORM });
         setHostelModalOpen(true);
@@ -245,9 +243,7 @@ export function useHostelBlocksFloors({ activeSection, fetchWithAuth, showToast 
         [canWriteHostel, loadStructure, notify, request],
     );
 
-    // ============================================================
     // BLOCK CRUD
-    // ============================================================
     const openCreateBlockModal = useCallback((hostelId) => {
         setBlockForm({ ...EMPTY_BLOCK_FORM, hostel_id: hostelId || "" });
         setBlockModalOpen(true);
@@ -345,9 +341,7 @@ export function useHostelBlocksFloors({ activeSection, fetchWithAuth, showToast 
         [canWriteHostel, loadStructure, notify, request],
     );
 
-    // ============================================================
     // FLOOR CRUD
-    // ============================================================
     const openCreateFloorModal = useCallback((blockId) => {
         setFloorForm({ ...EMPTY_FLOOR_FORM, block_id: blockId || "" });
         setFloorModalOpen(true);

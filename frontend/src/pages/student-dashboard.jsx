@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { APP_NAME, APP_YEAR, FILE_BASE_URL } from "../config/appConfig";
-import "../css/dashboard.css";
+import UserAvatar from "../components/UserAvatar";
+import { APP_YEAR, FILE_BASE_URL } from "../config/appConfig";
+import SettingsPanel from "../components/SettingsPanel";
 import { useStudentProfile } from "../controllers/StudentSide/useStudentProfile";
 import { useStudentDashboard } from "../controllers/StudentSide/studentDashboard";
 import { useDashboardUI } from "../controllers/useDashboardUI";
@@ -11,8 +12,14 @@ import { useStudentAttendance } from "../controllers/StudentSide/useStudentAtten
 import { useStudentExams } from "../controllers/Academic/useStudentExams";
 import { useStudentHostel } from "../controllers/Hostel/useStudentHostel";
 import { useStudentLibrary } from "../controllers/Library/useStudentLibrary";
+import { useStudentAccess } from "../controllers/StudentSide/useStudentAccess";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
 
 // ================= HOSTEL: SMALL DISPLAY HELPERS =================
+const SEARCH_SECTIONS = [{ key: "announcements", label: "Announcements" }, { key: "assignments", label: "Assignments" }, { key: "attendance", label: "Attendance" }, { key: "dashboard", label: "Dashboard" }, { key: "exams", label: "Exams" }, { key: "leaves", label: "Leaves" }, { key: "library", label: "Library" }, { key: "profile", label: "Profile" }, { key: "settings", label: "Settings" }, { key: "studhostel", label: "Studhostel" }, { key: "timetable", label: "Timetable" }];
+
 function formatDate(value) {
   if (!value) return "-";
   const d = new Date(value);
@@ -298,6 +305,9 @@ function StudentDashboard() {
     handleRaiseComplaint,
   } = useStudentHostel(fetchWithAuth, activeSection, showToast);
 
+  // Hostel and Library menu items appear only for students who use them.
+  const { hostelAllocated, libraryMember } = useStudentAccess();
+
   // ================= STUDENT LIBRARY =================
   const {
     studentLibraryLoading,
@@ -417,7 +427,7 @@ function StudentDashboard() {
   ${sidebarOpen ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
 `}
         >
-          <i className="bi bi-mortarboard text-purple-600 text-xl"></i>
+          <SchoolLogo className="bi bi-mortarboard text-purple-600 text-xl"/>
 
           <span
             className={`font-bold text-lg text-purple-600 transition-all duration-200
@@ -425,7 +435,7 @@ function StudentDashboard() {
     md:${sidebarOpen ? "block" : "hidden"}
   `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
@@ -437,11 +447,12 @@ function StudentDashboard() {
             ["assignments", "bi-journal-text", "Assignments"],
             ["exams", "bi-award", "Exams & Results"],
             ["timetable", "bi-clock", "Timetable"],
-            ["studhostel", "bi-building", "Hostel"],
-            ["library", "bi-collection", "Library"],
+            ...(hostelAllocated ? [["studhostel", "bi-building", "Hostel"]] : []),
+            ...(libraryMember ? [["library", "bi-collection", "Library"]] : []),
             ["leaves", "bi-calendar-check", "My Leave"],
             ["announcements", "bi-bell", "Notices"],
             ["profile", "bi-person", "Profile"],
+            ["settings", "bi-gear", "Settings"],
           ].map(([key, icon, label]) => {
             const isActive = activeSection === key;
 
@@ -492,14 +503,14 @@ function StudentDashboard() {
     md:${sidebarOpen ? "block" : "hidden"}
   `}
           >
-            {APP_NAME} © {APP_YEAR}
+            <SchoolName /> © {APP_YEAR}
           </span>
 
           {/* Optional icon when collapsed */}
           {!sidebarOpen && (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             ></i>
           )}
         </div>
@@ -508,7 +519,7 @@ function StudentDashboard() {
       <main
         className={`flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8 
 ${sidebarOpen ? "md:ml-64" : "md:ml-20"}
-maincolor transition-all duration-300 
+bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] transition-all duration-300 
 dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
       >
         {/* CENTER WRAPPER */}
@@ -559,20 +570,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
               <div className="hidden md:flex w-1/2 relative group px-4">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-full
-        bg-white/70 dark:bg-slate-700/70
-        backdrop-blur-md border border-gray-200 dark:border-slate-600
-        text-gray-800 dark:text-white
-        placeholder-gray-400 dark:placeholder-gray-400
-        focus:bg-white dark:focus:bg-slate-700
-        outline-none focus:ring-2 focus:ring-indigo-500
-        shadow-sm hover:shadow-md transition-all duration-300"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT */}
@@ -679,16 +677,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         )}
                       </div>
 
-                      {/* <div
-                        className="p-3 text-center text-sm text-indigo-600 
-              hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer font-medium"
-                        onClick={() => {
-                          navigate("/teacher/announcement"); // ✅ better route
-                          setShowNotifications(false);
-                        }}
-                      >
-                        View All Notices →
-                      </div> */}
+                      {/* <div */}
                     </div>
                   )}
                 </div>
@@ -703,10 +692,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
     backdrop-blur-md px-2 py-1.5 rounded-full 
     transition shadow-md hover:scale-105"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      className="rounded-full w-9 h-9 border-2 border-white dark:border-slate-600 shadow"
-                    />
+                    <UserAvatar className="rounded-full w-9 h-9 border-2 border-white dark:border-slate-600 shadow" />
 
                     <span className="font-medium hidden sm:inline text-sm text-gray-800 dark:text-gray-200">
                       {student?.first_name}
@@ -798,21 +784,14 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
           {/* MOBILE SEARCH */}
           {mobileSearchOpen && (
             <div className="md:hidden px-4">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full px-5 py-3 rounded-full bg-white shadow-md 
-        outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Search anything here..."
-              />
+              <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
             </div>
           )}
         </div>
 
         {/* ===================== DASHBOARD SECTION START =========================== */}
         {activeSection === "dashboard" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div>
               <h2 className="text-lg sm:text-xl font-semibold">
@@ -826,33 +805,33 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
             {/* STATS */}
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {/* Attendance */}
-              <div className="bg-white shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
+              <div className="bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
                 <p className="text-xs sm:text-sm text-gray-500">Attendance</p>
 
                 {!visibleCards.includes("attendance") ? (
                   <CardLoader />
                 ) : (
-                  <h3 className="text-xl sm:text-2xl font-bold mt-1 fade-in">
+                  <h3 className="text-xl sm:text-2xl font-bold mt-1 animate-fade-in">
                     {attendance?.summary?.attendance_percent ?? 0}%
                   </h3>
                 )}
               </div>
 
               {/* Subjects */}
-              <div className="bg-white shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
+              <div className="bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
                 <p className="text-xs sm:text-sm text-gray-500">Subjects</p>
 
                 {!visibleCards.includes("subjects") ? (
                   <CardLoader />
                 ) : (
-                  <h3 className="text-xl sm:text-2xl font-bold mt-1 fade-in">
+                  <h3 className="text-xl sm:text-2xl font-bold mt-1 animate-fade-in">
                     {Object.keys(timetable || {}).length || 0}
                   </h3>
                 )}
               </div>
 
               {/* Assignments */}
-              <div className="bg-white shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
+              <div className="bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
                 <p className="text-xs sm:text-sm text-gray-500">
                   Pending Assignments
                 </p>
@@ -860,14 +839,14 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {!visibleCards.includes("assignments") ? (
                   <CardLoader />
                 ) : (
-                  <h3 className="text-xl sm:text-2xl font-bold mt-1 fade-in">
+                  <h3 className="text-xl sm:text-2xl font-bold mt-1 animate-fade-in">
                     {assignmentCounts?.pending ?? 0}
                   </h3>
                 )}
               </div>
 
               {/* Score */}
-              <div className="bg-white shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
+              <div className="bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition p-4 sm:p-6 rounded-2xl">
                 <p className="text-xs sm:text-sm text-gray-500">
                   Average Score
                 </p>
@@ -875,7 +854,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {!visibleCards.includes("score") ? (
                   <CardLoader />
                 ) : (
-                  <h3 className="text-xl sm:text-2xl font-bold mt-1 fade-in">
+                  <h3 className="text-xl sm:text-2xl font-bold mt-1 animate-fade-in">
                     {performance?.marks?.length
                       ? Math.round(
                           performance.marks.reduce((a, b) => a + b, 0) /
@@ -893,7 +872,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
               {/* LEFT */}
               <div className="lg:col-span-7 space-y-6">
                 {/* ASSIGNMENTS */}
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
                   <h3 className="font-semibold mb-4 text-sm sm:text-base">
                     Upcoming Assignments
                   </h3>
@@ -901,11 +880,11 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   {!visibleCards.includes("assignmentsCard") ? (
                     <CardLoader />
                   ) : assignments.length === 0 ? (
-                    <p className="text-sm text-gray-500 fade-in">
+                    <p className="text-sm text-gray-500 animate-fade-in">
                       No assignments
                     </p>
                   ) : (
-                    <ul className="text-sm space-y-3 fade-in">
+                    <ul className="text-sm space-y-3 animate-fade-in">
                       {assignments.slice(0, 3).map((a) => (
                         <li key={a.id} className="flex justify-between">
                           <span className="truncate">📘 {a.title}</span>
@@ -919,7 +898,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 </div>
 
                 {/* EXAMS */}
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
                   <h3 className="font-semibold mb-4 text-sm sm:text-base">
                     Upcoming Exams
                   </h3>
@@ -927,9 +906,9 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   {!visibleCards.includes("examsCard") ? (
                     <CardLoader />
                   ) : upcomingExams.length === 0 ? (
-                    <p className="text-sm text-gray-500 fade-in">No exams</p>
+                    <p className="text-sm text-gray-500 animate-fade-in">No exams</p>
                   ) : (
-                    <div className="fade-in space-y-2">
+                    <div className="animate-fade-in space-y-2">
                       {upcomingExams.slice(0, 3).map((exam, i) => (
                         <p key={i} className="text-sm">
                           📘 {exam.exam} —{" "}
@@ -941,7 +920,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 </div>
 
                 {/* NOTICES */}
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl shadow-sm hover:shadow-md transition">
                   <h3 className="font-semibold mb-3 text-sm sm:text-base">
                     Notices
                   </h3>
@@ -949,11 +928,11 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   {!visibleCards.includes("noticesCard") ? (
                     <CardLoader />
                   ) : announcements.length === 0 ? (
-                    <p className="text-sm text-gray-500 fade-in">
+                    <p className="text-sm text-gray-500 animate-fade-in">
                       No announcements
                     </p>
                   ) : (
-                    <div className="fade-in space-y-2">
+                    <div className="animate-fade-in space-y-2">
                       {announcements.slice(0, 3).map((n) => (
                         <p key={n.id} className="text-sm truncate">
                           📢 {n.title}
@@ -962,64 +941,66 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                     </div>
                   )}
                 </div>
-                {/* LIBRARY */}
-                <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm hover:shadow-md transition">
-                  <h3 className="font-semibold mb-4 text-sm sm:text-base">
-                    Issued Library Books
-                  </h3>
+                {/* LIBRARY: shown to library members only */}
+                {libraryMember && (
+                  <div className="bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-2xl shadow-sm hover:shadow-md transition">
+                    <h3 className="font-semibold mb-4 text-sm sm:text-base">
+                      Issued Library Books
+                    </h3>
 
-                  {!visibleCards.includes("libraryCard") ? (
-                    <CardLoader />
-                  ) : studentLibraryLoading ? (
-                    <div className="flex justify-center py-5">
-                      <div className="h-6 w-6 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
-                    </div>
-                  ) : currentBooks.length === 0 ? (
-                    <p className="text-sm text-gray-500 fade-in">
-                      No books currently issued
-                    </p>
-                  ) : (
-                    <div className="fade-in space-y-2">
-                      {currentBooks.slice(0, 2).map((book) => (
-                        <button
-                          type="button"
-                          key={book.id}
-                          onClick={() => {
-                            setActiveSection("library");
-                            openLibraryRecord(book);
-                          }}
-                          className="w-full rounded-xl border p-3 text-left hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-700"
-                        >
-                          <p className="truncate text-sm font-medium">
-                            📘 {book.book_title || book.title}
-                          </p>
-
-                          <p className="mt-1 text-xs text-gray-500">
-                            Due: {book.due_date || "—"}
-                          </p>
-
-                          <p
-                            className={`mt-1 text-xs font-medium ${
-                              book.status === "Overdue"
-                                ? "text-red-600"
-                                : book.status === "Due Soon"
-                                  ? "text-amber-600"
-                                  : "text-green-600"
-                            }`}
+                    {!visibleCards.includes("libraryCard") ? (
+                      <CardLoader />
+                    ) : studentLibraryLoading ? (
+                      <div className="flex justify-center py-5">
+                        <div className="h-6 w-6 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
+                      </div>
+                    ) : currentBooks.length === 0 ? (
+                      <p className="text-sm text-gray-500 animate-fade-in">
+                        No books currently issued
+                      </p>
+                    ) : (
+                      <div className="animate-fade-in space-y-2">
+                        {currentBooks.slice(0, 2).map((book) => (
+                          <button
+                            type="button"
+                            key={book.id}
+                            onClick={() => {
+                              setActiveSection("library");
+                              openLibraryRecord(book);
+                            }}
+                            className="w-full rounded-xl border p-3 text-left hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-700"
                           >
-                            {book.status || "Issued"}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                            <p className="truncate text-sm font-medium">
+                              📘 {book.book_title || book.title}
+                            </p>
+
+                            <p className="mt-1 text-xs text-gray-500">
+                              Due: {book.due_date || "—"}
+                            </p>
+
+                            <p
+                              className={`mt-1 text-xs font-medium ${
+                                book.status === "Overdue"
+                                  ? "text-red-600"
+                                  : book.status === "Due Soon"
+                                    ? "text-amber-600"
+                                    : "text-green-600"
+                              }`}
+                            >
+                              {book.status || "Issued"}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* RIGHT */}
               <div className="lg:col-span-5 space-y-6">
                 {/* PERFORMANCE CHART */}
-                <div className="bg-white p-4 sm:p-6 rounded-2xl text-center relative shadow-sm hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl text-center relative shadow-sm hover:shadow-md transition">
                   <h3 className="font-semibold mb-2 text-sm sm:text-base">
                     Performance Overview
                   </h3>
@@ -1036,7 +1017,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 </div>
 
                 {/* ATTENDANCE CHART */}
-                <div className="bg-white p-4 sm:p-6 rounded-2xl text-center relative shadow-sm hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 rounded-2xl text-center relative shadow-sm hover:shadow-md transition">
                   <h3 className="font-semibold mb-2 text-sm sm:text-base">
                     Attendance Overview
                   </h3>
@@ -1309,7 +1290,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
         {/* ===================== ASSIGNMENTS SECTION START ========================*/}
         {activeSection === "assignments" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1337,7 +1318,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
             {/* FILTER TABS */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
-              <div className="flex overflow-x-auto no-scrollbar border-b dark:border-slate-700 text-sm font-medium">
+              <div className="flex overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden border-b dark:border-slate-700 text-sm font-medium">
                 {["all", "new", "pending", "late", "submitted", "resubmit"].map(
                   (tab) => (
                     <button
@@ -1513,7 +1494,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
         {/* ===================== EXAMS AND RESULTS SECTION START ========================*/}
         {activeSection === "exams" && (
-          <section className="active section p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {examLoading ? (
               <div className="flex justify-center items-center py-20">
                 <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -1880,7 +1861,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
         {/* ===================== HOSTEL SECTION START ========================*/}
         {activeSection === "studhostel" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
+          <section className="p-4 sm:p-6 space-y-6">
             {hostelLoading ? (
               <div className="flex justify-center items-center py-20">
                 <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -1906,7 +1887,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <button
                       onClick={() => setShowComplaintModal(true)}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-white text-indigo-600 rounded-xl text-sm font-medium hover:bg-gray-100 transition"
+                      className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-indigo-600 rounded-xl text-sm font-medium hover:bg-gray-100 transition"
                     >
                       Raise Complaint
                     </button>
@@ -1926,7 +1907,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 </div>
 
                 {/* TABS */}
-                <div className="flex gap-1 overflow-x-auto no-scrollbar border-b border-gray-200 dark:border-slate-700">
+                <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden border-b border-gray-200 dark:border-slate-700">
                   {HOSTEL_TABS.map((tab) => (
                     <button
                       key={tab.id}
@@ -2752,7 +2733,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= RAISE COMPLAINT MODAL ================= */}
                 {showComplaintModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowComplaintModal(false)}
                   >
                     <div
@@ -2772,7 +2753,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs text-gray-500 dark:text-gray-400">
                             Category
@@ -2846,7 +2827,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= APPLY LEAVE MODAL ================= */}
                 {showLeaveModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowLeaveModal(false)}
                   >
                     <div
@@ -2888,7 +2869,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         </select>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs text-gray-500 dark:text-gray-400">
                             From Date
@@ -2964,7 +2945,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= ADD VISITOR MODAL ================= */}
                 {showVisitorModal && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={() => setShowVisitorModal(false)}
                   >
                     <div
@@ -3001,7 +2982,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs text-gray-500 dark:text-gray-400">
                             Mobile
@@ -3089,7 +3070,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
         {/* ===================== STUDENT LIBRARY ======================== */}
         {activeSection === "library" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
+          <section className="p-4 sm:p-6 space-y-6">
             {studentLibraryLoading && !libraryProfile ? (
               <div className="flex justify-center items-center py-20">
                 <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -3113,7 +3094,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                       type="button"
                       onClick={refreshStudentLibrary}
                       disabled={studentLibraryLoading}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-white text-indigo-600 rounded-xl text-sm font-medium hover:bg-gray-100 transition disabled:opacity-60"
+                      className="flex-1 sm:flex-none px-4 py-2 bg-white dark:bg-slate-800 text-indigo-600 rounded-xl text-sm font-medium hover:bg-gray-100 transition disabled:opacity-60"
                     >
                       <i
                         className={`bi bi-arrow-clockwise mr-1 ${
@@ -3258,7 +3239,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 )}
 
                 {/* TABS */}
-                <div className="flex gap-1 overflow-x-auto no-scrollbar border-b border-gray-200 dark:border-slate-700">
+                <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden border-b border-gray-200 dark:border-slate-700">
                   {[
                     ["issued", "Current Books", currentBooks.length, "bi-book"],
                     [
@@ -3871,7 +3852,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                                 {book.author_name || "Unknown Author"}
                               </p>
 
-                              <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-gray-600 dark:text-gray-300">
+                              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-gray-600 dark:text-gray-300">
                                 <p>
                                   <span className="text-gray-400">
                                     Category:{" "}
@@ -3933,7 +3914,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 {/* ================= BOOK DETAIL MODAL ================= */}
                 {libraryRecordModalOpen && selectedLibraryRecord && (
                   <div
-                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50"
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[100]"
                     onClick={closeLibraryRecord}
                   >
                     <div
@@ -4050,7 +4031,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
             </div>
 
             {/* APPLY LEAVE */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm space-y-4">
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
               <h3 className="font-semibold">Apply for Leave</h3>
 
               {/* DATE */}
@@ -4125,7 +4106,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
             </div>
 
             {/* HISTORY */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm">
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm">
               <h3 className="font-semibold mb-4">Leave History</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
@@ -4201,7 +4182,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
         {/* ===================== ANNOUNCEMENTS + NOTIFICATIONS ========================*/}
         {activeSection === "announcements" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white p-5 sm:p-6 rounded-2xl shadow-md">
               <h3 className="text-lg sm:text-xl font-semibold">
@@ -4343,14 +4324,22 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* ===================== NOTICES SECTION END ========================*/}
 
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "settings" && (
+          <SettingsPanel
+            compact
+            user={student}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* PROFILE HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-              <img
-                src="https://i.pravatar.cc/100"
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white shadow"
-              />
+              <UserAvatar className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white shadow" />
 
               <div className="text-center sm:text-left w-full">
                 {editMode ? (
@@ -4668,7 +4657,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* ===================== PROFILE SECTION END ========================*/}
 
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100]">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md border border-gray-100 dark:border-slate-700">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

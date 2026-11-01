@@ -22,11 +22,7 @@ const EMPTY_FORM = {
     payment_date: new Date().toISOString().slice(0, 10),
 };
 
-/**
- * Drives the "Payment" dashboard section: record a payment against a
- * student's fee invoice (searches by student, then picks one of their
- * open invoices) and browse the full payment history.
- */
+// Drives the "Payment" dashboard section: record a payment against a
 export function useHostelPayments({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 
@@ -148,9 +144,7 @@ export function useHostelPayments({ activeSection, fetchWithAuth, showToast }) {
         loadPayments({ filters: next });
     }, [loadPayments]);
 
-    // ============================================================
     // RECORD PAYMENT
-    // ============================================================
     const openPaymentModal = useCallback(() => {
         setPaymentForm({ ...EMPTY_FORM });
         setStudentSearch("");

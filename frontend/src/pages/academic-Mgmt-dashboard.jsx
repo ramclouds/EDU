@@ -1,11 +1,15 @@
 import { useLocation } from "react-router-dom";
+import LibraryMembershipToggle from "../components/LibraryMembershipToggle";
+import UserAvatar from "../components/UserAvatar";
+import { useSectionInUrl } from "../controllers/useSectionInUrl";
+import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
+import DashboardSwitcher from "../components/DashboardSwitcher";
 import { useState, useEffect } from "react";
-import { APP_NAME, APP_YEAR, BASE_URL } from "../config/appConfig";
-import "../css/dashboard.css";
+import { APP_YEAR, BASE_URL } from "../config/appConfig";
+import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
 import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
-import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import { useAcademicPermission } from "../controllers/Academic/useAcademicPermission";
 import { useDivisionsSections } from "../controllers/Academic/useDivisionsSections";
 import { useAcademicClasses } from "../controllers/Academic/useAcademicClasses";
@@ -17,6 +21,11 @@ import { useTeacherManagement } from "../controllers/Academic/useTeachersManagem
 import { useExamResultManagement } from "../controllers/Academic/useExamResultManagement";
 import { useTimeTableManagement } from "../controllers/Academic/useTimetableManagement";
 import { useAttendanceManagement } from "../controllers/Academic/useAttendanceManagement";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
+
+const SEARCH_SECTIONS = [{ key: "attendance", label: "Attendance" }, { key: "batches", label: "Batches" }, { key: "classes", label: "Classes" }, { key: "dashboard", label: "Dashboard" }, { key: "divisions-sections", label: "Divisions sections" }, { key: "exams", label: "Exams" }, { key: "notifications", label: "Notifications" }, { key: "profile", label: "Profile" }, { key: "reports", label: "Reports" }, { key: "results", label: "Results" }, { key: "settings", label: "Settings" }, { key: "students", label: "Students" }, { key: "subjects", label: "Subjects" }, { key: "teachers", label: "Teachers" }, { key: "timetable", label: "Timetable" }];
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
@@ -25,14 +34,62 @@ function AdminDashboard() {
   const [activeSection, setActiveSection] = useState(
     location.state?.activeSection || "dashboard",
   );
+  useSectionInUrl(activeSection, setActiveSection);
   // const [noticeTab, setNoticeTab] = useState("announcements");
   const [search, setSearch] = useState("");
+  const [notificationFilterTab, setNotificationFilterTab] = useState("all");
+  const [notificationSearch, setNotificationSearch] = useState("");
+  const [createNotifModalOpen, setCreateNotifModalOpen] = useState(false);
+  const [createNotifForm, setCreateNotifForm] = useState({
+    title: "",
+    message: "",
+    priority: "Medium",
+    target_role: "all",
+  });
+  const [createNotifSaving, setCreateNotifSaving] = useState(false);
+  const [createNotifError, setCreateNotifError] = useState("");
+
+  const submitCreateNotification = async (event) => {
+    event?.preventDefault?.();
+
+    if (!createNotifForm.title.trim() || !createNotifForm.message.trim()) {
+      setCreateNotifError("Title and message are required");
+      return;
+    }
+
+    setCreateNotifSaving(true);
+    setCreateNotifError("");
+
+    try {
+      const response = await fetchWithAuth(`${BASE_URL}/announcements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createNotifForm),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to create notification");
+      }
+
+      showToast?.("Notification created", "success");
+      setCreateNotifModalOpen(false);
+      setCreateNotifForm({
+        title: "",
+        message: "",
+        priority: "Medium",
+        target_role: "all",
+      });
+    } catch (err) {
+      console.error("Create notification failed:", err);
+      setCreateNotifError(err.message || "Failed to create notification");
+    } finally {
+      setCreateNotifSaving(false);
+    }
+  };
 
   const { canWriteAcademic, AcademicAccessLevel } = useAcademicPermission();
-  const { dashboards: accessibleDashboards } = useDashboardAccess();
-  const otherAccessibleDashboards = (accessibleDashboards || []).filter(
-    (dashboard) => dashboard.key !== "academic-admin-dashboard",
-  );
 
   // ================= DASHBOARD HOOK =================
   const {
@@ -184,7 +241,6 @@ function AdminDashboard() {
   });
 
   // Refresh the class roster after a successful enrollment, so a newly
-  // enrolled student shows up in "My Classes" without a manual reload.
   useEffect(() => {
     if (studentManagement.enrollResult) {
       loadMyClasses();
@@ -194,13 +250,10 @@ function AdminDashboard() {
 
   // ================= STUDENT PROFILE TABS (attendance + leaves) =================
   const [studentProfileTab, setStudentProfileTab] = useState("overview");
-  const [studentProfileAttendance, setStudentProfileAttendance] =
-    useState(null);
-  const [studentProfileAttendanceLoading, setStudentProfileAttendanceLoading] =
-    useState(false);
+  const [studentProfileAttendance, setStudentProfileAttendance] = useState(null);
+  const [studentProfileAttendanceLoading, setStudentProfileAttendanceLoading] = useState(false);
   const [studentProfileLeaves, setStudentProfileLeaves] = useState([]);
-  const [studentProfileLeavesLoading, setStudentProfileLeavesLoading] =
-    useState(false);
+  const [studentProfileLeavesLoading, setStudentProfileLeavesLoading] = useState(false);
 
   useEffect(() => {
     if (!isStudentProfileOpen || !selectedStudent) return;
@@ -303,15 +356,12 @@ function AdminDashboard() {
   // ================= TEACHER PROFILE TABS (assigned classes + attendance + leaves) =================
   const [teacherProfileTab, setTeacherProfileTab] = useState("overview");
   const [teacherProfileAttendance, setTeacherProfileAttendance] = useState([]);
-  const [teacherProfileAttendanceLoading, setTeacherProfileAttendanceLoading] =
-    useState(false);
+  const [teacherProfileAttendanceLoading, setTeacherProfileAttendanceLoading] = useState(false);
   const [teacherProfileLeaves, setTeacherProfileLeaves] = useState([]);
-  const [teacherProfileLeavesLoading, setTeacherProfileLeavesLoading] =
-    useState(false);
+  const [teacherProfileLeavesLoading, setTeacherProfileLeavesLoading] = useState(false);
 
   useEffect(() => {
-    if (!teacherManagementViewModalOpen || !teacherManagementSelectedTeacher)
-      return;
+    if (!teacherManagementViewModalOpen || !teacherManagementSelectedTeacher) return;
 
     setTeacherProfileTab("overview");
 
@@ -440,10 +490,7 @@ function AdminDashboard() {
     showToast,
   });
 
-  // ================= ON LEAVE TODAY (cross-referenced with Attendance) =================
-  // Lets an Academic Admin see, right alongside the attendance list,
-  // who is marked absent because they're on an approved leave rather
-  // than an unexplained absence.
+  // ON LEAVE TODAY (cross-referenced with Attendance)
   const [onLeaveToday, setOnLeaveToday] = useState([]);
   const [onLeaveLoading, setOnLeaveLoading] = useState(false);
 
@@ -453,8 +500,7 @@ function AdminDashboard() {
     const loadOnLeaveToday = async () => {
       setOnLeaveLoading(true);
       try {
-        const checkDate =
-          selectedDate || new Date().toISOString().split("T")[0];
+        const checkDate = selectedDate || new Date().toISOString().split("T")[0];
 
         const [studentRes, teacherRes] = await Promise.all([
           fetchWithAuth(`${BASE_URL}/admin/student/leaves`),
@@ -482,9 +528,7 @@ function AdminDashboard() {
             leave_type: l.leave_type,
           }));
 
-        const teachersOnLeave = (
-          Array.isArray(teacherLeaves) ? teacherLeaves : []
-        )
+        const teachersOnLeave = (Array.isArray(teacherLeaves) ? teacherLeaves : [])
           .filter(isCoveringDate)
           .map((l) => ({
             id: `teacher-${l.id}`,
@@ -504,10 +548,6 @@ function AdminDashboard() {
     };
 
     loadOnLeaveToday();
-    // fetchWithAuth is recreated on every render (not memoized in
-    // useAdminDashboard) - including it here caused an infinite
-    // fetch loop. Only re-run when the section or date actually change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, selectedDate]);
 
   // ================= PROFILE HOOK =================
@@ -530,14 +570,16 @@ function AdminDashboard() {
     isSuperAdmin,
   } = useAdminProfile({ fetchWithAuth, showToast });
 
+  const dashAccess = useDashboardAccess();
   useEffect(() => {
     if (!admin?.id) return;
+    if (!dashAccess.loaded) return;
 
-    if (!isSuperAdmin && !isAcademicAdmin) {
-      showToast("You do not have access to the Academic Dashboard", "error");
-      navigate("/super-admin-dashboard", { replace: true });
+    if (!isSuperAdmin && !isAcademicAdmin && !dashAccess.canView("academic-admin-dashboard")) {
+      showToast("You do not have access to this dashboard", "error");
+      navigate(dashAccess.homeRoute, { replace: true });
     }
-  }, [admin?.id, isSuperAdmin, isAcademicAdmin, navigate, showToast]);
+  }, [admin?.id, isSuperAdmin, isAcademicAdmin, navigate, showToast, dashAccess.loaded, dashAccess.canView, dashAccess.homeRoute]);
 
   useEffect(() => {
     const desktopMedia = window.matchMedia("(min-width: 768px)");
@@ -587,9 +629,9 @@ function AdminDashboard() {
       ${sidebarExpanded ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
     `}
         >
-          <i
+          <SchoolLogo
             className="bi bi-mortarboard text-purple-600 text-xl"
-            title={!sidebarExpanded ? APP_NAME : ""}
+            title={!sidebarExpanded ? schoolDisplayName() : ""}
           />
 
           <span
@@ -598,7 +640,7 @@ function AdminDashboard() {
         ${sidebarExpanded ? "opacity-100 max-w-[180px] ml-2" : "opacity-0 max-w-0 ml-0"}
       `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
@@ -606,8 +648,9 @@ function AdminDashboard() {
         {/* ========================= Academic ADMIN SIDEBAR NAV ========================= */}
         <nav
           aria-label="Academic management navigation"
-          className="min-h-0 flex-1 space-y-2 no-scrollbar overflow-y-auto overscroll-contain px-3 py-4 text-sm [scrollbar-width:thin]"
+          className="min-h-0 flex-1 space-y-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overflow-y-auto overscroll-contain px-3 py-4 text-sm [scrollbar-width:thin]"
         >
+          <DashboardSwitcher expanded={sidebarExpanded} />
           {[
             {
               title: "MAIN",
@@ -616,10 +659,10 @@ function AdminDashboard() {
             {
               title: "ACADEMIC SETUP",
               items: [
-                ["classes", "bi-collection", "Classes"],
-                ["divisions-sections", "bi-diagram-3", "Grades & Sections"],
-                ["subjects", "bi-journal-bookmark", "Subjects"],
                 ["batches", "bi-layers", "Academic Years"],
+                ["divisions-sections", "bi-diagram-3", "Grades & Sections"],
+                ["classes", "bi-collection", "Classes"],
+                ["subjects", "bi-journal-bookmark", "Subjects"],
               ],
             },
             {
@@ -713,54 +756,6 @@ function AdminDashboard() {
             </div>
           ))}
 
-          {/* OTHER DASHBOARDS THIS ADMIN HAS BEEN GRANTED ACCESS TO */}
-          {otherAccessibleDashboards.length > 0 && (
-            <div>
-              {sidebarExpanded && (
-                <p className="text-xs text-gray-400 px-2 mt-4">
-                  OTHER DASHBOARDS
-                </p>
-              )}
-
-              {otherAccessibleDashboards.map((dashboard) => (
-                <button
-                  key={dashboard.key}
-                  type="button"
-                  title={!sidebarExpanded ? dashboard.label : ""}
-                  onClick={() => {
-                    navigate(dashboard.route);
-                    closeSidebarOnMobile();
-                  }}
-                  className={`relative flex w-full items-center rounded-xl py-3
-              transition-all duration-300 ease-in-out
-              ${
-                sidebarExpanded
-                  ? "gap-3 px-4 justify-start"
-                  : "justify-center px-0"
-              }
-              text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-800 dark:hover:text-white`}
-                >
-                  <i className="bi bi-grid-3x3-gap-fill text-base shrink-0" />
-
-                  <span
-                    className={`whitespace-nowrap truncate overflow-hidden
-                transition-all duration-300 ease-in-out
-                ${
-                  sidebarExpanded
-                    ? "opacity-100 max-w-[190px]"
-                    : "opacity-0 max-w-0"
-                }`}
-                  >
-                    {dashboard.label}
-                  </span>
-
-                  {sidebarExpanded && (
-                    <i className="bi bi-box-arrow-up-right ml-auto shrink-0 text-xs opacity-60" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
         </nav>
 
         {/* FOOTER */}
@@ -773,12 +768,12 @@ function AdminDashboard() {
         >
           {sidebarExpanded ? (
             <span className="whitespace-nowrap transition-all duration-300">
-              {APP_NAME} © {APP_YEAR}
+              <SchoolName /> © {APP_YEAR}
             </span>
           ) : (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             />
           )}
         </div>
@@ -786,9 +781,9 @@ function AdminDashboard() {
 
       {/* MAIN */}
       <main
-        className={`maincolor min-h-screen min-w-0 flex-1 overflow-x-hidden
+        className={`bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] min-h-screen min-w-0 flex-1 overflow-x-hidden
     px-3 py-4 text-gray-800 transition-[margin,width] duration-300
-    dark:bg-slate-900 dark:text-gray-100
+    dark:text-gray-100
     sm:px-5 sm:py-6 lg:px-8
     ${sidebarExpanded ? "md:ml-64" : "md:ml-20"}`}
       >
@@ -844,7 +839,7 @@ function AdminDashboard() {
               <div className="flex shrink-0 items-center gap-2 md:hidden">
                 <i className="bi bi-mortarboard text-lg text-indigo-600" />
                 <span className="max-w-[145px] truncate text-sm font-bold text-indigo-600">
-                  {APP_NAME}
+                  <SchoolName />
                 </span>
               </div>
 
@@ -873,18 +868,7 @@ function AdminDashboard() {
               <div className="relative hidden w-full max-w-xl flex-1 px-2 md:block">
                 <i className="bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-gray-200 bg-white/70 py-2.5 pl-10 pr-4
-            text-sm text-gray-800 shadow-sm outline-none backdrop-blur-md
-            transition-all duration-300 placeholder:text-gray-400
-            hover:shadow-md focus:bg-white focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-700/70 dark:text-white
-            dark:placeholder:text-gray-400 dark:focus:bg-slate-700"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT ACTIONS */}
@@ -1014,11 +998,7 @@ function AdminDashboard() {
               backdrop-blur-md transition-all duration-300 hover:scale-105
               dark:from-slate-700/70 dark:to-slate-700/60"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      alt="Admin profile"
-                      className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600"
-                    />
+                    <UserAvatar className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600" />
 
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 dark:text-gray-200 sm:inline">
                       {admin?.first_name || "Admin"}
@@ -1106,42 +1086,301 @@ function AdminDashboard() {
               <div className="relative">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 pl-11
-            text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-                  placeholder="Search anything here..."
-                  autoFocus
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
             </div>
           )}
         </div>
         {/* ================= Academic DASHBOARD ================= */}
         {activeSection === "dashboard" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold"> Dashboard</h2>
+                  <h2 className="text-xl font-semibold">
+                    Welcome back, {admin?.first_name || "Admin"}
+                  </h2>
 
                   <p className="mt-1 text-sm text-blue-100">
                     Today&apos;s classes, timetable, attendance and exam
                     overview
                   </p>
                 </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection("reports")}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20"
+                  >
+                    <i className="bi bi-bar-chart-line me-1.5" />
+                    Full Reports
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* QUICK STATS */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                {
+                  label: "Students",
+                  value: academicClasses.classStats.total_students_assigned,
+                  icon: "bi-mortarboard",
+                  cls: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                  section: "students",
+                },
+                {
+                  label: "Teachers",
+                  value: teacherManagementStats.total,
+                  icon: "bi-person-badge",
+                  cls: "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300",
+                  section: "teachers",
+                },
+                {
+                  label: "Today's Attendance",
+                  value: `${attendanceStats.percentage ?? 0}%`,
+                  icon: "bi-calendar-check",
+                  cls: "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300",
+                  section: "attendance",
+                },
+                {
+                  label: "Unread Notifications",
+                  value: totalUnread || 0,
+                  icon: "bi-bell",
+                  cls: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                  section: "notifications",
+                },
+              ].map((kpi) => (
+                <button
+                  type="button"
+                  key={kpi.label}
+                  onClick={() => setActiveSection(kpi.section)}
+                  className="text-left bg-white rounded-2xl border border-gray-200 shadow-sm p-4 transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {kpi.label}
+                      </p>
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {kpi.value ?? 0}
+                      </p>
+                    </div>
+                    <span
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${kpi.cls}`}
+                    >
+                      <i className={`bi ${kpi.icon} text-lg`} />
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* QUICK ACTIONS */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 dark:border-slate-700 dark:bg-slate-800">
+              <h3 className="font-bold text-gray-800 dark:text-white mb-4">
+                Quick Actions
+              </h3>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {[
+                  {
+                    label: "Enroll Student",
+                    icon: "bi-person-plus",
+                    onClick: () => {
+                      setActiveSection("students");
+                      studentManagement.openEnrollModal();
+                    },
+                  },
+                  {
+                    label: "Add Teacher",
+                    icon: "bi-person-badge",
+                    onClick: () => {
+                      setActiveSection("teachers");
+                      openTeacherManagementAddModal();
+                    },
+                  },
+                  {
+                    label: "Create Exam",
+                    icon: "bi-clipboard-plus",
+                    onClick: () => {
+                      setActiveSection("exams");
+                      openExamManagementModal();
+                    },
+                  },
+                  {
+                    label: "Mark Attendance",
+                    icon: "bi-calendar-check",
+                    onClick: () => setActiveSection("attendance"),
+                  },
+                  {
+                    label: "Add Class",
+                    icon: "bi-collection",
+                    onClick: () => {
+                      setActiveSection("classes");
+                      academicClasses.openCreateClassModal();
+                    },
+                  },
+                ].map((action) => (
+                  <button
+                    type="button"
+                    key={action.label}
+                    onClick={action.onClick}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-gray-100 dark:border-slate-700 p-4 text-center transition hover:border-indigo-200 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+                      <i className={`bi ${action.icon} text-lg`} />
+                    </span>
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                      {action.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* RECENT NOTIFICATIONS */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-slate-700">
+                  <h3 className="font-bold text-gray-800 dark:text-white">
+                    Recent Notifications
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection("notifications")}
+                    className="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                  >
+                    View All →
+                  </button>
+                </div>
+
+                <div className="divide-y divide-gray-100 dark:divide-slate-700">
+                  {(sortedNotifications || []).length === 0 ? (
+                    <p className="py-10 text-center text-sm text-gray-400">
+                      🎉 You&apos;re all caught up
+                    </p>
+                  ) : (
+                    sortedNotifications.slice(0, 5).map((item) => (
+                      <button
+                        type="button"
+                        key={`${item.source}-${item.id}-${item.time || item.date}`}
+                        onClick={() =>
+                          handleNotificationClick &&
+                          handleNotificationClick(item)
+                        }
+                        className={`w-full p-4 text-left transition hover:bg-gray-50 dark:hover:bg-slate-700/50 ${
+                          !item.is_read
+                            ? "bg-indigo-50/40 dark:bg-indigo-500/5"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs ${
+                              item.source === "notice"
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                : "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
+                            }`}
+                          >
+                            {item.source === "notice" ? "📢" : "📩"}
+                          </span>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">
+                              {item.title}
+                            </p>
+                            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                              {item.message || ""}
+                            </p>
+                          </div>
+
+                          {!item.is_read && (
+                            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* TODAY'S ATTENDANCE SNAPSHOT */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-800 dark:text-white">
+                    Today&apos;s Attendance
+                  </h3>
+                  <span className="text-xs text-gray-400">
+                    {attendanceStats.total ?? 0} marked
+                  </span>
+                </div>
+
+                {(() => {
+                  const total = attendanceStats.total || 0;
+                  const bars = [
+                    {
+                      label: "Present",
+                      value: attendanceStats.present || 0,
+                      cls: "bg-emerald-500",
+                    },
+                    {
+                      label: "Absent",
+                      value: attendanceStats.absent || 0,
+                      cls: "bg-red-500",
+                    },
+                    {
+                      label: "Late",
+                      value: attendanceStats.late || 0,
+                      cls: "bg-amber-500",
+                    },
+                  ];
+
+                  if (total === 0) {
+                    return (
+                      <p className="py-8 text-center text-sm text-gray-400">
+                        No attendance marked yet today.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      {bars.map((bar) => {
+                        const pct =
+                          total > 0 ? Math.round((bar.value / total) * 100) : 0;
+                        return (
+                          <div key={bar.label}>
+                            <div className="flex justify-between text-xs mb-1.5">
+                              <span className="font-medium text-gray-600 dark:text-gray-300">
+                                {bar.label}
+                              </span>
+                              <span className="text-gray-400">
+                                {bar.value} ({pct}%)
+                              </span>
+                            </div>
+                            <div className="h-2.5 w-full rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${bar.cls}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </section>
         )}
 
-        {/* =========================== TEACHERS SECTION START ============================ */}
+                {/* =========================== TEACHERS SECTION START ============================ */}
         {activeSection === "teachers" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -1157,7 +1396,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={openTeacherManagementAddModal}
-                  className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow"
+                  className="bg-white dark:bg-slate-800 text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow"
                 >
                   + Add Teacher
                 </button>
@@ -1165,28 +1404,28 @@ function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-xl shadow text-center">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Total Teachers</p>
                 <h2 className="font-bold text-lg">
                   {teacherManagementStats.total}
                 </h2>
               </div>
 
-              <div className="bg-white p-4 rounded-xl shadow text-center">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Active</p>
                 <h2 className="font-bold text-green-600 text-lg">
                   {teacherManagementStats.active}
                 </h2>
               </div>
 
-              <div className="bg-white p-4 rounded-xl shadow text-center">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Inactive</p>
                 <h2 className="font-bold text-red-500 text-lg">
                   {teacherManagementStats.inactive}
                 </h2>
               </div>
 
-              <div className="bg-white p-4 rounded-xl shadow text-center">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Suspended</p>
                 <h2 className="font-bold text-indigo-600 text-lg">
                   {teacherManagementStats.suspended}
@@ -1194,7 +1433,7 @@ function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow flex flex-col sm:flex-row sm:items-end gap-4">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow flex flex-col sm:flex-row sm:items-end gap-4">
               <div className="flex-1">
                 <label className="text-xs text-gray-500">Search Teacher</label>
                 <input
@@ -1243,7 +1482,7 @@ function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold">Teacher List</h3>
 
@@ -1266,7 +1505,7 @@ function AdminDashboard() {
                     className="border rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
                   >
                     <div className="space-y-1">
-                      <h4 className="font-semibold text-gray-800">
+                      <h4 className="font-semibold text-gray-800 dark:text-gray-100">
                         {teacher.full_name ||
                           `${teacher.first_name || ""} ${teacher.last_name || ""}`}
                       </h4>
@@ -1353,7 +1592,7 @@ function AdminDashboard() {
 
         {/* ADD / EDIT TEACHER MODAL */}
         {teacherManagementModalOpen && (
-          <div className="fixed inset-0 md:pl-64 z-50 bg-slate-950/60 backdrop-blur-md p-2 sm:p-4">
+          <div className="fixed inset-0 md:pl-64 z-[100] bg-slate-950/60 backdrop-blur-md p-2 sm:p-4">
             <div className="h-full w-full flex items-center justify-center">
               <div className="w-full max-w-7xl max-h-[95vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-white/20 dark:border-slate-700">
                 {/* HEADER */}
@@ -1843,6 +2082,13 @@ function AdminDashboard() {
                         />
                       </div>
 
+                    </div>
+
+                    {/* Login account for the teacher (separate from health details) */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        🔐 Teacher Login Account
+                      </h3>
                       <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">
                           Username
@@ -2030,8 +2276,8 @@ function AdminDashboard() {
 
         {/* VIEW TEACHER MODAL */}
         {teacherManagementViewModalOpen && teacherManagementSelectedTeacher && (
-          <div className="fixed inset-0 md:pl-64 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 relative">
+          <div className="fixed inset-0 md:pl-64 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-800 w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 relative">
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-xl font-semibold">
@@ -2055,21 +2301,9 @@ function AdminDashboard() {
               {/* TABS */}
               <div className="flex gap-2 border-b border-gray-200 dark:border-slate-700 mb-4">
                 {[
-                  {
-                    key: "overview",
-                    label: "Overview",
-                    icon: "bi-person-lines-fill",
-                  },
-                  {
-                    key: "classes",
-                    label: "Assigned Classes",
-                    icon: "bi-journal-bookmark",
-                  },
-                  {
-                    key: "attendance",
-                    label: "Attendance",
-                    icon: "bi-calendar-check",
-                  },
+                  { key: "overview", label: "Overview", icon: "bi-person-lines-fill" },
+                  { key: "classes", label: "Assigned Classes", icon: "bi-journal-bookmark" },
+                  { key: "attendance", label: "Attendance", icon: "bi-calendar-check" },
                   { key: "leaves", label: "Leaves", icon: "bi-calendar-x" },
                 ].map((tab) => (
                   <button
@@ -2090,96 +2324,90 @@ function AdminDashboard() {
 
               {/* ================= OVERVIEW TAB ================= */}
               {teacherProfileTab === "overview" && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                  <div className="border rounded-xl p-4">
-                    <h4 className="font-semibold mb-2">Contact</h4>
-                    <p>
-                      Email: {teacherManagementSelectedTeacher.email || "-"}
-                    </p>
-                    <p>
-                      Mobile: {teacherManagementSelectedTeacher.mobile || "-"}
-                    </p>
-                    <p>
-                      Username:{" "}
-                      {teacherManagementSelectedTeacher.username || "-"}
-                    </p>
-                  </div>
-
-                  <div className="border rounded-xl p-4">
-                    <h4 className="font-semibold mb-2">Professional</h4>
-                    <p>
-                      Designation:{" "}
-                      {teacherManagementSelectedTeacher.designation || "-"}
-                    </p>
-                    <p>
-                      Specialization:{" "}
-                      {teacherManagementSelectedTeacher.specialization || "-"}
-                    </p>
-                    <p>
-                      Experience:{" "}
-                      {teacherManagementSelectedTeacher.experience_years || 0}{" "}
-                      years
-                    </p>
-                  </div>
-
-                  <div className="border rounded-xl p-4">
-                    <h4 className="font-semibold mb-2">Employment</h4>
-                    <p>
-                      Joining:{" "}
-                      {teacherManagementSelectedTeacher.joining_date || "-"}
-                    </p>
-                    <p>
-                      Type:{" "}
-                      {teacherManagementSelectedTeacher.employment_type || "-"}
-                    </p>
-                    <p>
-                      Shift: {teacherManagementSelectedTeacher.shift || "-"}
-                    </p>
-                  </div>
-
-                  <div className="border rounded-xl p-4">
-                    <h4 className="font-semibold mb-2">Emergency</h4>
-                    <p>
-                      Name:{" "}
-                      {teacherManagementSelectedTeacher.emergency_name || "-"}
-                    </p>
-                    <p>
-                      Relation:{" "}
-                      {teacherManagementSelectedTeacher.emergency_relation ||
-                        "-"}
-                    </p>
-                    <p>
-                      Phone:{" "}
-                      {teacherManagementSelectedTeacher.emergency_phone || "-"}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">Contact</h4>
+                  <p>Email: {teacherManagementSelectedTeacher.email || "-"}</p>
+                  <p>
+                    Mobile: {teacherManagementSelectedTeacher.mobile || "-"}
+                  </p>
+                  <p>
+                    Username: {teacherManagementSelectedTeacher.username || "-"}
+                  </p>
                 </div>
+
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">Professional</h4>
+                  <p>
+                    Designation:{" "}
+                    {teacherManagementSelectedTeacher.designation || "-"}
+                  </p>
+                  <p>
+                    Specialization:{" "}
+                    {teacherManagementSelectedTeacher.specialization || "-"}
+                  </p>
+                  <p>
+                    Experience:{" "}
+                    {teacherManagementSelectedTeacher.experience_years || 0}{" "}
+                    years
+                  </p>
+                </div>
+
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">Employment</h4>
+                  <p>
+                    Joining:{" "}
+                    {teacherManagementSelectedTeacher.joining_date || "-"}
+                  </p>
+                  <p>
+                    Type:{" "}
+                    {teacherManagementSelectedTeacher.employment_type || "-"}
+                  </p>
+                  <p>Shift: {teacherManagementSelectedTeacher.shift || "-"}</p>
+                </div>
+
+                <div className="border rounded-xl p-4">
+                  <h4 className="font-semibold mb-2">Emergency</h4>
+                  <p>
+                    Name:{" "}
+                    {teacherManagementSelectedTeacher.emergency_name || "-"}
+                  </p>
+                  <p>
+                    Relation:{" "}
+                    {teacherManagementSelectedTeacher.emergency_relation || "-"}
+                  </p>
+                  <p>
+                    Phone:{" "}
+                    {teacherManagementSelectedTeacher.emergency_phone || "-"}
+                  </p>
+                </div>
+              </div>
               )}
 
               {/* ================= ASSIGNED CLASSES TAB ================= */}
               {teacherProfileTab === "classes" && (
-                <div className="border rounded-xl p-4">
-                  <h4 className="font-semibold mb-2">
-                    Assigned Classes & Subjects
-                  </h4>
+              <div className="border rounded-xl p-4">
+                <h4 className="font-semibold mb-2">
+                  Assigned Classes & Subjects
+                </h4>
 
-                  {(teacherManagementSelectedTeacher.assignments || [])
-                    .length === 0 ? (
-                    <p className="text-sm text-gray-500">No assignments</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {teacherManagementSelectedTeacher.assignments.map((a) => (
-                        <span
-                          key={a.id || `${a.academic_class_id}-${a.subject_id}`}
-                          className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded"
-                        >
-                          {a.class_name || "Class"} •{" "}
-                          {a.subject_name || "Subject"}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {(teacherManagementSelectedTeacher.assignments || []).length ===
+                0 ? (
+                  <p className="text-sm text-gray-500">No assignments</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {teacherManagementSelectedTeacher.assignments.map((a) => (
+                      <span
+                        key={a.id || `${a.academic_class_id}-${a.subject_id}`}
+                        className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded"
+                      >
+                        {a.class_name || "Class"} •{" "}
+                        {a.subject_name || "Subject"}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
               )}
 
               {/* ================= ATTENDANCE TAB ================= */}
@@ -2195,9 +2423,9 @@ function AdminDashboard() {
                       No attendance records found.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto overflow-hidden rounded-xl border border-gray-100">
+                    <div className="overflow-x-auto overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700">
                       <table className="min-w-full text-left text-sm">
-                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                        <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase text-gray-500">
                           <tr>
                             <th className="px-4 py-2.5">Date</th>
                             <th className="px-4 py-2.5">Status</th>
@@ -2216,8 +2444,8 @@ function AdminDashboard() {
                                     record.status === "Present"
                                       ? "bg-emerald-50 text-emerald-700"
                                       : record.status === "Late"
-                                        ? "bg-amber-50 text-amber-700"
-                                        : "bg-red-50 text-red-700"
+                                      ? "bg-amber-50 text-amber-700"
+                                      : "bg-red-50 text-red-700"
                                   }`}
                                 >
                                   {record.status}
@@ -2251,10 +2479,10 @@ function AdminDashboard() {
                     teacherProfileLeaves.map((leave, idx) => (
                       <div
                         key={leave.id || idx}
-                        className="flex items-center justify-between rounded-xl border border-gray-100 p-3"
+                        className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-slate-700 p-3"
                       >
                         <div>
-                          <p className="text-sm font-medium text-gray-800">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
                             {leave.leave_type || "Leave"} · {leave.from_date} to{" "}
                             {leave.to_date}
                           </p>
@@ -2267,8 +2495,8 @@ function AdminDashboard() {
                             leave.status === "Approved"
                               ? "bg-emerald-50 text-emerald-700"
                               : leave.status === "Rejected"
-                                ? "bg-red-50 text-red-700"
-                                : "bg-amber-50 text-amber-700"
+                              ? "bg-red-50 text-red-700"
+                              : "bg-amber-50 text-amber-700"
                           }`}
                         >
                           {leave.status || "Pending"}
@@ -2306,9 +2534,10 @@ function AdminDashboard() {
         )}
         {/* =========================== TEACHERS SECTION END ============================ */}
 
-        {/*  ============================= MY CLASSES START =============================  */}
+
+                {/*  ============================= MY CLASSES START =============================  */}
         {activeSection === "students" && (
-          <section className="section p-4 sm:p-6 space-y-6 hidden active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 text-white">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -2325,7 +2554,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={studentManagement.openEnrollModal}
-                  className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-indigo-50 transition-all duration-200"
+                  className="bg-white dark:bg-slate-800 text-indigo-600 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-indigo-50 transition-all duration-200"
                 >
                   <i className="bi bi-person-plus-fill me-2"></i>
                   Enroll Student
@@ -2427,7 +2656,7 @@ function AdminDashboard() {
                       </div>
 
                       {/* STATS */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-center">
                           <p className="text-xs text-gray-400 dark:text-gray-500">
                             Students
@@ -2479,7 +2708,7 @@ function AdminDashboard() {
         <div
           className={`${
             isClassDetailOpen ? "flex" : "hidden"
-          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-50 p-2 sm:p-4`}
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[100] p-2 sm:p-4`}
         >
           <div className="w-full max-w-6xl mx-auto bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 rounded-3xl shadow-xl p-4 sm:p-6 md:p-8 space-y-5 max-h-[95vh] overflow-hidden">
             {/* HEADER */}
@@ -2553,11 +2782,7 @@ function AdminDashboard() {
                   >
                     {/* STUDENT */}
                     <div className="md:col-span-3 flex items-center gap-3">
-                      <img
-                        src={`https://i.pravatar.cc/150?u=${student.student_id}`}
-                        alt={student.full_name}
-                        className="w-11 h-11 rounded-full object-cover"
-                      />
+                      <UserAvatar name={student.full_name} className="w-11 h-11 rounded-full object-cover" />
 
                       <div>
                         <p className="text-sm font-medium">
@@ -2626,7 +2851,7 @@ function AdminDashboard() {
         <div
           className={`${
             isStudentProfileOpen ? "flex" : "hidden"
-          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[60] p-2 sm:p-4`}
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[110] p-2 sm:p-4`}
         >
           <div className="bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 w-full max-w-5xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
             {/* HEADER */}
@@ -2643,11 +2868,7 @@ function AdminDashboard() {
 
             {/* PROFILE */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-              <img
-                src={`https://i.pravatar.cc/150?u=${selectedStudent?.student_id}`}
-                alt={selectedStudent?.full_name}
-                className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm"
-              />
+              <UserAvatar name={selectedStudent?.full_name} className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm" />
 
               <div className="text-center sm:text-left">
                 <h3 className="text-xl font-semibold">
@@ -2657,6 +2878,7 @@ function AdminDashboard() {
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Student ID: {selectedStudent?.student_id || "N/A"}
                 </p>
+                <LibraryMembershipToggle studentId={selectedStudent?.id} />
 
                 <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
                   <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-1 rounded-full">
@@ -2677,16 +2899,8 @@ function AdminDashboard() {
             {/* TABS */}
             <div className="flex gap-2 border-b border-gray-200 dark:border-slate-700">
               {[
-                {
-                  key: "overview",
-                  label: "Overview",
-                  icon: "bi-person-lines-fill",
-                },
-                {
-                  key: "attendance",
-                  label: "Attendance",
-                  icon: "bi-calendar-check",
-                },
+                { key: "overview", label: "Overview", icon: "bi-person-lines-fill" },
+                { key: "attendance", label: "Attendance", icon: "bi-calendar-check" },
                 { key: "leaves", label: "Leaves", icon: "bi-calendar-x" },
               ].map((tab) => (
                 <button
@@ -2708,83 +2922,80 @@ function AdminDashboard() {
             {/* ================= OVERVIEW TAB ================= */}
             {studentProfileTab === "overview" && (
               <>
-                {/* INFO */}
-                <div className="grid sm:grid-cols-2 gap-6 text-sm">
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
-                      Contact Info
-                    </h4>
+            {/* INFO */}
+            <div className="grid sm:grid-cols-2 gap-6 text-sm">
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Contact Info
+                </h4>
 
-                    <div>Email: {selectedStudent?.email || "-"}</div>
+                <div>Email: {selectedStudent?.email || "-"}</div>
 
-                    <div>Mobile: {selectedStudent?.mobile || "-"}</div>
+                <div>Mobile: {selectedStudent?.mobile || "-"}</div>
 
-                    <div>Address: {selectedStudent?.address || "-"}</div>
-                  </div>
+                <div>Address: {selectedStudent?.address || "-"}</div>
+              </div>
 
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
-                      Academic
-                    </h4>
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Academic
+                </h4>
 
-                    <div>DOB: {selectedStudent?.date_of_birth || "-"}</div>
+                <div>DOB: {selectedStudent?.date_of_birth || "-"}</div>
 
-                    <div>Roll No: {selectedStudent?.roll_number || "-"}</div>
+                <div>Roll No: {selectedStudent?.roll_number || "-"}</div>
 
-                    <div>
-                      Previous School: {selectedStudent?.previous_school || "-"}
-                    </div>
-                  </div>
+                <div>
+                  Previous School: {selectedStudent?.previous_school || "-"}
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
-                      Family
-                    </h4>
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Family
+                </h4>
 
-                    <div>Father: {selectedStudent?.father_name || "-"}</div>
+                <div>Father: {selectedStudent?.father_name || "-"}</div>
 
-                    <div>Mother: {selectedStudent?.mother_name || "-"}</div>
+                <div>Mother: {selectedStudent?.mother_name || "-"}</div>
 
-                    <div>Parent: {selectedStudent?.parent_name || "-"}</div>
+                <div>Parent: {selectedStudent?.parent_name || "-"}</div>
 
-                    <div>
-                      Parent Mobile: {selectedStudent?.parent_mobile || "-"}
-                    </div>
-                  </div>
+                <div>
+                  Parent Mobile: {selectedStudent?.parent_mobile || "-"}
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
-                      Emergency
-                    </h4>
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                  Emergency
+                </h4>
 
-                    <div>
-                      Contact: {selectedStudent?.emergency_contact_name || "-"}
-                    </div>
-
-                    <div>
-                      Number: {selectedStudent?.emergency_contact_number || "-"}
-                    </div>
-
-                    <div>
-                      Relation:{" "}
-                      {selectedStudent?.emergency_contact_relation || "-"}
-                    </div>
-                  </div>
+                <div>
+                  Contact: {selectedStudent?.emergency_contact_name || "-"}
                 </div>
 
-                {/* MEDICAL */}
-                <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-xl text-sm">
-                  <h4 className="font-medium text-red-600 mb-2">
-                    Medical Info
-                  </h4>
-
-                  <p>
-                    Medical Conditions:{" "}
-                    {selectedStudent?.medical_conditions || "None"}
-                  </p>
-
-                  <p>Allergies: {selectedStudent?.allergies || "None"}</p>
+                <div>
+                  Number: {selectedStudent?.emergency_contact_number || "-"}
                 </div>
+
+                <div>
+                  Relation: {selectedStudent?.emergency_contact_relation || "-"}
+                </div>
+              </div>
+            </div>
+
+            {/* MEDICAL */}
+            <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-xl text-sm">
+              <h4 className="font-medium text-red-600 mb-2">Medical Info</h4>
+
+              <p>
+                Medical Conditions:{" "}
+                {selectedStudent?.medical_conditions || "None"}
+              </p>
+
+              <p>Allergies: {selectedStudent?.allergies || "None"}</p>
+            </div>
               </>
             )}
 
@@ -2798,7 +3009,7 @@ function AdminDashboard() {
                   </div>
                 ) : studentProfileAttendance?.summary ? (
                   <>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       <div className="rounded-xl bg-emerald-50 dark:bg-emerald-500/10 p-4 text-center">
                         <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
                           {studentProfileAttendance.summary.present || 0}
@@ -2849,8 +3060,8 @@ function AdminDashboard() {
                                         record.status === "Present"
                                           ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
                                           : record.status === "Late"
-                                            ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
-                                            : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                                          ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                                          : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
                                       }`}
                                     >
                                       {record.status}
@@ -2906,8 +3117,8 @@ function AdminDashboard() {
                           leave.status === "Approved"
                             ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
                             : leave.status === "Rejected"
-                              ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
-                              : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
+                            ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                            : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"
                         }`}
                       >
                         {leave.status || "Pending"}
@@ -2921,698 +3132,710 @@ function AdminDashboard() {
         </div>
 
         {/* ============ ENROLL STUDENT MODAL (kept from Academic's own enroll flow) ============ */}
-        {/* ============ ENROLL STUDENT MODAL ============ */}
-        {studentManagement.enrollModalOpen && (
-          <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
-                studentManagement.closeEnrollModal();
-              }
-            }}
-          >
-            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-slate-800">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-800">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                  {studentManagement.enrollResult
-                    ? "Student Enrolled"
-                    : "Enroll Student"}
-                </h2>
+                    {/* ============ ENROLL STUDENT MODAL ============ */}
+            {studentManagement.enrollModalOpen && (
+              <div
+                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    studentManagement.closeEnrollModal();
+                  }
+                }}
+              >
+                <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-slate-800">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-5 dark:border-slate-700 dark:bg-slate-800">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                      {studentManagement.enrollResult
+                        ? "Student Enrolled"
+                        : "Enroll Student"}
+                    </h2>
 
-                <button
-                  type="button"
-                  onClick={studentManagement.closeEnrollModal}
-                  disabled={studentManagement.enrollSaving}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
-                >
-                  <i className="bi bi-x-lg" />
-                </button>
-              </div>
-
-              {studentManagement.enrollResult ? (
-                <div className="space-y-4 px-6 py-6">
-                  <div className="flex flex-col items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                    <i className="bi bi-check-circle text-3xl text-emerald-600 dark:text-emerald-300" />
-                    <p className="font-semibold text-emerald-800 dark:text-emerald-200">
-                      {studentManagement.enrollForm.first_name} was enrolled
-                      successfully
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-600">
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      Login Credentials - share these with the student
-                    </p>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <div>
-                        <p className="text-xs text-gray-400">Student ID</p>
-                        <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                          {studentManagement.enrollResult.student_id}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400">User ID</p>
-                        <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                          {studentManagement.enrollResult.user_id}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400">
-                          Temporary Password
-                        </p>
-                        <p className="font-mono font-semibold text-gray-900 dark:text-white">
-                          {studentManagement.enrollResult.password}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={studentManagement.closeEnrollModal}
-                      className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      onClick={studentManagement.enrollAnother}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700"
-                    >
-                      <i className="bi bi-person-plus" />
-                      Enroll Another
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <form
-                  onSubmit={studentManagement.submitEnrollment}
-                  className="space-y-6 px-6 py-6"
-                >
-                  {studentManagement.enrollOptions.academic_classes.length ===
-                    0 &&
-                    !studentManagement.enrollOptionsLoading && (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                        <i className="bi bi-exclamation-triangle mr-1.5" />
-                        No classes have been set up yet. Go to{" "}
-                        <span className="font-semibold">
-                          Grades &amp; Sections
-                        </span>{" "}
-                        and <span className="font-semibold">Classes</span>{" "}
-                        first, then come back to enroll students.
-                      </div>
-                    )}
-
-                  {studentManagement.enrollErrors.form && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-                      {studentManagement.enrollErrors.form}
-                    </div>
-                  )}
-
-                  {/* CLASS */}
-                  <div>
-                    <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                      Class <span className="text-red-500">*</span>
-                    </label>
-
-                    <select
-                      value={studentManagement.enrollForm.academic_class_id}
-                      onChange={(event) =>
-                        studentManagement.updateEnrollForm(
-                          "academic_class_id",
-                          event.target.value,
-                        )
-                      }
-                      className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition dark:bg-slate-900 dark:text-white ${
-                        studentManagement.enrollErrors.academic_class_id
-                          ? "border-red-500"
-                          : "border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600"
-                      }`}
-                    >
-                      <option value="">Select class</option>
-                      {studentManagement.enrollOptions.academic_classes.map(
-                        (cls) => (
-                          <option key={cls.id} value={cls.id}>
-                            {cls.display_name}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  </div>
-
-                  {/* LOGIN CREDENTIALS (editable, auto-suggested) */}
-                  {studentManagement.enrollForm.academic_class_id && (
-                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
-                        Login Credentials
-                      </p>
-
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                            Student ID <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={studentManagement.enrollForm.student_id}
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "student_id",
-                                event.target.value,
-                              )
-                            }
-                            placeholder={
-                              studentManagement.enrollPreviewLoading
-                                ? "Loading suggestion..."
-                                : "Auto-suggested, editable"
-                            }
-                            className={`w-full rounded-lg border px-3 py-2 font-mono text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
-                              studentManagement.enrollErrors.student_id
-                                ? "border-red-500"
-                                : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                            }`}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                            User ID <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={studentManagement.enrollForm.user_id}
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "user_id",
-                                event.target.value,
-                              )
-                            }
-                            placeholder={
-                              studentManagement.enrollPreviewLoading
-                                ? "Loading suggestion..."
-                                : "Auto-suggested, editable"
-                            }
-                            className={`w-full rounded-lg border px-3 py-2 font-mono text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
-                              studentManagement.enrollErrors.user_id
-                                ? "border-red-500"
-                                : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                            }`}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                            Roll Number
-                          </label>
-                          <input
-                            type="number"
-                            value={studentManagement.enrollForm.roll_number}
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "roll_number",
-                                event.target.value,
-                              )
-                            }
-                            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                            Password
-                          </label>
-                          <input
-                            type="text"
-                            value={studentManagement.enrollForm.password}
-                            onChange={(event) =>
-                              studentManagement.updateEnrollForm(
-                                "password",
-                                event.target.value,
-                              )
-                            }
-                            placeholder="Leave blank to auto-generate"
-                            className={`w-full rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
-                              studentManagement.enrollErrors.password
-                                ? "border-red-500"
-                                : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                            }`}
-                          />
-                          {studentManagement.enrollErrors.password && (
-                            <p className="mt-1 text-xs text-red-500">
-                              {studentManagement.enrollErrors.password}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <p className="mt-2 text-xs text-indigo-600/80 dark:text-indigo-300/80">
-                        Student ID and User ID are auto-suggested but you can
-                        edit them. Leave Password blank to auto-generate one
-                        from the mobile number.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* BASIC INFO */}
-                  <div>
-                    <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                      Basic Information
-                    </h3>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          First Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={studentManagement.enrollForm.first_name}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "first_name",
-                              event.target.value,
-                            )
-                          }
-                          className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                            studentManagement.enrollErrors.first_name
-                              ? "border-red-500"
-                              : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Middle Name
-                        </label>
-                        <input
-                          type="text"
-                          value={studentManagement.enrollForm.middle_name}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "middle_name",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Last Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={studentManagement.enrollForm.last_name}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "last_name",
-                              event.target.value,
-                            )
-                          }
-                          className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                            studentManagement.enrollErrors.last_name
-                              ? "border-red-500"
-                              : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Mobile <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={studentManagement.enrollForm.mobile}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "mobile",
-                              event.target.value,
-                            )
-                          }
-                          className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
-                            studentManagement.enrollErrors.mobile
-                              ? "border-red-500"
-                              : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          value={studentManagement.enrollForm.email}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "email",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Gender
-                        </label>
-                        <select
-                          value={studentManagement.enrollForm.gender}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "gender",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        >
-                          <option value="">Select</option>
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Date of Birth
-                        </label>
-                        <input
-                          type="date"
-                          value={studentManagement.enrollForm.date_of_birth}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "date_of_birth",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Blood Group
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. O+"
-                          value={studentManagement.enrollForm.blood_group}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "blood_group",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-
-                      <div className="sm:col-span-3">
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Address
-                        </label>
-                        <input
-                          type="text"
-                          value={studentManagement.enrollForm.address}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "address",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* PARENT / GUARDIAN */}
-                  <div>
-                    <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                      Parent / Guardian
-                    </h3>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <input
-                        type="text"
-                        placeholder="Father's name"
-                        value={studentManagement.enrollForm.father_name}
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "father_name",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Father's mobile"
-                        value={studentManagement.enrollForm.father_mobile}
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "father_mobile",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="email"
-                        placeholder="Father's email"
-                        value={studentManagement.enrollForm.father_email}
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "father_email",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Mother's name"
-                        value={studentManagement.enrollForm.mother_name}
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "mother_name",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Mother's mobile"
-                        value={studentManagement.enrollForm.mother_mobile}
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "mother_mobile",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="email"
-                        placeholder="Mother's email"
-                        value={studentManagement.enrollForm.mother_email}
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "mother_email",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  {/* HEALTH & ENROLLMENT DETAILS */}
-                  <div>
-                    <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                      Health &amp; Enrollment Details
-                    </h3>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <input
-                        type="text"
-                        placeholder="Medical conditions (optional)"
-                        value={studentManagement.enrollForm.medical_conditions}
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "medical_conditions",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Allergies (optional)"
-                        value={studentManagement.enrollForm.allergies}
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "allergies",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Admission Date
-                        </label>
-                        <input
-                          type="date"
-                          value={studentManagement.enrollForm.admission_date}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "admission_date",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        />
-                        <p className="mt-1 text-xs text-gray-400">
-                          Leave blank to use today&apos;s date.
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                          Status
-                        </label>
-                        <select
-                          value={studentManagement.enrollForm.status}
-                          onChange={(event) =>
-                            studentManagement.updateEnrollForm(
-                              "status",
-                              event.target.value,
-                            )
-                          }
-                          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* EMERGENCY + OTHER */}
-                  <div>
-                    <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
-                      Emergency Contact
-                    </h3>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <input
-                        type="text"
-                        placeholder="Contact name"
-                        value={
-                          studentManagement.enrollForm.emergency_contact_name
-                        }
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "emergency_contact_name",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Contact number"
-                        value={
-                          studentManagement.enrollForm.emergency_contact_number
-                        }
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "emergency_contact_number",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Relation"
-                        value={
-                          studentManagement.enrollForm
-                            .emergency_contact_relation
-                        }
-                        onChange={(event) =>
-                          studentManagement.updateEnrollForm(
-                            "emergency_contact_relation",
-                            event.target.value,
-                          )
-                        }
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                      />
-                    </div>
-
-                    <input
-                      type="text"
-                      placeholder="Previous school (optional)"
-                      value={studentManagement.enrollForm.previous_school}
-                      onChange={(event) =>
-                        studentManagement.updateEnrollForm(
-                          "previous_school",
-                          event.target.value,
-                        )
-                      }
-                      className="mt-4 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end">
                     <button
                       type="button"
                       onClick={studentManagement.closeEnrollModal}
                       disabled={studentManagement.enrollSaving}
-                      className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-white disabled:opacity-60 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
                     >
-                      Cancel
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={
-                        studentManagement.enrollSaving ||
-                        studentManagement.enrollOptions.academic_classes
-                          .length === 0
-                      }
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {studentManagement.enrollSaving ? (
-                        <>
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          Enrolling...
-                        </>
-                      ) : (
-                        "Enroll Student"
-                      )}
+                      <i className="bi bi-x-lg" />
                     </button>
                   </div>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
+
+                  {studentManagement.enrollResult ? (
+                    <div className="space-y-4 px-6 py-6">
+                      <div className="flex flex-col items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                        <i className="bi bi-check-circle text-3xl text-emerald-600 dark:text-emerald-300" />
+                        <p className="font-semibold text-emerald-800 dark:text-emerald-200">
+                          {studentManagement.enrollForm.first_name} was
+                          enrolled successfully
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl border border-gray-200 p-4 dark:border-slate-600">
+                        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                          Login Credentials - share these with the student
+                        </p>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div>
+                            <p className="text-xs text-gray-400">
+                              Student ID
+                            </p>
+                            <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                              {studentManagement.enrollResult.student_id}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400">User ID</p>
+                            <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                              {studentManagement.enrollResult.user_id}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400">
+                              Temporary Password
+                            </p>
+                            <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                              {studentManagement.enrollResult.password}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={studentManagement.closeEnrollModal}
+                          className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+                        >
+                          Close
+                        </button>
+                        <button
+                          type="button"
+                          onClick={studentManagement.enrollAnother}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700"
+                        >
+                          <i className="bi bi-person-plus" />
+                          Enroll Another
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={studentManagement.submitEnrollment}
+                      className="space-y-6 px-6 py-6"
+                    >
+                      {studentManagement.enrollOptions.academic_classes
+                        .length === 0 &&
+                        !studentManagement.enrollOptionsLoading && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                            <i className="bi bi-exclamation-triangle mr-1.5" />
+                            No classes have been set up yet. Go to{" "}
+                            <span className="font-semibold">
+                              Grades &amp; Sections
+                            </span>{" "}
+                            and{" "}
+                            <span className="font-semibold">Classes</span>{" "}
+                            first, then come back to enroll students.
+                          </div>
+                        )}
+
+                      {studentManagement.enrollErrors.form && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                          {studentManagement.enrollErrors.form}
+                        </div>
+                      )}
+
+                      {/* CLASS */}
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                          Class <span className="text-red-500">*</span>
+                        </label>
+
+                        <select
+                          value={studentManagement.enrollForm.academic_class_id}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "academic_class_id",
+                              event.target.value,
+                            )
+                          }
+                          className={`w-full rounded-xl border px-4 py-3 text-sm outline-none transition dark:bg-slate-900 dark:text-white ${
+                            studentManagement.enrollErrors.academic_class_id
+                              ? "border-red-500"
+                              : "border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600"
+                          }`}
+                        >
+                          <option value="">Select class</option>
+                          {studentManagement.enrollOptions.academic_classes.map(
+                            (cls) => (
+                              <option key={cls.id} value={cls.id}>
+                                {cls.display_name}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </div>
+
+                      {/* LOGIN CREDENTIALS (editable, auto-suggested) */}
+                      {studentManagement.enrollForm.academic_class_id && (
+                        <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+                          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+                            Login Credentials
+                          </p>
+
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                Student ID{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={studentManagement.enrollForm.student_id}
+                                onChange={(event) =>
+                                  studentManagement.updateEnrollForm(
+                                    "student_id",
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder={
+                                  studentManagement.enrollPreviewLoading
+                                    ? "Loading suggestion..."
+                                    : "Auto-suggested, editable"
+                                }
+                                className={`w-full rounded-lg border px-3 py-2 font-mono text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
+                                  studentManagement.enrollErrors.student_id
+                                    ? "border-red-500"
+                                    : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                                }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                User ID{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={studentManagement.enrollForm.user_id}
+                                onChange={(event) =>
+                                  studentManagement.updateEnrollForm(
+                                    "user_id",
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder={
+                                  studentManagement.enrollPreviewLoading
+                                    ? "Loading suggestion..."
+                                    : "Auto-suggested, editable"
+                                }
+                                className={`w-full rounded-lg border px-3 py-2 font-mono text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
+                                  studentManagement.enrollErrors.user_id
+                                    ? "border-red-500"
+                                    : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                                }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                Roll Number
+                              </label>
+                              <input
+                                type="number"
+                                value={studentManagement.enrollForm.roll_number}
+                                onChange={(event) =>
+                                  studentManagement.updateEnrollForm(
+                                    "roll_number",
+                                    event.target.value,
+                                  )
+                                }
+                                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                Password
+                              </label>
+                              <input
+                                type="text"
+                                value={studentManagement.enrollForm.password}
+                                onChange={(event) =>
+                                  studentManagement.updateEnrollForm(
+                                    "password",
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder="Leave blank to auto-generate"
+                                className={`w-full rounded-lg border px-3 py-2 text-sm outline-none dark:bg-slate-800 dark:text-gray-200 ${
+                                  studentManagement.enrollErrors.password
+                                    ? "border-red-500"
+                                    : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                                }`}
+                              />
+                              {studentManagement.enrollErrors.password && (
+                                <p className="mt-1 text-xs text-red-500">
+                                  {studentManagement.enrollErrors.password}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="mt-2 text-xs text-indigo-600/80 dark:text-indigo-300/80">
+                            Student ID and User ID are auto-suggested but you
+                            can edit them. Leave Password blank to
+                            auto-generate one from the mobile number.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* BASIC INFO */}
+                      <div>
+                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
+                          Basic Information
+                        </h3>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              First Name{" "}
+                              <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={studentManagement.enrollForm.first_name}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "first_name",
+                                  event.target.value,
+                                )
+                              }
+                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
+                                studentManagement.enrollErrors.first_name
+                                  ? "border-red-500"
+                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Middle Name
+                            </label>
+                            <input
+                              type="text"
+                              value={studentManagement.enrollForm.middle_name}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "middle_name",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Last Name{" "}
+                              <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={studentManagement.enrollForm.last_name}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "last_name",
+                                  event.target.value,
+                                )
+                              }
+                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
+                                studentManagement.enrollErrors.last_name
+                                  ? "border-red-500"
+                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Mobile <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={studentManagement.enrollForm.mobile}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "mobile",
+                                  event.target.value,
+                                )
+                              }
+                              className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none dark:bg-slate-900 dark:text-white ${
+                                studentManagement.enrollErrors.mobile
+                                  ? "border-red-500"
+                                  : "border-gray-200 focus:border-indigo-500 dark:border-slate-600"
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Email
+                            </label>
+                            <input
+                              type="email"
+                              value={studentManagement.enrollForm.email}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "email",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Gender
+                            </label>
+                            <select
+                              value={studentManagement.enrollForm.gender}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "gender",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            >
+                              <option value="">Select</option>
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Date of Birth
+                            </label>
+                            <input
+                              type="date"
+                              value={studentManagement.enrollForm.date_of_birth}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "date_of_birth",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Blood Group
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. O+"
+                              value={studentManagement.enrollForm.blood_group}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "blood_group",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-3">
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Address
+                            </label>
+                            <input
+                              type="text"
+                              value={studentManagement.enrollForm.address}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "address",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PARENT / GUARDIAN */}
+                      <div>
+                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
+                          Parent / Guardian
+                        </h3>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                          <input
+                            type="text"
+                            placeholder="Father's name"
+                            value={studentManagement.enrollForm.father_name}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "father_name",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Father's mobile"
+                            value={studentManagement.enrollForm.father_mobile}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "father_mobile",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                          <input
+                            type="email"
+                            placeholder="Father's email"
+                            value={studentManagement.enrollForm.father_email}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "father_email",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Mother's name"
+                            value={studentManagement.enrollForm.mother_name}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "mother_name",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Mother's mobile"
+                            value={studentManagement.enrollForm.mother_mobile}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "mother_mobile",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                          <input
+                            type="email"
+                            placeholder="Mother's email"
+                            value={studentManagement.enrollForm.mother_email}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "mother_email",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* HEALTH & ENROLLMENT DETAILS */}
+                      <div>
+                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
+                          Health &amp; Enrollment Details
+                        </h3>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <input
+                            type="text"
+                            placeholder="Medical conditions (optional)"
+                            value={studentManagement.enrollForm.medical_conditions}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "medical_conditions",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Allergies (optional)"
+                            value={studentManagement.enrollForm.allergies}
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "allergies",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Admission Date
+                            </label>
+                            <input
+                              type="date"
+                              value={studentManagement.enrollForm.admission_date}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "admission_date",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            />
+                            <p className="mt-1 text-xs text-gray-400">
+                              Leave blank to use today&apos;s date.
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                              Status
+                            </label>
+                            <select
+                              value={studentManagement.enrollForm.status}
+                              onChange={(event) =>
+                                studentManagement.updateEnrollForm(
+                                  "status",
+                                  event.target.value,
+                                )
+                              }
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                            >
+                              <option value="Active">Active</option>
+                              <option value="Inactive">Inactive</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* EMERGENCY + OTHER */}
+                      <div>
+                        <h3 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">
+                          Emergency Contact
+                        </h3>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                          <input
+                            type="text"
+                            placeholder="Contact name"
+                            value={
+                              studentManagement.enrollForm
+                                .emergency_contact_name
+                            }
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "emergency_contact_name",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Contact number"
+                            value={
+                              studentManagement.enrollForm
+                                .emergency_contact_number
+                            }
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "emergency_contact_number",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Relation"
+                            value={
+                              studentManagement.enrollForm
+                                .emergency_contact_relation
+                            }
+                            onChange={(event) =>
+                              studentManagement.updateEnrollForm(
+                                "emergency_contact_relation",
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                          />
+                        </div>
+
+                        <input
+                          type="text"
+                          placeholder="Previous school (optional)"
+                          value={studentManagement.enrollForm.previous_school}
+                          onChange={(event) =>
+                            studentManagement.updateEnrollForm(
+                              "previous_school",
+                              event.target.value,
+                            )
+                          }
+                          className="mt-4 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={studentManagement.closeEnrollModal}
+                          disabled={studentManagement.enrollSaving}
+                          className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-white disabled:opacity-60 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          type="submit"
+                          disabled={
+                            studentManagement.enrollSaving ||
+                            studentManagement.enrollOptions.academic_classes
+                              .length === 0
+                          }
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {studentManagement.enrollSaving ? (
+                            <>
+                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              Enrolling...
+                            </>
+                          ) : (
+                            "Enroll Student"
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
+            )}
+
+
+
 
         {/* ================= ACADEMIC YEARS (BATCHES) ================= */}
         {activeSection === "batches" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -3622,8 +3845,8 @@ function AdminDashboard() {
                   </h2>
 
                   <p className="text-xs sm:text-sm opacity-90">
-                    Manage school years like 2025-26, see which one is active,
-                    and review any year&apos;s data.
+                    Manage school years like 2025-26, see which one is
+                    active, and review any year&apos;s data.
                   </p>
                 </div>
 
@@ -3646,7 +3869,7 @@ function AdminDashboard() {
                     <button
                       type="button"
                       onClick={batchManagement.openCreateBatchModal}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
                     >
                       <i className="bi bi-plus-lg" />
                       Add Academic Year
@@ -3665,13 +3888,14 @@ function AdminDashboard() {
               <p className="text-sm text-indigo-900 dark:text-indigo-200">
                 An <span className="font-semibold">Academic Year</span> is a
                 school year like &quot;2025-26&quot;. Mark one as{" "}
-                <span className="font-semibold">Current</span> so new admissions
-                and classes default to it. Click{" "}
-                <span className="font-semibold">View</span> on any year - past
-                or present - to see its grades, sections and student counts. Use{" "}
-                <span className="font-semibold">Copy Classes</span> to reuse
-                last year&apos;s grade/section setup instead of rebuilding it
-                from scratch.
+                <span className="font-semibold">Current</span> so new
+                admissions and classes default to it. Click{" "}
+                <span className="font-semibold">View</span> on any year -
+                past or present - to see its grades, sections and student
+                counts. Use{" "}
+                <span className="font-semibold">Copy Classes</span> to
+                reuse last year&apos;s grade/section setup instead of
+                rebuilding it from scratch.
               </p>
             </div>
 
@@ -3749,7 +3973,7 @@ function AdminDashboard() {
             </div>
 
             {/* ACADEMIC YEAR CARDS */}
-            {batchManagement.batchLoading ? (
+            {batchManagement.batchLoading && batchManagement.batches.length === 0 ? (
               <div className="rounded-2xl border border-gray-100 bg-white p-16 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="flex flex-col items-center gap-3 text-gray-500">
                   <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
@@ -3824,10 +4048,10 @@ function AdminDashboard() {
                                 batch.academic_status === "Current"
                                   ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
                                   : batch.academic_status === "Upcoming"
-                                    ? "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
-                                    : batch.academic_status === "Completed"
-                                      ? "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
-                                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                                  ? "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
+                                  : batch.academic_status === "Completed"
+                                  ? "bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300"
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
                               }`}
                             >
                               {batch.academic_status === "Current" && (
@@ -3839,7 +4063,7 @@ function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-3 text-center">
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
                         <div className="rounded-xl bg-gray-50 p-3 dark:bg-slate-900/50">
                           <p className="text-lg font-bold text-gray-900 dark:text-white">
                             {batch.class_count || 0}
@@ -3901,9 +4125,7 @@ function AdminDashboard() {
                       {canWriteAcademic && (
                         <button
                           type="button"
-                          onClick={() =>
-                            batchManagement.openRolloverModal(batch)
-                          }
+                          onClick={() => batchManagement.openRolloverModal(batch)}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-gray-200 dark:hover:bg-slate-700"
                         >
                           <i className="bi bi-copy" />
@@ -4220,7 +4442,7 @@ function AdminDashboard() {
                       </div>
                     ) : batchManagement.overviewData ? (
                       <>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                           <div className="rounded-xl bg-indigo-50 p-3 text-center dark:bg-indigo-500/10">
                             <p className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
                               {
@@ -4279,7 +4501,8 @@ function AdminDashboard() {
                                   (cls) => (
                                     <tr key={cls.id}>
                                       <td className="px-4 py-2.5 font-medium text-gray-800 dark:text-gray-200">
-                                        {cls.division_name} {cls.section_name}
+                                        {cls.division_name}{" "}
+                                        {cls.section_name}
                                       </td>
                                       <td className="px-4 py-2.5 text-right text-gray-600 dark:text-gray-300">
                                         {cls.student_count}
@@ -4348,7 +4571,8 @@ function AdminDashboard() {
                       <>
                         <div>
                           <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            Copy into <span className="text-red-500">*</span>
+                            Copy into{" "}
+                            <span className="text-red-500">*</span>
                           </label>
 
                           <select
@@ -4360,9 +4584,7 @@ function AdminDashboard() {
                             }
                             className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                           >
-                            <option value="">
-                              Select target academic year
-                            </option>
+                            <option value="">Select target academic year</option>
                             {batchManagement.batches
                               .filter(
                                 (b) =>
@@ -4378,9 +4600,10 @@ function AdminDashboard() {
                         </div>
 
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Only the grade + section combinations are copied - no
-                          students are moved, and classes that already exist in
-                          the target year are skipped automatically.
+                          Only the grade + section combinations are copied
+                          - no students are moved, and classes that
+                          already exist in the target year are skipped
+                          automatically.
                         </p>
 
                         {batchManagement.rolloverError && (
@@ -4427,12 +4650,14 @@ function AdminDashboard() {
 
         {/* ================= SUBJECTS ================= */}
         {activeSection === "subjects" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg sm:text-xl font-semibold">Subjects</h2>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Subjects
+                  </h2>
 
                   <p className="text-xs sm:text-sm opacity-90">
                     The subjects taught across your school - Math, Science,
@@ -4449,7 +4674,9 @@ function AdminDashboard() {
                   >
                     <i
                       className={`bi bi-arrow-clockwise ${
-                        subjectManagement.subjectsLoading ? "animate-spin" : ""
+                        subjectManagement.subjectsLoading
+                          ? "animate-spin"
+                          : ""
                       }`}
                     />
                     Refresh
@@ -4459,7 +4686,7 @@ function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => subjectManagement.openSubjectModal()}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
                     >
                       <i className="bi bi-plus-lg" />
                       Add Subject
@@ -4482,8 +4709,8 @@ function AdminDashboard() {
                 students choose.{" "}
                 <span className="font-semibold">Practical</span> subjects
                 involve labs or hands-on work. Marking a subject{" "}
-                <span className="font-semibold">Inactive</span> hides it from
-                new timetables and exams without deleting its history.
+                <span className="font-semibold">Inactive</span> hides it
+                from new timetables and exams without deleting its history.
               </p>
             </div>
 
@@ -4572,7 +4799,9 @@ function AdminDashboard() {
                 <select
                   value={subjectManagement.subjectStatusFilter}
                   onChange={(event) =>
-                    subjectManagement.setSubjectStatusFilter(event.target.value)
+                    subjectManagement.setSubjectStatusFilter(
+                      event.target.value,
+                    )
                   }
                   className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 >
@@ -4622,7 +4851,7 @@ function AdminDashboard() {
                   </thead>
 
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                    {subjectManagement.subjectsLoading ? (
+                    {subjectManagement.subjectsLoading && subjectManagement.subjects.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-5 py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-gray-500">
@@ -4715,7 +4944,9 @@ function AdminDashboard() {
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    subjectManagement.openSubjectModal(subject)
+                                    subjectManagement.openSubjectModal(
+                                      subject,
+                                    )
                                   }
                                   title="Edit subject"
                                   className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 text-indigo-600 transition hover:bg-indigo-50 dark:border-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
@@ -4726,7 +4957,9 @@ function AdminDashboard() {
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    subjectManagement.deleteSubject(subject.id)
+                                    subjectManagement.deleteSubject(
+                                      subject.id,
+                                    )
                                   }
                                   disabled={subjectManagement.subjectDeleting}
                                   title="Delete subject"
@@ -4891,7 +5124,7 @@ function AdminDashboard() {
 
         {/* ================= DIVISIONS & SECTIONS ================= */}
         {activeSection === "divisions-sections" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -4943,15 +5176,15 @@ function AdminDashboard() {
                 <div className="text-sm text-indigo-900 dark:text-indigo-200">
                   <p className="font-semibold">How this works</p>
                   <p className="mt-1 leading-relaxed text-indigo-800/90 dark:text-indigo-200/80">
-                    <span className="font-semibold">Grades</span> are your year
-                    levels, like{" "}
+                    <span className="font-semibold">Grades</span> are your
+                    year levels, like{" "}
                     <span className="italic">Class 1, Class 2, Nursery</span>.{" "}
                     <span className="font-semibold">Sections</span> split a
                     grade into smaller groups, like{" "}
-                    <span className="italic">A, B, C</span>. Once you have both
-                    set up, head to{" "}
-                    <span className="font-semibold">Classes</span> to combine a
-                    grade and section into an actual class, like{" "}
+                    <span className="italic">A, B, C</span>. Once you have
+                    both set up, head to{" "}
+                    <span className="font-semibold">Classes</span> to combine
+                    a grade and section into an actual class, like{" "}
                     <span className="italic">Class 10 - A</span>.
                   </p>
                 </div>
@@ -5050,7 +5283,9 @@ function AdminDashboard() {
                       type="search"
                       value={divisionsSections.divisionSearch}
                       onChange={(event) => {
-                        divisionsSections.setDivisionSearch(event.target.value);
+                        divisionsSections.setDivisionSearch(
+                          event.target.value,
+                        );
                         divisionsSections.loadDivisions(event.target.value);
                       }}
                       placeholder="Search grades..."
@@ -5070,7 +5305,7 @@ function AdminDashboard() {
                     </thead>
 
                     <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                      {divisionsSections.divisionLoading ? (
+                      {divisionsSections.divisionLoading && divisionsSections.divisions.length === 0 ? (
                         <tr>
                           <td colSpan={3} className="px-5 py-14 text-center">
                             <div className="flex flex-col items-center gap-3 text-gray-500">
@@ -5093,8 +5328,8 @@ function AdminDashboard() {
 
                               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                 Add your first grade, like{" "}
-                                <span className="italic">Class 1</span>, to get
-                                started.
+                                <span className="italic">Class 1</span>, to
+                                get started.
                               </p>
                             </div>
                           </td>
@@ -5200,7 +5435,9 @@ function AdminDashboard() {
                       type="search"
                       value={divisionsSections.sectionSearch}
                       onChange={(event) => {
-                        divisionsSections.setSectionSearch(event.target.value);
+                        divisionsSections.setSectionSearch(
+                          event.target.value,
+                        );
                         divisionsSections.loadSections(event.target.value);
                       }}
                       placeholder="Search sections..."
@@ -5657,15 +5894,18 @@ function AdminDashboard() {
 
         {/* ================= CLASSES ================= */}
         {activeSection === "classes" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg sm:text-xl font-semibold">Classes</h2>
+                  <h2 className="text-lg sm:text-xl font-semibold">
+                    Classes
+                  </h2>
 
                   <p className="text-xs sm:text-sm opacity-90">
-                    Combine a Grade, Section and Academic Year into a class.
+                    Combine a Grade, Section and Academic Year into a
+                    class.
                   </p>
                 </div>
 
@@ -5688,7 +5928,7 @@ function AdminDashboard() {
                     <button
                       type="button"
                       onClick={academicClasses.openCreateClassModal}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
                     >
                       <i className="bi bi-plus-lg" />
                       Add Class
@@ -5711,11 +5951,17 @@ function AdminDashboard() {
                     A class is simply a{" "}
                     <span className="font-semibold">Grade</span> +{" "}
                     <span className="font-semibold">Section</span> for a
-                    specific{" "}
-                    <span className="font-semibold">Academic Year</span> - like{" "}
-                    <span className="italic">Class 10 - A (2025-26)</span>. No
-                    grades or sections yet? Set them up on the{" "}
-                    <span className="font-semibold">Grades &amp; Sections</span>{" "}
+                    specific <span className="font-semibold">
+                      Academic Year
+                    </span>{" "}
+                    - like{" "}
+                    <span className="italic">
+                      Class 10 - A (2025-26)
+                    </span>
+                    . No grades or sections yet? Set them up on the{" "}
+                    <span className="font-semibold">
+                      Grades &amp; Sections
+                    </span>{" "}
                     page first.
                   </p>
                 </div>
@@ -5837,7 +6083,7 @@ function AdminDashboard() {
                   </thead>
 
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                    {academicClasses.classLoading ? (
+                    {academicClasses.classLoading && academicClasses.classes.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-5 py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-gray-500">
@@ -5859,9 +6105,9 @@ function AdminDashboard() {
                             </h3>
 
                             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                              Add your first class, or adjust the filters above.
-                              You&apos;ll need at least one Grade, Section and
-                              Academic Year first.
+                              Add your first class, or adjust the filters
+                              above. You&apos;ll need at least one Grade,
+                              Section and Academic Year first.
                             </p>
 
                             {canWriteAcademic && (
@@ -5979,8 +6225,8 @@ function AdminDashboard() {
                       </h2>
 
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Pick a Grade, Section and Academic Year - together they
-                        make one class.
+                        Pick a Grade, Section and Academic Year - together
+                        they make one class.
                       </p>
                     </div>
 
@@ -6004,7 +6250,8 @@ function AdminDashboard() {
                     <div>
                       <div className="mb-1.5 flex items-center justify-between">
                         <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200">
-                          Academic Year <span className="text-red-500">*</span>
+                          Academic Year{" "}
+                          <span className="text-red-500">*</span>
                         </label>
 
                         {!academicClasses.newBatchOpen && (
@@ -6110,7 +6357,9 @@ function AdminDashboard() {
                           {academicClasses.options.batches.length === 0 && (
                             <p className="mt-1 text-xs text-amber-600">
                               No academic years yet - click{" "}
-                              <span className="font-semibold">Add new</span>{" "}
+                              <span className="font-semibold">
+                                Add new
+                              </span>{" "}
                               above to create one.
                             </p>
                           )}
@@ -6139,11 +6388,13 @@ function AdminDashboard() {
                           }`}
                         >
                           <option value="">Select grade</option>
-                          {academicClasses.options.divisions.map((division) => (
-                            <option key={division.id} value={division.id}>
-                              {division.division_name}
-                            </option>
-                          ))}
+                          {academicClasses.options.divisions.map(
+                            (division) => (
+                              <option key={division.id} value={division.id}>
+                                {division.division_name}
+                              </option>
+                            ),
+                          )}
                         </select>
 
                         {academicClasses.classErrors.division_id && (
@@ -6191,8 +6442,8 @@ function AdminDashboard() {
                     {(academicClasses.options.divisions.length === 0 ||
                       academicClasses.options.sections.length === 0) && (
                       <p className="text-xs text-amber-600">
-                        Add grades and sections first from the &quot;Grades
-                        &amp; Sections&quot; page.
+                        Add grades and sections first from the{" "}
+                        &quot;Grades &amp; Sections&quot; page.
                       </p>
                     )}
 
@@ -6343,9 +6594,9 @@ function AdminDashboard() {
           </section>
         )}
 
-        {/* =========================== PREMIUM TIMETABLE SECTION ============================ */}
+                {/* =========================== PREMIUM TIMETABLE SECTION ============================ */}
         {activeSection === "timetable" && (
-          <section className="space-y-6 animate-in fade-in duration-500">
+          <section className="space-y-6 animate-in animate-fade-in duration-500">
             {/*  HEADER  */}
             <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -6361,7 +6612,7 @@ function AdminDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
                   <button
                     onClick={() => openLectureModal()}
-                    className="w-full sm:w-auto bg-white text-indigo-600 px-4 py-3 rounded-xl font-medium shadow hover:shadow-md transition"
+                    className="w-full sm:w-auto bg-white dark:bg-slate-800 text-indigo-600 px-4 py-3 rounded-xl font-medium shadow hover:shadow-md transition"
                   >
                     + Schedule Lecture
                   </button>
@@ -6383,7 +6634,7 @@ function AdminDashboard() {
               </div>
             </div>
             {/* FILTERS */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-6 shadow-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <select
                   value={filters.academic_class_id}
@@ -6462,7 +6713,7 @@ function AdminDashboard() {
               ].map((item) => (
                 <div
                   key={item.title}
-                  className="group rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  className="group rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 p-4 sm:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -6484,7 +6735,7 @@ function AdminDashboard() {
             </div>
 
             {/* TIMETABLE */}
-            <div className="w-full max-w-full overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div className="w-full max-w-full overflow-hidden rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 shadow-sm">
               <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">
@@ -6509,7 +6760,7 @@ function AdminDashboard() {
                 {timeSlots.map((slot) => (
                   <div
                     key={slot}
-                    className="bg-white rounded-2xl shadow-sm border p-4"
+                    className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border p-4"
                   >
                     <h3 className="font-semibold mb-4">{slot}</h3>
 
@@ -6747,7 +6998,7 @@ function AdminDashboard() {
         {/* ================= LECTURE MODAL ================= */}
         <div
           id="lectureModal"
-          className={`fixed inset-0 z-[70] ${
+          className={`fixed inset-0 z-[110] ${
             lectureModalOpen ? "flex" : "hidden"
           } items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4`}
         >
@@ -6759,15 +7010,15 @@ function AdminDashboard() {
       max-h-[92vh]
       overflow-hidden
       rounded-2xl
-      bg-white
+      bg-white dark:bg-slate-800
       shadow-2xl
       border border-slate-200
       flex flex-col
-      animate-in fade-in zoom-in-95 duration-200
+      animate-in animate-fade-in zoom-in-95 duration-200
     "
           >
             {/* HEADER */}
-            <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white dark:bg-slate-800 border-b border-slate-200 px-4 sm:px-6 py-4 flex items-center justify-between">
               <div className="min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
                   Schedule Lecture
@@ -6811,7 +7062,7 @@ function AdminDashboard() {
               w-full h-11 px-4
               rounded-xl
               border border-slate-200
-              bg-white
+              bg-white dark:bg-slate-800
               text-sm
               focus:ring-2 focus:ring-indigo-500/20
               focus:border-indigo-500
@@ -6824,79 +7075,6 @@ function AdminDashboard() {
                     {TTClasses?.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.display_name || item.class_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">
-                    Division
-                  </label>
-
-                  <select
-                    value={selectedDivision}
-                    onChange={(e) => setSelectedDivision(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm"
-                  >
-                    <option value="">All Divisions</option>
-
-                    {divisions.map((division) => (
-                      <option key={division} value={division}>
-                        {division}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* DIVISION */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-600">
-                    Division
-                  </label>
-
-                  <select
-                    value={lectureForm.division_id || ""}
-                    onChange={(e) =>
-                      updateLectureForm("division_id", e.target.value)
-                    }
-                    className="
-              w-full h-11 px-4 rounded-xl border border-slate-200
-              text-sm focus:ring-2 focus:ring-indigo-500/20
-              focus:border-indigo-500 outline-none
-            "
-                  >
-                    <option value="">Select Division</option>
-
-                    {TTDivisions?.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.division_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* SECTION */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-600">
-                    Section
-                  </label>
-
-                  <select
-                    value={lectureForm.section_id || ""}
-                    onChange={(e) =>
-                      updateLectureForm("section_id", e.target.value)
-                    }
-                    className="
-              w-full h-11 px-4 rounded-xl border border-slate-200
-              text-sm focus:ring-2 focus:ring-indigo-500/20
-              focus:border-indigo-500 outline-none
-            "
-                  >
-                    <option value="">Select Section</option>
-
-                    {TTsections?.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.section_name}
                       </option>
                     ))}
                   </select>
@@ -7135,7 +7313,7 @@ function AdminDashboard() {
             </div>
 
             {/* FOOTER */}
-            <div className="sticky bottom-0 bg-white border-t border-slate-200 px-4 sm:px-6 py-4">
+            <div className="sticky bottom-0 bg-white dark:bg-slate-800 border-t border-slate-200 px-4 sm:px-6 py-4">
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
                 <button
                   onClick={closeLectureModal}
@@ -7144,7 +7322,7 @@ function AdminDashboard() {
             px-5 py-2.5
             rounded-xl
             border border-slate-300
-            bg-white
+            bg-white dark:bg-slate-800
             text-slate-700
             font-medium
             hover:bg-slate-50
@@ -7176,8 +7354,9 @@ function AdminDashboard() {
         </div>
         {/* ================= LECTURE MODAL END ================= */}
 
-        {activeSection === "attendance" && (
-          <section className="section active p-3 sm:p-5 lg:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-gray-100">
+
+                {activeSection === "attendance" && (
+          <section className="p-3 sm:p-5 lg:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-gray-100">
             {/* HEADER */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 p-6 sm:p-8 shadow-xl">
               <div className="relative z-10">
@@ -7244,7 +7423,7 @@ function AdminDashboard() {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
               <div className="xl:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* PRESENT */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Present</p>
@@ -7260,7 +7439,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* ABSENT */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Absent</p>
@@ -7276,7 +7455,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* TOTAL */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Total</p>
@@ -7292,7 +7471,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* PERCENTAGE */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Attendance %</p>
@@ -7310,7 +7489,7 @@ function AdminDashboard() {
             </div>
 
             {/* ================= FILTERS ================= */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* ROLE */}
                 <div>
@@ -7321,7 +7500,7 @@ function AdminDashboard() {
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-slate-700 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   >
                     <option value="students">Students</option>
 
@@ -7339,7 +7518,7 @@ function AdminDashboard() {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-slate-700 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
 
@@ -7350,7 +7529,7 @@ function AdminDashboard() {
                   </label>
                   <select
                     value={selectedClass}
-                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-slate-700 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     onChange={(e) => setSelectedClass(e.target.value)}
                   >
                     <option value="">All Classes</option>
@@ -7377,7 +7556,7 @@ function AdminDashboard() {
                       value={searchAttendance}
                       onChange={(e) => setSearchAttendance(e.target.value)}
                       placeholder="Search..."
-                      className="w-full h-11 rounded-xl border border-gray-200 pl-11 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      className="w-full h-11 rounded-xl border border-gray-200 dark:border-slate-700 pl-11 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
                 </div>
@@ -7385,11 +7564,11 @@ function AdminDashboard() {
             </div>
 
             {/* ================= TABLE ================= */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
               {/* TOP */}
-              <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+              <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-semibold text-lg text-gray-800">
+                  <h3 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
                     Attendance List
                   </h3>
 
@@ -7430,7 +7609,7 @@ function AdminDashboard() {
               {/* TABLE */}
               <div className="overflow-auto">
                 <table className="w-full min-w-[900px] text-sm">
-                  <thead className="bg-gray-50 sticky top-0 z-10 text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 sticky top-0 z-10 text-gray-600">
                     <tr>
                       <th className="p-4 text-left font-semibold">ID</th>
 
@@ -7444,7 +7623,7 @@ function AdminDashboard() {
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-gray-100 bg-white dark:bg-slate-800">
                     {loadingAttendance ? (
                       <tr>
                         <td colSpan="5" className="text-center p-8">
@@ -7507,7 +7686,7 @@ function AdminDashboard() {
               </div>
 
               {/* PAGINATION */}
-              <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="p-4 border-t border-gray-100 dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-center justify-between">
                 <p className="text-sm text-gray-500">
                   Showing {attendanceList.length} of {pagination.total} records
                 </p>
@@ -7516,7 +7695,7 @@ function AdminDashboard() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage(page - 1)}
-                    className="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition disabled:opacity-50"
+                    className="w-10 h-10 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-100 transition disabled:opacity-50"
                   >
                     <i className="fas fa-chevron-left text-xs"></i>
                   </button>
@@ -7530,7 +7709,7 @@ function AdminDashboard() {
                       pagination.pages === 0 || page >= pagination.pages
                     }
                     onClick={() => setPage(page + 1)}
-                    className="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition disabled:opacity-50"
+                    className="w-10 h-10 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-100 transition disabled:opacity-50"
                   >
                     <i className="fas fa-chevron-right text-xs"></i>
                   </button>
@@ -7540,9 +7719,10 @@ function AdminDashboard() {
           </section>
         )}
 
+
         {/* ===================== PROFILE SECTION START ========================*/}
-        {activeSection === "exams" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+                {activeSection === "exams" && (
+          <section className="p-4 sm:p-6 space-y-6">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -7579,7 +7759,7 @@ function AdminDashboard() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
@@ -7760,10 +7940,10 @@ function AdminDashboard() {
               ].map(([label, value]) => (
                 <div
                   key={label}
-                  className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm"
+                  className="p-4 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-sm"
                 >
                   <p className="text-xs text-gray-500 font-medium">{label}</p>
-                  <h5 className="text-xl font-bold text-gray-800">
+                  <h5 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                     {value || 0}
                   </h5>
                 </div>
@@ -7771,8 +7951,8 @@ function AdminDashboard() {
             </div>
 
             {/* Workflow */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <h3 className="font-bold text-gray-800 mb-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
+              <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4">
                 Exam Result Workflow
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-7 gap-3 text-sm">
@@ -7798,10 +7978,10 @@ function AdminDashboard() {
 
             {/* Class Progress */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <div className="xl:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900">
                   <div>
-                    <h3 className="font-bold text-gray-800">
+                    <h3 className="font-bold text-gray-800 dark:text-gray-100">
                       Class Wise Exam Progress
                     </h3>
                     <p className="text-xs text-gray-500">
@@ -7826,11 +8006,11 @@ function AdminDashboard() {
                     examManagementClasses.map((item) => (
                       <div
                         key={item.exam_id}
-                        className="border border-gray-200 rounded-2xl p-5 hover:shadow-md transition"
+                        className="border border-gray-200 dark:border-slate-700 rounded-2xl p-5 hover:shadow-md transition"
                       >
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h3 className="text-lg font-bold text-gray-800">
+                            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
                               {item.class_name}
                             </h3>
                             <p className="text-xs text-gray-500">
@@ -8027,9 +8207,9 @@ function AdminDashboard() {
             </div>
 
             {/* Exam Terms Table */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-gray-100 bg-gray-50">
-                <h3 className="font-bold text-gray-800">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+                <h3 className="font-bold text-gray-800 dark:text-gray-100">
                   Created Examinations
                 </h3>
                 <p className="text-xs text-gray-500">
@@ -8039,7 +8219,7 @@ function AdminDashboard() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 text-xs uppercase">
                     <tr>
                       <th className="px-4 py-3">Class</th>
                       <th className="px-4 py-3">Exam</th>
@@ -8098,13 +8278,14 @@ function AdminDashboard() {
                 </table>
               </div>
             </div>
+
           </section>
         )}
 
         {/* ================= CREATE EXAM MODAL START ================= */}
         {examManagementModalOpen && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-3 sm:p-5">
-            <div className="relative w-full max-w-5xl max-h-[94vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="relative w-full max-w-5xl max-h-[94vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-800 shadow-2xl">
               {/* Header */}
               <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-slate-200">
                 <div className="flex items-start justify-between gap-4 px-5 sm:px-7 py-5">
@@ -8171,7 +8352,7 @@ function AdminDashboard() {
                             )
                           }
                           placeholder="Annual Examination"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         />
                       </div>
 
@@ -8188,7 +8369,7 @@ function AdminDashboard() {
                               e.target.value,
                             )
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         >
                           <option value="">Select Academic Batch</option>
                           {(examManagementOptions.batches || []).map(
@@ -8213,7 +8394,7 @@ function AdminDashboard() {
                               e.target.value,
                             )
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         >
                           <option value="Unit Test">Unit Test</option>
                           <option value="Mid Term">Mid Term</option>
@@ -8236,7 +8417,7 @@ function AdminDashboard() {
                               e.target.value,
                             )
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         />
                       </div>
 
@@ -8250,7 +8431,7 @@ function AdminDashboard() {
                           onChange={(e) =>
                             updateExamManagementForm("end_date", e.target.value)
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         />
                       </div>
                     </div>
@@ -8259,7 +8440,7 @@ function AdminDashboard() {
                   {/* Assignment Details */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {/* Classes */}
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                    <div className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-5 sm:p-6 shadow-sm">
                       <div className="flex items-center justify-between gap-3 mb-4">
                         <div>
                           <h4 className="font-black text-slate-900">
@@ -8307,7 +8488,7 @@ function AdminDashboard() {
                     </div>
 
                     {/* Subjects */}
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                    <div className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-5 sm:p-6 shadow-sm">
                       <div className="flex items-center justify-between gap-3 mb-4">
                         <div>
                           <h4 className="font-black text-slate-900">
@@ -8358,7 +8539,7 @@ function AdminDashboard() {
                       <button
                         type="button"
                         onClick={closeExamManagementModal}
-                        className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                        className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
                       >
                         Cancel
                       </button>
@@ -8383,11 +8564,11 @@ function AdminDashboard() {
 
         {/* ================= EXAM DETAILS MODAL START ================= */}
         {examManagementDetailsModalOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
-              <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+              <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800">
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
                     {examManagementSelectedDetails?.exam?.class_name || "Exam"}{" "}
                     Details
                   </h3>
@@ -8414,12 +8595,12 @@ function AdminDashboard() {
                 ) : (
                   <>
                     <div>
-                      <h4 className="font-bold text-gray-800 mb-3">
+                      <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-3">
                         Subject Status
                       </h4>
                       <div className="overflow-x-auto border rounded-xl">
                         <table className="w-full text-left text-sm">
-                          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                          <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 text-xs uppercase">
                             <tr>
                               <th className="px-4 py-3">Subject</th>
                               <th className="px-4 py-3">Teacher</th>
@@ -8469,12 +8650,12 @@ function AdminDashboard() {
                     {(examManagementSelectedDetails?.students || []).length >
                       0 && (
                       <div>
-                        <h4 className="font-bold text-gray-800 mb-3">
+                        <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-3">
                           Student Marks
                         </h4>
                         <div className="overflow-x-auto border rounded-xl">
                           <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 text-xs uppercase">
                               <tr>
                                 <th className="px-4 py-3">Roll</th>
                                 <th className="px-4 py-3">Student</th>
@@ -8490,7 +8671,7 @@ function AdminDashboard() {
                               </tr>
                             </thead>
 
-                            <tbody className="divide-y divide-slate-100 bg-white">
+                            <tbody className="divide-y divide-slate-100 bg-white dark:bg-slate-800">
                               {examManagementSelectedDetails.students.map(
                                 (student, index) => {
                                   const hasResult = Boolean(student.result_id);
@@ -8749,8 +8930,9 @@ function AdminDashboard() {
         )}
         {/* ================= EXAM DETAILS MODAL END ================= */}
 
-        {activeSection === "results" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+
+                {activeSection === "results" && (
+          <section className="p-4 sm:p-6 space-y-6">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -8759,8 +8941,8 @@ function AdminDashboard() {
                     Results
                   </h2>
                   <p className="text-indigo-100 text-sm mt-1">
-                    Search, review, and export student marks. Click any row to
-                    verify or edit its marks directly.
+                    Search, review, and export student marks. Click any row
+                    to verify or edit its marks directly.
                   </p>
                 </div>
 
@@ -8823,9 +9005,7 @@ function AdminDashboard() {
                           row.grade || "",
                           row.status || "",
                         ]
-                          .map(
-                            (cell) => `"${String(cell).replace(/"/g, '""')}"`,
-                          )
+                          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
                           .join(","),
                       );
 
@@ -8849,7 +9029,7 @@ function AdminDashboard() {
 
                       showToast?.("Results exported as CSV", "success");
                     }}
-                    className="bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md"
+                    className="bg-white dark:bg-slate-800 text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md"
                   >
                     <i className="bi bi-filetype-csv me-1.5" />
                     Export CSV
@@ -8859,7 +9039,7 @@ function AdminDashboard() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
@@ -9040,10 +9220,10 @@ function AdminDashboard() {
               ].map(([label, value]) => (
                 <div
                   key={label}
-                  className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm"
+                  className="p-4 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-sm"
                 >
                   <p className="text-xs text-gray-500 font-medium">{label}</p>
-                  <h5 className="text-xl font-bold text-gray-800">
+                  <h5 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                     {value || 0}
                   </h5>
                 </div>
@@ -9051,8 +9231,8 @@ function AdminDashboard() {
             </div>
 
             {/* Workflow */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <h3 className="font-bold text-gray-800 mb-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
+              <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4">
                 Exam Result Workflow
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-7 gap-3 text-sm">
@@ -9100,15 +9280,15 @@ function AdminDashboard() {
 
               return (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
                     <p className="text-xs font-semibold uppercase text-gray-400">
                       Total Results
                     </p>
-                    <p className="mt-2 text-2xl font-bold text-gray-800">
+                    <p className="mt-2 text-2xl font-bold text-gray-800 dark:text-gray-100">
                       {total}
                     </p>
                   </div>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
                     <p className="text-xs font-semibold uppercase text-gray-400">
                       Average %
                     </p>
@@ -9116,7 +9296,7 @@ function AdminDashboard() {
                       {avgPercentage}%
                     </p>
                   </div>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
                     <p className="text-xs font-semibold uppercase text-gray-400">
                       Pass Rate
                     </p>
@@ -9127,7 +9307,7 @@ function AdminDashboard() {
                       {passCount} passed
                     </p>
                   </div>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
                     <p className="text-xs font-semibold uppercase text-gray-400">
                       Failing
                     </p>
@@ -9143,9 +9323,9 @@ function AdminDashboard() {
             })()}
 
             {/* Result Rows */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-gray-100 bg-gray-50">
-                <h3 className="font-bold text-gray-800">Student Result Rows</h3>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+                <h3 className="font-bold text-gray-800 dark:text-gray-100">Student Result Rows</h3>
                 <p className="text-xs text-gray-500">
                   Searchable result data from submitted marks. Click a row to
                   verify or edit.
@@ -9154,7 +9334,7 @@ function AdminDashboard() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 text-xs uppercase">
                     <tr>
                       <th className="px-4 py-3">Roll</th>
                       <th className="px-4 py-3">Student</th>
@@ -9218,12 +9398,12 @@ function AdminDashboard() {
                                 ["A+", "A", "A-"].includes(row.grade)
                                   ? "bg-emerald-100 text-emerald-700"
                                   : ["B+", "B", "B-"].includes(row.grade)
-                                    ? "bg-sky-100 text-sky-700"
-                                    : ["C+", "C", "C-"].includes(row.grade)
-                                      ? "bg-amber-100 text-amber-700"
-                                      : row.grade
-                                        ? "bg-red-100 text-red-700"
-                                        : "bg-gray-100 text-gray-500"
+                                  ? "bg-sky-100 text-sky-700"
+                                  : ["C+", "C", "C-"].includes(row.grade)
+                                  ? "bg-amber-100 text-amber-700"
+                                  : row.grade
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-gray-100 text-gray-500"
                               }`}
                             >
                               {row.grade || "-"}
@@ -9234,9 +9414,10 @@ function AdminDashboard() {
                               className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                 String(row.status).toLowerCase() === "pass"
                                   ? "bg-emerald-50 text-emerald-700"
-                                  : String(row.status).toLowerCase() === "fail"
-                                    ? "bg-red-50 text-red-700"
-                                    : "bg-amber-50 text-amber-700"
+                                  : String(row.status).toLowerCase() ===
+                                    "fail"
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-amber-50 text-amber-700"
                               }`}
                             >
                               {row.status || "Pending"}
@@ -9252,6 +9433,744 @@ function AdminDashboard() {
           </section>
         )}
 
+
+        {/* ================= REPORTS & ANALYTICS ================= */}
+        {activeSection === "reports" && (
+          <section className="p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                    Reports &amp; Analytics
+                  </h2>
+                  <p className="text-indigo-100 text-sm mt-1">
+                    A live snapshot of your school&apos;s academic
+                    performance, pulled from every section on this
+                    dashboard.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    refreshExamManagement?.();
+                    refreshAttendance?.();
+                    loadTeacherManagementTeachers?.();
+                    loadMyClasses?.();
+                  }}
+                  className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20 self-start"
+                >
+                  <i className="bi bi-arrow-clockwise me-1.5" />
+                  Refresh All
+                </button>
+              </div>
+            </div>
+
+            {/* KPI CARDS */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              {[
+                {
+                  label: "Students",
+                  value: academicClasses.classStats.total_students_assigned,
+                  icon: "bi-mortarboard",
+                  cls: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                  onClick: () => setActiveSection("students"),
+                },
+                {
+                  label: "Teachers",
+                  value: teacherManagementStats.total,
+                  icon: "bi-person-badge",
+                  cls: "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300",
+                  onClick: () => setActiveSection("teachers"),
+                },
+                {
+                  label: "Classes",
+                  value: academicClasses.classStats.total,
+                  icon: "bi-collection",
+                  cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+                  onClick: () => setActiveSection("classes"),
+                },
+                {
+                  label: "Subjects",
+                  value: subjectManagement.subjectStats.total,
+                  icon: "bi-journal-bookmark",
+                  cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                  onClick: () => setActiveSection("subjects"),
+                },
+                {
+                  label: "Today's Attendance",
+                  value: `${attendanceStats.percentage ?? 0}%`,
+                  icon: "bi-calendar-check",
+                  cls: "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300",
+                  onClick: () => setActiveSection("attendance"),
+                },
+                {
+                  label: "Exam Pass Rate",
+                  value: `${examManagementStats.passPercentage || 0}%`,
+                  icon: "bi-award",
+                  cls: "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
+                  onClick: () => setActiveSection("results"),
+                },
+              ].map((kpi) => (
+                <button
+                  type="button"
+                  key={kpi.label}
+                  onClick={kpi.onClick}
+                  className="text-left bg-white rounded-2xl border border-gray-200 shadow-sm p-4 transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {kpi.label}
+                      </p>
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {kpi.value ?? 0}
+                      </p>
+                    </div>
+                    <span
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${kpi.cls}`}
+                    >
+                      <i className={`bi ${kpi.icon} text-lg`} />
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* ATTENDANCE BREAKDOWN */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-800 dark:text-white">
+                    Today&apos;s Attendance Breakdown
+                  </h3>
+                  <span className="text-xs text-gray-400">
+                    {attendanceStats.total ?? 0} marked
+                  </span>
+                </div>
+
+                {(() => {
+                  const total = attendanceStats.total || 0;
+                  const bars = [
+                    {
+                      label: "Present",
+                      value: attendanceStats.present || 0,
+                      cls: "bg-emerald-500",
+                    },
+                    {
+                      label: "Absent",
+                      value: attendanceStats.absent || 0,
+                      cls: "bg-red-500",
+                    },
+                    {
+                      label: "Late",
+                      value: attendanceStats.late || 0,
+                      cls: "bg-amber-500",
+                    },
+                  ];
+
+                  if (total === 0) {
+                    return (
+                      <p className="py-8 text-center text-sm text-gray-400">
+                        No attendance marked yet today.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      {bars.map((bar) => {
+                        const pct = total > 0 ? Math.round((bar.value / total) * 100) : 0;
+                        return (
+                          <div key={bar.label}>
+                            <div className="flex justify-between text-xs mb-1.5">
+                              <span className="font-medium text-gray-600 dark:text-gray-300">
+                                {bar.label}
+                              </span>
+                              <span className="text-gray-400">
+                                {bar.value} ({pct}%)
+                              </span>
+                            </div>
+                            <div className="h-2.5 w-full rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${bar.cls}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("attendance")}
+                  className="mt-4 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                >
+                  View full attendance →
+                </button>
+              </div>
+
+              {/* EXAM & RESULTS SUMMARY */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-gray-800 dark:text-white">
+                    Exams &amp; Results Summary
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    ["Total Exams", examManagementStats.totalExams],
+                    ["Classes Covered", examManagementStats.classesCovered],
+                    ["Results Published", examManagementStats.resultsPublished],
+                    ["Pending Marks", examManagementStats.pendingMarks],
+                    ["Average Score", `${examManagementStats.averageScore || 0}%`],
+                    ["At Risk Students", examManagementStats.atRiskStudents],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="rounded-xl bg-gray-50 dark:bg-slate-900/50 p-3"
+                    >
+                      <p className="text-xs text-gray-400">{label}</p>
+                      <p className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                        {value ?? 0}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("exams")}
+                  className="mt-4 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                >
+                  View full exam control center →
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* ACADEMIC STRUCTURE */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 dark:border-slate-700 dark:bg-slate-800">
+                <h3 className="font-bold text-gray-800 dark:text-white mb-4">
+                  Academic Structure
+                </h3>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[
+                    {
+                      label: "Grades",
+                      value: divisionsSections.divisionStats.total,
+                      section: "divisions-sections",
+                    },
+                    {
+                      label: "Sections",
+                      value: divisionsSections.sectionStats.total,
+                      section: "divisions-sections",
+                    },
+                    {
+                      label: "Classes",
+                      value: academicClasses.classStats.total,
+                      section: "classes",
+                    },
+                    {
+                      label: "Subjects",
+                      value: subjectManagement.subjectStats.total,
+                      section: "subjects",
+                    },
+                    {
+                      label: "Academic Years",
+                      value: batchManagement.batchStats.total,
+                      section: "batches",
+                    },
+                    {
+                      label: "Current Year",
+                      value: batchManagement.batchStats.current_batch || "—",
+                      section: "batches",
+                      isText: true,
+                    },
+                  ].map((item) => (
+                    <button
+                      type="button"
+                      key={item.label}
+                      onClick={() => setActiveSection(item.section)}
+                      className="text-left rounded-xl border border-gray-100 dark:border-slate-700 p-3 transition hover:border-indigo-200 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10"
+                    >
+                      <p className="text-xs text-gray-400">{item.label}</p>
+                      <p
+                        className={`font-bold text-gray-800 dark:text-gray-100 ${
+                          item.isText ? "text-sm" : "text-lg"
+                        }`}
+                      >
+                        {item.value}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* TEACHER WORKLOAD */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 dark:border-slate-700 dark:bg-slate-800">
+                <h3 className="font-bold text-gray-800 dark:text-white mb-4">
+                  Teacher Status
+                </h3>
+
+                {(() => {
+                  const total = teacherManagementStats.total || 0;
+                  const bars = [
+                    {
+                      label: "Active",
+                      value: teacherManagementStats.active || 0,
+                      cls: "bg-emerald-500",
+                    },
+                    {
+                      label: "Inactive",
+                      value: teacherManagementStats.inactive || 0,
+                      cls: "bg-gray-400",
+                    },
+                    {
+                      label: "Suspended",
+                      value: teacherManagementStats.suspended || 0,
+                      cls: "bg-amber-500",
+                    },
+                  ];
+
+                  if (total === 0) {
+                    return (
+                      <p className="py-8 text-center text-sm text-gray-400">
+                        No teachers added yet.
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      {bars.map((bar) => {
+                        const pct = total > 0 ? Math.round((bar.value / total) * 100) : 0;
+                        return (
+                          <div key={bar.label}>
+                            <div className="flex justify-between text-xs mb-1.5">
+                              <span className="font-medium text-gray-600 dark:text-gray-300">
+                                {bar.label}
+                              </span>
+                              <span className="text-gray-400">
+                                {bar.value} ({pct}%)
+                              </span>
+                            </div>
+                            <div className="h-2.5 w-full rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${bar.cls}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("teachers")}
+                  className="mt-4 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
+                >
+                  View all teachers →
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ================= NOTIFICATIONS ================= */}
+        {activeSection === "notifications" && (
+          <section className="p-4 sm:p-6 space-y-6">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                    Notifications
+                  </h2>
+                  <p className="text-indigo-100 text-sm mt-1">
+                    School announcements and alerts, all in one place.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {canWriteAcademic && (
+                    <button
+                      type="button"
+                      onClick={() => setCreateNotifModalOpen(true)}
+                      className="bg-white dark:bg-slate-800 text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md self-start"
+                    >
+                      <i className="bi bi-plus-lg me-1.5" />
+                      Create Notification
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={!totalUnread}
+                    onClick={() => {
+                      (sortedNotifications || [])
+                        .filter((item) => !item.is_read)
+                        .forEach((item) => {
+                          if (item.source === "notice") {
+                            markNoticeAsRead?.(item.id);
+                          } else {
+                            markNotificationRead?.(item.id);
+                          }
+                        });
+                    }}
+                    className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm transition border border-white/20 self-start disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <i className="bi bi-check2-all me-1.5" />
+                    Mark All Read
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ============ CREATE NOTIFICATION MODAL ============ */}
+            {createNotifModalOpen && (
+              <div
+                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget && !createNotifSaving) {
+                    setCreateNotifModalOpen(false);
+                  }
+                }}
+              >
+                <form
+                  onSubmit={submitCreateNotification}
+                  className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5 dark:border-slate-700">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                      Create Notification
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setCreateNotifModalOpen(false)}
+                      disabled={createNotifSaving}
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                    >
+                      <i className="bi bi-x-lg" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 px-6 py-5">
+                    {createNotifError && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                        {createNotifError}
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={createNotifForm.title}
+                        onChange={(event) =>
+                          setCreateNotifForm((prev) => ({
+                            ...prev,
+                            title: event.target.value,
+                          }))
+                        }
+                        autoFocus
+                        placeholder="e.g. Parent-Teacher Meeting on Friday"
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                        Message <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={createNotifForm.message}
+                        onChange={(event) =>
+                          setCreateNotifForm((prev) => ({
+                            ...prev,
+                            message: event.target.value,
+                          }))
+                        }
+                        placeholder="Details for this notification..."
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                          Priority
+                        </label>
+                        <select
+                          value={createNotifForm.priority}
+                          onChange={(event) =>
+                            setCreateNotifForm((prev) => ({
+                              ...prev,
+                              priority: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-200">
+                          Audience
+                        </label>
+                        <select
+                          value={createNotifForm.target_role}
+                          onChange={(event) =>
+                            setCreateNotifForm((prev) => ({
+                              ...prev,
+                              target_role: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                        >
+                          <option value="all">Everyone</option>
+                          <option value="students">Students only</option>
+                          <option value="teachers">Teachers only</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900/50 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setCreateNotifModalOpen(false)}
+                      disabled={createNotifSaving}
+                      className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-white disabled:opacity-60 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={createNotifSaving}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {createNotifSaving ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          Sending...
+                        </>
+                      ) : (
+                        "Send Notification"
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* STATS */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                {
+                  label: "Total",
+                  value: (sortedNotifications || []).length,
+                  icon: "bi-bell",
+                  cls: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300",
+                },
+                {
+                  label: "Unread",
+                  value: totalUnread || 0,
+                  icon: "bi-envelope-exclamation",
+                  cls: "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300",
+                },
+                {
+                  label: "Announcements",
+                  value: (announcements || []).length,
+                  icon: "bi-megaphone",
+                  cls: "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+                },
+                {
+                  label: "Alerts",
+                  value: (notifications || []).length,
+                  icon: "bi-exclamation-circle",
+                  cls: "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300",
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {stat.label}
+                      </p>
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                        {stat.value}
+                      </p>
+                    </div>
+                    <span
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${stat.cls}`}
+                    >
+                      <i className={`bi ${stat.icon} text-lg`} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* FILTERS + LIST */}
+            {(() => {
+              const filtered = (sortedNotifications || []).filter((item) => {
+                if (notificationFilterTab === "unread" && item.is_read)
+                  return false;
+                if (
+                  notificationFilterTab === "announcements" &&
+                  item.source !== "notice"
+                )
+                  return false;
+                if (
+                  notificationFilterTab === "alerts" &&
+                  item.source !== "leave"
+                )
+                  return false;
+
+                if (!notificationSearch.trim()) return true;
+
+                const q = notificationSearch.toLowerCase();
+                return (
+                  (item.title || "").toLowerCase().includes(q) ||
+                  (item.message || "").toLowerCase().includes(q)
+                );
+              });
+
+              return (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-800">
+                  <div className="p-5 border-b border-gray-100 dark:border-slate-700 space-y-4">
+                    <div className="relative">
+                      <i className="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="search"
+                        value={notificationSearch}
+                        onChange={(event) =>
+                          setNotificationSearch(event.target.value)
+                        }
+                        placeholder="Search notifications..."
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: "all", label: "All" },
+                        { key: "unread", label: "Unread" },
+                        { key: "announcements", label: "Announcements" },
+                        { key: "alerts", label: "Alerts" },
+                      ].map((tab) => (
+                        <button
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setNotificationFilterTab(tab.key)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                            notificationFilterTab === tab.key
+                              ? "bg-indigo-600 text-white"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="max-h-[32rem] overflow-y-auto divide-y divide-gray-100 dark:divide-slate-700">
+                    {notificationLoading || noticeLoading ? (
+                      <div className="flex flex-col items-center gap-3 py-16 text-gray-500">
+                        <span className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                        Loading notifications...
+                      </div>
+                    ) : filtered.length === 0 ? (
+                      <p className="py-16 text-center text-sm text-gray-400">
+                        {notificationSearch
+                          ? "No notifications match your search."
+                          : "🎉 You're all caught up"}
+                      </p>
+                    ) : (
+                      filtered.map((item) => (
+                        <button
+                          type="button"
+                          key={`${item.source}-${item.id}-${item.time || item.date}`}
+                          onClick={() =>
+                            handleNotificationClick &&
+                            handleNotificationClick(item)
+                          }
+                          className={`w-full p-4 text-left transition hover:bg-gray-50 dark:hover:bg-slate-700/50 ${
+                            !item.is_read
+                              ? "bg-indigo-50/40 dark:bg-indigo-500/5"
+                              : ""
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span
+                              className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm ${
+                                item.source === "notice"
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                                  : "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
+                              }`}
+                            >
+                              {item.source === "notice" ? "📢" : "📩"}
+                            </span>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate font-semibold text-gray-800 dark:text-white">
+                                  {item.title}
+                                </p>
+                                {!item.is_read && (
+                                  <span className="h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                                )}
+                              </div>
+
+                              <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                                {item.message || ""}
+                              </p>
+
+                              <p className="mt-1 text-xs text-gray-400">
+                                {item.time}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </section>
+        )}
+
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={admin}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
           <section className="space-y-6 py-2 text-gray-800 dark:text-gray-100">
             {/* ================= PROFILE HEADER ================= */}
@@ -9259,10 +10178,7 @@ function AdminDashboard() {
               <div className="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
 
               <div className="relative flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src="https://i.pravatar.cc/120?img=12"
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg"
-                />
+                <UserAvatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
 
                 <div className="text-center sm:text-left flex-1">
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -9273,21 +10189,21 @@ function AdminDashboard() {
                           value={formData.first_name || ""}
                           onChange={handleChange}
                           placeholder="First Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="middle_name"
                           value={formData.middle_name || ""}
                           onChange={handleChange}
                           placeholder="Middle Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="last_name"
                           value={formData.last_name || ""}
                           onChange={handleChange}
                           placeholder="Last Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     ) : (
@@ -9296,7 +10212,7 @@ function AdminDashboard() {
                   </h2>
 
                   <p className="text-sm opacity-90 mt-1">
-                    {admin?.designation} • {admin?.specialization || "NA"}
+                    {admin?.designation} • {admin?.specialization || "Not added"}
                   </p>
 
                   <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
@@ -9305,11 +10221,11 @@ function AdminDashboard() {
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
-                      {admin?.status || "NA"}
+                      {admin?.status || "Not added"}
                     </span>
                   </div>
                 </div>
@@ -9392,7 +10308,7 @@ function AdminDashboard() {
                   <p>
                     Role:{" "}
                     <span className="font-medium">
-                      {admin?.designation || "NA"}
+                      {admin?.designation || "Not added"}
                     </span>
                   </p>
 
@@ -9419,7 +10335,7 @@ function AdminDashboard() {
                   <p>
                     Access Level:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -9433,26 +10349,26 @@ function AdminDashboard() {
                   <p>
                     School Name:{" "}
                     <span className="font-medium">
-                      {admin?.school_name || "NA"}
+                      {admin?.school_name || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Code:{" "}
                     <span className="font-medium">
-                      {admin?.school_code || "NA"}
+                      {admin?.school_code || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Board:{" "}
-                    <span className="font-medium">{admin?.board || "NA"}</span>
+                    <span className="font-medium">{admin?.board || "Not added"}</span>
                   </p>
 
                   <p>
                     Established:{" "}
                     <span className="font-medium">
-                      {admin?.established_year || "NA"}
+                      {admin?.established_year || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -9466,14 +10382,14 @@ function AdminDashboard() {
                   <p>
                     Users Managed:{" "}
                     <span className="font-medium">
-                      {admin?.users_managed || "NA"}
+                      {admin?.users_managed || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Active Sessions:{" "}
                     <span className="font-medium">
-                      {admin?.active_sessions || "NA"}
+                      {admin?.active_sessions || "Not added"}
                     </span>
                   </p>
 
@@ -9491,21 +10407,21 @@ function AdminDashboard() {
                   <p>
                     Fee Access:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.fee_access || "NA"}
+                      {admin?.fee_access || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Discount Authority:{" "}
                     <span className="font-medium">
-                      {admin?.discount_authority || "NA"}
+                      {admin?.discount_authority || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Revenue View:{" "}
                     <span className="font-medium">
-                      {admin?.revenue_view || "NA"}
+                      {admin?.revenue_view || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -9526,14 +10442,14 @@ function AdminDashboard() {
                   <p>
                     2FA:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.two_factor_enabled || "NA"}
+                      {admin?.two_factor_enabled || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Login Alerts:{" "}
                     <span className="font-medium">
-                      {admin?.login_alerts || "NA"}
+                      {admin?.login_alerts || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -9547,21 +10463,21 @@ function AdminDashboard() {
                   <p>
                     Logins (30d):{" "}
                     <span className="font-medium">
-                      {admin?.logins_30d || "NA"}
+                      {admin?.logins_30d || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Actions:{" "}
                     <span className="font-medium">
-                      {admin?.actions_count || "NA"}
+                      {admin?.actions_count || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Last Action:{" "}
                     <span className="font-medium">
-                      {admin?.last_action || "NA"}
+                      {admin?.last_action || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -9687,7 +10603,7 @@ function AdminDashboard() {
                   <p>
                     Created On:{" "}
                     <span className="font-medium">
-                      {admin?.created_on || "NA"}
+                      {admin?.created_on || "Not added"}
                     </span>
                   </p>
                 </div>

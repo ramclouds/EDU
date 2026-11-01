@@ -1,15 +1,67 @@
 import os
-from flask import Flask, jsonify, send_from_directory, request
-from flask_jwt_extended import JWTManager
+from flask import Flask, g, jsonify, send_from_directory, request
 from flask_cors import CORS
 from dotenv import load_dotenv
-import traceback
+from pathlib import Path
 
 # ==== LOAD ENV ====
-load_dotenv()
+# Read backend/.env from this file's own folder. utf-8-sig also accepts a file
+# saved by Windows Notepad with a hidden byte-order mark.
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH, encoding="utf-8-sig")
 
 # ==== CORE ====
-from utils.auth import Login, SignUp, db, bcrypt
+from utils.auth import Login, Logout, db, bcrypt
+from utils.auth_middleware import login_required
+from utils.tenant_routing import TenantRoutingMiddleware, bind_request_tenant
+from utils.production import init_production, tenant_cors_origins
+from utils.assignments import ASSIGNMENT_BASE, UPLOAD_BASE, TeacherSubjectAssignmentsAPI
+from utils.mail_admin import (
+    BroadcastAPI,
+    BroadcastDetailAPI,
+    PlatformMailAPI,
+    PlatformMailTestAPI,
+    SchoolMailAPI,
+    SchoolMailTestAPI,
+)
+from utils.preferences import DeveloperPreferencesAPI, MyPreferencesAPI
+from utils.photos import MyPhotoAPI, ProfilePhotoAPI
+from utils.password_reset import ForgotPasswordAPI, ResetPasswordAPI
+from utils.library_membership import StudentLibraryMembershipAPI
+from utils.platform import SchoolPlanAPI  # noqa: E402
+from utils.settings_admin import ServiceReloadAPI, SettingsAPI, SettingsApplyAPI
+from utils.profile import (
+    DeveloperPasswordAPI,
+    DeveloperProfileAPI,
+    MyPasswordAPI,
+    MyProfileAPI,
+)
+from utils.login_branding import (
+    PublicBrandingAPI,
+    PublicBrandingAssetAPI,
+    SchoolBrandingAPI,
+    SchoolBrandingAssetAPI,
+)
+from utils.platform import (
+    DeveloperLoginTwoFactorAPI,
+    DeveloperTwoFactorAPI,
+    PlatformInfoAPI,
+    SchoolActivityAPI,
+    SchoolDatabaseAPI,
+    SchoolDomainDetailAPI,
+    SchoolDomainsAPI,
+    SchoolDomainVerifyAPI,
+    TenantCheckAPI,
+    ExtendTrialAPI,
+    ResetAdminPasswordAPI,
+    DeveloperAuditAPI,
+    DeveloperLogin,
+    DeveloperLogout,
+    PlatformStatsAPI,
+    SchoolDetailAPI,
+    SchoolListCreateAPI,
+    SchoolStatusAPI,
+)
 
 # ==== STUDENT / TEACHER ====
 from utils.studentDetails import (
@@ -25,7 +77,50 @@ from utils.teacherDetails import (
     ChangeTeacherPassword,
 )
 
-from utils.adminsDetails import AdminDetails, UpdateAdminProfile, ChangeAdminPassword
+from utils.adminsDetails import (
+    AdminDetails,
+    UpdateAdminProfile,
+    ChangeAdminPassword,
+    AdminListAPI,
+    CreateAdminAPI,
+)
+
+# ==== STAFF DIRECTORY (Accounts Admin's combined Staff section) ====
+from utils.staffDirectory import AdminStaffListAPI
+
+# ==== ACCOUNTS (fees, payroll, general ledger) ====
+from utils.accounts import (
+    StudentFeeOverviewAPI,
+    FeeInstallmentListAPI,
+    FeeInstallmentDetailAPI,
+    FeePaymentListAPI,
+    FeePaymentDetailAPI,
+    FeeDashboardSummaryAPI,
+    StaffSalaryOverviewAPI,
+    SalaryStructureAPI,
+    PayslipListAPI,
+    PayslipDetailAPI,
+    PayrollSummaryAPI,
+    AccountsTransactionListAPI,
+    AccountsTransactionDetailAPI,
+    FeeStructureListAPI,
+    FeeStructureDetailAPI,
+    FeeStructureApplyAPI,
+    PendingFeesListAPI,
+    AccountsBatchOptionsAPI,
+    FeeReportsAPI,
+    ExpenseCategoryListAPI,
+    ExpenseCategoryDetailAPI,
+    PayrollStaffListAPI,
+    PayslipsAllListAPI,
+    RunPayrollAPI,
+    BankAccountListAPI,
+    BankAccountDetailAPI,
+    FinancialOverviewAPI,
+    ProfitLossAPI,
+    SendFeeRemindersAPI,
+    AccountsActivityLogsAPI,
+)
 from utils.assets import (
     CreateAssetAPI,
     GetAssetsAPI,
@@ -64,6 +159,7 @@ from utils.Notifications import (
 
 # ==== LEAVES ====
 from utils.leaves import (
+    TeacherLeaveCancelAPI,
     ApplyLeave,
     TeacherLeaveHistory,
     TeacherLeaveBalanceAPI,
@@ -207,11 +303,17 @@ from utils.hostel import (
     HostelReportsAPI,
 )
 
+from utils.school_overview import ParentsAPI, EventsAPI, EventDetailAPI
+from utils.school_dashboard import SchoolOverviewAPI
+from utils.global_search import GlobalSearchAPI
+from utils.school_branding import SchoolLogoAPI, SchoolLogoServeAPI, SchoolMeAPI
 from utils.announcement import (
     CreateNoticeAPI,
     StudentNoticeAPI,
     TeacherNoticeAPI,
     AdminNoticeAPI,
+    AdminNoticeManageAPI,
+    DeleteNoticeAPI,
     MarkNoticeReadAPI,
 )
 
@@ -271,42 +373,68 @@ from utils.TeacherManagement import (
 
 from utils.subjects import AdminSubjectsAPI, AdminSubjectDetailAPI
 
-from utils.rolePermissionManagement import (
-    MyRBACAccessAPI,
-    RBACBootstrapAPI,
-    RBACRoleDetailAPI,
-    RBACRoleListAPI,
-    RBACRolePermissionAPI,
-    RBACUserAccessAPI,
-    RBACUserListAPI,
-    RBACUserOverrideAPI,
-    RBACUserRoleAPI,
-    seed_rbac_defaults,
-    MyDashboardAccessAPI,
-    MyRBACAccessAPI,
-)
+from utils.rolePermissionManagement import MyRBACAccessAPI, RBACBootstrapAPI, RBACRoleDetailAPI, RBACRoleListAPI, RBACRolePermissionAPI, RBACUserAccessAPI, RBACUserListAPI, RBACUserOverrideAPI, RBACUserRoleAPI, MyDashboardAccessAPI, MyRBACAccessAPI
 
 
 # CREATE APP
 def create_app():
     app = Flask(__name__)
+    # Strip /y22-style version prefixes and record the host's tenant before routing.
+    app.wsgi_app = TenantRoutingMiddleware(app.wsgi_app)
 
     # ==== CONFIG ====
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("MYSQL_DSN")
+    is_production = os.getenv("FLASK_ENV", "development") == "production"
+
+    mysql_dsn = os.getenv("MYSQL_DSN")
+    if not mysql_dsn:
+        here = Path(__file__).resolve().parent
+        found = ENV_PATH.exists()
+        names = sorted(p.name for p in here.glob(".env*")) or ["none"]
+        raise RuntimeError(
+            "MYSQL_DSN is not set. The app looked for this file: "
+            f"{ENV_PATH} (found: {'yes' if found else 'NO'}). "
+            f"Files starting with .env in this folder: {', '.join(names)}. "
+            "Make sure the file is named exactly '.env' (not '.env.txt') and sits in the backend folder, "
+            "and that it contains a line: MYSQL_DSN=mysql+pymysql://root:@127.0.0.1/edu_school"
+        )
+    app.config["SQLALCHEMY_DATABASE_URI"] = mysql_dsn
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET", "super-secret-key")
+
+    secret_key = os.getenv("APP_SECRET_KEY") or os.getenv("JWT_SECRET")
+    if is_production and not secret_key:
+        raise RuntimeError(
+            "APP_SECRET_KEY is not set. Refusing to start in production "
+            "without one — set it in your environment (see .env.example)."
+        )
+    app.config["SECRET_KEY"] = secret_key or "dev-only-insecure-secret"
+    # Largest request body accepted (uploads). Stops oversized uploads exhausting the server.
+    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
     # ==== INIT ====
     db.init_app(app)
     bcrypt.init_app(app)
-    JWTManager(app)
 
     # ==== CORS ====
+    cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+    cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+    # Every school's own addresses (<tenant>.login.<base>, <tenant>.api.<base>),
+    # built from TENANT_BASE_DOMAIN with strict end anchors.
+    cors_origins += tenant_cors_origins()
+
     CORS(
         app,
         supports_credentials=True,
-        origins=["http://localhost:5173"],
-        allow_headers=["Content-Type", "Authorization"],
+        origins=cors_origins,
+        # Headers the browser may send. The two CSRF headers are required for every change
+        # made with the session cookie (see utils/session.py).
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-CSRF-Token",
+            "X-Dev-CSRF-Token",
+            "X-Token-Transport",
+        ],
+        expose_headers=["Retry-After", "X-Request-ID"],
         methods=[
             "GET",
             "POST",
@@ -322,6 +450,14 @@ def create_app():
         if request.method == "OPTIONS":
             return jsonify({"message": "OK"}), 200
 
+    @app.before_request
+    def pick_school_database():
+        # Each school's data lives in its own database; select it from the host.
+        return bind_request_tenant()
+
+    # Proxy headers, security headers, /healthz and /readyz, production checks.
+    init_production(app, db, is_production)
+
     # HEALTH
     @app.route("/")
     def health():
@@ -330,14 +466,155 @@ def create_app():
     # AUTH
     app.add_url_rule("/api/login", view_func=Login.as_view("login"), methods=["POST"])
 
+
     app.add_url_rule(
-        "/api/signup", view_func=SignUp.as_view("signup"), methods=["POST"]
+        "/api/logout",
+        view_func=login_required(Logout.as_view("logout")),
+        methods=["POST"],
     )
 
-    # =========================================================
-    # RBAC ROUTES
-    # =========================================================
+    # ================= PLATFORM / DEVELOPER (multi-school) =================
+    app.add_url_rule(
+        "/api/developer/login",
+        view_func=DeveloperLogin.as_view("developer_login"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/logout",
+        view_func=DeveloperLogout.as_view("developer_logout"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools",
+        view_func=SchoolListCreateAPI.as_view("developer_schools"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>",
+        view_func=SchoolDetailAPI.as_view("developer_school_detail"),
+        methods=["GET", "PUT"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/status",
+        view_func=SchoolStatusAPI.as_view("developer_school_status"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/tenants/check",
+        view_func=TenantCheckAPI.as_view("developer_tenant_check"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/domains",
+        view_func=SchoolDomainsAPI.as_view("developer_school_domains"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/domains/<int:domain_id>",
+        view_func=SchoolDomainDetailAPI.as_view("developer_school_domain_detail"),
+        methods=["DELETE"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/domains/<int:domain_id>/verify",
+        view_func=SchoolDomainVerifyAPI.as_view("developer_school_domain_verify"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/database",
+        view_func=SchoolDatabaseAPI.as_view("developer_school_database"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/branding",
+        view_func=SchoolBrandingAPI.as_view("developer_school_branding"),
+        methods=["GET", "PUT"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/branding/<kind>",
+        view_func=SchoolBrandingAssetAPI.as_view("developer_school_branding_asset"),
+        methods=["POST", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/public/branding",
+        view_func=PublicBrandingAPI.as_view("public_branding"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/public/branding/asset/<kind>",
+        view_func=PublicBrandingAssetAPI.as_view("public_branding_asset"),
+        methods=["GET"],
+    )
+    app.add_url_rule("/api/developer/mail/platform", view_func=PlatformMailAPI.as_view("developer_platform_mail"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/developer/mail/platform/test", view_func=PlatformMailTestAPI.as_view("developer_platform_mail_test"), methods=["POST"])
+    app.add_url_rule("/api/developer/schools/<int:school_id>/mail", view_func=SchoolMailAPI.as_view("developer_school_mail"), methods=["GET", "PUT", "DELETE"])
+    app.add_url_rule("/api/developer/schools/<int:school_id>/mail/test", view_func=SchoolMailTestAPI.as_view("developer_school_mail_test"), methods=["POST"])
+    app.add_url_rule("/api/developer/broadcasts", view_func=BroadcastAPI.as_view("developer_broadcasts"), methods=["GET", "POST"])
+    app.add_url_rule("/api/developer/broadcasts/<int:broadcast_id>", view_func=BroadcastDetailAPI.as_view("developer_broadcast_detail"), methods=["GET"])
+    app.add_url_rule("/api/developer/settings", view_func=SettingsAPI.as_view("developer_settings"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/developer/settings/apply", view_func=SettingsApplyAPI.as_view("developer_settings_apply"), methods=["POST"])
+    app.add_url_rule("/api/developer/service/reload", view_func=ServiceReloadAPI.as_view("developer_service_reload"), methods=["POST"])
+    app.add_url_rule(
+        "/api/admin/students/<int:student_id>/library-membership",
+        view_func=StudentLibraryMembershipAPI.as_view("student_library_membership"),
+        methods=["PUT"],
+    )
+    app.add_url_rule("/api/password/forgot", view_func=ForgotPasswordAPI.as_view("password_forgot"), methods=["POST"])
+    app.add_url_rule("/api/password/reset", view_func=ResetPasswordAPI.as_view("password_reset"), methods=["POST"])
+    app.add_url_rule("/api/me/photo", view_func=MyPhotoAPI.as_view("my_photo"), methods=["POST", "DELETE"])
+    app.add_url_rule("/api/profile-photo/<filename>", view_func=ProfilePhotoAPI.as_view("profile_photo"), methods=["GET"])
+    app.add_url_rule("/api/me/profile", view_func=MyProfileAPI.as_view("my_profile"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/me/preferences", view_func=MyPreferencesAPI.as_view("my_preferences"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/developer/me/preferences", view_func=DeveloperPreferencesAPI.as_view("developer_preferences"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/me/password", view_func=MyPasswordAPI.as_view("my_password"), methods=["POST"])
+    app.add_url_rule("/api/developer/me/profile", view_func=DeveloperProfileAPI.as_view("developer_profile"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/developer/me/password", view_func=DeveloperPasswordAPI.as_view("developer_password"), methods=["POST"])
+    app.add_url_rule(
+        "/api/developer/login/2fa",
+        view_func=DeveloperLoginTwoFactorAPI.as_view("developer_login_2fa"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/2fa",
+        view_func=DeveloperTwoFactorAPI.as_view("developer_2fa"),
+        methods=["GET", "POST", "PUT", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/plan",
+        view_func=SchoolPlanAPI.as_view("developer_school_plan"),
+        methods=["PUT"],
+    )
+    app.add_url_rule(
+        "/api/developer/stats",
+        view_func=PlatformStatsAPI.as_view("developer_stats"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/platform",
+        view_func=PlatformInfoAPI.as_view("developer_platform"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/audit",
+        view_func=DeveloperAuditAPI.as_view("developer_audit"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/activity",
+        view_func=SchoolActivityAPI.as_view("developer_school_activity"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/extend-trial",
+        view_func=ExtendTrialAPI.as_view("developer_extend_trial"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/reset-admin-password",
+        view_func=ResetAdminPasswordAPI.as_view("developer_reset_admin_password"),
+        methods=["POST"],
+    )
 
+    # RBAC ROUTES
     app.add_url_rule(
         "/api/rbac/bootstrap",
         view_func=RBACBootstrapAPI.as_view("rbac_bootstrap_api"),
@@ -454,6 +731,18 @@ def create_app():
         methods=["PUT"],
     )
 
+    app.add_url_rule(
+        "/api/admin/list",
+        view_func=AdminListAPI.as_view("admin_list"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/admin/create",
+        view_func=CreateAdminAPI.as_view("create_admin"),
+        methods=["POST"],
+    )
+
     # ASSETS MANAGEMENT
     app.add_url_rule(
         "/api/assets",
@@ -499,7 +788,7 @@ def create_app():
     # TEACHER ASSIGNMENTS (NEW)
     app.add_url_rule(
         "/api/teacher/<int:teacher_id>/assigned-classes",
-        view_func=TeacherAssignedClassesAPI.as_view("teacher_assigned_classes"),
+        view_func=TeacherSubjectAssignmentsAPI.as_view("teacher_assigned_classes"),
         methods=["GET"],
     )
 
@@ -585,6 +874,60 @@ def create_app():
         "/api/announcements/read/<int:notice_id>/<int:user_id>",
         view_func=MarkNoticeReadAPI.as_view("mark_notice_read"),
         methods=["POST"],
+    )
+
+    app.add_url_rule(
+        "/api/announcements/manage",
+        view_func=AdminNoticeManageAPI.as_view("admin_notice_manage"),
+        methods=["GET"],
+    )
+
+    app.add_url_rule(
+        "/api/announcements/<int:notice_id>",
+        view_func=DeleteNoticeAPI.as_view("delete_notice"),
+        methods=["DELETE"],
+    )
+
+    # ================= PARENTS & EVENTS (Super Admin sections) =================
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/logo",
+        view_func=SchoolLogoAPI.as_view("developer_school_logo"),
+        methods=["POST", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/school-logo/<int:school_id>",
+        view_func=SchoolLogoServeAPI.as_view("school_logo"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/school/me",
+        view_func=SchoolMeAPI.as_view("school_me"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/search",
+        view_func=GlobalSearchAPI.as_view("global_search"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/admin/school-overview",
+        view_func=SchoolOverviewAPI.as_view("admin_school_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/admin/parents",
+        view_func=ParentsAPI.as_view("admin_parents"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/admin/events",
+        view_func=EventsAPI.as_view("admin_events"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/admin/events/<int:event_id>",
+        view_func=EventDetailAPI.as_view("admin_event_detail"),
+        methods=["DELETE"],
     )
 
     # NOTIFICATIONS
@@ -680,6 +1023,11 @@ def create_app():
         view_func=UpdateLeaveStatus.as_view("update_teacher_leave"),
         methods=["POST"],
     )
+    app.add_url_rule(
+        "/api/teacher/leave/<int:leave_id>",
+        view_func=TeacherLeaveCancelAPI.as_view("teacher_leave_cancel"),
+        methods=["DELETE"],
+    )
 
     app.add_url_rule(
         "/api/student/leave",
@@ -725,7 +1073,6 @@ def create_app():
     )
 
     # ==== TEACHER ATTENDANCE ====
-    # 1️⃣ Get teacher assigned classes
     app.add_url_rule(
         "/api/teacher/classes/<int:teacher_id>",
         view_func=TeacherAssignedClassesAPI.as_view("teacher_classes"),
@@ -1075,9 +1422,7 @@ def create_app():
         methods=["GET"],
     )
 
-    # =========================================================
     # LIBRARY CATEGORY MANAGEMENT
-    # =========================================================
 
     app.add_url_rule(
         "/api/admin/library/categories",
@@ -1103,9 +1448,7 @@ def create_app():
         methods=["GET", "OPTIONS"],
     )
 
-    # =========================================================
     # LIBRARY AUTHOR MANAGEMENT
-    # =========================================================
     app.add_url_rule(
         "/api/admin/library/authors",
         view_func=LibraryAuthorListAPI.as_view("library_author_list_api"),
@@ -1130,9 +1473,7 @@ def create_app():
         methods=["GET", "OPTIONS"],
     )
 
-    # =========================================================
     # LIBRARY BOOK MANAGEMENT
-    # =========================================================
     app.add_url_rule(
         "/api/admin/library/books",
         view_func=LibraryBookListAPI.as_view("library_book_list_api"),
@@ -1727,10 +2068,193 @@ def create_app():
         methods=["POST"],
     )
 
-    # STUDENT ROSTER (Academic Admin Students section)
+    # STUDENT ROSTER (Academic Admin Students section, Accounts Admin
     app.add_url_rule(
         "/api/admin/students",
         view_func=AdminStudentsListAPI.as_view("admin_students_list"),
+        methods=["GET"],
+    )
+
+    # STAFF DIRECTORY (Accounts Admin Staff section - teachers +
+    app.add_url_rule(
+        "/api/admin/staff",
+        view_func=AdminStaffListAPI.as_view("admin_staff_list"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: STUDENT FEES ====================
+    app.add_url_rule(
+        "/api/accounts/students/<int:student_id>/fees",
+        view_func=StudentFeeOverviewAPI.as_view("accounts_student_fee_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/students/<int:student_id>/installments",
+        view_func=FeeInstallmentListAPI.as_view("accounts_fee_installments"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/installments/<int:installment_id>",
+        view_func=FeeInstallmentDetailAPI.as_view("accounts_fee_installment_detail"),
+        methods=["PUT", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/accounts/students/<int:student_id>/payments",
+        view_func=FeePaymentListAPI.as_view("accounts_fee_payments"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/payments/<int:payment_id>",
+        view_func=FeePaymentDetailAPI.as_view("accounts_fee_payment_detail"),
+        methods=["GET", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/accounts/fees/summary",
+        view_func=FeeDashboardSummaryAPI.as_view("accounts_fee_summary"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: STAFF PAYROLL ====================
+    app.add_url_rule(
+        "/api/accounts/staff/<string:record_type>/<int:record_id>/salary",
+        view_func=StaffSalaryOverviewAPI.as_view("accounts_staff_salary_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/staff/<string:record_type>/<int:record_id>/salary-structure",
+        view_func=SalaryStructureAPI.as_view("accounts_salary_structure"),
+        methods=["GET", "PUT"],
+    )
+    app.add_url_rule(
+        "/api/accounts/staff/<string:record_type>/<int:record_id>/payslips",
+        view_func=PayslipListAPI.as_view("accounts_payslips"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/payslips/<int:payslip_id>",
+        view_func=PayslipDetailAPI.as_view("accounts_payslip_detail"),
+        methods=["GET", "PUT"],
+    )
+    app.add_url_rule(
+        "/api/accounts/payroll/summary",
+        view_func=PayrollSummaryAPI.as_view("accounts_payroll_summary"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: GENERAL LEDGER ====================
+    app.add_url_rule(
+        "/api/accounts/transactions",
+        view_func=AccountsTransactionListAPI.as_view("accounts_transactions"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/transactions/<int:transaction_id>",
+        view_func=AccountsTransactionDetailAPI.as_view("accounts_transaction_detail"),
+        methods=["GET", "PUT", "DELETE"],
+    )
+
+    # ==================== ACCOUNTS: FEE STRUCTURE TEMPLATES ====================
+    app.add_url_rule(
+        "/api/accounts/fee-structures",
+        view_func=FeeStructureListAPI.as_view("accounts_fee_structures"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/fee-structures/<int:structure_id>",
+        view_func=FeeStructureDetailAPI.as_view("accounts_fee_structure_detail"),
+        methods=["PUT", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/accounts/fee-structures/<int:structure_id>/apply",
+        view_func=FeeStructureApplyAPI.as_view("accounts_fee_structure_apply"),
+        methods=["POST"],
+    )
+
+    # ==================== ACCOUNTS: PENDING FEES ====================
+    app.add_url_rule(
+        "/api/accounts/fees/pending",
+        view_func=PendingFeesListAPI.as_view("accounts_pending_fees"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: BATCH OPTIONS ====================
+    app.add_url_rule(
+        "/api/accounts/batches",
+        view_func=AccountsBatchOptionsAPI.as_view("accounts_batch_options"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: FEE REPORTS ====================
+    app.add_url_rule(
+        "/api/accounts/fees/reports",
+        view_func=FeeReportsAPI.as_view("accounts_fee_reports"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: EXPENSE CATEGORIES ====================
+    app.add_url_rule(
+        "/api/accounts/expense-categories",
+        view_func=ExpenseCategoryListAPI.as_view("accounts_expense_categories"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/expense-categories/<int:category_id>",
+        view_func=ExpenseCategoryDetailAPI.as_view("accounts_expense_category_detail"),
+        methods=["PUT", "DELETE"],
+    )
+
+    # ==================== ACCOUNTS: SALARY MANAGEMENT ====================
+    app.add_url_rule(
+        "/api/accounts/payroll/staff",
+        view_func=PayrollStaffListAPI.as_view("accounts_payroll_staff_list"),
+        methods=["GET"],
+    )
+
+    # ==================== ACCOUNTS: PAYSLIPS (ROSTER-WIDE) ====================
+    app.add_url_rule(
+        "/api/accounts/payslips",
+        view_func=PayslipsAllListAPI.as_view("accounts_payslips_all"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/payroll/run",
+        view_func=RunPayrollAPI.as_view("accounts_payroll_run"),
+        methods=["POST"],
+    )
+
+    # ==================== ACCOUNTS: BANK ACCOUNTS ====================
+    app.add_url_rule(
+        "/api/accounts/bank-accounts",
+        view_func=BankAccountListAPI.as_view("accounts_bank_accounts"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/accounts/bank-accounts/<int:account_id>",
+        view_func=BankAccountDetailAPI.as_view("accounts_bank_account_detail"),
+        methods=["PUT", "DELETE"],
+    )
+
+    # ==================== ACCOUNTS: FINANCIAL REPORTS ====================
+    app.add_url_rule(
+        "/api/accounts/financial-overview",
+        view_func=FinancialOverviewAPI.as_view("accounts_financial_overview"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/profit-loss",
+        view_func=ProfitLossAPI.as_view("accounts_profit_loss"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/accounts/fees/send-reminders",
+        view_func=SendFeeRemindersAPI.as_view("accounts_send_fee_reminders"),
+        methods=["POST"],
+    )
+
+    # ==================== ACCOUNTS: ACTIVITY LOGS (Super Admin only) ====================
+    app.add_url_rule(
+        "/api/accounts/activity-logs",
+        view_func=AccountsActivityLogsAPI.as_view("accounts_activity_logs"),
         methods=["GET"],
     )
 
@@ -1786,68 +2310,74 @@ def create_app():
 
     # FILE SERVING
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
-    TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
+    SUBMITTED_FOLDER = UPLOAD_BASE
+    TEACHER_ASSIGNMENT_FOLDER = ASSIGNMENT_BASE
+
+    def _school_folder(root):
+        # Only the folder of the school the request belongs to. Other schools are unreachable.
+        sid = g.get("tenant_school_id")
+        return os.path.join(root, str(int(sid))) if sid else None
+
+    def _safe_send(base_folder, filename):
+        # Resolve filename under base_folder and refuse to serve anything
+        base_abs = os.path.abspath(base_folder)
+        full_path = os.path.abspath(os.path.join(base_abs, filename))
+
+        if os.path.commonpath([base_abs, full_path]) != base_abs:
+            return None
+
+        if not os.path.isfile(full_path):
+            return None
+
+        return full_path
 
     # STUDENT SUBMITTED FILES
     @app.route("/Submitted_Assignments/<path:filename>")
+    @login_required
     def submitted_files(filename):
 
         try:
+            folder = _school_folder(SUBMITTED_FOLDER)
+            full_path = _safe_send(folder, filename) if folder else None
 
-            safe_filename = os.path.normpath(filename)
-            full_path = os.path.join(SUBMITTED_FOLDER, safe_filename)
-
-            if not os.path.exists(full_path):
-
+            if full_path is None:
                 return jsonify({"error": "File not found"}), 404
 
             directory = os.path.dirname(full_path)
             actual_filename = os.path.basename(full_path)
             response = send_from_directory(
-                directory, actual_filename, as_attachment=False
-            )
-
-            # 🔥 OPEN IN BROWSER
-            response.headers["Content-Disposition"] = (
-                f'inline; filename="{actual_filename}"'
+                directory, actual_filename, as_attachment=not actual_filename.lower().endswith(".pdf")
             )
 
             return response
 
-        except Exception as e:
-            traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+        except Exception:
+            app.logger.exception("Failed to serve submitted assignment file")
+            return jsonify({"error": "Unable to serve file"}), 500
 
     # TEACHER ASSIGNMENT FILES
     @app.route("/Assignment_Files/<path:filename>")
+    @login_required
     def assignment_files(filename):
 
         try:
+            folder = _school_folder(TEACHER_ASSIGNMENT_FOLDER)
+            full_path = _safe_send(folder, filename) if folder else None
 
-            safe_filename = os.path.normpath(filename)
-            full_path = os.path.join(TEACHER_ASSIGNMENT_FOLDER, safe_filename)
-
-            if not os.path.exists(full_path):
-
+            if full_path is None:
                 return jsonify({"error": "File not found"}), 404
 
             directory = os.path.dirname(full_path)
             actual_filename = os.path.basename(full_path)
             response = send_from_directory(
-                directory, actual_filename, as_attachment=False
-            )
-
-            # 🔥 OPEN INLINE
-            response.headers["Content-Disposition"] = (
-                f'inline; filename="{actual_filename}"'
+                directory, actual_filename, as_attachment=not actual_filename.lower().endswith(".pdf")
             )
 
             return response
 
-        except Exception as e:
-            traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+        except Exception:
+            app.logger.exception("Failed to serve assignment file")
+            return jsonify({"error": "Unable to serve file"}), 500
 
     # ERROR HANDLERS
     @app.errorhandler(404)
@@ -1858,17 +2388,8 @@ def create_app():
     def internal_error(e):
         return jsonify({"error": "Internal server error"}), 500
 
-    # =========================================================
-    # RBAC INITIALIZATION
-    # =========================================================
-    # This updates only RBAC default modules/roles. It is idempotent and
-    # does not change login, routing, dashboard, or other application logic.
-    with app.app_context():
-        try:
-            seed_rbac_defaults()
-        except Exception:
-            app.logger.exception("RBAC defaults initialization failed")
-
+    # RBAC defaults are seeded into each school's database when it is
+    # provisioned (utils/tenant_routing.py). Nothing to seed on the platform DB.
     return app
 
 
@@ -1876,9 +2397,20 @@ def create_app():
 app = create_app()
 
 if __name__ == "__main__":
+    is_dev = os.getenv("FLASK_ENV", "development") == "development"
 
     with app.app_context():
-        if os.getenv("FLASK_ENV") == "development":
-            db.create_all()
+        if is_dev:
+            # Dev convenience only: create the platform tables. School databases
+            # are created by the Developer console when a school is added.
+            platform_tables = {
+                "schools", "developers", "developer_audit_logs", "school_domains", "school_branding",
+                "smtp_settings", "mail_broadcasts", "mail_deliveries", "developer_preferences",
+            }
+            db.metadata.create_all(
+                bind=db.engine,
+                tables=[t for t in db.metadata.sorted_tables if t.name in platform_tables],
+            )
 
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # debug=True enables the Werkzeug interactive debugger, which allows
+    app.run(host="0.0.0.0", port=5000, debug=is_dev)

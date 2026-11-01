@@ -138,9 +138,7 @@ export function useHostelRooms({ activeSection, fetchWithAuth, showToast }) {
         loadRooms({ filters });
     }, [loadRooms]);
 
-    // ============================================================
     // ROOM CRUD
-    // ============================================================
     const openCreateRoomModal = useCallback((floorId) => {
         setRoomForm({ ...EMPTY_ROOM_FORM, floor_id: floorId || "" });
         setRoomModalOpen(true);

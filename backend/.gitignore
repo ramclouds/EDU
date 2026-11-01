@@ -1,0 +1,22 @@
+# Secrets
+.env
+*.env.local
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Uploaded/generated content (served from disk, not source)
+Submitted_Assignments/
+Assignment_Files/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

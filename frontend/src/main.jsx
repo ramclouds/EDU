@@ -2,10 +2,23 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { APP_NAME, APP_FAVICON } from "./config/appConfig";
+import { initTheme } from "./controllers/theme";
+import { installPlanNotice } from "./controllers/planGate";
+import { installApiSession } from "./controllers/apiSession";
+import { APP_FAVICON } from "./config/appConfig";
+import { schoolDisplayName } from "./lib/schoolProfile";
+
+// Tailwind is now compiled at build time via @tailwindcss/vite (see
+import "./css/theme.css";
+// Self-hosted from the bootstrap-icons npm package (already a dependency
+import "bootstrap-icons/font/bootstrap-icons.css";
+
+installApiSession();
+initTheme();
+installPlanNotice();
 
 // TITLE
-document.title = APP_NAME;
+document.title = schoolDisplayName();
 
 // FAVICON
 const setFavicon = (iconUrl) => {
@@ -27,5 +40,5 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <BrowserRouter>
       <App />
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

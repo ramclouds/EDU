@@ -131,9 +131,7 @@ export function useHostelComplaints({ activeSection, fetchWithAuth, showToast })
         loadComplaints({ filters: next });
     }, [loadComplaints]);
 
-    // ============================================================
     // TRIAGE MODAL
-    // ============================================================
     const openComplaintModal = useCallback((complaint) => {
         setSelectedComplaint({ ...complaint });
         setComplaintModalOpen(true);

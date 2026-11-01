@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BASE_URL } from "../../config/appConfig";
 
 export function useTeacherAttendance({
@@ -15,6 +15,7 @@ export function useTeacherAttendance({
     );
     const [selectedClass, setSelectedClass] = useState(null);
     const [selectedDate, setSelectedDate] = useState("");
+    const dashboardLoadedRef = useRef(false);
     const [attendanceOwner, setAttendanceOwner] = useState(null);
     const [attendanceLoading, setAttendanceLoading] = useState(false);
     const [dashboardAttendance, setDashboardAttendance] = useState({
@@ -495,6 +496,11 @@ export function useTeacherAttendance({
         ) {
             return;
         }
+
+        // Load the classes and the weekly summary once per visit. Switching sections again
+        // must not repeat the 7-day, per-class requests; the refresh button reloads them.
+        if (dashboardLoadedRef.current) return;
+        dashboardLoadedRef.current = true;
 
         const initAttendance = async () => {
 

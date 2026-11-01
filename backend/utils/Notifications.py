@@ -1,14 +1,24 @@
 from utils.auth import db
 from utils.auth_middleware import login_required, get_current_user
+from utils.rolePermissionManagement import super_admin_required
+from utils.tenancy import current_school_id as _current_school_id
 from datetime import datetime
 from flask import jsonify, request
 from sqlalchemy import or_
 from flask.views import MethodView
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # COMMON NOTIFICATION MODEL
 class Notification(db.Model):
     __tablename__ = "notifications"
+
+    # Scoped per school. Nullable so rows written before multi-tenancy
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     id = db.Column(
         db.Integer,
@@ -196,6 +206,33 @@ class Notification(db.Model):
         }
 
 
+def recipient_school_id(user_id, role, fallback=None):
+    # School a notification recipient belongs to, read from their own row
+    if user_id is None:
+        return fallback
+
+    try:
+        from utils.auth import Admin, Teacher, Student, NonTeachingStaff
+
+        model = {
+            "admin": Admin,
+            "teacher": Teacher,
+            "student": Student,
+            "staff": NonTeachingStaff,
+        }.get(str(role or "").lower())
+
+        if model is None:
+            return fallback
+
+        row = model.query.filter_by(id=user_id).first()
+        if row is not None:
+            return getattr(row, "school_id", None)
+    except Exception:
+        logger.exception("recipient_school_id lookup failed")
+
+    return fallback
+
+
 # 📌 CREATE NOTIFICATION (HELPER)
 
 
@@ -204,6 +241,7 @@ def create_notification(
 ):
     try:
         notification = Notification(
+            school_id=recipient_school_id(user_id, role, _current_school_id()),
             user_id=user_id,
             role=role,
             title=title,
@@ -279,6 +317,7 @@ def get_notification_current_admin():
     if not current_user:
         return None
 
+    # Super Admins are admins too: their role is stored as "super_admin".
     if (
         str(
             getattr(
@@ -287,7 +326,7 @@ def get_notification_current_admin():
                 "",
             )
         ).lower()
-        != "admin"
+        not in ("admin", "super_admin")
     ):
         return None
 
@@ -328,7 +367,9 @@ class NotificationsAPI(MethodView):
 
         notifications = (
             Notification.query.filter_by(
-                user_id=current_user.id, role=current_user.role
+                user_id=current_user.id,
+                role=current_user.role,
+                school_id=_current_school_id(),
             )
             .order_by(Notification.created_at.desc())
             .all()
@@ -361,13 +402,11 @@ class MarkNotificationReadAPI(MethodView):
         current_user = get_current_user()
 
         # 🐛 BUGFIX: only filtered by user_id, not role. user_id is not
-        # guaranteed unique *across* roles (a student and a teacher could
-        # both have id=7), so a user could accidentally mark — or with the
-        # delete endpoint below, delete — another role's notification.
         notification = Notification.query.filter_by(
             id=notification_id,
             user_id=current_user.id,
             role=current_user.role,
+            school_id=_current_school_id(),
         ).first()
 
         if not notification:
@@ -389,14 +428,11 @@ class MarkAllNotificationsReadAPI(MethodView):
         current_user = get_current_user()
 
         # 🐛 BUGFIX: missing role filter (see note above) and no
-        # synchronize_session setting — SQLAlchemy's default
-        # ("evaluate") can raise on some bulk UPDATE filters. Also
-        # scope the update to unread rows only, since that's all this
-        # endpoint needs to touch.
         Notification.query.filter_by(
             user_id=current_user.id,
             role=current_user.role,
             is_read=False,
+            school_id=_current_school_id(),
         ).update({"is_read": True}, synchronize_session=False)
 
         db.session.commit()
@@ -417,6 +453,7 @@ class DeleteNotificationAPI(MethodView):
             id=notification_id,
             user_id=current_user.id,
             role=current_user.role,
+            school_id=_current_school_id(),
         ).first()
 
         if not notification:
@@ -439,7 +476,10 @@ class UnreadNotificationCountAPI(MethodView):
 
         # 🐛 BUGFIX: missing role filter, same issue as above.
         count = Notification.query.filter_by(
-            user_id=current_user.id, role=current_user.role, is_read=False
+            user_id=current_user.id,
+            role=current_user.role,
+            is_read=False,
+            school_id=_current_school_id(),
         ).count()
 
         return jsonify({"unread_count": count})
@@ -489,7 +529,9 @@ class LibraryNotificationsAPI(MethodView):
 
             role_filter = clean_notification_text(request.args.get("role"))
 
-            query = Notification.query
+            query = Notification.query.filter(
+                Notification.school_id == _current_school_id()
+            )
 
             # Only library-related notification types.
             query = query.filter(
@@ -671,19 +713,19 @@ class LibraryNotificationsAPI(MethodView):
             normalized_user_id = None
 
         # App notifications can be marked Sent
-        # immediately because they are stored
-        # in the notification system itself.
         if channel == "App" and scheduled_at is None:
             delivery_status = "Sent"
             sent_at = datetime.utcnow()
 
         else:
             # External channels need an actual
-            # Email/SMS/WhatsApp provider worker.
             delivery_status = "Pending"
             sent_at = None
 
         notification = Notification(
+            school_id=recipient_school_id(
+                normalized_user_id, role, _current_school_id()
+            ),
             user_id=normalized_user_id,
             role=role,
             recipient_name=(recipient_name or None),
@@ -752,10 +794,10 @@ class LibraryNotificationRetryAPI(MethodView):
         if access_error:
             return access_error
 
-        notification = db.session.get(
-            Notification,
-            notification_id,
-        )
+        notification = Notification.query.filter_by(
+            school_id=_current_school_id(),
+            id=notification_id,
+        ).first()
 
         if not notification:
             return (
@@ -812,6 +854,10 @@ class ActivityLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+
     user_id = db.Column(db.Integer)
     role = db.Column(db.String(50))
 
@@ -828,6 +874,7 @@ class ActivityLog(db.Model):
 def log_activity(user_id, role, action, description, student_id=None, leave_id=None):
     try:
         log = ActivityLog(
+            school_id=_current_school_id(),
             user_id=user_id,
             role=role,
             action=action,
@@ -856,10 +903,10 @@ class LibraryNotificationDetailsAPI(MethodView):
         if access_error:
             return access_error
 
-        notification = db.session.get(
-            Notification,
-            notification_id,
-        )
+        notification = Notification.query.filter_by(
+            school_id=_current_school_id(),
+            id=notification_id,
+        ).first()
 
         if not notification:
             return (
@@ -886,16 +933,17 @@ class LibraryNotificationDetailsAPI(MethodView):
 #  GET ACTIVITY LOGS (FIXED API)
 class ActivityLogsAPI(MethodView):
 
-    @login_required
+    decorators = [super_admin_required]
+
     def get(self):
         try:
-            current_user = get_current_user()
-
-            # 🔒 Only admin can view logs
-            if current_user.role != "admin":
-                return jsonify({"error": "Unauthorized"}), 403
-
-            logs = ActivityLog.query.order_by(ActivityLog.created_at.desc()).all()
+            logs = (
+                ActivityLog.query.filter(
+                    ActivityLog.school_id == _current_school_id()
+                )
+                .order_by(ActivityLog.created_at.desc())
+                .all()
+            )
 
             return jsonify(
                 [
@@ -913,5 +961,6 @@ class ActivityLogsAPI(MethodView):
                 ]
             )
 
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
+        except Exception:
+            logger.exception("Failed to fetch activity logs")
+            return jsonify({"error": "Internal server error"}), 500

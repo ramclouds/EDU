@@ -12,13 +12,7 @@ const EMPTY_STATS = {
     by_category: {},
 };
 
-/**
- * Drives the "Activity Logs" dashboard section: an audit trail of
- * significant admin actions across the hostel module (allocations,
- * payments, complaint/maintenance status changes, leave decisions,
- * staff changes, visitor decisions). Read-only - logs are written
- * automatically by the endpoints that perform those actions.
- */
+// Drives the "Activity Logs" dashboard section: an audit trail of
 export function useHostelActivityLogs({ activeSection, fetchWithAuth, showToast }) {
     const fetchRef = useRef(fetchWithAuth);
     const toastRef = useRef(showToast);

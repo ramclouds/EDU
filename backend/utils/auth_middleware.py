@@ -1,8 +1,11 @@
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import jsonify, request
 
-from utils.auth import Admin, Student, Teacher
+from utils.auth import TOKEN_EXPIRY_HOURS, Admin, Student, Teacher, db
+from utils.security import hash_token
+from utils.session import SCHOOL_COOKIE, SCHOOL_CSRF_COOKIE, SCHOOL_CSRF_HEADER, bearer_token, csrf_passes
 
 try:
     from utils.auth import Staff
@@ -32,7 +35,7 @@ def _find_user_by_token(token):
         if not hasattr(model, "auth_token"):
             continue
 
-        user = model.query.filter_by(auth_token=token).first()
+        user = model.query.filter_by(auth_token=hash_token(token)).first()
         if user is not None:
             return user
 
@@ -45,7 +48,11 @@ def login_required(function):
         if request.method == "OPTIONS":
             return jsonify({"message": "OK"}), 200
 
-        token = _extract_bearer_token()
+        token = bearer_token()
+        from_cookie = False
+        if not token:
+            token = request.cookies.get(SCHOOL_COOKIE)
+            from_cookie = bool(token)
         if not token:
             return jsonify({"error": "Unauthorized - Token missing"}), 401
 
@@ -55,8 +62,27 @@ def login_required(function):
             if user is None:
                 return jsonify({"error": "Invalid token"}), 401
 
+            expires_at = getattr(user, "token_expires_at", None)
+            if expires_at is not None and datetime.utcnow() > expires_at:
+                # Session expired — revoke it so the stale token can't be
+                user.auth_token = None
+                user.token_expires_at = None
+                db.session.commit()
+                return jsonify({"error": "Session expired, please log in again"}), 401
+
             if str(getattr(user, "status", "Active")).lower() != "active":
                 return jsonify({"error": "Account inactive"}), 403
+
+            # A browser session (cookie) must send the CSRF header with every change.
+            if from_cookie and not csrf_passes(SCHOOL_CSRF_COOKIE, SCHOOL_CSRF_HEADER):
+                return jsonify({"error": "Security check failed. Reload the page and try again.", "error_code": "CSRF"}), 403
+
+            # Sliding expiry: any authenticated activity extends the
+            if hasattr(user, "token_expires_at"):
+                user.token_expires_at = datetime.utcnow() + timedelta(
+                    hours=TOKEN_EXPIRY_HOURS
+                )
+                db.session.commit()
 
             request.user = user
             request.auth_token = token
@@ -73,6 +99,7 @@ def login_required(function):
                 request.user_type = None
 
         except Exception:
+            db.session.rollback()
             return jsonify({"error": "Unable to validate authentication token"}), 401
 
         return function(*args, **kwargs)

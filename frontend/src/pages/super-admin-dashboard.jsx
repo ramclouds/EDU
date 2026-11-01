@@ -1,50 +1,48 @@
 import { useNavigate } from "react-router-dom";
+import UserAvatar from "../components/UserAvatar";
 import { useState, useEffect, useRef } from "react";
 import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import {
-  APP_NAME,
   APP_YEAR,
   BASE_URL,
   FILE_BASE_URL,
 } from "../config/appConfig";
-import "../css/dashboard.css";
+import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
 import { useAdminProfile } from "../controllers/AdminSide/useAdminProfile";
+import { useAdminManagement } from "../controllers/AdminSide/useAdminManagement";
+import CreateAdminModal from "../components/CreateAdminModal";
+import {
+  SchoolOverviewSection,
+  StaffSection,
+  NoticesSection,
+  FeesSection,
+  PayrollSection,
+  ReportsSection,
+  AnalyticsSection,
+  ParentsSection,
+  EventsSection,
+} from "../components/SuperAdminSections";
 import { useAssets } from "../controllers/Assets/useAssets";
-import { useLeaveManagement } from "../controllers/academic/useLeaveManagement";
+import { useLeaveManagement } from "../controllers/Academic/useLeaveManagement";
 import { useStudentEnrollment } from "../controllers/Academic/useStudentEnrollment";
 import { useRolePermissionManagement } from "../controllers/Auth/useRolePermissionManagement";
-import { useLibraryOverview } from "../controllers/Library/useLibraryOverview";
+import GlobalSearch from "../components/GlobalSearch";
+import { SchoolName, SchoolLogo } from "../components/SchoolBrand";
+import { schoolDisplayName } from "../lib/schoolProfile";
+
+const SEARCH_SECTIONS = [{ key: "admissions", label: "Admissions" }, { key: "analytics", label: "Analytics" }, { key: "assets", label: "Assets" }, { key: "dashboard", label: "Dashboard" }, { key: "events", label: "Events" }, { key: "fees", label: "Fees" }, { key: "leave", label: "Leave" }, { key: "manage-admins", label: "Manage admins" }, { key: "notices", label: "Notices" }, { key: "parents", label: "Parents" }, { key: "payroll", label: "Payroll" }, { key: "profile", label: "Profile" }, { key: "reports", label: "Reports" }, { key: "roles", label: "Roles" }, { key: "security", label: "Security" }, { key: "settings", label: "Settings" }, { key: "staff", label: "Staff" }];
 
 function AdminDashboard() {
   // UI STATE (LOCAL COMPONENT STATE)
   const [noticeTab, setNoticeTab] = useState("announcements");
   const [activeSection, setActiveSection] = useState("dashboard");
   const [search, setSearch] = useState("");
+  const [showCreateAdminModal, setShowCreateAdminModal] = useState(false);
 
   // Which of the other admin dashboards this account may currently
-  // open - Super Admin normally sees all of them, but this stays
-  // driven by Role & Permission Management rather than assumed, so a
-  // future "restricted super admin" style role also works correctly.
   const { canView: canViewDashboard } = useDashboardAccess();
-
-  // Real-time library stats for the overview widget below - see
-  // controllers/Library/useLibraryOverview.js. Only fetched/rendered
-  // when this Super Admin actually has view access to the library
-  // dashboard, matching the same gate used for the sidebar link.
-  const {
-    stats: libraryStats,
-    occupancyRate: libraryOccupancyRate,
-    recentActivity: libraryRecentActivity,
-    overdueAlerts: libraryOverdueAlerts,
-    recentBooks: libraryRecentBooks,
-    loading: libraryOverviewLoading,
-    refreshing: libraryOverviewRefreshing,
-    error: libraryOverviewError,
-    lastUpdated: libraryOverviewUpdatedAt,
-    refresh: refreshLibraryOverview,
-  } = useLibraryOverview();
 
   // ================= DASHBOARD HOOK =================
   const {
@@ -105,6 +103,42 @@ function AdminDashboard() {
 
     toast,
   } = useAdminDashboard(activeSection);
+
+  // SECURITY & ACTIVITY LOGS
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [activityLogsLoading, setActivityLogsLoading] = useState(false);
+  const [activityLogsError, setActivityLogsError] = useState(null);
+
+  useEffect(() => {
+    if (activeSection !== "security") return;
+
+    let cancelled = false;
+    setActivityLogsLoading(true);
+    setActivityLogsError(null);
+
+    fetch(`${BASE_URL}/admin/activity-logs`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("signed_in")}` },
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (cancelled) return;
+        if (ok) {
+          setActivityLogs(Array.isArray(data) ? data : []);
+        } else {
+          setActivityLogsError(data.error || "Failed to load activity logs");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setActivityLogsError("Failed to load activity logs");
+      })
+      .finally(() => {
+        if (!cancelled) setActivityLogsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection]);
 
   // ================= ENROLLMENT HOOK =================
   const {
@@ -275,6 +309,14 @@ function AdminDashboard() {
     handleLogout,
   } = useAdminProfile({ fetchWithAuth, showToast });
 
+  // ================= ADMIN MANAGEMENT (create/list admins) =================
+  const {
+    admins: allAdmins,
+    loading: adminsLoading,
+    creating: creatingAdmin,
+    createAdmin,
+  } = useAdminManagement();
+
   // ================= ASSETS HOOK =================
   const {
     // DATA
@@ -335,8 +377,6 @@ function AdminDashboard() {
   }, []);
 
   // Enrolling new students now happens from the Academic Dashboard - if
-  // this tab is ever selected (e.g. a stale default from the hook),
-  // land on Promote instead of showing a blank tab.
   useEffect(() => {
     if (enrollmentActiveTab === "enroll") {
       setEnrollmentActiveTab("promote");
@@ -373,9 +413,9 @@ function AdminDashboard() {
       ${sidebarExpanded ? "px-6 py-5 gap-2 justify-start" : "py-5 justify-center"}
     `}
         >
-          <i
+          <SchoolLogo
             className="bi bi-mortarboard text-purple-600 text-xl"
-            title={!sidebarExpanded ? APP_NAME : ""}
+            title={!sidebarExpanded ? schoolDisplayName() : ""}
           />
 
           <span
@@ -384,12 +424,12 @@ function AdminDashboard() {
         ${sidebarExpanded ? "opacity-100 max-w-[180px] ml-2" : "opacity-0 max-w-0 ml-0"}
       `}
           >
-            {APP_NAME}
+            <SchoolName />
           </span>
         </div>
 
         {/* NAV */}
-        <nav className="flex-1 overflow-y-auto no-scrollbar scroll-smooth px-2 py-4 space-y-2 text-sm">
+        <nav className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth px-2 py-4 space-y-2 text-sm">
           {[
             {
               title: "MAIN",
@@ -401,6 +441,7 @@ function AdminDashboard() {
             {
               title: "USER MANAGEMENT",
               items: [
+                ["manage-admins", "bi-person-gear", "Manage Admins"],
                 ["parents", "bi-people-fill", "Parents"],
                 ["roles", "bi-shield-lock", "Roles & Permissions"],
               ],
@@ -457,9 +498,6 @@ function AdminDashboard() {
             },
           ].map((section) => {
             // key -> dashboardRegistry key, used to check real access
-            // before showing a cross-dashboard nav link. Add new
-            // cross-dashboard links to this map (and to the backend +
-            // frontend dashboardRegistry) - nothing else needs to change.
             const DASHBOARD_LINK_TARGETS = {
               "library-dashboard": "library-admin-dashboard",
               "accounts-dashboard": "accounts-admin-dashboard",
@@ -619,12 +657,12 @@ function AdminDashboard() {
         >
           {sidebarExpanded ? (
             <span className="whitespace-nowrap transition-all duration-300">
-              {APP_NAME} © {APP_YEAR}
+              <SchoolName /> © {APP_YEAR}
             </span>
           ) : (
             <i
               className="bi bi-mortarboard text-purple-500"
-              title={`${APP_NAME} © ${APP_YEAR}`}
+              title={`${schoolDisplayName()} © ${APP_YEAR}`}
             />
           )}
         </div>
@@ -634,7 +672,7 @@ function AdminDashboard() {
       <main
         className={`flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8
     ${sidebarOpen ? "md:ml-64" : "md:ml-20"}
-    maincolor transition-all duration-300
+    bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] transition-all duration-300
     dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
       >
         {/* CENTER WRAPPER */}
@@ -670,7 +708,7 @@ function AdminDashboard() {
               <div className="flex shrink-0 items-center gap-2 md:hidden">
                 <i className="bi bi-mortarboard text-lg text-indigo-600" />
                 <span className="max-w-[145px] truncate text-sm font-bold text-indigo-600">
-                  {APP_NAME}
+                  <SchoolName />
                 </span>
               </div>
 
@@ -696,18 +734,7 @@ function AdminDashboard() {
               <div className="relative hidden w-full max-w-xl flex-1 px-2 md:block">
                 <i className="bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-full border border-gray-200 bg-white/70 py-2.5 pl-10 pr-4
-            text-sm text-gray-800 shadow-sm outline-none backdrop-blur-md
-            transition-all duration-300 placeholder:text-gray-400
-            hover:shadow-md focus:bg-white focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-700/70 dark:text-white
-            dark:placeholder:text-gray-400 dark:focus:bg-slate-700"
-                  placeholder="Search anything here..."
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
 
               {/* RIGHT ACTIONS */}
@@ -837,11 +864,7 @@ function AdminDashboard() {
               backdrop-blur-md transition-all duration-300 hover:scale-105
               dark:from-slate-700/70 dark:to-slate-700/60"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      alt="Admin profile"
-                      className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600"
-                    />
+                    <UserAvatar className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600" />
 
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 dark:text-gray-200 sm:inline">
                       {admin?.first_name || "Admin"}
@@ -929,405 +952,107 @@ function AdminDashboard() {
               <div className="relative">
                 <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
 
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-5 py-3 pl-11
-            text-sm shadow-sm outline-none transition focus:ring-2 focus:ring-indigo-500
-            dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-                  placeholder="Search anything here..."
-                  autoFocus
-                />
+                <GlobalSearch sections={SEARCH_SECTIONS} onNavigate={setActiveSection} />
               </div>
             </div>
           )}
         </div>
         {/* ===================== DASHBOARD SECTION START =========================== */}
-        {activeSection === "dashboard" && (
-          <section className="space-y-6">
-            {/* =====================================================
-        WELCOME HEADER
-    ====================================================== */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h1 className="text-xl font-bold text-slate-900">
-                Welcome back, Super Admin
-              </h1>
+        {activeSection === "dashboard" && <SchoolOverviewSection />}
 
-              <p className="mt-1 text-sm text-slate-500">
-                Here&apos;s a real-time snapshot of what&apos;s happening across
-                the school.
-              </p>
+        {activeSection === "manage-admins" && (
+          <section className="space-y-6">
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                  Manage Admins
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Create and view Academic, Library, Accounts, Hostel, HR,
+                  and Super Admin accounts.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateAdminModal(true)}
+                className="whitespace-nowrap rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:opacity-90"
+              >
+                <i className="bi bi-plus-lg mr-1"></i> New admin
+              </button>
             </div>
 
-            {/* =====================================================
-        LIBRARY OVERVIEW - real-time data via useLibraryOverview
-        (controllers/Library/useLibraryOverview.js -> GET
-        /api/admin/library/dashboard). Gated the same way as the
-        sidebar's Library link so it stays consistent if a
-        restricted Super Admin role is ever introduced.
-    ====================================================== */}
-            {canViewDashboard("library-admin-dashboard") && (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                      <i className="fas fa-book text-xl" />
-                    </div>
-
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-900">
-                        Library Overview
-                      </h2>
-
-                      <p className="mt-1 text-sm text-slate-500">
-                        {libraryOverviewUpdatedAt
-                          ? `Updated ${libraryOverviewUpdatedAt.toLocaleTimeString()}`
-                          : "Live circulation, inventory and fine stats."}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={refreshLibraryOverview}
-                      disabled={
-                        libraryOverviewLoading || libraryOverviewRefreshing
-                      }
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <i
-                        className={`fas fa-sync-alt ${
-                          libraryOverviewRefreshing ? "animate-spin" : ""
-                        }`}
-                      />
-                      Refresh
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate("/library-admin-dashboard", {
-                          state: {
-                            from: "super-admin-dashboard",
-                            accessBy: "super_admin",
-                            activeSection: "dashboard",
-                          },
-                        })
-                      }
-                      className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                    >
-                      Open Library Dashboard
-                      <i className="fas fa-arrow-right" />
-                    </button>
-                  </div>
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {adminsLoading ? (
+                <div className="p-10 text-center text-gray-400">
+                  Loading…
                 </div>
-
-                <div className="p-5">
-                  {libraryOverviewLoading ? (
-                    <div className="flex min-h-[200px] items-center justify-center">
-                      <div className="text-center">
-                        <i className="fas fa-spinner animate-spin text-3xl text-indigo-600" />
-
-                        <p className="mt-3 text-sm font-medium text-slate-500">
-                          Loading library stats...
-                        </p>
-                      </div>
-                    </div>
-                  ) : libraryOverviewError ? (
-                    <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 text-center">
-                      <i className="fas fa-triangle-exclamation text-2xl text-rose-500" />
-
-                      <p className="text-sm font-medium text-rose-600">
-                        {libraryOverviewError}
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={refreshLibraryOverview}
-                        className="mt-1 text-sm font-semibold text-indigo-600 hover:underline"
-                      >
-                        Try again
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {/* =========================================
-                  STAT CARDS
-              ========================================== */}
-                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                        {[
-                          {
-                            label: "Titles",
-                            value: libraryStats.total_titles,
-                            icon: "fas fa-book",
-                            wrap: "bg-indigo-100 text-indigo-700",
-                          },
-                          {
-                            label: "Total Copies",
-                            value: libraryStats.total_copies,
-                            icon: "fas fa-layer-group",
-                            wrap: "bg-slate-100 text-slate-700",
-                          },
-                          {
-                            label: "Currently Issued",
-                            value: libraryStats.currently_issued,
-                            icon: "fas fa-right-from-bracket",
-                            wrap: "bg-amber-100 text-amber-700",
-                          },
-                          {
-                            label: "Available",
-                            value: libraryStats.available_copies,
-                            icon: "fas fa-circle-check",
-                            wrap: "bg-emerald-100 text-emerald-700",
-                          },
-                          {
-                            label: "Overdue",
-                            value: libraryStats.overdue_books,
-                            icon: "fas fa-triangle-exclamation",
-                            wrap: "bg-rose-100 text-rose-700",
-                          },
-                          {
-                            label: "Due Soon",
-                            value: libraryStats.due_soon,
-                            icon: "fas fa-clock",
-                            wrap: "bg-orange-100 text-orange-700",
-                          },
-                        ].map((card) => (
-                          <div
-                            key={card.label}
-                            className="rounded-xl border border-slate-200 p-4"
-                          >
-                            <div
-                              className={`mb-2 flex h-9 w-9 items-center justify-center rounded-lg ${card.wrap}`}
+              ) : allAdmins.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">
+                  No admin accounts yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-slate-700">
+                        <th className="px-5 py-3">Name</th>
+                        <th className="px-5 py-3">Email</th>
+                        <th className="px-5 py-3">Type</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3">Username</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allAdmins.map((a) => (
+                        <tr
+                          key={a.id}
+                          className="border-b border-gray-50 last:border-0 dark:border-slate-700/50"
+                        >
+                          <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">
+                            {a.first_name} {a.last_name}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {a.email}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {a.admin_type}
+                          </td>
+                          <td className="px-5 py-3">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                a.status === "Active"
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400"
+                              }`}
                             >
-                              <i className={`${card.icon} text-sm`} />
-                            </div>
-
-                            <p className="text-xl font-bold text-slate-900">
-                              {card.value ?? 0}
-                            </p>
-
-                            <p className="text-xs text-slate-500">
-                              {card.label}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* =========================================
-                  OCCUPANCY + FINE SUMMARY
-              ========================================== */}
-                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Copies In Circulation
-                          </p>
-
-                          <div className="mt-2 flex items-center gap-3">
-                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                              <div
-                                className="h-full rounded-full bg-indigo-600"
-                                style={{
-                                  width: `${Math.min(
-                                    libraryOccupancyRate,
-                                    100,
-                                  )}%`,
-                                }}
-                              />
-                            </div>
-
-                            <span className="text-sm font-bold text-slate-900">
-                              {libraryOccupancyRate}%
+                              {a.status}
                             </span>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Fine Collected
-                          </p>
-
-                          <p className="mt-2 text-lg font-bold text-emerald-700">
-                            &#8377;
-                            {Number(libraryStats.fine_collected || 0).toFixed(
-                              2,
-                            )}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Fine Pending
-                          </p>
-
-                          <p className="mt-2 text-lg font-bold text-rose-700">
-                            &#8377;
-                            {Number(libraryStats.fine_pending || 0).toFixed(2)}
-                          </p>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Fine Waived
-                          </p>
-
-                          <p className="mt-2 text-lg font-bold text-slate-700">
-                            &#8377;
-                            {Number(libraryStats.fine_waived || 0).toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* =========================================
-                  RECENT ACTIVITY + OVERDUE ALERTS
-              ========================================== */}
-                      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        <div className="rounded-xl border border-slate-200">
-                          <div className="border-b border-slate-200 p-4">
-                            <h3 className="text-sm font-bold text-slate-900">
-                              Recent Activity
-                            </h3>
-                          </div>
-
-                          <div className="max-h-72 overflow-y-auto p-2">
-                            {libraryRecentActivity.length === 0 ? (
-                              <p className="p-3 text-sm text-slate-400">
-                                No recent library activity.
-                              </p>
-                            ) : (
-                              libraryRecentActivity.map((activity) => (
-                                <div
-                                  key={activity.id}
-                                  className="flex items-start gap-3 rounded-lg p-3 hover:bg-slate-50"
-                                >
-                                  <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                                    <i
-                                      className={`text-xs ${
-                                        activity.type === "issue"
-                                          ? "fas fa-arrow-up text-amber-600"
-                                          : activity.type === "return"
-                                            ? "fas fa-arrow-down text-emerald-600"
-                                            : activity.type === "payment"
-                                              ? "fas fa-indian-rupee-sign text-emerald-600"
-                                              : "fas fa-hand-holding-dollar text-slate-500"
-                                      }`}
-                                    />
-                                  </div>
-
-                                  <div className="min-w-0">
-                                    <p className="truncate text-sm text-slate-700">
-                                      {activity.title}
-                                    </p>
-
-                                    {activity.date && (
-                                      <p className="text-xs text-slate-400">
-                                        {new Date(
-                                          activity.date,
-                                        ).toLocaleString()}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200">
-                          <div className="flex items-center justify-between border-b border-slate-200 p-4">
-                            <h3 className="text-sm font-bold text-slate-900">
-                              Overdue Alerts
-                            </h3>
-
-                            {libraryOverdueAlerts.length > 0 && (
-                              <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
-                                {libraryOverdueAlerts.length}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="max-h-72 overflow-y-auto p-2">
-                            {libraryOverdueAlerts.length === 0 ? (
-                              <p className="p-3 text-sm text-slate-400">
-                                No overdue books right now.
-                              </p>
-                            ) : (
-                              libraryOverdueAlerts.map((alert) => (
-                                <div
-                                  key={`${alert.member_type}-${alert.id}`}
-                                  className="flex items-center justify-between gap-3 rounded-lg p-3 hover:bg-slate-50"
-                                >
-                                  <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium text-slate-700">
-                                      {alert.book_title}
-                                    </p>
-
-                                    <p className="truncate text-xs text-slate-400">
-                                      {alert.member_name}
-                                      {alert.member_code
-                                        ? ` (${alert.member_code})`
-                                        : ""}
-                                    </p>
-                                  </div>
-
-                                  <span className="shrink-0 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
-                                    {alert.overdue_days}d overdue
-                                  </span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* =========================================
-                  RECENTLY ADDED BOOKS
-              ========================================== */}
-                      {libraryRecentBooks.length > 0 && (
-                        <div className="mt-6">
-                          <h3 className="mb-3 text-sm font-bold text-slate-900">
-                            Recently Added Books
-                          </h3>
-
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                            {libraryRecentBooks.map((book) => (
-                              <div
-                                key={book.id}
-                                className="rounded-xl border border-slate-200 p-3"
-                              >
-                                <p className="truncate text-sm font-semibold text-slate-800">
-                                  {book.title}
-                                </p>
-
-                                <p className="truncate text-xs text-slate-400">
-                                  {book.author || "Unknown author"}
-                                </p>
-
-                                <p className="mt-2 text-xs text-slate-500">
-                                  {book.available_copies}/{book.total_copies}{" "}
-                                  available
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+                          </td>
+                          <td className="px-5 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">
+                            {a.username}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              )}
+            </div>
+
+            {showCreateAdminModal && (
+              <CreateAdminModal
+                onClose={() => setShowCreateAdminModal(false)}
+                onCreate={createAdmin}
+                creating={creatingAdmin}
+              />
             )}
           </section>
         )}
 
         {activeSection === "roles" && (
           <section className="space-y-6">
-            {/* =====================================================
-        SECTION HEADER
-    ====================================================== */}
-            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            {/* SECTION HEADER */}
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
                   <i className="fas fa-user-shield text-xl" />
@@ -1349,7 +1074,7 @@ function AdminDashboard() {
                   type="button"
                   onClick={refreshRbacRolePermissionManagement}
                   disabled={rbacLoading}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <i
                     className={`fas fa-sync-alt ${
@@ -1370,11 +1095,9 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* =====================================================
-        LOADING
-    ====================================================== */}
+            {/* LOADING */}
             {rbacLoading ? (
-              <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 shadow-sm">
                 <div className="text-center">
                   <i className="fas fa-spinner animate-spin text-4xl text-indigo-600" />
 
@@ -1385,10 +1108,8 @@ function AdminDashboard() {
               </div>
             ) : (
               <>
-                {/* =================================================
-            CARD 1: ROLES AND PERMISSIONS
-        ================================================== */}
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {/* CARD 1: ROLES AND PERMISSIONS */}
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 shadow-sm">
                   <div className="border-b border-slate-200 p-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -1415,9 +1136,7 @@ function AdminDashboard() {
                   </div>
 
                   <div className="p-5">
-                    {/* =============================================
-                ROLE CARDS
-            ============================================== */}
+                    {/* ROLE CARDS */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {/* ADD ROLE CARD */}
                       <button
@@ -1515,9 +1234,7 @@ function AdminDashboard() {
                       })}
                     </div>
 
-                    {/* =============================================
-                SELECTED ROLE PERMISSION MATRIX
-            ============================================== */}
+                    {/* SELECTED ROLE PERMISSION MATRIX */}
                     {rbacSelectedRole ? (
                       <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
                         <div className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -1582,7 +1299,7 @@ function AdminDashboard() {
                                 )
                               }
                               disabled={rbacSelectedRole.code === "super-admin"}
-                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <i className="fas fa-times mr-1.5" />
                               Revoke All
@@ -1626,7 +1343,7 @@ function AdminDashboard() {
                         ) : (
                           <div className="overflow-x-auto">
                             <table className="w-full min-w-[640px]">
-                              <thead className="bg-white">
+                              <thead className="bg-white dark:bg-slate-800">
                                 <tr className="border-b border-slate-200">
                                   <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                                     Dashboard Page
@@ -1757,7 +1474,7 @@ function AdminDashboard() {
                       </div>
                     ) : (
                       <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center">
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white dark:bg-slate-800 text-slate-400 shadow-sm">
                           <i className="fas fa-user-tag text-xl" />
                         </div>
 
@@ -1773,10 +1490,8 @@ function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* =================================================
-            CARD 2: USER ROLE ASSIGNMENT
-        ================================================== */}
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {/* CARD 2: USER ROLE ASSIGNMENT */}
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 shadow-sm">
                   <div className="border-b border-slate-200 p-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                       <div>
@@ -1816,7 +1531,7 @@ function AdminDashboard() {
                           name="user_type"
                           value={rbacUserFilters.user_type}
                           onChange={updateRbacUserFilter}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                         >
                           {rbacUserTypes.map((type) => (
                             <option key={type.value} value={type.value}>
@@ -1859,7 +1574,7 @@ function AdminDashboard() {
                           name="role_id"
                           value={rbacUserFilters.role_id}
                           onChange={updateRbacUserFilter}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                         >
                           <option value="">All Roles</option>
 
@@ -1880,7 +1595,7 @@ function AdminDashboard() {
                           name="status"
                           value={rbacUserFilters.status}
                           onChange={updateRbacUserFilter}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                         >
                           <option value="">All Status</option>
                           <option value="active">Active</option>
@@ -1912,7 +1627,7 @@ function AdminDashboard() {
                             clearSelectedUser: true,
                           });
                         }}
-                        className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <i className="fas fa-undo" />
                         Reset
@@ -2055,9 +1770,7 @@ function AdminDashboard() {
               </>
             )}
 
-            {/* =====================================================
-        USER ACCESS POPUP
-    ====================================================== */}
+            {/* USER ACCESS POPUP */}
             {rbacUserAccessModalOpen && rbacSelectedUser && (
               <div
                 className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -2067,7 +1780,7 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   {/* POPUP HEADER */}
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-6 sm:py-5">
                     <div className="flex min-w-0 items-center gap-4">
@@ -2134,9 +1847,7 @@ function AdminDashboard() {
                     </div>
                   ) : (
                     <div className="overflow-y-auto p-5 sm:p-6">
-                      {/* ===========================================
-                  ROLE AND TEMPORARY ACCESS
-              ============================================ */}
+                      {/* ROLE AND TEMPORARY ACCESS */}
                       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                         {/* ASSIGN ROLE */}
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -2170,7 +1881,7 @@ function AdminDashboard() {
                               assignRbacRoleToUser(event.target.value)
                             }
                             disabled={rbacSavingUserAccess}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <option value="">No Role Assigned</option>
 
@@ -2244,7 +1955,7 @@ function AdminDashboard() {
 
                               <div className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-amber-600" />
 
-                              <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+                              <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white dark:bg-slate-800 shadow transition peer-checked:translate-x-5" />
                             </div>
                           </label>
 
@@ -2261,7 +1972,7 @@ function AdminDashboard() {
                                   name="expires_at"
                                   value={rbacTemporaryAccessForm.expires_at}
                                   onChange={updateRbacTemporaryAccessForm}
-                                  className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                                  className="w-full rounded-lg border border-amber-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                                 />
                               </div>
 
@@ -2276,7 +1987,7 @@ function AdminDashboard() {
                                   value={rbacTemporaryAccessForm.reason}
                                   onChange={updateRbacTemporaryAccessForm}
                                   placeholder="Example: Temporary exam result verification access"
-                                  className="w-full resize-none rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                                  className="w-full resize-none rounded-lg border border-amber-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                                 />
                               </div>
 
@@ -2292,9 +2003,7 @@ function AdminDashboard() {
                         </div>
                       </div>
 
-                      {/* ===========================================
-                  PERMISSION OVERRIDES
-              ============================================ */}
+                      {/* PERMISSION OVERRIDES */}
                       <div className="mt-6 overflow-hidden rounded-xl border border-slate-200">
                         <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
@@ -2327,7 +2036,7 @@ function AdminDashboard() {
 
                         <div className="overflow-x-auto">
                           <table className="w-full min-w-[640px]">
-                            <thead className="bg-white">
+                            <thead className="bg-white dark:bg-slate-800">
                               <tr className="border-b border-slate-200">
                                 <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                                   Dashboard Page
@@ -2466,7 +2175,7 @@ function AdminDashboard() {
                       type="button"
                       onClick={resetRbacUserOverrides}
                       disabled={rbacSavingUserAccess || rbacUserAccessLoading}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <i className="fas fa-undo" />
                       Reset to Role Permissions
@@ -2477,7 +2186,7 @@ function AdminDashboard() {
                         type="button"
                         onClick={closeRbacUserAccessModal}
                         disabled={rbacSavingUserAccess}
-                        className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                        className="rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                       >
                         Cancel
                       </button>
@@ -2511,9 +2220,7 @@ function AdminDashboard() {
               </div>
             )}
 
-            {/* =====================================================
-        CREATE / EDIT ROLE MODAL
-    ====================================================== */}
+            {/* CREATE / EDIT ROLE MODAL */}
             {rbacRoleModalOpen && (
               <div
                 className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -2523,7 +2230,7 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
                     <div>
                       <h3 className="text-lg font-bold text-slate-900">
@@ -2595,7 +2302,7 @@ function AdminDashboard() {
                         name="user_type"
                         value={rbacRoleForm.user_type}
                         onChange={updateRbacRoleForm}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                       >
                         {rbacUserTypes.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -2644,7 +2351,7 @@ function AdminDashboard() {
 
                         <div className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-indigo-600" />
 
-                        <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+                        <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white dark:bg-slate-800 shadow transition peer-checked:translate-x-5" />
                       </div>
                     </label>
                   </div>
@@ -2654,7 +2361,7 @@ function AdminDashboard() {
                       type="button"
                       onClick={closeRbacRoleModal}
                       disabled={rbacSavingRole}
-                      className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                      className="rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -2686,9 +2393,7 @@ function AdminDashboard() {
               </div>
             )}
 
-            {/* =====================================================
-        DELETE ROLE CONFIRMATION
-    ====================================================== */}
+            {/* DELETE ROLE CONFIRMATION */}
             {rbacDeleteRoleModalOpen && rbacSelectedRole && (
               <div
                 className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -2698,7 +2403,7 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   <div className="p-6 text-center">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600">
                       <i className="fas fa-trash-alt text-2xl" />
@@ -2722,7 +2427,7 @@ function AdminDashboard() {
                       type="button"
                       onClick={closeRbacDeleteRoleModal}
                       disabled={rbacDeletingRole}
-                      className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                      className="flex-1 rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -2769,7 +2474,7 @@ function AdminDashboard() {
             </div>
 
             {/* TABS */}
-            <div className="flex flex-wrap gap-2 bg-white p-2 rounded-xl shadow text-sm">
+            <div className="flex flex-wrap gap-2 bg-white dark:bg-slate-800 p-2 rounded-xl shadow text-sm">
               {["promote", "report"].map((tab) => (
                 <button
                   key={tab}
@@ -2789,7 +2494,7 @@ function AdminDashboard() {
 
             {/* PROMOTE TAB */}
             {enrollmentActiveTab === "promote" && (
-              <div className="bg-white p-6 rounded-xl shadow animate-in fade-in duration-300">
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow animate-in animate-fade-in duration-300">
                 <h3 className="font-bold text-lg mb-4 text-orange-600">
                   Mass Promotion Module
                 </h3>
@@ -2866,7 +2571,7 @@ function AdminDashboard() {
 
             {/* REPORT TAB */}
             {enrollmentActiveTab === "report" && (
-              <div className="bg-white p-5 rounded-xl shadow animate-in fade-in duration-300">
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow animate-in animate-fade-in duration-300">
                 <h3 className="font-bold mb-4">Export Student Data</h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-6">
@@ -2945,9 +2650,9 @@ function AdminDashboard() {
                   </button>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-slate-700">
                   <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-600">
+                    <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                       <tr>
                         <th className="p-4">ID</th>
                         <th className="p-4">Student Name</th>
@@ -3011,7 +2716,7 @@ function AdminDashboard() {
         {/* =========================== ATTENDANCE SECTION END ============================ */}
         {/* ============================= LEAVE MANAGEMENT SECTION START ============================= */}
         {activeSection === "leave" && (
-          <section className="section active p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* HEADER */}
             <div
               className="bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600
@@ -3268,7 +2973,7 @@ function AdminDashboard() {
 
         {/* ============================= Asset Inventory START ============================= */}
         {activeSection === "assets" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* TOP SECTION */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* MAIN CARD */}
@@ -3310,7 +3015,7 @@ function AdminDashboard() {
                       resetAssetForm();
                       openAddAssetModal();
                     }}
-                    className="bg-white text-indigo-700 hover:bg-indigo-50 px-5 py-3 rounded-2xl text-sm font-bold shadow-lg transition"
+                    className="bg-white dark:bg-slate-800 text-indigo-700 hover:bg-indigo-50 px-5 py-3 rounded-2xl text-sm font-bold shadow-lg transition"
                   >
                     + Register Asset
                   </button>
@@ -3320,7 +3025,7 @@ function AdminDashboard() {
               </div>
 
               {/* OPERATIONAL */}
-              <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] uppercase font-black text-slate-400">
@@ -3343,7 +3048,7 @@ function AdminDashboard() {
               </div>
 
               {/* REPAIR */}
-              <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] uppercase font-black text-slate-400">
@@ -3367,7 +3072,7 @@ function AdminDashboard() {
             </div>
 
             {/* SEARCH + FILTERS */}
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-5">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 shadow-sm p-5 space-y-5">
               {/* SEARCH */}
               <div className="relative">
                 <input
@@ -3408,7 +3113,7 @@ function AdminDashboard() {
             </div>
 
             {/* ASSET TABLE */}
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1200px] text-sm">
                   <thead className="bg-slate-50 border-b border-slate-100">
@@ -3631,7 +3336,7 @@ function AdminDashboard() {
 
             {/* DELETED ASSET HISTORY */}
             {deletedAssets?.length > 0 && (
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-black text-slate-800">
@@ -3705,8 +3410,8 @@ function AdminDashboard() {
         {/* ============================= Asset Inventory END ============================= */}
         {/*  Add Asset Modal START  */}
         {isAddAssetModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 overflow-y-auto py-10">
-            <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden animate-[fadeIn_.3s_ease]">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 overflow-y-auto py-10">
+            <div className="bg-white dark:bg-slate-800 w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden animate-[fadeIn_.3s_ease]">
               {/* HEADER */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
                 <div>
@@ -4103,17 +3808,96 @@ function AdminDashboard() {
         )}
         {/* ============================= Add Asset Modal END ============================= */}
         {/* ===================== PROFILE SECTION START ========================*/}
+        {activeSection === "security" && (
+          <section className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                Security & Activity Logs
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                A record of actions taken across the school's dashboards.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              {activityLogsLoading ? (
+                <div className="p-10 text-center text-gray-400">
+                  Loading…
+                </div>
+              ) : activityLogsError ? (
+                <div className="p-10 text-center text-red-500">
+                  {activityLogsError}
+                </div>
+              ) : activityLogs.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">
+                  No activity recorded yet.
+                </div>
+              ) : (
+                <div className="max-h-[70vh] overflow-y-auto">
+                  <div className="overflow-x-auto"><table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white dark:bg-slate-800">
+                      <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-slate-700">
+                        <th className="px-5 py-3">Time</th>
+                        <th className="px-5 py-3">Role</th>
+                        <th className="px-5 py-3">Action</th>
+                        <th className="px-5 py-3">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activityLogs.map((log) => (
+                        <tr
+                          key={log.id}
+                          className="border-b border-gray-50 last:border-0 dark:border-slate-700/50"
+                        >
+                          <td className="whitespace-nowrap px-5 py-3 text-gray-500 dark:text-gray-400">
+                            {log.time}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {log.role}
+                          </td>
+                          <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">
+                            {log.action}
+                          </td>
+                          <td className="px-5 py-3 text-gray-600 dark:text-gray-300">
+                            {log.description}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table></div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeSection === "staff" && <StaffSection />}
+        {activeSection === "notices" && <NoticesSection />}
+        {activeSection === "fees" && <FeesSection />}
+        {activeSection === "payroll" && <PayrollSection />}
+        {activeSection === "reports" && <ReportsSection />}
+        {activeSection === "analytics" && <AnalyticsSection />}
+        {activeSection === "parents" && <ParentsSection />}
+        {activeSection === "events" && <EventsSection />}
+
+        {activeSection === "settings" && (
+          <SettingsPanel
+            user={admin}
+            darkMode={darkMode}
+            onToggleTheme={toggleTheme}
+            onChangePassword={() => setPasswordModalOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+
         {activeSection === "profile" && (
-          <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* ================= PROFILE HEADER ================= */}
             <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-xl overflow-hidden">
               <div className="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
 
               <div className="relative flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src="https://i.pravatar.cc/120?img=12"
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg"
-                />
+                <UserAvatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
 
                 <div className="text-center sm:text-left flex-1">
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -4124,21 +3908,21 @@ function AdminDashboard() {
                           value={formData.first_name || ""}
                           onChange={handleChange}
                           placeholder="First Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="middle_name"
                           value={formData.middle_name || ""}
                           onChange={handleChange}
                           placeholder="Middle Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="last_name"
                           value={formData.last_name || ""}
                           onChange={handleChange}
                           placeholder="Last Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     ) : (
@@ -4147,7 +3931,7 @@ function AdminDashboard() {
                   </h2>
 
                   <p className="text-sm opacity-90 mt-1">
-                    {admin?.designation} • {admin?.specialization || "NA"}
+                    {admin?.designation} • {admin?.specialization || "Not added"}
                   </p>
 
                   <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
@@ -4156,11 +3940,11 @@ function AdminDashboard() {
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
-                      {admin?.status || "NA"}
+                      {admin?.status || "Not added"}
                     </span>
                   </div>
                 </div>
@@ -4243,7 +4027,7 @@ function AdminDashboard() {
                   <p>
                     Role:{" "}
                     <span className="font-medium">
-                      {admin?.designation || "NA"}
+                      {admin?.designation || "Not added"}
                     </span>
                   </p>
 
@@ -4251,14 +4035,14 @@ function AdminDashboard() {
                     Permissions:{" "}
                     <span className="font-medium">
                       {" "}
-                      {admin?.permissions || "NA"}
+                      {admin?.permissions || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Access Level:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4272,26 +4056,26 @@ function AdminDashboard() {
                   <p>
                     School Name:{" "}
                     <span className="font-medium">
-                      {admin?.school_name || "NA"}
+                      {admin?.school_name || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Code:{" "}
                     <span className="font-medium">
-                      {admin?.school_code || "NA"}
+                      {admin?.school_code || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Board:{" "}
-                    <span className="font-medium">{admin?.board || "NA"}</span>
+                    <span className="font-medium">{admin?.board || "Not added"}</span>
                   </p>
 
                   <p>
                     Established:{" "}
                     <span className="font-medium">
-                      {admin?.established_year || "NA"}
+                      {admin?.established_year || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4305,14 +4089,14 @@ function AdminDashboard() {
                   <p>
                     Users Managed:{" "}
                     <span className="font-medium">
-                      {admin?.users_managed || "NA"}
+                      {admin?.users_managed || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Active Sessions:{" "}
                     <span className="font-medium">
-                      {admin?.active_sessions || "NA"}
+                      {admin?.active_sessions || "Not added"}
                     </span>
                   </p>
 
@@ -4330,21 +4114,21 @@ function AdminDashboard() {
                   <p>
                     Fee Access:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.fee_access || "NA"}
+                      {admin?.fee_access || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Discount Authority:{" "}
                     <span className="font-medium">
-                      {admin?.discount_authority || "NA"}
+                      {admin?.discount_authority || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Revenue View:{" "}
                     <span className="font-medium">
-                      {admin?.revenue_view || "NA"}
+                      {admin?.revenue_view || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4365,14 +4149,14 @@ function AdminDashboard() {
                   <p>
                     2FA:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.two_factor_enabled || "NA"}
+                      {admin?.two_factor_enabled || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Login Alerts:{" "}
                     <span className="font-medium">
-                      {admin?.login_alerts || "NA"}
+                      {admin?.login_alerts || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4386,21 +4170,21 @@ function AdminDashboard() {
                   <p>
                     Logins (30d):{" "}
                     <span className="font-medium">
-                      {admin?.logins_30d || "NA"}
+                      {admin?.logins_30d || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Actions:{" "}
                     <span className="font-medium">
-                      {admin?.actions_count || "NA"}
+                      {admin?.actions_count || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Last Action:{" "}
                     <span className="font-medium">
-                      {admin?.last_action || "NA"}
+                      {admin?.last_action || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4526,7 +4310,7 @@ function AdminDashboard() {
                   <p>
                     Created On:{" "}
                     <span className="font-medium">
-                      {admin?.created_on || "NA"}
+                      {admin?.created_on || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4564,7 +4348,7 @@ function AdminDashboard() {
         )}
         {/* ===================== PROFILE SECTION END ========================*/}
         {passwordModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-[100]">
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md border border-gray-100 dark:border-slate-700">
               {/* HEADER */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

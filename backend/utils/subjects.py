@@ -6,15 +6,31 @@ from utils.auth import db
 from utils.rolePermissionManagement import permission_required
 
 
+def _current_school_id():
+    return getattr(getattr(request, "user", None), "school_id", None)
+
+
 class Subject(db.Model):
     __tablename__ = "subjects"
 
     id = db.Column(db.Integer, primary_key=True)
-    subject_code = db.Column(db.String(20), unique=True)
-    subject_name = db.Column(db.String(100), nullable=False, unique=True)
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
+    subject_code = db.Column(db.String(20))
+    subject_name = db.Column(db.String(100), nullable=False)
     subject_type = db.Column(db.String(20), nullable=False, server_default="Core")
     status = db.Column(db.String(20), nullable=False, server_default="Active")
     created_at = db.Column(db.DateTime, server_default=func.now())
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "school_id", "subject_code", name="uq_school_subject_code"
+        ),
+        db.UniqueConstraint(
+            "school_id", "subject_name", name="uq_school_subject_name"
+        ),
+    )
 
 
 def subject_to_dict(subject):
@@ -40,7 +56,7 @@ class AdminSubjectsAPI(MethodView):
             subject_type = clean_text(request.args.get("type"))
             status = clean_text(request.args.get("status"))
 
-            query = Subject.query
+            query = Subject.query.filter(Subject.school_id == _current_school_id())
 
             if search:
                 like = f"%{search}%"
@@ -63,14 +79,22 @@ class AdminSubjectsAPI(MethodView):
 
             subjects = query.order_by(Subject.subject_name.asc()).all()
 
-            total = Subject.query.count()
+            total = Subject.query.filter(
+                Subject.school_id == _current_school_id()
+            ).count()
             active = (
-                Subject.query.filter(Subject.status == "Active").count()
+                Subject.query.filter(
+                    Subject.school_id == _current_school_id(),
+                    Subject.status == "Active",
+                ).count()
                 if hasattr(Subject, "status")
                 else total
             )
             inactive = (
-                Subject.query.filter(Subject.status == "Inactive").count()
+                Subject.query.filter(
+                    Subject.school_id == _current_school_id(),
+                    Subject.status == "Inactive",
+                ).count()
                 if hasattr(Subject, "status")
                 else 0
             )
@@ -91,7 +115,7 @@ class AdminSubjectsAPI(MethodView):
             )
 
         except Exception as e:
-            return jsonify({"success": False, "error": str(e)}), 500
+            return jsonify({"success": False, "error": "Internal server error"}), 500
 
     @permission_required("academic", "create")
     def post(self):
@@ -114,10 +138,11 @@ class AdminSubjectsAPI(MethodView):
                 )
 
             duplicate = Subject.query.filter(
+                Subject.school_id == _current_school_id(),
                 or_(
                     func.lower(Subject.subject_name) == subject_name.lower(),
                     func.lower(Subject.subject_code) == subject_code.lower(),
-                )
+                ),
             ).first()
 
             if duplicate:
@@ -134,6 +159,7 @@ class AdminSubjectsAPI(MethodView):
             subject = Subject(
                 subject_name=subject_name,
                 subject_code=subject_code,
+                school_id=_current_school_id(),
             )
 
             if hasattr(Subject, "subject_type"):
@@ -182,13 +208,15 @@ class AdminSubjectsAPI(MethodView):
 
         except Exception as e:
             db.session.rollback()
-            return jsonify({"success": False, "error": str(e)}), 500
+            return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 class AdminSubjectDetailAPI(MethodView):
     @permission_required("academic", "view")
     def get(self, subject_id):
-        subject = Subject.query.get(subject_id)
+        subject = Subject.query.filter_by(
+            id=subject_id, school_id=_current_school_id()
+        ).first()
 
         if not subject:
             return jsonify({"success": False, "error": "Subject not found"}), 404
@@ -206,7 +234,10 @@ class AdminSubjectDetailAPI(MethodView):
     @permission_required("academic", "edit")
     def put(self, subject_id):
         try:
-            subject = Subject.query.get(subject_id)
+            school_id = _current_school_id()
+            subject = Subject.query.filter_by(
+                id=subject_id, school_id=school_id
+            ).first()
 
             if not subject:
                 return jsonify({"success": False, "error": "Subject not found"}), 404
@@ -229,6 +260,7 @@ class AdminSubjectDetailAPI(MethodView):
                 )
 
             duplicate = Subject.query.filter(
+                Subject.school_id == school_id,
                 Subject.id != subject_id,
                 or_(
                     func.lower(Subject.subject_name) == subject_name.lower(),
@@ -283,12 +315,14 @@ class AdminSubjectDetailAPI(MethodView):
 
         except Exception as e:
             db.session.rollback()
-            return jsonify({"success": False, "error": str(e)}), 500
+            return jsonify({"success": False, "error": "Internal server error"}), 500
 
     @permission_required("academic", "delete")
     def delete(self, subject_id):
         try:
-            subject = Subject.query.get(subject_id)
+            subject = Subject.query.filter_by(
+                id=subject_id, school_id=_current_school_id()
+            ).first()
 
             if not subject:
                 return jsonify({"success": False, "error": "Subject not found"}), 404
@@ -320,4 +354,4 @@ class AdminSubjectDetailAPI(MethodView):
 
         except Exception as e:
             db.session.rollback()
-            return jsonify({"success": False, "error": str(e)}), 500
+            return jsonify({"success": False, "error": "Internal server error"}), 500

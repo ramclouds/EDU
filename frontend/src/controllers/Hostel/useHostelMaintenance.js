@@ -143,9 +143,7 @@ export function useHostelMaintenance({ activeSection, fetchWithAuth, showToast }
         loadMaintenance({ filters: next });
     }, [loadMaintenance]);
 
-    // ============================================================
     // CREATE / EDIT
-    // ============================================================
     const openCreateMaintenanceModal = useCallback(() => {
         setMaintenanceForm({ ...EMPTY_FORM });
         setMaintenanceModalOpen(true);

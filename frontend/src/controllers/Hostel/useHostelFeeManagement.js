@@ -18,13 +18,7 @@ const EMPTY_GENERATE_FORM = {
     due_date: "",
 };
 
-/**
- * Drives the "Fee Management" dashboard section: define fee structures
- * (what residents should be charged, e.g. "Annual Hostel Fee -
- * ₹50,000") and generate them as individual invoices for every current
- * resident. Also loads the fee invoice overview (same data the
- * Pending Dues section filters down to unpaid-only).
- */
+// Drives the "Fee Management" dashboard section: define fee structures
 export function useHostelFeeManagement({ activeSection, fetchWithAuth, showToast }) {
     const { canWriteHostel } = useHostelPermission();
 
@@ -144,9 +138,7 @@ export function useHostelFeeManagement({ activeSection, fetchWithAuth, showToast
         [loadFees, loadStructures],
     );
 
-    // ============================================================
     // FEE STRUCTURE CRUD
-    // ============================================================
     const openCreateStructureModal = useCallback(() => {
         setStructureForm({ ...EMPTY_STRUCTURE_FORM });
         setStructureModalOpen(true);
@@ -249,9 +241,7 @@ export function useHostelFeeManagement({ activeSection, fetchWithAuth, showToast
         [canWriteHostel, loadStructures, notify, request],
     );
 
-    // ============================================================
     // GENERATE INVOICES
-    // ============================================================
     const openGenerateModal = useCallback((structure) => {
         setGenerateForm({
             fee_structure_id: structure?.id || "",

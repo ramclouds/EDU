@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-
-const BASE_URL = "http://localhost:5000/api";
+import { BASE_URL } from "../../config/appConfig";
+// Was a locally hardcoded "http://localhost:5000/api" here, separate fro
 
 export function useStudentProfile({ fetchWithAuth }) {
     // 👤 PROFILE
@@ -42,7 +42,7 @@ export function useStudentProfile({ fetchWithAuth }) {
         try {
             return {
                 user: JSON.parse(localStorage.getItem("user")),
-                token: localStorage.getItem("token"),
+                token: localStorage.getItem("signed_in"),
             };
         } catch {
             return { user: null, token: null };
@@ -51,6 +51,14 @@ export function useStudentProfile({ fetchWithAuth }) {
 
     // ================= LOGOUT =================
     const logoutUser = () => {
+        const token = localStorage.getItem("signed_in");
+        if (token) {
+            fetch(`${BASE_URL}/logout`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => {});
+        }
+
         localStorage.clear();
         window.location.href = "/";
     };

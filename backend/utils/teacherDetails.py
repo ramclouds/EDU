@@ -5,7 +5,7 @@ from flask.views import MethodView
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import or_
 import bcrypt
-from utils.studentDetails import AcademicClass, Batch, Division, Section
+from utils.studentDetails import AcademicClass, Division, Section
 from utils.subjects import Subject
 from utils.auth import db, Teacher
 from utils.auth_middleware import (
@@ -18,19 +18,15 @@ logger = logging.getLogger(__name__)
 
 
 def _can_access_teacher(teacher_id):
-    """
-    BUG FIX: these endpoints previously had no ownership check at all -
-    any logged-in account (another teacher, a student) could view or
-    edit any teacher's profile, including changing their password,
-    just by guessing an id in the URL. Now: a teacher may only access
-    their own record; any admin may access any teacher (Academic
-    Admin oversight, Super Admin, etc).
-    """
+    # BUG FIX: these endpoints previously had no ownership check at all
     current_user = get_current_user()
     current_user_type = get_current_user_type()
 
     if current_user_type == "admin":
-        return True
+        target = Teacher.query.get(teacher_id)
+        return target is not None and (
+            getattr(current_user, "school_id", None) == target.school_id
+        )
 
     if (
         current_user_type == "teacher"
@@ -187,10 +183,18 @@ class TeacherDetails(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
 # ================= UPDATE TEACHER PROFILE =================
+# Set by an administrator, never by the teacher on their own profile.
+TEACHER_ADMIN_FIELDS = (
+    "designation", "experience_years", "employment_type", "shift",
+    "medical_condition", "status", "joining_date",
+)
+
+
 class UpdateTeacherProfile(MethodView):
 
     @login_required
@@ -210,6 +214,19 @@ class UpdateTeacherProfile(MethodView):
             data = request.get_json()
             if not data:
                 return jsonify({"error": "Invalid JSON"}), 400
+
+            # A teacher may edit their own details, but employment and health details are set
+            # by an administrator only. Refuse any attempt to change them.
+            if getattr(request, "user_type", None) == "teacher" and request.user.id == id:
+                changed = [
+                    field for field in TEACHER_ADMIN_FIELDS
+                    if field in data and str(data.get(field) or "") != str(getattr(teacher, field) or "")
+                ]
+                if changed:
+                    return jsonify({
+                        "error": "Only an administrator can change: " + ", ".join(changed),
+                        "error_code": "ADMIN_ONLY_FIELDS",
+                    }), 403
 
             new_email = data.get("email")
             new_mobile = data.get("mobile")
@@ -305,6 +322,7 @@ class UpdateTeacherProfile(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500
 
 
@@ -316,10 +334,6 @@ class ChangeTeacherPassword(MethodView):
             id = int(id)
 
             # This endpoint requires knowing the current password, so
-            # it's self-service only - a teacher changing their own
-            # password. Admin-initiated password resets go through
-            # AdminTeacherPasswordAPI (utils/TeacherManagement.py),
-            # which doesn't require the old password.
             current_user = get_current_user()
             current_user_type = get_current_user_type()
             if not (
@@ -365,4 +379,5 @@ class ChangeTeacherPassword(MethodView):
 
         except Exception as e:
             logger.exception(e)
+            db.session.rollback()
             return jsonify({"error": "Something went wrong"}), 500

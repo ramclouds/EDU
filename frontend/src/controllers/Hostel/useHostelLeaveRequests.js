@@ -144,9 +144,7 @@ export function useHostelLeaveRequests({ activeSection, fetchWithAuth, showToast
         loadLeaveRequests({ filters: next });
     }, [loadLeaveRequests]);
 
-    // ============================================================
     // NEW LEAVE REQUEST
-    // ============================================================
     const openLeaveModal = useCallback(() => {
         setLeaveForm({ ...EMPTY_LEAVE_FORM });
         setStudentSearch("");
@@ -234,9 +232,7 @@ export function useHostelLeaveRequests({ activeSection, fetchWithAuth, showToast
         }
     }, [canWriteHostel, leaveForm, loadLeaveRequests, notify, request]);
 
-    // ============================================================
     // WORKFLOW ACTIONS
-    // ============================================================
     const approveLeave = useCallback(
         async (leave) => {
             if (!canWriteHostel) {

@@ -1,4 +1,5 @@
 import os
+import secrets
 import re
 from datetime import datetime
 
@@ -8,7 +9,7 @@ from werkzeug.utils import secure_filename
 import traceback
 from sqlalchemy import text
 
-from utils.auth import db, Student
+from utils.auth import db, Admin, Student
 from utils.auth_middleware import login_required
 from utils.studentDetails import (
     StudentAcademicRecord,
@@ -18,24 +19,31 @@ from utils.studentDetails import (
     Section,
 )
 
-from utils.teacherDetails import TeacherClass, Subject
+from utils.teacherDetails import Teacher, TeacherClass, Subject
+from utils.tenancy import (
+    caller_can_access_student,
+    caller_can_access_teacher,
+    current_school_id as _current_school_id,
+)
 
-# =============================
 # CONFIG
-# =============================
 ALLOWED_EXTENSIONS = {"pdf", "doc", "docx"}
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 UPLOAD_BASE = os.path.abspath(os.path.join(BASE_DIR, "..", "Submitted_Assignments"))
+ASSIGNMENT_BASE = os.path.abspath(os.path.join(BASE_DIR, "..", "Assignment_Files"))
+MAX_ASSIGNMENT_BYTES = 10 * 1024 * 1024
 
 
-# =============================
 # MODELS
-# =============================
 class Assignment(db.Model):
     __tablename__ = "assignments"
 
     id = db.Column(db.Integer, primary_key=True)
+
+    school_id = db.Column(
+        db.Integer, db.ForeignKey("schools.id"), nullable=True, index=True
+    )
 
     academic_class_id = db.Column(
         db.Integer,
@@ -127,9 +135,7 @@ class AssignmentFile(db.Model):
     file_url = db.Column(db.Text, nullable=False)
 
 
-# =============================
 # HELPERS
-# =============================
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -180,20 +186,23 @@ def get_student_class_info(student_id):
 def create_folder_structure(info):
 
     folder_name = f"{info['batch']}_{info['division']}_{info['section']}"
-    folder_path = os.path.join(UPLOAD_BASE, folder_name)
+    # Each school has its own folder, so one school never reads or overwrites another's files.
+    folder_path = os.path.join(UPLOAD_BASE, str(_current_school_id()), folder_name)
     os.makedirs(folder_path, exist_ok=True)
 
     return folder_path, folder_name
 
 
-# =============================
 # SUBMIT ASSIGNMENT API
-# =============================
 class SubmitAssignmentAPI(MethodView):
 
     @login_required
     def post(self, student_id, assignment_id):
         try:
+            allowed, student = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             file = request.files.get("file")
 
             if not file:
@@ -202,10 +211,11 @@ class SubmitAssignmentAPI(MethodView):
             if not allowed_file(file.filename):
                 return jsonify({"error": "Invalid file type"}), 400
 
-            student = Student.query.get(student_id)
-            assignment = Assignment.query.get(assignment_id)
+            assignment = Assignment.query.filter_by(
+                id=assignment_id, school_id=student.school_id
+            ).first()
 
-            if not student or not assignment:
+            if not assignment:
                 return jsonify({"error": "Invalid student or assignment"}), 404
 
             info = get_student_class_info(student_id)
@@ -290,14 +300,16 @@ class SubmitAssignmentAPI(MethodView):
             return jsonify({"error": "Upload failed"}), 500
 
 
-# =============================
 # GET STUDENT ASSIGNMENTS API
-# =============================
 class GetStudentAssignmentsAPI(MethodView):
 
     @login_required
     def get(self, student_id):
         try:
+            allowed, _ = caller_can_access_student(student_id)
+            if not allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             record = StudentAcademicRecord.query.filter_by(
                 student_id=student_id, is_current=True
             ).first()
@@ -395,14 +407,19 @@ class GetStudentAssignmentsAPI(MethodView):
 
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # Get only Teacher Assigned Classes
-class TeacherAssignedClassesAPI(MethodView):
+class TeacherSubjectAssignmentsAPI(MethodView):
+    """Each class and subject this teacher is assigned to (used by the assignment form)."""
 
     @login_required
     def get(self, teacher_id):
+        allowed, _ = caller_can_access_teacher(teacher_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
 
         mappings = (
             db.session.query(
@@ -443,6 +460,11 @@ class CreateAssignmentAPI(MethodView):
     def post(self, teacher_id):
 
         try:
+            # Without this, a teacher at a DIFFERENT school who happened
+            caller_allowed, _ = caller_can_access_teacher(teacher_id)
+            if not caller_allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
             title = request.form.get("title")
             description = request.form.get("description")
 
@@ -478,26 +500,35 @@ class CreateAssignmentAPI(MethodView):
                 due_date=due_date,
                 total_marks=total_marks,
                 created_by=teacher_id,
+                school_id=_current_school_id(),
             )
+
+            # Check the attachment before anything is saved.
+            file = request.files.get("file")
+            attachment = None
+            if file and file.filename:
+                if not allowed_file(file.filename):
+                    return jsonify({"error": "Only PDF, DOC or DOCX files can be attached"}), 400
+                data = file.read(MAX_ASSIGNMENT_BYTES + 1)
+                if len(data) > MAX_ASSIGNMENT_BYTES:
+                    return jsonify({"error": "The attached file is larger than 10 MB"}), 400
+                attachment = (data, secure_filename(file.filename) or "attachment", file.filename.rsplit(".", 1)[1].lower())
 
             db.session.add(assignment)
             db.session.flush()
 
-            file = request.files.get("file")
-
-            if file:
-
-                os.makedirs("Assignment_Files", exist_ok=True)
-
-                filename = secure_filename(file.filename)
-
-                file.save(os.path.join("Assignment_Files", filename))
-
+            if attachment:
+                data, display_name, ext = attachment
+                stored = f"{secrets.token_hex(16)}.{ext}"
+                folder = os.path.join(ASSIGNMENT_BASE, str(_current_school_id()))
+                os.makedirs(folder, exist_ok=True)
+                with open(os.path.join(folder, stored), "wb") as fh:
+                    fh.write(data)
                 db.session.add(
                     AssignmentFile(
                         assignment_id=assignment.id,
-                        file_name=filename,
-                        file_url=f"/Assignment_Files/{filename}",
+                        file_name=display_name,
+                        file_url=f"/Assignment_Files/{stored}",
                     )
                 )
 
@@ -509,7 +540,7 @@ class CreateAssignmentAPI(MethodView):
             db.session.rollback()
             traceback.print_exc()
 
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 # Teacher Assignment Dashboard API (Accordion Data)
@@ -517,6 +548,9 @@ class TeacherAssignmentsAPI(MethodView):
 
     @login_required
     def get(self, teacher_id):
+        allowed, _ = caller_can_access_teacher(teacher_id)
+        if not allowed:
+            return jsonify({"error": "Forbidden"}), 403
 
         query = text("""
 SELECT
@@ -632,6 +666,10 @@ class AssignmentSubmissionListAPI(MethodView):
 
     @login_required
     def get(self, assignment_id):
+        if not Assignment.query.filter_by(
+            id=assignment_id, school_id=_current_school_id()
+        ).first():
+            return jsonify({"error": "Assignment not found"}), 404
 
         query = text("""
 SELECT
@@ -689,9 +727,28 @@ class GradeAssignmentAPI(MethodView):
     @login_required
     def put(self, submission_id):
 
+        if not isinstance(request.user, (Admin, Teacher)):
+            return jsonify({"error": "Only staff can grade"}), 403
+
         data = request.form if request.form else request.get_json(silent=True) or {}
 
-        sub = AssignmentSubmission.query.get(submission_id)
+        # AssignmentSubmission has no school_id of its own — previously
+        sub = (
+            AssignmentSubmission.query.join(
+                Assignment, Assignment.id == AssignmentSubmission.assignment_id
+            )
+            .filter(
+                AssignmentSubmission.id == submission_id,
+                Assignment.school_id == _current_school_id(),
+            )
+            .first()
+        )
+
+        if not sub:
+            return jsonify({"error": "Submission not found"}), 404
+        _asg = Assignment.query.get(sub.assignment_id)
+        if isinstance(request.user, Teacher) and _asg and _asg.created_by != request.user.id:
+            return jsonify({"error": "You can only grade assignments you created"}), 403
 
         sub.marks_obtained = data.get("marks")
         sub.feedback = data.get("feedback")
@@ -718,9 +775,6 @@ class GradeAssignmentAPI(MethodView):
 
 
 # Add Edit/Delete for assignments
-# =============================
-# UPDATE ASSIGNMENT API
-# =============================
 class UpdateAssignmentAPI(MethodView):
 
     @login_required
@@ -728,17 +782,22 @@ class UpdateAssignmentAPI(MethodView):
 
         try:
 
-            assignment = Assignment.query.get_or_404(assignment_id)
-
-            # =============================
             # AUTH CHECK
-            # =============================
+            caller_allowed, _ = caller_can_access_teacher(teacher_id)
+            if not caller_allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
+            assignment = Assignment.query.filter_by(
+                id=assignment_id, school_id=_current_school_id()
+            ).first()
+
+            if not assignment:
+                return jsonify({"error": "Assignment not found"}), 404
+
             if assignment.created_by != teacher_id:
                 return jsonify({"error": "Unauthorized"}), 403
 
-            # =============================
             # SUPPORT FORM-DATA + JSON
-            # =============================
             data = request.form if request.form else request.get_json(silent=True) or {}
 
             print("========== UPDATE ASSIGNMENT ==========")
@@ -746,9 +805,7 @@ class UpdateAssignmentAPI(MethodView):
             print("FILES:", request.files)
             print("JSON:", request.get_json(silent=True))
 
-            # =============================
             # UPDATE FIELDS
-            # =============================
 
             assignment.title = data.get("title", assignment.title)
 
@@ -781,9 +838,7 @@ class UpdateAssignmentAPI(MethodView):
 
                 assignment.total_marks = int(data.get("total_marks"))
 
-            # =============================
             # OPTIONAL FILE UPDATE
-            # =============================
 
             file = request.files.get("file")
 
@@ -805,9 +860,7 @@ class UpdateAssignmentAPI(MethodView):
                 # save new file
                 file.save(file_path)
 
-                # =============================
                 # DELETE OLD FILES
-                # =============================
 
                 old_files = AssignmentFile.query.filter_by(
                     assignment_id=assignment.id
@@ -829,9 +882,7 @@ class UpdateAssignmentAPI(MethodView):
 
                     db.session.delete(old)
 
-                # =============================
                 # SAVE NEW FILE RECORD
-                # =============================
 
                 db.session.add(
                     AssignmentFile(
@@ -841,9 +892,7 @@ class UpdateAssignmentAPI(MethodView):
                     )
                 )
 
-            # =============================
             # COMMIT
-            # =============================
 
             db.session.commit()
 
@@ -863,7 +912,7 @@ class UpdateAssignmentAPI(MethodView):
 
             traceback.print_exc()
 
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": "Internal server error"}), 500
 
 
 class DeleteAssignmentAPI(MethodView):
@@ -872,14 +921,21 @@ class DeleteAssignmentAPI(MethodView):
     def delete(self, teacher_id, assignment_id):
 
         try:
-            assignment = Assignment.query.get_or_404(assignment_id)
+            caller_allowed, _ = caller_can_access_teacher(teacher_id)
+            if not caller_allowed:
+                return jsonify({"error": "Forbidden"}), 403
+
+            assignment = Assignment.query.filter_by(
+                id=assignment_id, school_id=_current_school_id()
+            ).first()
+
+            if not assignment:
+                return jsonify({"error": "Assignment not found"}), 404
 
             if assignment.created_by != teacher_id:
                 return jsonify({"error": "Unauthorized"}), 403
 
-            # =============================
             # 🔥 DELETE FILES FROM DISK
-            # =============================
 
             # 1. Assignment files (teacher uploads)
             for f in assignment.files:
@@ -902,9 +958,7 @@ class DeleteAssignmentAPI(MethodView):
                         if os.path.exists(file_path):
                             os.remove(file_path)
 
-            # =============================
             # 🔥 DELETE DB (CASCADE)
-            # =============================
             db.session.delete(assignment)
             db.session.commit()
 
@@ -917,18 +971,30 @@ class DeleteAssignmentAPI(MethodView):
             return jsonify({"error": "Delete failed", "details": str(e)}), 500
 
 
-# =============================
 # RECHECK / FORCE RESUBMIT API
-# =============================
 class ForceResubmitAPI(MethodView):
 
     @login_required
     def post(self, submission_id):
+        if not isinstance(request.user, (Admin, Teacher)):
+            return jsonify({"error": "Only staff can reset submissions"}), 403
         try:
-            sub = AssignmentSubmission.query.get(submission_id)
+            sub = (
+                AssignmentSubmission.query.join(
+                    Assignment, Assignment.id == AssignmentSubmission.assignment_id
+                )
+                .filter(
+                    AssignmentSubmission.id == submission_id,
+                    Assignment.school_id == _current_school_id(),
+                )
+                .first()
+            )
 
             if not sub:
                 return jsonify({"error": "Submission not found"}), 404
+            _asg = Assignment.query.get(sub.assignment_id)
+            if isinstance(request.user, Teacher) and _asg and _asg.created_by != request.user.id:
+                return jsonify({"error": "You can only reset submissions for your own assignments"}), 403
 
             # 🔥 Update status to recheck
             sub.status = "Needs Resubmission"
@@ -937,7 +1003,6 @@ class ForceResubmitAPI(MethodView):
             sub.marks_obtained = None
 
             # optional: keep feedback OR reset
-            # sub.feedback = None
 
             db.session.commit()
 
@@ -945,4 +1010,5 @@ class ForceResubmitAPI(MethodView):
 
         except Exception as e:
             traceback.print_exc()
-            return jsonify({"error": str(e)}), 500
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500

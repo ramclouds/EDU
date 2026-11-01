@@ -33,7 +33,7 @@ const readAcademicAccess = () => {
   };
 };
 
-export const Academic_READ_ONLY_MESSAGE =
+const Academic_READ_ONLY_MESSAGE =
   "You have read-only access to the Academic dashboard. Ask your Super Admin for Full Access if you need to make changes.";
 
 export function useAcademicPermission() {
@@ -45,7 +45,6 @@ export function useAcademicPermission() {
 
   useEffect(() => {
     // Picks up permission changes made in another tab (e.g. Super
-    // Admin revokes access while this tab is open).
     const onStorage = (event) => {
       if (
         !event ||
