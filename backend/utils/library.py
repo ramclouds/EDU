@@ -90,22 +90,6 @@ def scoped_get(model, pk):
     return model.query.filter_by(id=pk, school_id=current_school_id()).first()
 
 
-def current_school_id():
-    """Caller's school. None for a legacy/unmigrated install (matches None)."""
-    return getattr(getattr(request, "user", None), "school_id", None)
-
-
-def scoped_get(model, pk):
-    # Load a library row by primary key, only if it belongs to the caller's
-    if pk is None:
-        return None
-    try:
-        pk = int(pk)
-    except (TypeError, ValueError):
-        return None
-    return model.query.filter_by(id=pk, school_id=current_school_id()).first()
-
-
 def authorize_library_admin(required_right="read"):
     current_user = getattr(request, "user", None)
 

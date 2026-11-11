@@ -17,11 +17,6 @@ installApiSession();
 initTheme();
 installPlanNotice();
 
-// Tailwind is now compiled at build time via @tailwindcss/vite (see
-import "./css/theme.css";
-// Self-hosted from the bootstrap-icons npm package (already a dependency
-import "bootstrap-icons/font/bootstrap-icons.css";
-
 // TITLE
 document.title = schoolDisplayName();
 
