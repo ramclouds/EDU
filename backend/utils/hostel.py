@@ -10,7 +10,7 @@ import logging
 
 from utils.auth import db, Admin, Student
 from utils.tenancy import caller_can_access_student
-from utils.auth_middleware import login_required, get_current_user
+from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import user_has_permission
 from utils.studentDetails import (
     StudentAcademicRecord,

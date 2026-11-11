@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 
 import { BASE_URL } from "../../config/appConfig";
 import { DASHBOARD_BY_KEY, DASHBOARD_BY_ROUTE } from "./dashboardRegistry";
 
 const STORAGE_KEY = "dashboard_access";
 
-export function readStoredDashboardAccess() {
+function readStoredDashboardAccess() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     return Array.isArray(raw) ? raw : [];
@@ -27,7 +27,7 @@ export function clearStoredDashboardAccess() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-export function findDashboardAccess(list, routeOrKey) {
+function findDashboardAccess(list, routeOrKey) {
   if (!routeOrKey) return null;
 
   return (
@@ -37,81 +37,99 @@ export function findDashboardAccess(list, routeOrKey) {
   );
 }
 
-export function dashboardLabel(routeOrKey) {
-  return (
-    DASHBOARD_BY_ROUTE[routeOrKey]?.label ||
-    DASHBOARD_BY_KEY[routeOrKey]?.label ||
-    "this dashboard"
-  );
+// HOOK
+// One store shared by every component on the page: a refresh made by the sidebar
+// also updates the route guard and the dashboard checks.
+let store = { dashboards: readStoredDashboardAccess(), loading: false, loaded: false };
+const storeListeners = new Set();
+let inflight = null;
+
+const getStore = () => store;
+
+function subscribeStore(listener) {
+  storeListeners.add(listener);
+  return () => storeListeners.delete(listener);
 }
 
-// HOOK
+function setStore(patch) {
+  store = { ...store, ...patch };
+  storeListeners.forEach((listener) => listener());
+}
 
-export function useDashboardAccess() {
-  const [dashboards, setDashboards] = useState(readStoredDashboardAccess());
-  const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+// The first dashboard this user may open. Used when a page sends them somewhere else.
+function firstAccessibleRoute(list) {
+  const first = (list || []).find((entry) => entry.can_view && entry.route);
+  return first ? first.route : "/";
+}
 
-  const refresh = useCallback(async () => {
-    const token = localStorage.getItem("token");
+// Called on sign-out, so the next person never sees the previous person's list.
+export function resetDashboardAccessStore() {
+  clearStoredDashboardAccess();
+  store = { dashboards: [], loading: false, loaded: false };
+  storeListeners.forEach((listener) => listener());
+}
 
-    if (!token) {
-      setDashboards([]);
-      storeDashboardAccess([]);
-      setLoaded(true);
-      return [];
-    }
+async function fetchDashboards() {
+  if (inflight) return inflight;
 
-    setLoading(true);
+  const token = localStorage.getItem("signed_in");
+  if (!token) {
+    setStore({ dashboards: [], loading: false, loaded: true });
+    storeDashboardAccess([]);
+    return [];
+  }
 
+  setStore({ loading: true });
+  inflight = (async () => {
     try {
       const response = await fetch(`${BASE_URL}/rbac/my-dashboards`, {
         method: "GET",
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!response.ok) {
-        return readStoredDashboardAccess();
-      }
-
+      if (!response.ok) throw new Error("access list unavailable");
       const data = await response.json();
       const list = Array.isArray(data.dashboards) ? data.dashboards : [];
-
-      setDashboards(list);
       storeDashboardAccess(list);
-
+      setStore({ dashboards: list, loading: false, loaded: true });
       return list;
-    } catch (error) {
-      console.warn("Failed to refresh dashboard access:", error);
-      return readStoredDashboardAccess();
+    } catch {
+      const fallback = readStoredDashboardAccess();
+      setStore({ dashboards: fallback, loading: false, loaded: true });
+      return fallback;
     } finally {
-      setLoading(false);
-      setLoaded(true);
+      inflight = null;
     }
-  }, []);
+  })();
+  return inflight;
+}
+
+export function useDashboardAccess() {
+  const snapshot = useSyncExternalStore(subscribeStore, getStore, getStore);
+
+  const refresh = useCallback(() => fetchDashboards(), []);
 
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refresh]);
 
   const canView = useCallback(
-    (routeOrKey) => Boolean(findDashboardAccess(dashboards, routeOrKey)?.can_view),
-    [dashboards],
+    (routeOrKey) => Boolean(findDashboardAccess(snapshot.dashboards, routeOrKey)?.can_view),
+    [snapshot.dashboards],
   );
 
   const canWrite = useCallback(
-    (routeOrKey) => Boolean(findDashboardAccess(dashboards, routeOrKey)?.can_write),
-    [dashboards],
+    (routeOrKey) => Boolean(findDashboardAccess(snapshot.dashboards, routeOrKey)?.can_write),
+    [snapshot.dashboards],
   );
 
   return {
-    dashboards, // [{ key, label, route, can_view, can_write }, ...]
-    loading,
-    loaded,
+    dashboards: snapshot.dashboards, // [{ key, label, route, can_view, can_write }, ...]
+    loading: snapshot.loading,
+    loaded: snapshot.loaded,
     refresh,
     canView,
     canWrite,
+    homeRoute: firstAccessibleRoute(snapshot.dashboards),
   };
 }
 

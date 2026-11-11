@@ -1,16 +1,21 @@
+from sqlalchemy import event
 import os
-import uuid
-from flask import request, jsonify
+from flask import request, jsonify, g
 from flask.views import MethodView
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
+from utils.security import hash_token
+from utils.session import wants_token_in_body
 import logging
 import re
 
+from utils.tenant_routing import TenantSession
+
 bcrypt = Bcrypt()
-db = SQLAlchemy()
+# Every query goes to the active school's database (see utils/tenant_routing.py).
+db = SQLAlchemy(session_options={"class_": TenantSession})
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +251,9 @@ class Admin(db.Model):
 
 class Student(db.Model):
     __tablename__ = "students"
+    profile_image = db.Column(db.String(255))
+    # Set by the library: a student sees the Library section only when this is true.
+    library_member = db.Column(db.Boolean, default=False)
 
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.String(20), unique=True, nullable=False)
@@ -305,6 +313,7 @@ class Student(db.Model):
 
 class Teacher(db.Model):
     __tablename__ = "teachers"
+    profile_image = db.Column(db.String(255))
 
     id = db.Column(db.Integer, primary_key=True)
     teacher_id = db.Column(db.String(50), unique=True, nullable=False)
@@ -374,9 +383,30 @@ class Teacher(db.Model):
 
 
 # LOGIN CLASS
+def _find_login_user(identifier, school_filter):
+    """The user with this email/username in the school database now selected."""
+    return (
+        Student.query.filter_by(email=identifier, **school_filter).first()
+        or Teacher.query.filter_by(email=identifier, **school_filter).first()
+        or Teacher.query.filter_by(username=identifier, **school_filter).first()
+        or Admin.query.filter_by(email=identifier, **school_filter).first()
+        or Admin.query.filter_by(username=identifier, **school_filter).first()
+        or NonTeachingStaff.query.filter_by(
+            email=identifier, is_deleted=False, **school_filter
+        ).first()
+        or NonTeachingStaff.query.filter_by(
+            username=identifier, is_deleted=False, **school_filter
+        ).first()
+    )
+
+
 class Login(MethodView):
 
     def post(self):
+        from utils.rate_limit import login_guard
+        return login_guard("login", self._post)
+
+    def _post(self):
         try:
             data = request.get_json()
             if not data:
@@ -390,16 +420,43 @@ class Login(MethodView):
                 return jsonify({"error": "Email/Username and password required"}), 400
 
             # ================= SCHOOL RESOLUTION (multi-tenant) =================
+            # The school registry lives in the platform DB, so look the school up
+            # there first. Only then is the school's own database selected.
             from utils.platform import School
+            from utils.tenant_routing import (
+                activate_tenant,
+                current_tenant_school_id,
+                current_tenant_slug,
+                list_login_schools,
+                new_user_token,
+                platform_scope,
+                tenant_scope,
+            )
 
             school = None
+            school_pk = None
             if school_code:
-                school = School.query.filter_by(school_code=school_code).first()
-                if not school:
+                with platform_scope():
+                    school = School.query.filter_by(school_code=school_code).first()
+                    if not school:
+                        return jsonify({"error": "Invalid school code"}), 401
+                    if school.refresh_status():
+                        db.session.commit()
+                    school_allowed = school.is_login_allowed()
+                    school_pk, school_db = school.id, school.database_name
+                    school_tid = school.tenant_id
+
+                # Host already pinned a different school (e.g. apec.api.* with
+                # school code of melair): refuse rather than mix tenants.
+                pinned = current_tenant_school_id()
+                if pinned is not None and pinned != school_pk:
                     return jsonify({"error": "Invalid school code"}), 401
-                if school.refresh_status():
-                    db.session.commit()
-                if not school.is_login_allowed():
+                if pinned is None:
+                    if not school_db or not school_tid:
+                        return jsonify({"error": "This school is not fully set up yet"}), 503
+                    activate_tenant(school_pk, school_db, school_tid)
+
+                if not school_allowed:
                     return (
                         jsonify(
                             {
@@ -413,30 +470,63 @@ class Login(MethodView):
                         ),
                         403,
                     )
-            # If no school_code was sent, we fall back to an unscoped lookup
-            school_filter = {"school_id": school.id} if school else {}
+            # ---- common login page: no school code, no school address ----
+            # Search the schools for this email/username with this password. Only a
+            # school where both match is used, so nothing is revealed about others.
+            if not school_code and current_tenant_school_id() is None:
+                matches, blocked = [], False
+                for candidate_school in list_login_schools():
+                    with tenant_scope(candidate_school["database_name"]):
+                        candidate = _find_login_user(identifier, {})
+                        matched = bool(candidate) and bcrypt.check_password_hash(
+                            candidate.password, password
+                        )
+                    if matched:
+                        if candidate_school["allowed"]:
+                            matches.append(candidate_school)
+                        else:
+                            blocked = True
 
-            user = (
-                Student.query.filter_by(email=identifier, **school_filter).first()
-                or Teacher.query.filter_by(email=identifier, **school_filter).first()
-                or Teacher.query.filter_by(
-                    username=identifier, **school_filter
-                ).first()
-                or Admin.query.filter_by(email=identifier, **school_filter).first()
-                or Admin.query.filter_by(
-                    username=identifier, **school_filter
-                ).first()
-                or NonTeachingStaff.query.filter_by(
-                    email=identifier,
-                    is_deleted=False,
-                    **school_filter,
-                ).first()
-                or NonTeachingStaff.query.filter_by(
-                    username=identifier,
-                    is_deleted=False,
-                    **school_filter,
-                ).first()
-            )
+                if len(matches) > 1:
+                    return (
+                        jsonify({
+                            "error": (
+                                "This login exists in more than one school. "
+                                "Enter your school code to continue."
+                            ),
+                            "error_code": "MULTIPLE_SCHOOLS",
+                            "schools": [
+                                {"name": m["name"], "school_code": m["school_code"]}
+                                for m in matches
+                            ],
+                        }),
+                        409,
+                    )
+                if not matches:
+                    if blocked:
+                        return (
+                            jsonify({
+                                "error": (
+                                    "This school's account is suspended or its "
+                                    "trial/subscription has expired. Contact "
+                                    "support to continue."
+                                ),
+                                "error_code": "SCHOOL_ACCESS_DENIED",
+                            }),
+                            403,
+                        )
+                    return jsonify({"error": "Invalid email/username or password"}), 401
+                chosen = matches[0]
+                activate_tenant(chosen["id"], chosen["database_name"], chosen["tenant_id"])
+
+            if not current_tenant_slug():
+                return jsonify({"error": "This school is not fully set up yet"}), 503
+
+            # The school's database holds only its own users, so school_id is
+            # redundant here. Kept as a filter for safety on shared tables.
+            school_filter = {"school_id": school_pk} if school_pk else {}
+
+            user = _find_login_user(identifier, school_filter)
 
             if not user:
                 return jsonify({"error": "User not found"}), 401
@@ -502,8 +592,9 @@ class Login(MethodView):
                     )
 
             # Generate token only after the dashboard-access check passes,
-            token = str(uuid.uuid4())
-            user.auth_token = token
+            token = new_user_token(current_tenant_slug())
+            g.pending_session = ("school", token)
+            user.auth_token = hash_token(token)
             user.token_expires_at = datetime.utcnow() + timedelta(
                 hours=TOKEN_EXPIRY_HOURS
             )
@@ -561,8 +652,8 @@ class Login(MethodView):
 
             try:
                 from utils.school_branding import school_public
-                from utils.platform import School as _School
-                school_info = school_public(_School.query.get(user.school_id)) if getattr(user, "school_id", None) else None
+                from utils.tenant_routing import platform_school_snapshot
+                school_info = school_public(platform_school_snapshot(getattr(user, "school_id", None)))
             except Exception:
                 logger.exception("Unable to load school details during login")
                 school_info = None
@@ -570,7 +661,7 @@ class Login(MethodView):
             return (
                 jsonify(
                     {
-                        "token": token,
+                        **({"token": token} if wants_token_in_body() else {}),
                         "role": user.role,
                         "school": school_info,
                         "dashboard": dashboard,
@@ -578,6 +669,20 @@ class Login(MethodView):
                         "dashboard_access": dashboard_access,
                         "user": {
                             "id": user.id,
+                            "first_name": getattr(user, "first_name", None),
+                            "last_name": getattr(user, "last_name", None),
+                            "profile_image": (
+                                f"/api/profile-photo/{user.profile_image}"
+                                if getattr(user, "profile_image", None) else None
+                            ),
+                            # Readable id shown in the browser address: ADM-..., STU..., etc.
+                            "user_code": (
+                                getattr(user, "admin_id", None)
+                                or getattr(user, "student_id", None)
+                                or getattr(user, "teacher_id", None)
+                                or getattr(user, "staff_id", None)
+                                or getattr(user, "user_id", None)
+                            ),
                             "role": user.role,
                             "user_type": user.role,
                             "admin_type": getattr(user, "admin_type", None),
@@ -628,6 +733,7 @@ class Logout(MethodView):
             user.auth_token = None
             user.token_expires_at = None
             db.session.commit()
+            g.pending_clear = "school"
             return jsonify({"message": "Logged out"}), 200
         except SQLAlchemyError:
             db.session.rollback()
@@ -1038,63 +1144,24 @@ def generate_user_id():
         return f"USR{int(datetime.utcnow().timestamp())}"
 
 
-def generate_admin_id():
-    try:
-        last_admin = Admin.query.order_by(Admin.id.desc()).first()
 
-        if not last_admin or not last_admin.admin_id:
-            return "ADM1001"
-
-        last_id = int(last_admin.admin_id.replace("ADM", ""))
-        return f"ADM{last_id + 1}"
-
-    except Exception as e:
-        logger.error(f"Admin ID generation failed: {e}")
-        return f"ADM{int(datetime.utcnow().timestamp())}"
-
-
-def generate_staff_id():
-    try:
-        last_staff = NonTeachingStaff.query.order_by(NonTeachingStaff.id.desc()).first()
-
-        if not last_staff or not last_staff.staff_id:
-            return "NTS1001"
-
-        numeric_part = int(
-            last_staff.staff_id.replace(
-                "NTS",
-                "",
-            )
-        )
-
-        return f"NTS{numeric_part + 1}"
-
-    except Exception as error:
-        logger.error("Non-teaching staff ID " f"generation failed: {error}")
-
-        return f"NTS{int(datetime.utcnow().timestamp())}"
-
-
-def generate_staff_user_id():
-    try:
-        last_staff = NonTeachingStaff.query.order_by(NonTeachingStaff.id.desc()).first()
-
-        if not last_staff or not last_staff.user_id:
-            return "STFUSR1001"
-
-        numeric_part = int(
-            last_staff.user_id.replace(
-                "STFUSR",
-                "",
-            )
-        )
-
-        return f"STFUSR{numeric_part + 1}"
-
-    except Exception as error:
-        logger.error("Staff user ID generation failed: " f"{error}")
-
-        return "STFUSR" f"{int(datetime.utcnow().timestamp())}"
 
 
 # SIGNUP CLASS
+
+
+# ----------------------------------------------------------------- blank values
+# Forms send "" for an empty choice or date. MySQL ENUM and DATE columns reject "",
+# so every write path is fixed once here: "" becomes NULL on these columns.
+def _blank_to_null(mapper, connection, target):
+    from sqlalchemy import Date, DateTime, Enum
+
+    for column in mapper.columns:
+        if isinstance(column.type, (Enum, Date, DateTime)):
+            if getattr(target, column.key, None) == "":
+                setattr(target, column.key, None)
+
+
+for _model in (Admin, Student, Teacher, NonTeachingStaff):
+    event.listen(_model, "before_insert", _blank_to_null)
+    event.listen(_model, "before_update", _blank_to_null)

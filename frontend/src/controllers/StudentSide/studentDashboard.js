@@ -126,7 +126,7 @@ export function useStudentDashboard(
 
           token:
             localStorage.getItem(
-              "token",
+              "signed_in",
             ),
         };
       } catch (error) {
@@ -145,7 +145,7 @@ export function useStudentDashboard(
   const logoutUser =
     useCallback(() => {
       // Best-effort server-side session revocation (see useAdminProfile.js
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("signed_in");
       if (token) {
         fetch(`${BASE_URL}/logout`, {
           method: "POST",
@@ -497,23 +497,25 @@ export function useStudentDashboard(
       [fetchWithAuth],
     );
 
-  // Initial notification load + polling.
+  // Initial notification load, then a refresh every 30 seconds. Nothing is requested while
+  // the tab is hidden; the list refreshes as soon as the tab is shown again.
   useEffect(() => {
     fetchNotifications({
       silent: false,
     });
 
-    const interval =
-      setInterval(() => {
-        fetchNotifications({
-          silent: true,
-        });
-      }, 15000);
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications({ silent: true });
+      }
+    };
+
+    const interval = setInterval(refreshIfVisible, 30000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
 
     return () => {
-      clearInterval(
-        interval,
-      );
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
     };
   }, [
     fetchNotifications,

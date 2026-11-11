@@ -3,7 +3,6 @@ from flask.views import MethodView
 from sqlalchemy import func, extract, case, and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 from math import ceil
-from sqlalchemy.orm import joinedload
 from utils.auth import db, Admin, Student
 from utils.auth_middleware import login_required, get_current_user
 from utils.rolePermissionManagement import permission_required
@@ -15,7 +14,7 @@ import io
 import logging
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import letter, A4, landscape
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from utils.teacherDetails import Teacher
 
@@ -125,41 +124,6 @@ class AttendanceSession(db.Model):
         ),
     )
 
-
-class AttendanceAudit(db.Model):
-
-    __tablename__ = "attendance_audit"
-
-    id = db.Column(
-        db.Integer,
-        primary_key=True,
-    )
-
-    attendance_record_id = db.Column(
-        db.Integer,
-        nullable=False,
-    )
-
-    old_status = db.Column(
-        db.String(20),
-    )
-
-    new_status = db.Column(
-        db.String(20),
-    )
-
-    changed_by_role = db.Column(
-        db.String(20),
-    )
-
-    changed_by_user_id = db.Column(
-        db.Integer,
-    )
-
-    created_at = db.Column(
-        db.DateTime,
-        server_default=db.func.now(),
-    )
 
 
 class AttendanceRecord(db.Model):

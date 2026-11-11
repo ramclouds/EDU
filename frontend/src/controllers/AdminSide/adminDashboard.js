@@ -73,7 +73,7 @@ export function useAdminDashboard(activeSection, setActiveSection) {
         try {
             return {
                 user: JSON.parse(localStorage.getItem("user")),
-                token: localStorage.getItem("token"),
+                token: localStorage.getItem("signed_in"),
             };
         } catch {
             return { user: null, token: null };

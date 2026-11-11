@@ -1,7 +1,10 @@
 import { useLocation } from "react-router-dom";
+import UserAvatar from "../components/UserAvatar";
+import { useSectionInUrl } from "../controllers/useSectionInUrl";
+import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
+import DashboardSwitcher from "../components/DashboardSwitcher";
 import { useState, useEffect } from "react";
-import { APP_NAME, APP_YEAR, FILE_BASE_URL } from "../config/appConfig";
-import "../css/dashboard.css";
+import { APP_YEAR, FILE_BASE_URL } from "../config/appConfig";
 import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
@@ -36,7 +39,7 @@ const BookDetailItem = ({ label, value }) => {
         {label}
       </p>
 
-      <div className="min-h-[42px] rounded-lg bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700">
+      <div className="min-h-[42px] rounded-lg bg-gray-50 dark:bg-slate-900 px-3 py-2.5 text-sm font-medium text-gray-700">
         {displayValue}
       </div>
     </div>
@@ -60,12 +63,12 @@ const StudentDetailItem = ({ label, value }) => {
 
 const TeacherStatCard = ({ label, value }) => {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
         {label}
       </p>
 
-      <p className="mt-2 text-2xl font-bold text-gray-900">{value ?? 0}</p>
+      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">{value ?? 0}</p>
     </div>
   );
 };
@@ -77,6 +80,7 @@ function AdminDashboard() {
   const [activeSection, setActiveSection] = useState(
     location.state?.activeSection || "dashboard",
   );
+  useSectionInUrl(activeSection, setActiveSection);
   // const [noticeTab, setNoticeTab] = useState("announcements");
   const [search, setSearch] = useState("");
 
@@ -651,14 +655,16 @@ function AdminDashboard() {
     showToast,
   });
 
+  const dashAccess = useDashboardAccess();
   useEffect(() => {
     if (!admin?.id) return;
+    if (!dashAccess.loaded) return;
 
-    if (!isSuperAdmin && !isLibraryAdmin) {
-      showToast("You do not have access to the Library Dashboard", "error");
-      navigate("/super-admin-dashboard", { replace: true });
+    if (!isSuperAdmin && !isLibraryAdmin && !dashAccess.canView("library-admin-dashboard")) {
+      showToast("You do not have access to this dashboard", "error");
+      navigate(dashAccess.homeRoute, { replace: true });
     }
-  }, [admin?.id, isSuperAdmin, isLibraryAdmin, navigate, showToast]);
+  }, [admin?.id, isSuperAdmin, isLibraryAdmin, navigate, showToast, dashAccess.loaded, dashAccess.canView, dashAccess.homeRoute]);
 
   useEffect(() => {
     const desktopMedia = window.matchMedia("(min-width: 768px)");
@@ -727,8 +733,9 @@ function AdminDashboard() {
         {/* ========================= LIBRARY ADMIN SIDEBAR NAV ========================= */}
         <nav
           aria-label="Library management navigation"
-          className="min-h-0 flex-1 space-y-2 no-scrollbar overflow-y-auto overscroll-contain px-3 py-4 text-sm [scrollbar-width:thin]"
+          className="min-h-0 flex-1 space-y-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overflow-y-auto overscroll-contain px-3 py-4 text-sm [scrollbar-width:thin]"
         >
+          <DashboardSwitcher expanded={sidebarExpanded} />
           {[
             {
               title: "MAIN",
@@ -860,7 +867,7 @@ function AdminDashboard() {
 
       {/* MAIN */}
       <main
-        className={`maincolor min-h-screen min-w-0 flex-1 overflow-x-hidden
+        className={`bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] min-h-screen min-w-0 flex-1 overflow-x-hidden
     px-3 py-4 text-gray-800 transition-[margin,width] duration-300
     dark:bg-slate-900 dark:text-gray-100
     sm:px-5 sm:py-6 lg:px-8
@@ -1108,11 +1115,7 @@ function AdminDashboard() {
               backdrop-blur-md transition-all duration-300 hover:scale-105
               dark:from-slate-700/70 dark:to-slate-700/60"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      alt="Admin profile"
-                      className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600"
-                    />
+                    <UserAvatar className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600" />
 
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 dark:text-gray-200 sm:inline">
                       {admin?.first_name || "Admin"}
@@ -1207,7 +1210,7 @@ function AdminDashboard() {
         </div>
         {/* ================= LIBRARY DASHBOARD ================= */}
         {activeSection === "dashboard" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1282,7 +1285,7 @@ function AdminDashboard() {
               ].map(([label, value, icon, iconClass]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -1290,7 +1293,7 @@ function AdminDashboard() {
                         {label}
                       </p>
 
-                      <p className="mt-2 text-xl font-bold text-gray-900">
+                      <p className="mt-2 text-xl font-bold text-gray-900 dark:text-gray-100">
                         {value ?? 0}
                       </p>
                     </div>
@@ -1307,7 +1310,7 @@ function AdminDashboard() {
 
             {/* TODAY STATS */}
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Available Copies</p>
 
                 <p className="mt-1 text-xl font-bold text-green-700">
@@ -1315,7 +1318,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Issued Today</p>
 
                 <p className="mt-1 text-xl font-bold text-blue-700">
@@ -1323,7 +1326,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Returned Today</p>
 
                 <p className="mt-1 text-xl font-bold text-green-700">
@@ -1331,7 +1334,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Due Soon</p>
 
                 <p className="mt-1 text-xl font-bold text-amber-700">
@@ -1339,7 +1342,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Pending Fine</p>
 
                 <p className="mt-1 text-xl font-bold text-red-700">
@@ -1347,7 +1350,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Fine Waived</p>
 
                 <p className="mt-1 text-xl font-bold text-purple-700">
@@ -1357,10 +1360,10 @@ function AdminDashboard() {
             </div>
 
             {/* QUICK SHORTCUTS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                     Quick Shortcuts
                   </h3>
 
@@ -1478,7 +1481,7 @@ function AdminDashboard() {
               ].map(([label, value, icon]) => (
                 <div
                   key={label}
-                  className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm"
+                  className="flex items-center gap-3 rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700">
                     <i className={`bi ${icon} text-lg`}></i>
@@ -1487,7 +1490,7 @@ function AdminDashboard() {
                   <div>
                     <p className="text-xs text-gray-500">{label}</p>
 
-                    <p className="text-lg font-bold text-gray-900">
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
                       {value || 0}
                     </p>
                   </div>
@@ -1498,9 +1501,9 @@ function AdminDashboard() {
             {/* CHARTS */}
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               {/* ISSUE / RETURN TREND */}
-              <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
                 <div className="mb-5">
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                     7-Day Circulation Trend
                   </h3>
 
@@ -1566,9 +1569,9 @@ function AdminDashboard() {
               </div>
 
               {/* REVENUE TREND */}
-              <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
                 <div className="mb-5">
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                     7-Day Fine Collection
                   </h3>
 
@@ -1613,7 +1616,7 @@ function AdminDashboard() {
             {/* OVERDUE + RECENT BOOKS */}
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               {/* OVERDUE ALERTS */}
-              <div className="overflow-hidden rounded-xl border border-red-100 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-red-100 bg-white dark:bg-slate-800 shadow-sm">
                 <div className="flex items-center justify-between border-b border-red-100 bg-red-50 px-5 py-4">
                   <div>
                     <h3 className="font-semibold text-red-700">
@@ -1648,7 +1651,7 @@ function AdminDashboard() {
                         className="flex w-full items-center justify-between gap-4 border-b px-5 py-4 text-left hover:bg-red-50"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-gray-900">
+                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                             {alert.member_name}
                           </p>
 
@@ -1679,10 +1682,10 @@ function AdminDashboard() {
               </div>
 
               {/* RECENTLY ADDED BOOKS */}
-              <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
                 <div className="flex items-center justify-between border-b px-5 py-4">
                   <div>
-                    <h3 className="font-semibold text-gray-900">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                       Recently Added Books
                     </h3>
 
@@ -1718,7 +1721,7 @@ function AdminDashboard() {
                         </span>
 
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-gray-900">
+                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                             {book.title}
                           </p>
 
@@ -1743,10 +1746,10 @@ function AdminDashboard() {
             </div>
 
             {/* RECENT ACTIVITY */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="flex items-center justify-between border-b px-5 py-4">
                 <div>
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                     Recent Activity
                   </h3>
 
@@ -1801,7 +1804,7 @@ function AdminDashboard() {
                         </span>
 
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-gray-800">
+                          <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">
                             {activity.title}
                           </p>
                         </div>
@@ -1820,7 +1823,7 @@ function AdminDashboard() {
 
         {/* ================= CATEGORIES SECTION ================= */}
         {activeSection === "categories" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1853,7 +1856,7 @@ function AdminDashboard() {
                   <button
                     type="button"
                     onClick={openCreateCategoryModal}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
                   >
                     <i className="bi bi-plus-lg" />
                     Add Category
@@ -2530,7 +2533,7 @@ function AdminDashboard() {
 
         {/* ================= AUTHORS SECTION ================= */}
         {activeSection === "authors" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -2547,7 +2550,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={openCreateAuthorModal}
-                  className="inline-flex items-center justify-center gap-2 bg-white text-indigo-700 px-4 py-2.5 rounded-xl text-sm font-semibold shadow hover:bg-indigo-50 transition"
+                  className="inline-flex items-center justify-center gap-2 bg-white dark:bg-slate-800 text-indigo-700 px-4 py-2.5 rounded-xl text-sm font-semibold shadow hover:bg-indigo-50 transition"
                 >
                   <span className="text-lg leading-none">+</span>
                   Add Author
@@ -2557,17 +2560,17 @@ function AdminDashboard() {
 
             {/* Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4 border border-gray-100 dark:border-slate-700">
                 <p className="text-xs font-medium text-gray-500">
                   Total Authors
                 </p>
 
-                <p className="mt-2 text-2xl font-bold text-gray-900">
+                <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {authorStats.total_authors || 0}
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4 border border-gray-100 dark:border-slate-700">
                 <p className="text-xs font-medium text-gray-500">
                   Active Authors
                 </p>
@@ -2577,7 +2580,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4 border border-gray-100 dark:border-slate-700">
                 <p className="text-xs font-medium text-gray-500">
                   Inactive Authors
                 </p>
@@ -2587,7 +2590,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl shadow p-4 border border-gray-100">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4 border border-gray-100 dark:border-slate-700">
                 <p className="text-xs font-medium text-gray-500">
                   Books Assigned
                 </p>
@@ -2599,7 +2602,7 @@ function AdminDashboard() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-xl shadow border border-gray-100">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow border border-gray-100 dark:border-slate-700">
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
                 <div className="xl:col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -2627,7 +2630,7 @@ function AdminDashboard() {
                     onChange={(event) =>
                       updateAuthorFilter("country", event.target.value)
                     }
-                    className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">All Countries</option>
 
@@ -2649,7 +2652,7 @@ function AdminDashboard() {
                     onChange={(event) =>
                       updateAuthorFilter("status", event.target.value)
                     }
-                    className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">All Statuses</option>
                     <option value="Active">Active</option>
@@ -2679,10 +2682,10 @@ function AdminDashboard() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow border border-gray-100 dark:border-slate-700 overflow-hidden">
               <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
                 <table className="w-full text-sm min-w-[850px]">
-                  <thead className="bg-gray-50 text-gray-600 border-b">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600 border-b">
                     <tr>
                       <th className="p-3 text-left font-semibold">#</th>
                       <th className="p-3 text-left font-semibold">Author</th>
@@ -2731,7 +2734,7 @@ function AdminDashboard() {
                           </td>
 
                           <td className="p-3">
-                            <div className="font-semibold text-gray-900">
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">
                               {author.name}
                             </div>
 
@@ -2850,10 +2853,10 @@ function AdminDashboard() {
             {/* Create/Edit Modal */}
             {authorModalOpen && (
               <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
-                <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-white dark:bg-slate-800 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden">
                   <div className="px-5 py-4 border-b flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         {authorForm.id ? "Edit Author" : "Add Author"}
                       </h3>
 
@@ -2961,7 +2964,7 @@ function AdminDashboard() {
                         onChange={(event) =>
                           updateAuthorForm("status", event.target.value)
                         }
-                        className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
@@ -2998,13 +3001,13 @@ function AdminDashboard() {
             {/* Delete Modal */}
             {authorDeleteModal.open && (
               <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
-                <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
                   <div className="p-5">
                     <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl mb-4">
                       !
                     </div>
 
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                       Delete Author
                     </h3>
 
@@ -3024,7 +3027,7 @@ function AdminDashboard() {
                     )}
                   </div>
 
-                  <div className="px-5 py-4 bg-gray-50 flex justify-end gap-3">
+                  <div className="px-5 py-4 bg-gray-50 dark:bg-slate-900 flex justify-end gap-3">
                     <button
                       type="button"
                       onClick={closeDeleteAuthorModal}
@@ -3057,7 +3060,7 @@ function AdminDashboard() {
 
         {/* ================= ADD BOOK SECTION ================= */}
         {activeSection === "add-book" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -3108,10 +3111,10 @@ function AdminDashboard() {
             {/* Form */}
             <form
               onSubmit={saveBook}
-              className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden"
+              className="bg-white dark:bg-slate-800 rounded-xl shadow border border-gray-100 dark:border-slate-700 overflow-hidden"
             >
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-900">
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-700">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                   Book Information
                 </h3>
 
@@ -3418,7 +3421,7 @@ function AdminDashboard() {
               </div>
 
               {/* Actions */}
-              <div className="px-5 py-4 bg-gray-50 border-t flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+              <div className="px-5 py-4 bg-gray-50 dark:bg-slate-900 border-t flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
                 <button
                   type="button"
                   onClick={resetBookForm}
@@ -3458,7 +3461,7 @@ function AdminDashboard() {
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     Recently Added Books
                   </h3>
 
@@ -3477,10 +3480,10 @@ function AdminDashboard() {
                 </button>
               </div>
 
-              <div className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow border border-gray-100 dark:border-slate-700 overflow-hidden">
                 <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
                   <table className="w-full text-sm min-w-[1000px]">
-                    <thead className="bg-gray-50 text-gray-600 border-b">
+                    <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600 border-b">
                       <tr>
                         <th className="p-3 text-left">Book ID</th>
                         <th className="p-3 text-left">Title</th>
@@ -3523,7 +3526,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {book.title}
                               </p>
 
@@ -3545,7 +3548,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3 text-center">
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {book.available_copies}/{book.total_copies}
                               </p>
 
@@ -3597,7 +3600,7 @@ function AdminDashboard() {
 
         {/* ============================= ALL BOOKS SECTION START ============================= */}
         {activeSection === "book" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -3629,7 +3632,7 @@ function AdminDashboard() {
                   <button
                     type="button"
                     onClick={() => setActiveSection("add-book")}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
                   >
                     <i className="fas fa-plus"></i>
                     Add Book
@@ -3640,14 +3643,14 @@ function AdminDashboard() {
 
             {/* STATISTICS */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                       Total Books
                     </p>
 
-                    <p className="mt-2 text-2xl font-bold text-gray-800">
+                    <p className="mt-2 text-2xl font-bold text-gray-800 dark:text-gray-100">
                       {bookStats?.total_books || 0}
                     </p>
                   </div>
@@ -3658,7 +3661,7 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -3676,7 +3679,7 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -3694,7 +3697,7 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -3712,7 +3715,7 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -3732,7 +3735,7 @@ function AdminDashboard() {
             </div>
 
             {/* SEARCH AND FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div className="relative xl:col-span-2">
                   <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
@@ -3827,10 +3830,10 @@ function AdminDashboard() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
-              <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
+              <div className="flex flex-col gap-3 border-b border-gray-100 dark:border-slate-700 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-semibold text-gray-800">Book Records</h3>
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-100">Book Records</h3>
 
                   <p className="text-xs text-gray-500">
                     {bookPagination?.total || 0} record(s) found
@@ -3853,7 +3856,7 @@ function AdminDashboard() {
 
               <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
                 <table className="min-w-[1200px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-wide text-gray-500">
                     <tr>
                       <th className="px-4 py-3 text-left">Book</th>
 
@@ -3926,7 +3929,7 @@ function AdminDashboard() {
                               onClick={() => openBookDetails(book)}
                               className="text-left"
                             >
-                              <div className="font-semibold text-gray-800 hover:text-indigo-600">
+                              <div className="font-semibold text-gray-800 dark:text-gray-100 hover:text-indigo-600">
                                 {book.title}
                               </div>
 
@@ -4033,7 +4036,7 @@ function AdminDashboard() {
 
               {/* PAGINATION */}
               {!booksLoading && bookRows.length > 0 && (
-                <div className="flex flex-col gap-3 border-t border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 border-t border-gray-100 dark:border-slate-700 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-xs text-gray-500">
                     Page {bookPagination?.page || 1} of{" "}
                     {bookPagination?.pages || 1}
@@ -4076,9 +4079,9 @@ function AdminDashboard() {
             {bookDetailsModalOpen && selectedBook && (
               <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-y-auto bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4">
                 <div className="max-h-[94dvh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl dark:bg-slate-800 sm:rounded-2xl">
-                  <div className="sticky top-0 flex items-center justify-between border-b bg-white px-5 py-4">
+                  <div className="sticky top-0 flex items-center justify-between border-b bg-white dark:bg-slate-800 px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-800">
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
                         Book Details
                       </h3>
 
@@ -4161,7 +4164,7 @@ function AdminDashboard() {
                         Description
                       </p>
 
-                      <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+                      <div className="rounded-lg bg-gray-50 dark:bg-slate-900 p-3 text-sm text-gray-700">
                         {selectedBook.description || "No description provided"}
                       </div>
                     </div>
@@ -4196,7 +4199,7 @@ function AdminDashboard() {
 
         {/* ================= LIBRARY STUDENTS ================= */}
         {activeSection === "students" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -4237,11 +4240,11 @@ function AdminDashboard() {
 
             {/* STATS */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   Total Students
                 </p>
-                <p className="mt-2 text-2xl font-bold text-gray-900">
+                <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {studentStats.total_students}
                 </p>
               </div>
@@ -4275,7 +4278,7 @@ function AdminDashboard() {
             </div>
 
             {/* FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <input
                   type="text"
@@ -4348,10 +4351,10 @@ function AdminDashboard() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
                 <table className="min-w-[1100px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-wide text-gray-600">
                     <tr>
                       <th className="p-3 text-left">Student</th>
                       <th className="p-3 text-left">Class</th>
@@ -4420,7 +4423,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-medium text-gray-800">
+                              <p className="font-medium text-gray-800 dark:text-gray-100">
                                 {student.class_name}
                               </p>
 
@@ -4504,7 +4507,7 @@ function AdminDashboard() {
               </div>
 
               {/* PAGINATION */}
-              <div className="flex flex-col gap-3 border-t border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 border-t border-gray-100 dark:border-slate-700 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <span>Rows:</span>
 
@@ -4556,10 +4559,10 @@ function AdminDashboard() {
             {/* STUDENT DETAILS MODAL */}
             {studentDetailsModalOpen && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 sm:p-6">
-                <div className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+                <div className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white dark:bg-slate-800 px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Student Library Record
                       </h3>
 
@@ -4627,7 +4630,7 @@ function AdminDashboard() {
                               onClick={() =>
                                 issueBookToStudent(studentDetails.student)
                               }
-                              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-700"
+                              className="rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-700"
                             >
                               <i className="bi bi-journal-plus mr-2"></i>
                               Issue Book
@@ -4726,7 +4729,7 @@ function AdminDashboard() {
                         ].map(([label, value, valueClass]) => (
                           <div
                             key={label}
-                            className="rounded-xl border bg-gray-50 p-3"
+                            className="rounded-xl border bg-gray-50 dark:bg-slate-900 p-3"
                           >
                             <p className="text-xs text-gray-500">{label}</p>
                             <p
@@ -4740,13 +4743,13 @@ function AdminDashboard() {
 
                       {/* ACTIVE ISSUES */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Currently Issued Books
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[900px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Book</th>
                                 <th className="p-3 text-left">Issue Date</th>
@@ -4772,7 +4775,7 @@ function AdminDashboard() {
                                 studentDetails.active_issues.map((issue) => (
                                   <tr key={issue.id}>
                                     <td className="p-3">
-                                      <p className="font-medium text-gray-900">
+                                      <p className="font-medium text-gray-900 dark:text-gray-100">
                                         {issue.book_title}
                                       </p>
                                       <p className="text-xs text-gray-500">
@@ -4840,13 +4843,13 @@ function AdminDashboard() {
 
                       {/* RETURN HISTORY */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Book Return History
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[850px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Book</th>
                                 <th className="p-3 text-left">Issued</th>
@@ -4900,13 +4903,13 @@ function AdminDashboard() {
 
                       {/* FINE HISTORY */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Fine Collection History
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[800px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Date</th>
                                 <th className="p-3 text-left">Issue ID</th>
@@ -4978,10 +4981,10 @@ function AdminDashboard() {
             {/* FINE PAYMENT MODAL */}
             {fineModalOpen && (
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
-                <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+                <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   <div className="flex items-center justify-between border-b px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Record Fine Payment
                       </h3>
 
@@ -5132,7 +5135,7 @@ function AdminDashboard() {
 
         {/* ================= LIBRARY TEACHERS ================= */}
         {activeSection === "teachers" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -5178,7 +5181,7 @@ function AdminDashboard() {
               />
             </div>
 
-            <div className="rounded-xl bg-white p-4 shadow-sm">
+            <div className="rounded-xl bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <input
                   type="text"
@@ -5243,7 +5246,7 @@ function AdminDashboard() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-xl bg-white shadow">
+            <div className="overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow">
               <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
                 <table className="min-w-[1100px] w-full text-sm">
                   <thead className="bg-gray-100 text-gray-600">
@@ -5408,10 +5411,10 @@ function AdminDashboard() {
             {/* TEACHER DETAILS MODAL */}
             {teacherDetailsModalOpen && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 sm:p-6">
-                <div className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+                <div className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white dark:bg-slate-800 px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Teacher Library Record
                       </h3>
 
@@ -5487,7 +5490,7 @@ function AdminDashboard() {
                                   teacherLibraryDetails.teacher,
                                 )
                               }
-                              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-700"
+                              className="rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-700"
                             >
                               <i className="bi bi-journal-plus mr-2"></i>
                               Issue Book
@@ -5584,7 +5587,7 @@ function AdminDashboard() {
                         ].map(([label, value, valueClass]) => (
                           <div
                             key={label}
-                            className="rounded-xl border bg-gray-50 p-3"
+                            className="rounded-xl border bg-gray-50 dark:bg-slate-900 p-3"
                           >
                             <p className="text-xs text-gray-500">{label}</p>
                             <p
@@ -5598,13 +5601,13 @@ function AdminDashboard() {
 
                       {/* ACTIVE ISSUES */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Currently Issued Books
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[900px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Book</th>
                                 <th className="p-3 text-left">Issue Date</th>
@@ -5632,7 +5635,7 @@ function AdminDashboard() {
                                   (issue) => (
                                     <tr key={issue.id}>
                                       <td className="p-3">
-                                        <p className="font-medium text-gray-900">
+                                        <p className="font-medium text-gray-900 dark:text-gray-100">
                                           {issue.book_title}
                                         </p>
                                         <p className="text-xs text-gray-500">
@@ -5701,13 +5704,13 @@ function AdminDashboard() {
 
                       {/* RETURN HISTORY */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Book Return History
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[850px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Book</th>
                                 <th className="p-3 text-left">Issued</th>
@@ -5768,13 +5771,13 @@ function AdminDashboard() {
 
                       {/* FINE COLLECTION HISTORY */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Fine Collection History
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[800px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Date</th>
                                 <th className="p-3 text-left">Issue ID</th>
@@ -5862,7 +5865,7 @@ function AdminDashboard() {
 
         {/* ================= ALL LIBRARY MEMBERS ================= */}
         {activeSection === "members" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -5895,13 +5898,13 @@ function AdminDashboard() {
               ].map(([label, value]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                     {label}
                   </p>
 
-                  <p className="mt-2 text-2xl font-bold text-gray-900">
+                  <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {value || 0}
                   </p>
                 </div>
@@ -5909,7 +5912,7 @@ function AdminDashboard() {
             </div>
 
             {/* FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <input
                   type="text"
@@ -5993,10 +5996,10 @@ function AdminDashboard() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
                 <table className="min-w-[1150px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-wide text-gray-600">
                     <tr>
                       <th className="p-3 text-left">Member</th>
                       <th className="p-3 text-left">Role</th>
@@ -6083,7 +6086,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-medium text-gray-800">
+                              <p className="font-medium text-gray-800 dark:text-gray-100">
                                 {member.class_or_department || "Not Assigned"}
                               </p>
 
@@ -6195,11 +6198,11 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+                <div className="max-h-[94vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   {/* MODAL HEADER */}
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white dark:bg-slate-800 px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Member Library Record
                       </h3>
 
@@ -6265,7 +6268,7 @@ function AdminDashboard() {
                                 memberDetails.member?.library_status ===
                                 "Blocked"
                               }
-                              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <i className="bi bi-journal-plus mr-2"></i>
                               Issue Book
@@ -6355,7 +6358,7 @@ function AdminDashboard() {
                         ].map(([label, value, valueClass]) => (
                           <div
                             key={label}
-                            className="rounded-xl border bg-gray-50 p-3"
+                            className="rounded-xl border bg-gray-50 dark:bg-slate-900 p-3"
                           >
                             <p className="text-xs text-gray-500">{label}</p>
 
@@ -6370,7 +6373,7 @@ function AdminDashboard() {
 
                       {/* PROFILE INFORMATION */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Member Information
                         </h4>
 
@@ -6444,13 +6447,13 @@ function AdminDashboard() {
                           ].map(([label, value]) => (
                             <div
                               key={label}
-                              className="rounded-xl border border-gray-100 bg-gray-50 p-3"
+                              className="rounded-xl border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 p-3"
                             >
                               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                                 {label}
                               </p>
 
-                              <p className="mt-1 break-words text-sm font-medium text-gray-800">
+                              <p className="mt-1 break-words text-sm font-medium text-gray-800 dark:text-gray-100">
                                 {value !== null &&
                                 value !== undefined &&
                                 value !== ""
@@ -6464,13 +6467,13 @@ function AdminDashboard() {
 
                       {/* ACTIVE ISSUES */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Currently Issued Books
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[900px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Book</th>
                                 <th className="p-3 text-left">Issue Date</th>
@@ -6496,7 +6499,7 @@ function AdminDashboard() {
                                 memberDetails.active_issues.map((issue) => (
                                   <tr key={issue.id}>
                                     <td className="p-3">
-                                      <p className="font-medium text-gray-900">
+                                      <p className="font-medium text-gray-900 dark:text-gray-100">
                                         {issue.book_title}
                                       </p>
 
@@ -6568,13 +6571,13 @@ function AdminDashboard() {
 
                       {/* RETURN HISTORY */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Book Return History
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[850px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Book</th>
                                 <th className="p-3 text-left">Issued</th>
@@ -6640,13 +6643,13 @@ function AdminDashboard() {
 
                       {/* FINE HISTORY */}
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Fine Collection History
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[800px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Date</th>
                                 <th className="p-3 text-left">Issue ID</th>
@@ -6724,7 +6727,7 @@ function AdminDashboard() {
 
         {/* ================= ISSUE AND MANAGE BOOKS ================= */}
         {activeSection === "issued-books" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -6835,7 +6838,7 @@ function AdminDashboard() {
               ].map(([label, value, icon, classes]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -6843,7 +6846,7 @@ function AdminDashboard() {
                         {label}
                       </p>
 
-                      <p className="mt-2 text-2xl font-bold text-gray-900">
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {value || 0}
                       </p>
                     </div>
@@ -6861,10 +6864,10 @@ function AdminDashboard() {
             {/* ISSUE FORM */}
             <form
               onSubmit={saveIssue}
-              className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+              className="overflow-hidden rounded-2xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm"
             >
-              <div className="border-b border-gray-100 px-5 py-4">
-                <h3 className="font-semibold text-gray-900">Issue New Book</h3>
+              <div className="border-b border-gray-100 dark:border-slate-700 px-5 py-4">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Issue New Book</h3>
 
                 <p className="mt-1 text-xs text-gray-500">
                   Select an active member and an available book copy.
@@ -6965,7 +6968,7 @@ function AdminDashboard() {
                   </div>
 
                   {memberDropdownOpen && issueForm.member_type && (
-                    <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl">
+                    <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl">
                       {issueMembers
                         .filter(
                           (member) =>
@@ -7006,7 +7009,7 @@ function AdminDashboard() {
                             }`}
                           >
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-gray-900">
+                              <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                                 {member.name}
                               </p>
 
@@ -7071,7 +7074,7 @@ function AdminDashboard() {
                         Selected Member
                       </p>
 
-                      <p className="mt-1 text-sm font-medium text-gray-800">
+                      <p className="mt-1 text-sm font-medium text-gray-800 dark:text-gray-100">
                         {selectedIssueMember.name}
                       </p>
 
@@ -7254,7 +7257,7 @@ function AdminDashboard() {
             </form>
 
             {/* FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
                 <input
                   type="search"
@@ -7332,10 +7335,10 @@ function AdminDashboard() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
                 <table className="min-w-[1250px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-wide text-gray-600">
                     <tr>
                       <th className="p-3 text-left">Issue ID</th>
                       <th className="p-3 text-left">Member</th>
@@ -7389,7 +7392,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {issue.member_name}
                               </p>
 
@@ -7399,7 +7402,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-medium text-gray-900">
+                              <p className="font-medium text-gray-900 dark:text-gray-100">
                                 {issue.book_title}
                               </p>
 
@@ -7520,10 +7523,10 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   <div className="flex items-center justify-between border-b px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Issue Record
                       </h3>
 
@@ -7582,13 +7585,13 @@ function AdminDashboard() {
                       ].map(([label, value]) => (
                         <div
                           key={label}
-                          className="rounded-xl border border-gray-100 bg-gray-50 p-3"
+                          className="rounded-xl border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 p-3"
                         >
                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                             {label}
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-medium text-gray-800">
+                          <p className="mt-1 break-words text-sm font-medium text-gray-800 dark:text-gray-100">
                             {value !== null &&
                             value !== undefined &&
                             value !== ""
@@ -7631,7 +7634,7 @@ function AdminDashboard() {
 
         {/* ================= RETURN BOOKS ================= */}
         {activeSection === "return-books" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -7715,7 +7718,7 @@ function AdminDashboard() {
               ].map(([label, value, valueClass]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                     {label}
@@ -7731,10 +7734,10 @@ function AdminDashboard() {
             {/* RETURN FORM */}
             <form
               onSubmit={(event) => processReturn(event, returnForm.fine_action)}
-              className="overflow-visible rounded-2xl border border-gray-100 bg-white shadow-sm"
+              className="overflow-visible rounded-2xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm"
             >
               <div className="border-b px-5 py-4">
-                <h3 className="font-semibold text-gray-900">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                   Process Book Return
                 </h3>
 
@@ -7825,7 +7828,7 @@ function AdminDashboard() {
                   </div>
 
                   {issueDropdownOpen && (
-                    <div className="absolute z-[80] mt-1 max-h-80 w-full overflow-y-auto rounded-xl border bg-white shadow-xl">
+                    <div className="absolute z-[80] mt-1 max-h-80 w-full overflow-y-auto rounded-xl border bg-white dark:bg-slate-800 shadow-xl">
                       {activeIssueOptions
                         .filter(
                           (record) =>
@@ -7861,7 +7864,7 @@ function AdminDashboard() {
                             className="flex w-full items-center justify-between border-b px-4 py-3 text-left hover:bg-indigo-50"
                           >
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-gray-900">
+                              <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                                 {record.book_title}
                               </p>
 
@@ -7948,14 +7951,14 @@ function AdminDashboard() {
                             {label}
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-semibold text-gray-800">
+                          <p className="mt-1 break-words text-sm font-semibold text-gray-800 dark:text-gray-100">
                             {value || "—"}
                           </p>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500">
+                    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 dark:bg-slate-900 p-6 text-center text-sm text-gray-500">
                       Select an issued record to view return and fine
                       information.
                     </div>
@@ -7976,7 +7979,7 @@ function AdminDashboard() {
                         <p className="text-xs font-medium uppercase text-gray-500">
                           Late Days
                         </p>
-                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                        <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
                           {calculatedReturnInfo.overdueDays}
                         </p>
                       </div>
@@ -7994,7 +7997,7 @@ function AdminDashboard() {
                         <p className="text-xs font-medium uppercase text-gray-500">
                           Return Condition
                         </p>
-                        <p className="mt-1 text-sm font-semibold text-gray-800">
+                        <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-100">
                           {calculatedReturnInfo.overdueDays > 0
                             ? "Late Return"
                             : "Returned On Time"}
@@ -8145,7 +8148,7 @@ function AdminDashboard() {
             </form>
 
             {/* RETURN HISTORY FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <input
                   type="search"
@@ -8234,9 +8237,9 @@ function AdminDashboard() {
             </div>
 
             {/* RETURNED RECORDS */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="border-b px-5 py-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Returned Books
                 </h3>
 
@@ -8247,7 +8250,7 @@ function AdminDashboard() {
 
               <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:thin]">
                 <table className="min-w-[1200px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase text-gray-600">
                     <tr>
                       <th className="p-3 text-left">Issue ID</th>
                       <th className="p-3 text-left">Member</th>
@@ -8303,7 +8306,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {record.member_name}
                               </p>
 
@@ -8416,8 +8419,8 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-                  <div className="sticky top-0 flex items-center justify-between border-b bg-white px-5 py-4">
+                <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
+                  <div className="sticky top-0 flex items-center justify-between border-b bg-white dark:bg-slate-800 px-5 py-4">
                     <div>
                       <h3 className="text-lg font-semibold">Return Record</h3>
 
@@ -8489,13 +8492,13 @@ function AdminDashboard() {
                       ].map(([label, value]) => (
                         <div
                           key={label}
-                          className="rounded-xl border bg-gray-50 p-3"
+                          className="rounded-xl border bg-gray-50 dark:bg-slate-900 p-3"
                         >
                           <p className="text-xs font-medium uppercase text-gray-500">
                             {label}
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-medium text-gray-800">
+                          <p className="mt-1 break-words text-sm font-medium text-gray-800 dark:text-gray-100">
                             {value !== null &&
                             value !== undefined &&
                             value !== ""
@@ -8524,7 +8527,7 @@ function AdminDashboard() {
 
         {/* ================= FINE MANAGEMENT ================= */}
         {activeSection === "fines" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -8605,7 +8608,7 @@ function AdminDashboard() {
               ].map(([label, value, valueClass]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                     {label}
@@ -8619,7 +8622,7 @@ function AdminDashboard() {
             </div>
 
             {/* FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <input
                   type="search"
@@ -8709,10 +8712,10 @@ function AdminDashboard() {
             </div>
 
             {/* FINES TABLE */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="overflow-x-auto">
                 <table className="min-w-[1350px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-wide text-gray-600">
                     <tr>
                       <th className="p-3 text-left">Fine ID</th>
                       <th className="p-3 text-left">Member</th>
@@ -8777,7 +8780,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {fine.member_name}
                               </p>
 
@@ -8800,7 +8803,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-medium text-gray-900">
+                              <p className="font-medium text-gray-900 dark:text-gray-100">
                                 {fine.book_title}
                               </p>
 
@@ -8814,7 +8817,7 @@ function AdminDashboard() {
                               {fine.overdue_days}
                             </td>
 
-                            <td className="p-3 text-right font-semibold text-gray-800">
+                            <td className="p-3 text-right font-semibold text-gray-800 dark:text-gray-100">
                               ₹{Number(fine.fine_amount || 0).toFixed(2)}
                             </td>
 
@@ -8925,11 +8928,11 @@ function AdminDashboard() {
               >
                 <form
                   onSubmit={saveFineAction}
-                  className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+                  className="w-full max-w-xl overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl"
                 >
                   <div className="flex items-center justify-between border-b px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         {fineActionForm.action === "waive"
                           ? "Waive Fine"
                           : "Collect Fine"}
@@ -8950,8 +8953,8 @@ function AdminDashboard() {
                   </div>
 
                   <div className="space-y-4 p-5">
-                    <div className="rounded-xl bg-gray-50 p-4">
-                      <p className="font-semibold text-gray-900">
+                    <div className="rounded-xl bg-gray-50 dark:bg-slate-900 p-4">
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">
                         {selectedFine.member_name}
                       </p>
 
@@ -9117,10 +9120,10 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+                <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white dark:bg-slate-800 px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Fine Details
                       </h3>
 
@@ -9191,13 +9194,13 @@ function AdminDashboard() {
                         ].map(([label, value]) => (
                           <div
                             key={label}
-                            className="rounded-xl border bg-gray-50 p-3"
+                            className="rounded-xl border bg-gray-50 dark:bg-slate-900 p-3"
                           >
                             <p className="text-xs uppercase text-gray-500">
                               {label}
                             </p>
 
-                            <p className="mt-1 text-lg font-bold text-gray-900">
+                            <p className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">
                               {value}
                             </p>
                           </div>
@@ -9229,13 +9232,13 @@ function AdminDashboard() {
                         ].map(([label, value]) => (
                           <div
                             key={label}
-                            className="rounded-xl border bg-gray-50 p-3"
+                            className="rounded-xl border bg-gray-50 dark:bg-slate-900 p-3"
                           >
                             <p className="text-xs font-medium uppercase text-gray-500">
                               {label}
                             </p>
 
-                            <p className="mt-1 break-words text-sm font-medium text-gray-800">
+                            <p className="mt-1 break-words text-sm font-medium text-gray-800 dark:text-gray-100">
                               {value !== null &&
                               value !== undefined &&
                               value !== ""
@@ -9247,13 +9250,13 @@ function AdminDashboard() {
                       </div>
 
                       <div>
-                        <h4 className="mb-3 text-base font-semibold text-gray-900">
+                        <h4 className="mb-3 text-base font-semibold text-gray-900 dark:text-gray-100">
                           Payment & Waiver History
                         </h4>
 
                         <div className="overflow-x-auto rounded-xl border">
                           <table className="min-w-[850px] w-full text-sm">
-                            <thead className="bg-gray-50 text-gray-600">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                               <tr>
                                 <th className="p-3 text-left">Date</th>
                                 <th className="p-3 text-right">Amount</th>
@@ -9369,7 +9372,7 @@ function AdminDashboard() {
 
         {/* ================= LIBRARY TRANSACTIONS ================= */}
         {activeSection === "transactions" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -9475,7 +9478,7 @@ function AdminDashboard() {
               ].map(([label, value, icon, iconClass]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -9483,7 +9486,7 @@ function AdminDashboard() {
                         {label}
                       </p>
 
-                      <p className="mt-2 text-xl font-bold text-gray-900">
+                      <p className="mt-2 text-xl font-bold text-gray-900 dark:text-gray-100">
                         {value || 0}
                       </p>
                     </div>
@@ -9499,7 +9502,7 @@ function AdminDashboard() {
             </div>
 
             {/* FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-8">
                 <input
                   type="search"
@@ -9617,9 +9620,9 @@ function AdminDashboard() {
             </div>
 
             {/* TRANSACTION TABLE */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="border-b px-5 py-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Transaction History
                 </h3>
 
@@ -9631,7 +9634,7 @@ function AdminDashboard() {
 
               <div className="overflow-x-auto">
                 <table className="min-w-[1350px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-wide text-gray-600">
                     <tr>
                       <th className="p-3 text-left">Transaction ID</th>
 
@@ -9700,7 +9703,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {transaction.member_name}
                               </p>
 
@@ -9727,7 +9730,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-medium text-gray-900">
+                              <p className="font-medium text-gray-900 dark:text-gray-100">
                                 {transaction.book_title}
                               </p>
 
@@ -9740,7 +9743,7 @@ function AdminDashboard() {
                               </p>
                             </td>
 
-                            <td className="p-3 text-right text-base font-bold text-gray-900">
+                            <td className="p-3 text-right text-base font-bold text-gray-900 dark:text-gray-100">
                               ₹{Number(transaction.amount || 0).toFixed(2)}
                             </td>
 
@@ -9838,10 +9841,10 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+                <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white dark:bg-slate-800 px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Transaction Details
                       </h3>
 
@@ -9924,13 +9927,13 @@ function AdminDashboard() {
                       ].map(([label, value]) => (
                         <div
                           key={label}
-                          className="rounded-xl border border-gray-100 bg-gray-50 p-3"
+                          className="rounded-xl border border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 p-3"
                         >
                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
                             {label}
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-medium text-gray-800">
+                          <p className="mt-1 break-words text-sm font-medium text-gray-800 dark:text-gray-100">
                             {value !== null &&
                             value !== undefined &&
                             value !== ""
@@ -9959,7 +9962,7 @@ function AdminDashboard() {
 
         {/* ================= REPORTS & ANALYTICS ================= */}
         {activeSection === "reports" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -10021,7 +10024,7 @@ function AdminDashboard() {
             </div>
 
             {/* FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <input
                   type="search"
@@ -10159,7 +10162,7 @@ function AdminDashboard() {
               ].map(([label, value, icon, iconClass]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -10167,7 +10170,7 @@ function AdminDashboard() {
                         {label}
                       </p>
 
-                      <p className="mt-2 text-xl font-bold text-gray-900">
+                      <p className="mt-2 text-xl font-bold text-gray-900 dark:text-gray-100">
                         {value || 0}
                       </p>
                     </div>
@@ -10184,7 +10187,7 @@ function AdminDashboard() {
 
             {/* SECONDARY KPIs */}
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Available Copies</p>
 
                 <p className="mt-1 text-xl font-bold text-green-700">
@@ -10192,7 +10195,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Returned Books</p>
 
                 <p className="mt-1 text-xl font-bold text-blue-700">
@@ -10200,7 +10203,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Active Borrowers</p>
 
                 <p className="mt-1 text-xl font-bold text-purple-700">
@@ -10208,7 +10211,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <div className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <p className="text-xs text-gray-500">Fine Waived</p>
 
                 <p className="mt-1 text-xl font-bold text-gray-700">
@@ -10220,9 +10223,9 @@ function AdminDashboard() {
             {/* ANALYTICS */}
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               {/* ISSUE TREND */}
-              <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
                 <div className="mb-5">
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                     Book Issue Trend
                   </h3>
 
@@ -10277,9 +10280,9 @@ function AdminDashboard() {
               </div>
 
               {/* MEMBER DISTRIBUTION */}
-              <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
                 <div className="mb-5">
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                     Borrower Distribution
                   </h3>
 
@@ -10304,7 +10307,7 @@ function AdminDashboard() {
                             {member.label}
                           </span>
 
-                          <span className="text-sm font-bold text-gray-900">
+                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
                             {member.value}
                           </span>
                         </div>
@@ -10333,8 +10336,8 @@ function AdminDashboard() {
             {/* TOP BOOKS + CATEGORY DISTRIBUTION */}
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
               {/* TOP BOOKS */}
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
-                <h3 className="font-semibold text-gray-900">
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                   Most Issued Books
                 </h3>
 
@@ -10351,14 +10354,14 @@ function AdminDashboard() {
                     topBooks.map((book, index) => (
                       <div
                         key={book.book_id}
-                        className="flex items-center gap-3 rounded-lg border border-gray-100 p-3"
+                        className="flex items-center gap-3 rounded-lg border border-gray-100 dark:border-slate-700 p-3"
                       >
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-sm font-bold text-indigo-700">
                           {index + 1}
                         </span>
 
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-gray-900">
+                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                             {book.title}
                           </p>
 
@@ -10382,8 +10385,8 @@ function AdminDashboard() {
               </div>
 
               {/* CATEGORY DISTRIBUTION */}
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
-                <h3 className="font-semibold text-gray-900">Book Categories</h3>
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-5 shadow-sm">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Book Categories</h3>
 
                 <p className="mt-1 text-xs text-gray-500">
                   Current library collection by category
@@ -10393,10 +10396,10 @@ function AdminDashboard() {
                   {categoryDistribution.map((category) => (
                     <div
                       key={category.name}
-                      className="flex items-center justify-between rounded-lg border border-gray-100 p-3"
+                      className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-slate-700 p-3"
                     >
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                           {category.name}
                         </p>
 
@@ -10415,9 +10418,9 @@ function AdminDashboard() {
             </div>
 
             {/* REPORT TABLE */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="border-b px-5 py-4">
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Circulation Report
                 </h3>
 
@@ -10428,7 +10431,7 @@ function AdminDashboard() {
 
               <div className="overflow-x-auto">
                 <table className="min-w-[1300px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-wide text-gray-600">
                     <tr>
                       <th className="p-3 text-left">Report ID</th>
 
@@ -10493,7 +10496,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {record.member_name}
                               </p>
 
@@ -10513,7 +10516,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-medium text-gray-900">
+                              <p className="font-medium text-gray-900 dark:text-gray-100">
                                 {record.book_title}
                               </p>
 
@@ -10597,7 +10600,7 @@ function AdminDashboard() {
 
         {/* ================= LIBRARY NOTIFICATIONS ================= */}
         {activeSection === "notifications" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -10614,7 +10617,7 @@ function AdminDashboard() {
                   <button
                     type="button"
                     onClick={openNotificationModal}
-                    className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow hover:bg-indigo-50"
+                    className="rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-semibold text-indigo-700 shadow hover:bg-indigo-50"
                   >
                     <i className="bi bi-plus-lg mr-2"></i>
                     Send Notification
@@ -10682,7 +10685,7 @@ function AdminDashboard() {
               ].map(([label, value, icon, iconClass]) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -10690,7 +10693,7 @@ function AdminDashboard() {
                         {label}
                       </p>
 
-                      <p className="mt-2 text-2xl font-bold text-gray-900">
+                      <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {value || 0}
                       </p>
                     </div>
@@ -10706,7 +10709,7 @@ function AdminDashboard() {
             </div>
 
             {/* FILTERS */}
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <input
                   type="search"
@@ -10818,10 +10821,10 @@ function AdminDashboard() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
               <div className="overflow-x-auto">
                 <table className="min-w-[1350px] w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase tracking-wide text-gray-600">
                     <tr>
                       <th className="p-3 text-left">ID</th>
 
@@ -10891,7 +10894,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 dark:text-gray-100">
                                 {notification.title}
                               </p>
 
@@ -10912,7 +10915,7 @@ function AdminDashboard() {
                             </td>
 
                             <td className="p-3">
-                              <p className="font-medium text-gray-800">
+                              <p className="font-medium text-gray-800 dark:text-gray-100">
                                 {notification.recipient_name || "All Members"}
                               </p>
 
@@ -11041,11 +11044,11 @@ function AdminDashboard() {
               >
                 <form
                   onSubmit={saveNotification}
-                  className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+                  className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 shadow-2xl"
                 >
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white dark:bg-slate-800 px-5 py-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Send Notification
                       </h3>
 
@@ -11312,7 +11315,7 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   <div className="flex items-center justify-between border-b px-5 py-4">
                     <div>
                       <h3 className="text-lg font-semibold">
@@ -11387,13 +11390,13 @@ function AdminDashboard() {
                       ].map(([label, value]) => (
                         <div
                           key={label}
-                          className="rounded-xl border bg-gray-50 p-3"
+                          className="rounded-xl border bg-gray-50 dark:bg-slate-900 p-3"
                         >
                           <p className="text-xs uppercase text-gray-500">
                             {label}
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-medium text-gray-800">
+                          <p className="mt-1 break-words text-sm font-medium text-gray-800 dark:text-gray-100">
                             {value || "—"}
                           </p>
                         </div>
@@ -11447,10 +11450,7 @@ function AdminDashboard() {
               <div className="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
 
               <div className="relative flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src="https://i.pravatar.cc/120?img=12"
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg"
-                />
+                <UserAvatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
 
                 <div className="text-center sm:text-left flex-1">
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -11461,21 +11461,21 @@ function AdminDashboard() {
                           value={formData.first_name || ""}
                           onChange={handleChange}
                           placeholder="First Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="middle_name"
                           value={formData.middle_name || ""}
                           onChange={handleChange}
                           placeholder="Middle Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="last_name"
                           value={formData.last_name || ""}
                           onChange={handleChange}
                           placeholder="Last Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     ) : (
@@ -11484,7 +11484,7 @@ function AdminDashboard() {
                   </h2>
 
                   <p className="text-sm opacity-90 mt-1">
-                    {admin?.designation} • {admin?.specialization || "NA"}
+                    {admin?.designation} • {admin?.specialization || "Not added"}
                   </p>
 
                   <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
@@ -11493,11 +11493,11 @@ function AdminDashboard() {
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
-                      {admin?.status || "NA"}
+                      {admin?.status || "Not added"}
                     </span>
                   </div>
                 </div>
@@ -11580,7 +11580,7 @@ function AdminDashboard() {
                   <p>
                     Role:{" "}
                     <span className="font-medium">
-                      {admin?.designation || "NA"}
+                      {admin?.designation || "Not added"}
                     </span>
                   </p>
 
@@ -11607,7 +11607,7 @@ function AdminDashboard() {
                   <p>
                     Access Level:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11621,26 +11621,26 @@ function AdminDashboard() {
                   <p>
                     School Name:{" "}
                     <span className="font-medium">
-                      {admin?.school_name || "NA"}
+                      {admin?.school_name || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Code:{" "}
                     <span className="font-medium">
-                      {admin?.school_code || "NA"}
+                      {admin?.school_code || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Board:{" "}
-                    <span className="font-medium">{admin?.board || "NA"}</span>
+                    <span className="font-medium">{admin?.board || "Not added"}</span>
                   </p>
 
                   <p>
                     Established:{" "}
                     <span className="font-medium">
-                      {admin?.established_year || "NA"}
+                      {admin?.established_year || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11654,14 +11654,14 @@ function AdminDashboard() {
                   <p>
                     Users Managed:{" "}
                     <span className="font-medium">
-                      {admin?.users_managed || "NA"}
+                      {admin?.users_managed || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Active Sessions:{" "}
                     <span className="font-medium">
-                      {admin?.active_sessions || "NA"}
+                      {admin?.active_sessions || "Not added"}
                     </span>
                   </p>
 
@@ -11679,21 +11679,21 @@ function AdminDashboard() {
                   <p>
                     Fee Access:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.fee_access || "NA"}
+                      {admin?.fee_access || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Discount Authority:{" "}
                     <span className="font-medium">
-                      {admin?.discount_authority || "NA"}
+                      {admin?.discount_authority || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Revenue View:{" "}
                     <span className="font-medium">
-                      {admin?.revenue_view || "NA"}
+                      {admin?.revenue_view || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11714,14 +11714,14 @@ function AdminDashboard() {
                   <p>
                     2FA:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.two_factor_enabled || "NA"}
+                      {admin?.two_factor_enabled || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Login Alerts:{" "}
                     <span className="font-medium">
-                      {admin?.login_alerts || "NA"}
+                      {admin?.login_alerts || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11735,21 +11735,21 @@ function AdminDashboard() {
                   <p>
                     Logins (30d):{" "}
                     <span className="font-medium">
-                      {admin?.logins_30d || "NA"}
+                      {admin?.logins_30d || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Actions:{" "}
                     <span className="font-medium">
-                      {admin?.actions_count || "NA"}
+                      {admin?.actions_count || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Last Action:{" "}
                     <span className="font-medium">
-                      {admin?.last_action || "NA"}
+                      {admin?.last_action || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11875,7 +11875,7 @@ function AdminDashboard() {
                   <p>
                     Created On:{" "}
                     <span className="font-medium">
-                      {admin?.created_on || "NA"}
+                      {admin?.created_on || "Not added"}
                     </span>
                   </p>
                 </div>

@@ -2,11 +2,11 @@
 
 EDU System is a multi-school (multi-tenant) school management platform.
 
-| Role | What they do | Where they log in |
-|---|---|---|
-| **Developer** (platform owner, you) | Creates and manages schools | `/developer/login` |
-| **Super Admin** (one per school) | Runs one school and creates its other staff | `/` (school code + email) |
-| Other admins, teachers, students | Day-to-day school work | `/` (school code + email) |
+| Role                                      | What they do                                | Where they log in           |
+| ----------------------------------------- | ------------------------------------------- | --------------------------- |
+| **Developer** (platform owner, you) | Creates and manages schools                 | `/developer/login`        |
+| **Super Admin** (one per school)    | Runs one school and creates its other staff | `/` (school code + email) |
+| Other admins, teachers, students          | Day-to-day school work                      | `/` (school code + email) |
 
 ---
 
@@ -131,10 +131,10 @@ VALUES ('DEV-001', 'Your', 'Name', 'you@yourcompany.com', 'developer', '<bcrypt-
 
 ## 3. Developer login page and dashboard
 
-| Page | URL |
-|---|---|
-| Developer login ("Platform Console") | `http://localhost:5173/developer/login` |
-| Developer dashboard | `http://localhost:5173/developer/dashboard` |
+| Page                                 | URL                                           |
+| ------------------------------------ | --------------------------------------------- |
+| Developer login ("Platform Console") | `http://localhost:5173/developer/login`     |
+| Developer dashboard                  | `http://localhost:5173/developer/dashboard` |
 
 1. Open `/developer/login`.
 2. Enter the Developer username (or email) and password.
@@ -151,21 +151,21 @@ From `/developer/dashboard`, open the create-school form and fill it in.
 
 **School details**
 
-| Field | Required | Notes |
-|---|---|---|
-| Name | Yes | School name |
-| Contact email / phone / address | No | |
-| Plan | No | `Trial` (default, 14 days), `Basic`, `Pro` or `Enterprise` |
-| Max students / Max staff | No | Defaults: 200 / 30 |
+| Field                           | Required | Notes                                                              |
+| ------------------------------- | -------- | ------------------------------------------------------------------ |
+| Name                            | Yes      | School name                                                        |
+| Contact email / phone / address | No       |                                                                    |
+| Plan                            | No       | `Trial` (default, 14 days), `Basic`, `Pro` or `Enterprise` |
+| Max students / Max staff        | No       | Defaults: 200 / 30                                                 |
 
 **First Super Admin of that school**
 
-| Field | Required | Notes |
-|---|---|---|
-| First name | Yes | |
-| Last name | No | |
-| Admin email | Yes | Must not already be used by another admin |
-| Temporary password | Yes | Share it with the school and ask them to change it after first login |
+| Field              | Required | Notes                                                                |
+| ------------------ | -------- | -------------------------------------------------------------------- |
+| First name         | Yes      |                                                                      |
+| Last name          | No       |                                                                      |
+| Admin email        | Yes      | Must not already be used by another admin                            |
+| Temporary password | Yes      | Share it with the school and ask them to change it after first login |
 
 When you submit, **one step creates both** the school and its Super Admin:
 
@@ -175,25 +175,25 @@ When you submit, **one step creates both** the school and its Super Admin:
 
 **Give the school these three things:**
 
-| Item | Example |
-|---|---|
-| School code | `SCH-A1B2C3` |
-| Username | email prefix + `_` + last 4 characters of the code, e.g. `principal_B2C3` (or the admin email) |
-| Password | the temporary password you entered |
+| Item        | Example                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------- |
+| School code | `SCH-A1B2C3`                                                                                    |
+| Username    | email prefix +`_` + last 4 characters of the code, e.g. `principal_B2C3` (or the admin email) |
+| Password    | the temporary password you entered                                                                |
 
 You can also manage schools from the dashboard: view the list with student and staff counts, edit details, and suspend, activate or archive a school. A suspended, archived or expired school cannot log in.
 
 ### API reference (all need `Authorization: Bearer <developer-token>`)
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | `/api/developer/login` | Developer login |
-| POST | `/api/developer/logout` | Developer logout |
-| GET | `/api/developer/schools` | List schools |
-| POST | `/api/developer/schools` | Create school and Super Admin |
-| GET / PUT | `/api/developer/schools/<id>` | View or edit a school |
-| POST | `/api/developer/schools/<id>/status` | Change school status |
-| GET | `/api/developer/stats` | Platform statistics |
+| Method    | Endpoint                               | Purpose                       |
+| --------- | -------------------------------------- | ----------------------------- |
+| POST      | `/api/developer/login`               | Developer login               |
+| POST      | `/api/developer/logout`              | Developer logout              |
+| GET       | `/api/developer/schools`             | List schools                  |
+| POST      | `/api/developer/schools`             | Create school and Super Admin |
+| GET / PUT | `/api/developer/schools/<id>`        | View or edit a school         |
+| POST      | `/api/developer/schools/<id>/status` | Change school status          |
+| GET       | `/api/developer/stats`               | Platform statistics           |
 
 ---
 
@@ -209,24 +209,24 @@ All school users (admins, teachers, students, staff) sign in on the main page:
 
 ### Dashboard routes
 
-| Who | Route |
-|---|---|
-| Student | `/student-dashboard` |
-| Teacher | `/teacher-dashboard` |
-| **Super Admin** | `/super-admin-dashboard` |
-| Library Admin | `/library-admin-dashboard` |
-| Academic Admin | `/academic-admin-dashboard` |
-| Accounts Admin | `/accounts-admin-dashboard` |
-| Hostel Admin | `/hostel-admin-dashboard` |
-| HR Admin | `/hr-admin-dashboard` |
+| Who                   | Route                         |
+| --------------------- | ----------------------------- |
+| Student               | `/student-dashboard`        |
+| Teacher               | `/teacher-dashboard`        |
+| **Super Admin** | `/super-admin-dashboard`    |
+| Library Admin         | `/library-admin-dashboard`  |
+| Academic Admin        | `/academic-admin-dashboard` |
+| Accounts Admin        | `/accounts-admin-dashboard` |
+| Hostel Admin          | `/hostel-admin-dashboard`   |
+| HR Admin              | `/hr-admin-dashboard`       |
 
 Other routes:
 
-| Route | Purpose |
-|---|---|
-| `/` | School login |
-| `/signup` | Sign-up page |
-| `/developer/login` | Developer login |
+| Route                    | Purpose             |
+| ------------------------ | ------------------- |
+| `/`                    | School login        |
+| `/signup`              | Sign-up page        |
+| `/developer/login`     | Developer login     |
 | `/developer/dashboard` | Developer dashboard |
 
 The **Super Admin** has full access to every dashboard by default: open `/academic-admin-dashboard`, `/library-admin-dashboard`, `/hostel-admin-dashboard` and so on, and no read-only banner appears. Other admins only see the modules assigned to them through roles and permissions.
@@ -249,12 +249,12 @@ The **Super Admin** has full access to every dashboard by default: open `/academ
 
 ## 7. Troubleshooting
 
-| Problem | Fix |
-|---|---|
-| `Data truncated for column 'role'` when creating a school | Run `backend/migrations_fix_admin_role_enum.sql` |
-| `Data truncated for column 'blood_group'` when enrolling a student | Update to the latest backend (blank blood group is now stored as `NULL`) |
-| `Invalid school code` | Check the code, including the `SCH-` prefix; it is case-insensitive in the form (uppercased automatically) |
-| "suspended or expired" on login | Check the school's status and trial/subscription dates in the Developer dashboard |
-| New Super Admin is sent back to the login page | Update to the latest frontend (route guard now accepts `super_admin`) |
-| Browser CORS errors | Make sure `CORS_ORIGINS` in `backend/.env` matches your frontend URL |
-| `[BABEL] ... exceeds the max of 500KB` | Informational only; the app works. Silenced in `vite.config.js` |
+| Problem                                                              | Fix                                                                                                         |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `Data truncated for column 'role'` when creating a school          | Run`backend/migrations_fix_admin_role_enum.sql`                                                           |
+| `Data truncated for column 'blood_group'` when enrolling a student | Update to the latest backend (blank blood group is now stored as`NULL`)                                   |
+| `Invalid school code`                                              | Check the code, including the`SCH-` prefix; it is case-insensitive in the form (uppercased automatically) |
+| "suspended or expired" on login                                      | Check the school's status and trial/subscription dates in the Developer dashboard                           |
+| New Super Admin is sent back to the login page                       | Update to the latest frontend (route guard now accepts`super_admin`)                                      |
+| Browser CORS errors                                                  | Make sure`CORS_ORIGINS` in `backend/.env` matches your frontend URL                                     |
+| `[BABEL] ... exceeds the max of 500KB`                             | Informational only; the app works. Silenced in`vite.config.js`                                            |

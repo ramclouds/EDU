@@ -245,6 +245,26 @@ export function useTeacherLeaves({
     }
   };
 
+  // A teacher withdraws their own request while it is still pending. The server refuses
+  // approved or rejected requests, and this shows the server's reason.
+  const withdrawLeave = async (leaveId) => {
+    if (!window.confirm("Withdraw this leave request? It will be deleted.")) return;
+    try {
+      const res = await fetchWithAuth(`${BASE_URL}/teacher/leave/${leaveId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast?.(data.error || "Could not withdraw this leave", "error");
+        return;
+      }
+      showToast?.("Leave request withdrawn", "success");
+      await fetchLeaveData();
+    } catch {
+      showToast?.("Could not reach the server", "error");
+    }
+  };
+
   return {
     // shared loading
     leaveLoading,
@@ -268,5 +288,6 @@ export function useTeacherLeaves({
     calculateDays,
     handleApplyLeave,
     fetchLeaveData,
+    withdrawLeave,
   };
 }

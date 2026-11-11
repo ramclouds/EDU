@@ -64,7 +64,8 @@ def build_overview(school_id):
     def sc(model):
         return model.query.filter(model.school_id == school_id)
 
-    school = PlatformSchool.query.get(school_id) if school_id else None
+    from utils.tenant_routing import platform_school_snapshot
+    school = platform_school_snapshot(school_id)  # platform record, not the school's copy
 
     # ---------- people ----------
     students_active = _count(sc(Student).filter(Student.status == "Active"))
@@ -186,16 +187,11 @@ def build_overview(school_id):
             "name": school.name, "school_code": school.school_code, "plan": school.plan,
             "status": school.status, "trial_days_left": trial_days,
             "subscription_ends_at": school.subscription_ends_at.date().isoformat() if school.subscription_ends_at else None,
-            "max_students": school.max_students, "max_staff": school.max_staff,
         }
         if trial_days is not None and trial_days <= 7:
             alerts.append({"level": "warning", "text": f"Trial ends in {trial_days} day(s). Contact the platform owner to subscribe."})
         if school.subscription_ends_at and school.status == "Active" and (school.subscription_ends_at - now).days <= 14:
             alerts.append({"level": "warning", "text": "Your subscription ends within 14 days."})
-        if school.max_students and students_active >= 0.9 * school.max_students:
-            alerts.append({"level": "warning", "text": f"Student limit almost reached ({students_active} of {school.max_students})."})
-        if school.max_staff and (teachers_active + staff_active) >= 0.9 * school.max_staff:
-            alerts.append({"level": "warning", "text": "Staff limit almost reached."})
 
     if leave["teacher_pending"] + leave["student_pending"]:
         alerts.append({"level": "info", "text": f"{leave['teacher_pending'] + leave['student_pending']} leave request(s) waiting for approval."})

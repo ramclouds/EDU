@@ -39,3 +39,7 @@ Werkzeug==3.1.5
 # single-threaded and not hardened against slow/hostile clients.
 # gunicorn is the WSGI server; see wsgi.py + gunicorn_conf.py.
 gunicorn==23.0.0
+# Proves a school owns its custom domain (DNS TXT lookup)
+dnspython==2.7.0
+# Shared login-protection counters across gunicorn workers (utils/rate_limit.py)
+redis==5.2.1

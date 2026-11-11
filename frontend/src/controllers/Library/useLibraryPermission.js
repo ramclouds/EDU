@@ -33,7 +33,7 @@ const readLibraryAccess = () => {
   };
 };
 
-export const LIBRARY_READ_ONLY_MESSAGE =
+const LIBRARY_READ_ONLY_MESSAGE =
   "You have read-only access to the Library dashboard. Ask your Super Admin for Full Access if you need to make changes.";
 
 export function useLibraryPermission() {

@@ -54,7 +54,7 @@ export default function GlobalSearch({ sections = [], onNavigate }) {
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`${BASE_URL}/search?q=${encodeURIComponent(term)}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          headers: { Authorization: `Bearer ${localStorage.getItem("signed_in")}` },
         });
         const body = await res.json().catch(() => ({}));
         if (id !== requestId.current) return;

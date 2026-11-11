@@ -1,17 +1,57 @@
 import os
-from flask import Flask, jsonify, send_from_directory, request
+from flask import Flask, g, jsonify, send_from_directory, request
 from flask_cors import CORS
 from dotenv import load_dotenv
+from pathlib import Path
 
 # ==== LOAD ENV ====
-load_dotenv()
+# Read backend/.env from this file's own folder. utf-8-sig also accepts a file
+# saved by Windows Notepad with a hidden byte-order mark.
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH, encoding="utf-8-sig")
 
 # ==== CORE ====
 from utils.auth import Login, Logout, db, bcrypt
 from utils.auth_middleware import login_required
+from utils.tenant_routing import TenantRoutingMiddleware, bind_request_tenant
+from utils.production import init_production, tenant_cors_origins
+from utils.assignments import ASSIGNMENT_BASE, UPLOAD_BASE, TeacherSubjectAssignmentsAPI
+from utils.mail_admin import (
+    BroadcastAPI,
+    BroadcastDetailAPI,
+    PlatformMailAPI,
+    PlatformMailTestAPI,
+    SchoolMailAPI,
+    SchoolMailTestAPI,
+)
+from utils.preferences import DeveloperPreferencesAPI, MyPreferencesAPI
+from utils.photos import MyPhotoAPI, ProfilePhotoAPI
+from utils.password_reset import ForgotPasswordAPI, ResetPasswordAPI
+from utils.library_membership import StudentLibraryMembershipAPI
+from utils.platform import SchoolPlanAPI  # noqa: E402
+from utils.settings_admin import ServiceReloadAPI, SettingsAPI, SettingsApplyAPI
+from utils.profile import (
+    DeveloperPasswordAPI,
+    DeveloperProfileAPI,
+    MyPasswordAPI,
+    MyProfileAPI,
+)
+from utils.login_branding import (
+    PublicBrandingAPI,
+    PublicBrandingAssetAPI,
+    SchoolBrandingAPI,
+    SchoolBrandingAssetAPI,
+)
 from utils.platform import (
+    DeveloperLoginTwoFactorAPI,
+    DeveloperTwoFactorAPI,
     PlatformInfoAPI,
     SchoolActivityAPI,
+    SchoolDatabaseAPI,
+    SchoolDomainDetailAPI,
+    SchoolDomainsAPI,
+    SchoolDomainVerifyAPI,
+    TenantCheckAPI,
     ExtendTrialAPI,
     ResetAdminPasswordAPI,
     DeveloperAuditAPI,
@@ -119,6 +159,7 @@ from utils.Notifications import (
 
 # ==== LEAVES ====
 from utils.leaves import (
+    TeacherLeaveCancelAPI,
     ApplyLeave,
     TeacherLeaveHistory,
     TeacherLeaveBalanceAPI,
@@ -332,33 +373,29 @@ from utils.TeacherManagement import (
 
 from utils.subjects import AdminSubjectsAPI, AdminSubjectDetailAPI
 
-from utils.rolePermissionManagement import (
-    MyRBACAccessAPI,
-    RBACBootstrapAPI,
-    RBACRoleDetailAPI,
-    RBACRoleListAPI,
-    RBACRolePermissionAPI,
-    RBACUserAccessAPI,
-    RBACUserListAPI,
-    RBACUserOverrideAPI,
-    RBACUserRoleAPI,
-    seed_rbac_defaults,
-    MyDashboardAccessAPI,
-    MyRBACAccessAPI,
-)
+from utils.rolePermissionManagement import MyRBACAccessAPI, RBACBootstrapAPI, RBACRoleDetailAPI, RBACRoleListAPI, RBACRolePermissionAPI, RBACUserAccessAPI, RBACUserListAPI, RBACUserOverrideAPI, RBACUserRoleAPI, MyDashboardAccessAPI, MyRBACAccessAPI
 
 
 # CREATE APP
 def create_app():
     app = Flask(__name__)
+    # Strip /y22-style version prefixes and record the host's tenant before routing.
+    app.wsgi_app = TenantRoutingMiddleware(app.wsgi_app)
 
     # ==== CONFIG ====
     is_production = os.getenv("FLASK_ENV", "development") == "production"
 
     mysql_dsn = os.getenv("MYSQL_DSN")
     if not mysql_dsn:
+        here = Path(__file__).resolve().parent
+        found = ENV_PATH.exists()
+        names = sorted(p.name for p in here.glob(".env*")) or ["none"]
         raise RuntimeError(
-            "MYSQL_DSN is not set. Add it to your .env (see .env.example)."
+            "MYSQL_DSN is not set. The app looked for this file: "
+            f"{ENV_PATH} (found: {'yes' if found else 'NO'}). "
+            f"Files starting with .env in this folder: {', '.join(names)}. "
+            "Make sure the file is named exactly '.env' (not '.env.txt') and sits in the backend folder, "
+            "and that it contains a line: MYSQL_DSN=mysql+pymysql://root:@127.0.0.1/edu_school"
         )
     app.config["SQLALCHEMY_DATABASE_URI"] = mysql_dsn
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -370,6 +407,8 @@ def create_app():
             "without one — set it in your environment (see .env.example)."
         )
     app.config["SECRET_KEY"] = secret_key or "dev-only-insecure-secret"
+    # Largest request body accepted (uploads). Stops oversized uploads exhausting the server.
+    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
     # ==== INIT ====
     db.init_app(app)
@@ -378,12 +417,24 @@ def create_app():
     # ==== CORS ====
     cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173")
     cors_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+    # Every school's own addresses (<tenant>.login.<base>, <tenant>.api.<base>),
+    # built from TENANT_BASE_DOMAIN with strict end anchors.
+    cors_origins += tenant_cors_origins()
 
     CORS(
         app,
         supports_credentials=True,
         origins=cors_origins,
-        allow_headers=["Content-Type", "Authorization"],
+        # Headers the browser may send. The two CSRF headers are required for every change
+        # made with the session cookie (see utils/session.py).
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-CSRF-Token",
+            "X-Dev-CSRF-Token",
+            "X-Token-Transport",
+        ],
+        expose_headers=["Retry-After", "X-Request-ID"],
         methods=[
             "GET",
             "POST",
@@ -398,6 +449,14 @@ def create_app():
     def handle_options():
         if request.method == "OPTIONS":
             return jsonify({"message": "OK"}), 200
+
+    @app.before_request
+    def pick_school_database():
+        # Each school's data lives in its own database; select it from the host.
+        return bind_request_tenant()
+
+    # Proxy headers, security headers, /healthz and /readyz, production checks.
+    init_production(app, db, is_production)
 
     # HEALTH
     @app.route("/")
@@ -441,6 +500,90 @@ def create_app():
         methods=["POST"],
     )
     app.add_url_rule(
+        "/api/developer/tenants/check",
+        view_func=TenantCheckAPI.as_view("developer_tenant_check"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/domains",
+        view_func=SchoolDomainsAPI.as_view("developer_school_domains"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/domains/<int:domain_id>",
+        view_func=SchoolDomainDetailAPI.as_view("developer_school_domain_detail"),
+        methods=["DELETE"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/domains/<int:domain_id>/verify",
+        view_func=SchoolDomainVerifyAPI.as_view("developer_school_domain_verify"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/database",
+        view_func=SchoolDatabaseAPI.as_view("developer_school_database"),
+        methods=["GET", "POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/branding",
+        view_func=SchoolBrandingAPI.as_view("developer_school_branding"),
+        methods=["GET", "PUT"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/branding/<kind>",
+        view_func=SchoolBrandingAssetAPI.as_view("developer_school_branding_asset"),
+        methods=["POST", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/public/branding",
+        view_func=PublicBrandingAPI.as_view("public_branding"),
+        methods=["GET"],
+    )
+    app.add_url_rule(
+        "/api/public/branding/asset/<kind>",
+        view_func=PublicBrandingAssetAPI.as_view("public_branding_asset"),
+        methods=["GET"],
+    )
+    app.add_url_rule("/api/developer/mail/platform", view_func=PlatformMailAPI.as_view("developer_platform_mail"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/developer/mail/platform/test", view_func=PlatformMailTestAPI.as_view("developer_platform_mail_test"), methods=["POST"])
+    app.add_url_rule("/api/developer/schools/<int:school_id>/mail", view_func=SchoolMailAPI.as_view("developer_school_mail"), methods=["GET", "PUT", "DELETE"])
+    app.add_url_rule("/api/developer/schools/<int:school_id>/mail/test", view_func=SchoolMailTestAPI.as_view("developer_school_mail_test"), methods=["POST"])
+    app.add_url_rule("/api/developer/broadcasts", view_func=BroadcastAPI.as_view("developer_broadcasts"), methods=["GET", "POST"])
+    app.add_url_rule("/api/developer/broadcasts/<int:broadcast_id>", view_func=BroadcastDetailAPI.as_view("developer_broadcast_detail"), methods=["GET"])
+    app.add_url_rule("/api/developer/settings", view_func=SettingsAPI.as_view("developer_settings"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/developer/settings/apply", view_func=SettingsApplyAPI.as_view("developer_settings_apply"), methods=["POST"])
+    app.add_url_rule("/api/developer/service/reload", view_func=ServiceReloadAPI.as_view("developer_service_reload"), methods=["POST"])
+    app.add_url_rule(
+        "/api/admin/students/<int:student_id>/library-membership",
+        view_func=StudentLibraryMembershipAPI.as_view("student_library_membership"),
+        methods=["PUT"],
+    )
+    app.add_url_rule("/api/password/forgot", view_func=ForgotPasswordAPI.as_view("password_forgot"), methods=["POST"])
+    app.add_url_rule("/api/password/reset", view_func=ResetPasswordAPI.as_view("password_reset"), methods=["POST"])
+    app.add_url_rule("/api/me/photo", view_func=MyPhotoAPI.as_view("my_photo"), methods=["POST", "DELETE"])
+    app.add_url_rule("/api/profile-photo/<filename>", view_func=ProfilePhotoAPI.as_view("profile_photo"), methods=["GET"])
+    app.add_url_rule("/api/me/profile", view_func=MyProfileAPI.as_view("my_profile"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/me/preferences", view_func=MyPreferencesAPI.as_view("my_preferences"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/developer/me/preferences", view_func=DeveloperPreferencesAPI.as_view("developer_preferences"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/me/password", view_func=MyPasswordAPI.as_view("my_password"), methods=["POST"])
+    app.add_url_rule("/api/developer/me/profile", view_func=DeveloperProfileAPI.as_view("developer_profile"), methods=["GET", "PUT"])
+    app.add_url_rule("/api/developer/me/password", view_func=DeveloperPasswordAPI.as_view("developer_password"), methods=["POST"])
+    app.add_url_rule(
+        "/api/developer/login/2fa",
+        view_func=DeveloperLoginTwoFactorAPI.as_view("developer_login_2fa"),
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/developer/2fa",
+        view_func=DeveloperTwoFactorAPI.as_view("developer_2fa"),
+        methods=["GET", "POST", "PUT", "DELETE"],
+    )
+    app.add_url_rule(
+        "/api/developer/schools/<int:school_id>/plan",
+        view_func=SchoolPlanAPI.as_view("developer_school_plan"),
+        methods=["PUT"],
+    )
+    app.add_url_rule(
         "/api/developer/stats",
         view_func=PlatformStatsAPI.as_view("developer_stats"),
         methods=["GET"],
@@ -472,7 +615,6 @@ def create_app():
     )
 
     # RBAC ROUTES
-
     app.add_url_rule(
         "/api/rbac/bootstrap",
         view_func=RBACBootstrapAPI.as_view("rbac_bootstrap_api"),
@@ -646,7 +788,7 @@ def create_app():
     # TEACHER ASSIGNMENTS (NEW)
     app.add_url_rule(
         "/api/teacher/<int:teacher_id>/assigned-classes",
-        view_func=TeacherAssignedClassesAPI.as_view("teacher_assigned_classes"),
+        view_func=TeacherSubjectAssignmentsAPI.as_view("teacher_assigned_classes"),
         methods=["GET"],
     )
 
@@ -880,6 +1022,11 @@ def create_app():
         "/api/teacher/leave/update/<int:leave_id>",
         view_func=UpdateLeaveStatus.as_view("update_teacher_leave"),
         methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/teacher/leave/<int:leave_id>",
+        view_func=TeacherLeaveCancelAPI.as_view("teacher_leave_cancel"),
+        methods=["DELETE"],
     )
 
     app.add_url_rule(
@@ -2163,8 +2310,13 @@ def create_app():
 
     # FILE SERVING
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    SUBMITTED_FOLDER = os.path.join(BASE_DIR, "Submitted_Assignments")
-    TEACHER_ASSIGNMENT_FOLDER = os.path.join(BASE_DIR, "Assignment_Files")
+    SUBMITTED_FOLDER = UPLOAD_BASE
+    TEACHER_ASSIGNMENT_FOLDER = ASSIGNMENT_BASE
+
+    def _school_folder(root):
+        # Only the folder of the school the request belongs to. Other schools are unreachable.
+        sid = g.get("tenant_school_id")
+        return os.path.join(root, str(int(sid))) if sid else None
 
     def _safe_send(base_folder, filename):
         # Resolve filename under base_folder and refuse to serve anything
@@ -2185,7 +2337,8 @@ def create_app():
     def submitted_files(filename):
 
         try:
-            full_path = _safe_send(SUBMITTED_FOLDER, filename)
+            folder = _school_folder(SUBMITTED_FOLDER)
+            full_path = _safe_send(folder, filename) if folder else None
 
             if full_path is None:
                 return jsonify({"error": "File not found"}), 404
@@ -2193,11 +2346,7 @@ def create_app():
             directory = os.path.dirname(full_path)
             actual_filename = os.path.basename(full_path)
             response = send_from_directory(
-                directory, actual_filename, as_attachment=False
-            )
-
-            response.headers["Content-Disposition"] = (
-                f'inline; filename="{actual_filename}"'
+                directory, actual_filename, as_attachment=not actual_filename.lower().endswith(".pdf")
             )
 
             return response
@@ -2212,7 +2361,8 @@ def create_app():
     def assignment_files(filename):
 
         try:
-            full_path = _safe_send(TEACHER_ASSIGNMENT_FOLDER, filename)
+            folder = _school_folder(TEACHER_ASSIGNMENT_FOLDER)
+            full_path = _safe_send(folder, filename) if folder else None
 
             if full_path is None:
                 return jsonify({"error": "File not found"}), 404
@@ -2220,11 +2370,7 @@ def create_app():
             directory = os.path.dirname(full_path)
             actual_filename = os.path.basename(full_path)
             response = send_from_directory(
-                directory, actual_filename, as_attachment=False
-            )
-
-            response.headers["Content-Disposition"] = (
-                f'inline; filename="{actual_filename}"'
+                directory, actual_filename, as_attachment=not actual_filename.lower().endswith(".pdf")
             )
 
             return response
@@ -2242,13 +2388,8 @@ def create_app():
     def internal_error(e):
         return jsonify({"error": "Internal server error"}), 500
 
-    # RBAC INITIALIZATION
-    with app.app_context():
-        try:
-            seed_rbac_defaults()
-        except Exception:
-            app.logger.exception("RBAC defaults initialization failed")
-
+    # RBAC defaults are seeded into each school's database when it is
+    # provisioned (utils/tenant_routing.py). Nothing to seed on the platform DB.
     return app
 
 
@@ -2260,8 +2401,16 @@ if __name__ == "__main__":
 
     with app.app_context():
         if is_dev:
-            # Dev convenience only. Production schema changes must go
-            db.create_all()
+            # Dev convenience only: create the platform tables. School databases
+            # are created by the Developer console when a school is added.
+            platform_tables = {
+                "schools", "developers", "developer_audit_logs", "school_domains", "school_branding",
+                "smtp_settings", "mail_broadcasts", "mail_deliveries", "developer_preferences",
+            }
+            db.metadata.create_all(
+                bind=db.engine,
+                tables=[t for t in db.metadata.sorted_tables if t.name in platform_tables],
+            )
 
     # debug=True enables the Werkzeug interactive debugger, which allows
     app.run(host="0.0.0.0", port=5000, debug=is_dev)

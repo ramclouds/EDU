@@ -6,7 +6,6 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from utils.auth import db, bcrypt, Teacher
-from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import permission_required
 from utils.teacherDetails import TeacherClass
 from utils.studentDetails import AcademicClass, Batch, Division, Section
@@ -544,7 +543,7 @@ class AdminTeacherPasswordAPI(MethodView):
             data = request.get_json() or {}
             password = data.get("password")
 
-            if not password or len(password) < 6:
+            if not password or len(password) < 8:
                 return jsonify({"error": "Password must be at least 6 characters"}), 400
 
             teacher.password = bcrypt.generate_password_hash(password).decode("utf-8")

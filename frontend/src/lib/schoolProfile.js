@@ -35,7 +35,7 @@ export function subscribeSchoolProfile(callback) {
 export async function refreshSchoolProfileOnce() {
   if (refreshed) return;
   refreshed = true;
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("signed_in");
   if (!token) return;
   try {
     const res = await fetch(`${BASE_URL}/school/me`, { headers: { Authorization: `Bearer ${token}` } });

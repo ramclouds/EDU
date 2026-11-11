@@ -34,7 +34,7 @@ const readAccountsAccess = () => {
   };
 };
 
-export const Accounts_READ_ONLY_MESSAGE =
+const Accounts_READ_ONLY_MESSAGE =
   "You have read-only access to the Accounts dashboard. Ask your Super Admin for Full Access if you need to make changes.";
 
 export function useAccountsPermission() {

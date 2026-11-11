@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDeveloperDashboard } from "../controllers/Developer/useDeveloperDashboard";
 import { APP_NAME, FILE_BASE_URL } from "../config/appConfig";
-import "../css/dashboard.css";
+import CreateTenantWizard from "../components/developer/CreateTenantWizard";
+import TenantDomains from "../components/developer/TenantDomains";
+import TenantDatabase from "../components/developer/TenantDatabase";
+import SchoolBrandingEditor from "../components/developer/SchoolBrandingEditor";
+import SchoolMailPanel from "../components/developer/SchoolMailPanel";
+import PlanEditor from "../components/developer/PlanEditor";
+import EmailCenter from "../components/developer/EmailCenter";
+import DeveloperSettings from "../components/developer/DeveloperSettings";
+import ProfileModal from "../components/ProfileModal";
+import ThemeToggle from "../components/ThemeToggle";
+import SchoolsTable from "../components/developer/SchoolsTable";
 
 const STATUS_STYLES = {
   Active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
@@ -9,9 +19,14 @@ const STATUS_STYLES = {
   Suspended: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
   Expired: "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400",
 };
-const PLANS = ["Trial", "Basic", "Pro", "Enterprise"];
+const PLANS = ["Trial", "Basic", "Pro", "Enterprise", "Custom"];
 const card = "rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800";
 const input = "mt-1 w-full rounded-lg border px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100";
+const developerInitials = (d) => {
+  const source = (d?.name || d?.username || "P").trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] || "P") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+};
 const btn = "rounded-lg border px-3 py-1.5 text-xs font-medium dark:border-slate-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700";
 const primary = "rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:opacity-90 disabled:opacity-50";
 
@@ -67,78 +82,6 @@ function CopyButton({ text, label = "Copy" }) {
   );
 }
 
-function CreateSchoolModal({ onClose, onCreate, creating, prefix }) {
-  const [form, setForm] = useState({
-    name: "", contact_email: "", contact_phone: "", address: "", plan: "Trial",
-    max_students: 200, max_staff: 30,
-    admin_first_name: "", admin_last_name: "", admin_email: "", admin_password: "",
-  });
-  const update = (f) => (e) => setForm((s) => ({ ...s, [f]: e.target.value }));
-  const [logoFile, setLogoFile] = useState(null);
-  const submit = async (e) => {
-    e.preventDefault();
-    const r = await onCreate({ ...form, max_students: Number(form.max_students), max_staff: Number(form.max_staff) }, logoFile);
-    if (r) onClose();
-  };
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
-      <div className={`${card} max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6`}>
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Onboard a school</h3>
-        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Creates the school, its tenant key{prefix ? ` (${prefix}_…)` : ""}, and its first Super Admin login. All schools share the same MySQL database; the tenant key is a label that identifies the school.
-        </p>
-        <form onSubmit={submit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className="sm:col-span-2 text-sm font-medium">School name
-            <input required className={input} value={form.name} onChange={update("name")} />
-          </label>
-          <label className="text-sm font-medium">Contact email
-            <input type="email" className={input} value={form.contact_email} onChange={update("contact_email")} />
-          </label>
-          <label className="text-sm font-medium">Contact phone
-            <input className={input} value={form.contact_phone} onChange={update("contact_phone")} />
-          </label>
-          <label className="sm:col-span-2 text-sm font-medium">Address
-            <input className={input} value={form.address} onChange={update("address")} />
-          </label>
-          <label className="text-sm font-medium">Plan
-            <select className={input} value={form.plan} onChange={update("plan")}>
-              {PLANS.map((p) => <option key={p}>{p}</option>)}
-            </select>
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-sm font-medium">Max students
-              <input type="number" min="1" className={input} value={form.max_students} onChange={update("max_students")} />
-            </label>
-            <label className="text-sm font-medium">Max staff
-              <input type="number" min="1" className={input} value={form.max_staff} onChange={update("max_staff")} />
-            </label>
-          </div>
-          <label className="sm:col-span-2 text-sm font-medium">School logo (optional, PNG, JPG or WEBP, up to 2 MB)
-            <input type="file" accept="image/png,image/jpeg,image/webp" className={input} onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
-          </label>
-          <p className="sm:col-span-2 mt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">First Super Admin</p>
-          <label className="text-sm font-medium">First name
-            <input required className={input} value={form.admin_first_name} onChange={update("admin_first_name")} />
-          </label>
-          <label className="text-sm font-medium">Last name
-            <input className={input} value={form.admin_last_name} onChange={update("admin_last_name")} />
-          </label>
-          <label className="text-sm font-medium">Admin email
-            <input required type="email" className={input} value={form.admin_email} onChange={update("admin_email")} />
-          </label>
-          <label className="text-sm font-medium">Temporary password
-            <input required minLength={8} className={input} value={form.admin_password} onChange={update("admin_password")} />
-          </label>
-          <div className="flex justify-end gap-2 sm:col-span-2">
-            <button type="button" onClick={onClose} className={btn}>Cancel</button>
-            <button type="submit" disabled={creating} className={primary}>{creating ? "Creating…" : "Create school"}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 function SchoolLogoManager({ detail, api, busy, onChanged }) {
   const [file, setFile] = useState(null);
   const logo = detail.logo_url ? `${FILE_BASE_URL}${detail.logo_url}` : null;
@@ -185,7 +128,7 @@ function SchoolDetail({ schoolId, listRow, api, onClose, onChanged }) {
     const [d, a] = await Promise.all([api.loadSchoolDetail(schoolId), api.loadActivity(schoolId)]);
     setDetail(d);
     setActivity(a);
-    setEdit(d ? { plan: d.plan, max_students: d.max_students, max_staff: d.max_staff, name: d.name, contact_email: d.contact_email || "", contact_phone: d.contact_phone || "", address: d.address || "" } : null);
+    setEdit(d ? { name: d.name, contact_email: d.contact_email || "", contact_phone: d.contact_phone || "", address: d.address || "" } : null);
   };
   useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [schoolId]);
 
@@ -224,7 +167,13 @@ function SchoolDetail({ schoolId, listRow, api, onClose, onChanged }) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{detail.name}</h2>
-              <p className="font-mono text-xs text-gray-500">{detail.school_code} · tenant key {detail.database_name}</p>
+              <p className="font-mono text-xs text-gray-500">{detail.school_code} · database {detail.database_name}</p>
+              {detail.login_url && (
+                <p className="mt-1 text-xs text-gray-500">Login: <a href={detail.login_url} target="_blank" rel="noreferrer" className="font-mono text-indigo-600 hover:underline dark:text-indigo-400">{detail.login_url}</a></p>
+              )}
+              {detail.api_url && (
+                <p className="text-xs text-gray-500">API: <span className="font-mono">{detail.api_url}</span></p>
+              )}
             </div>
             <button type="button" onClick={onClose} className={btn}>Close</button>
           </div>
@@ -240,31 +189,37 @@ function SchoolDetail({ schoolId, listRow, api, onClose, onChanged }) {
           {tab === "overview" && (
             <>
               <SchoolLogoManager detail={detail} api={api} busy={busy} onChanged={() => { reload(); onChanged(); }} />
+              <TenantDatabase schoolId={detail.id} api={api} />
+              <TenantDomains schoolId={detail.id} api={api} />
+              <PlanEditor schoolId={detail.id} school={detail} api={api} onSaved={reload} />
+              <SchoolBrandingEditor schoolId={detail.id} schoolName={detail.name} api={api} />
+              <SchoolMailPanel schoolId={detail.id} schoolName={detail.name} api={api} />
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[detail.status] || ""}`}>{detail.status}</span>
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs dark:bg-slate-700 dark:text-gray-200">{detail.plan}</span>
                 {detail.login_allowed ? null : <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs text-red-700">Logins blocked</span>}
-                {detail.near_student_limit && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs text-amber-700">Near student limit</span>}
               </div>
               {detail.trial_days_left !== null && (
                 <p className="text-sm text-gray-600 dark:text-gray-300">Trial: <strong>{detail.trial_days_left} day(s) left</strong> (ends {fmtDate(detail.trial_ends_at)})</p>
               )}
-              <dl className="grid grid-cols-2 gap-3 text-sm">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div><dt className="text-xs text-gray-400">Contact email</dt><dd>{detail.contact_email || "—"}</dd></div>
+                <div><dt className="text-xs text-gray-400">Country/Region</dt><dd>{detail.country || "—"}</dd></div>
+                <div><dt className="text-xs text-gray-400">Created by</dt><dd>{detail.created_by || "—"}</dd></div>
                 <div><dt className="text-xs text-gray-400">Contact phone</dt><dd>{detail.contact_phone || "—"}</dd></div>
                 <div className="col-span-2"><dt className="text-xs text-gray-400">Address</dt><dd>{detail.address || "—"}</dd></div>
                 <div><dt className="text-xs text-gray-400">Onboarded</dt><dd>{fmtDate(detail.created_at)}</dd></div>
                 <div><dt className="text-xs text-gray-400">Subscription ends</dt><dd>{fmtDate(detail.subscription_ends_at)}</dd></div>
-                <div><dt className="text-xs text-gray-400">Students</dt><dd>{detail.student_count} / {detail.max_students}</dd></div>
-                <div><dt className="text-xs text-gray-400">Staff</dt><dd>{detail.staff_count} / {detail.max_staff}</dd></div>
+                <div><dt className="text-xs text-gray-400">Students</dt><dd>{detail.student_count}</dd></div>
+                <div><dt className="text-xs text-gray-400">Staff</dt><dd>{detail.staff_count}</dd></div>
               </dl>
               <div className="space-y-3">
-                <Bar label="Students used" pct={detail.usage.students_pct} />
-                <Bar label="Staff used" pct={detail.usage.staff_pct} />
               </div>
               <div className="flex flex-wrap gap-2">
                 <CopyButton text={detail.school_code} label="Copy school code" />
-                <CopyButton text={detail.database_name || ""} label="Copy tenant key" />
+                {detail.login_url && <CopyButton text={detail.login_url} label="Copy login URL" />}
+                {detail.api_url && <CopyButton text={detail.api_url} label="Copy API URL" />}
+                <CopyButton text={detail.database_name || ""} label="Copy database name" />
               </div>
             </>
           )}
@@ -326,7 +281,7 @@ function SchoolDetail({ schoolId, listRow, api, onClose, onChanged }) {
                   Status <strong>{detail.status}</strong> · plan <strong>{detail.plan}</strong>
                   {detail.subscription_ends_at ? <> · paid until <strong>{fmtDate(detail.subscription_ends_at)}</strong></> : " · no paid subscription"}
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="text-sm font-medium">Plan
                     <select className={input} value={subPlan} onChange={(e) => setSubPlan(e.target.value)}>
                       {["Basic", "Pro", "Enterprise"].map((p) => <option key={p}>{p}</option>)}
@@ -362,21 +317,10 @@ function SchoolDetail({ schoolId, listRow, api, onClose, onChanged }) {
                 </div>
               </section>
               <section className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Plan, limits and details</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="text-sm font-medium">Plan
-                    <select className={input} value={edit.plan} onChange={(e) => setEdit({ ...edit, plan: e.target.value })}>
-                      {PLANS.map((p) => <option key={p}>{p}</option>)}
-                    </select>
-                  </label>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">School details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="text-sm font-medium">Name
                     <input className={input} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
-                  </label>
-                  <label className="text-sm font-medium">Max students
-                    <input type="number" min="1" className={input} value={edit.max_students} onChange={(e) => setEdit({ ...edit, max_students: e.target.value })} />
-                  </label>
-                  <label className="text-sm font-medium">Max staff
-                    <input type="number" min="1" className={input} value={edit.max_staff} onChange={(e) => setEdit({ ...edit, max_staff: e.target.value })} />
                   </label>
                   <label className="text-sm font-medium">Contact email
                     <input className={input} value={edit.contact_email} onChange={(e) => setEdit({ ...edit, contact_email: e.target.value })} />
@@ -386,7 +330,7 @@ function SchoolDetail({ schoolId, listRow, api, onClose, onChanged }) {
                   </label>
                 </div>
                 <div className="flex justify-end">
-                  <button type="button" disabled={busy} className={primary} onClick={() => act(() => api.updateSchool(schoolId, { ...edit, max_students: Number(edit.max_students), max_staff: Number(edit.max_staff) }))}>Save changes</button>
+                  <button type="button" disabled={busy} className={primary} onClick={() => act(() => api.updateSchool(schoolId, { ...edit }))}>Save changes</button>
                 </div>
               </section>
             </div>
@@ -423,7 +367,7 @@ function PlatformPanel({ platform }) {
           <div className="flex justify-between"><dt className="text-gray-500">Allowed origins</dt><dd className="max-w-[60%] truncate">{platform.app.cors_origins}</dd></div>
         </dl>
         <h3 className="mt-6 font-semibold text-gray-800 dark:text-gray-100">Totals</h3>
-        <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
           <div><dt className="text-gray-500">Schools</dt><dd className="text-lg font-semibold">{platform.totals.schools}</dd></div>
           <div><dt className="text-gray-500">Students</dt><dd className="text-lg font-semibold">{platform.totals.students}</dd></div>
           <div><dt className="text-gray-500">Staff</dt><dd className="text-lg font-semibold">{platform.totals.staff}</dd></div>
@@ -480,6 +424,9 @@ export default function DeveloperDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [openSchoolId, setOpenSchoolId] = useState(null);
   const [auditSchool, setAuditSchool] = useState(null);
 
@@ -493,10 +440,6 @@ export default function DeveloperDashboard() {
     () => schools.filter((s) => { const d = trialDaysLeft(s); return d !== null && d <= 7; }).length,
     [schools],
   );
-  const nearLimit = useMemo(
-    () => schools.filter((s) => s.max_students && s.student_count >= 0.9 * s.max_students).length,
-    [schools],
-  );
 
   const filtered = schools.filter((s) => {
     const q = search.trim().toLowerCase();
@@ -507,7 +450,7 @@ export default function DeveloperDashboard() {
   });
 
   const exportCsv = () => {
-    const cols = ["name", "school_code", "database_name", "plan", "status", "student_count", "max_students", "staff_count", "max_staff", "trial_ends_at", "contact_email"];
+    const cols = ["name", "school_code", "database_name", "plan", "status", "student_count", "staff_count", "trial_ends_at", "contact_email"];
     const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const header = cols.map((c) => (c === "database_name" ? "tenant_key" : c));
     const rows = [header.join(","), ...filtered.map((s) => cols.map((c) => esc(s[c])).join(","))];
@@ -521,35 +464,44 @@ export default function DeveloperDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-white px-6 py-4 dark:border-slate-700 dark:bg-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 p-2 text-white"><i className="bi bi-hdd-network" /></div>
-          <div>
-            <div className="font-semibold text-gray-800 dark:text-gray-100">Platform Console</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{APP_NAME}</div>
+      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/90 backdrop-blur dark:border-slate-700 dark:bg-slate-800/90">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 p-2.5 text-white shadow-md"><i className="bi bi-hdd-network" /></div>
+            <div>
+              <div className="font-semibold text-gray-900 dark:text-gray-100">Platform Console</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{APP_NAME}</div>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {platform && (
-            <button type="button" onClick={() => setTab("platform")} className="flex items-center gap-2 rounded-full border px-3 py-1 text-xs dark:border-slate-600">
-              <span className={`h-2 w-2 rounded-full ${platform.database.reachable ? "bg-emerald-500" : "bg-red-500"}`} />
-              <span className="font-mono">{platform.database.name || platform.database.engine}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {platform && (
+              <button type="button" onClick={() => setTab("platform")} title="Database status" className="flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700">
+                <span className={`h-2 w-2 rounded-full ${platform.database.reachable ? "bg-emerald-500" : "bg-red-500"}`} />
+                <span className="font-mono">{platform.database.name || platform.database.engine}</span>
+              </button>
+            )}
+            <ThemeToggle />
+            <button type="button" onClick={() => setShowSettings(true)} className={btn}><i className="bi bi-gear mr-1" />Settings</button>
+            <button type="button" onClick={() => setShowProfile(true)} className="flex items-center gap-3 rounded-full border border-gray-200 py-1 pl-1 pr-4 transition hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-700">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-xs font-semibold text-white">{developerInitials(developer)}</span>
+              <span className="text-left leading-tight">
+                <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">{developer?.name || developer?.username || "Platform owner"}</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400">Platform owner · My profile</span>
+              </span>
             </button>
-          )}
-          <span className="text-sm text-gray-600 dark:text-gray-300">{developer?.name}</span>
-          <button type="button" onClick={api.logout} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-300">Log out</button>
+            <button type="button" onClick={api.logout} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-300">Log out</button>
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-7xl space-y-6 px-6 py-8">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
-          <Stat label="Schools" value={stats?.total_schools} />
+          <Stat label="Total schools" value={stats?.total_schools} />
           <Stat label="Active" value={stats?.active_schools} />
-          <Stat label="Trial" value={stats?.trial_schools} />
+          <Stat label="On trial" value={stats?.trial_schools} />
           <Stat label="Suspended" value={stats?.suspended_schools} />
-          <Stat label="Trial ends ≤7d" value={expiringSoon} tone="text-amber-600" />
-          <Stat label="Near student limit" value={nearLimit} tone="text-amber-600" />
-          <Stat label="Students" value={stats?.total_students} />
+          <Stat label="Trials ending in 7 days" value={expiringSoon} tone="text-amber-600" />
+          <Stat label="Students (all schools)" value={stats?.total_students} />
         </div>
 
         <div className="flex gap-1 border-b border-gray-200 dark:border-slate-700">
@@ -559,56 +511,25 @@ export default function DeveloperDashboard() {
         </div>
 
         {tab === "schools" && (
-          <div className={`${card} overflow-hidden p-0`}>
-            <div className="flex flex-col gap-3 border-b border-gray-100 p-5 lg:flex-row lg:items-center lg:justify-between dark:border-slate-700">
-              <div className="flex flex-wrap gap-2">
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, code, tenant key, email…" className={input + " mt-0 w-72"} />
-                <select className={input + " mt-0 w-auto"} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                  <option value="all">All statuses</option>
-                  {["Active", "Trial", "Suspended", "Expired"].map((s) => <option key={s}>{s}</option>)}
-                </select>
-                <select className={input + " mt-0 w-auto"} value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
-                  <option value="all">All plans</option>
-                  {PLANS.map((p) => <option key={p}>{p}</option>)}
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={exportCsv} disabled={!filtered.length} className={btn}>Export CSV</button>
-                <button type="button" onClick={() => setShowCreate(true)} className={primary}><i className="bi bi-plus-lg mr-1" />New school</button>
-              </div>
-            </div>
-            {loading ? (
-              <div className="p-10 text-center text-gray-400">Loading…</div>
-            ) : filtered.length === 0 ? (
-              <div className="p-10 text-center text-gray-400">{schools.length === 0 ? "No schools yet — onboard your first one." : "No schools match these filters."}</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-slate-700">
-                      <th className="px-5 py-3">School</th><th className="px-5 py-3">Code</th><th className="px-5 py-3">Tenant key</th><th className="px-5 py-3">Plan</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Students</th><th className="px-5 py-3">Trial</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((s) => {
-                      const days = trialDaysLeft(s);
-                      return (
-                        <tr key={s.id} onClick={() => setOpenSchoolId(s.id)} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50 dark:border-slate-700/50 dark:hover:bg-slate-700/40">
-                          <td className="px-5 py-3 font-medium text-gray-800 dark:text-gray-100">{s.name}</td>
-                          <td className="px-5 py-3 font-mono text-xs text-gray-500">{s.school_code}</td>
-                          <td className="px-5 py-3 font-mono text-xs text-gray-500">{s.database_name || "—"}</td>
-                          <td className="px-5 py-3">{s.plan}</td>
-                          <td className="px-5 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[s.status] || STATUS_STYLES.Expired}`}>{s.status}</span></td>
-                          <td className="px-5 py-3">{s.student_count ?? "—"} / {s.max_students}</td>
-                          <td className="px-5 py-3">{days === null ? "—" : <span className={days <= 7 ? "font-medium text-amber-600" : ""}>{days}d left</span>}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <SchoolsTable
+            schools={schools}
+            filtered={filtered}
+            loading={loading}
+            search={search}
+            onSearch={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilter={setStatusFilter}
+            planFilter={planFilter}
+            onPlanFilter={setPlanFilter}
+            plans={PLANS}
+            statusStyles={STATUS_STYLES}
+            trialDaysLeft={trialDaysLeft}
+            onOpen={(id) => setOpenSchoolId(id)}
+            onCreate={() => setShowCreate(true)}
+            onEmail={() => setShowEmail(true)}
+            onExport={exportCsv}
+            exportDisabled={!filtered.length}
+          />
         )}
 
         {tab === "audit" && (
@@ -618,10 +539,18 @@ export default function DeveloperDashboard() {
         {tab === "platform" && <PlatformPanel platform={platform} />}
       </div>
 
+      {showSettings && <DeveloperSettings api={api} onClose={() => setShowSettings(false)} />}
+
+      {showProfile && <ProfileModal mode="developer" onClose={() => setShowProfile(false)} />}
+
+      {showEmail && (
+        <EmailCenter onClose={() => setShowEmail(false)} api={api} schools={schools} />
+      )}
+
       {showCreate && (
-        <CreateSchoolModal
+        <CreateTenantWizard
           onClose={() => setShowCreate(false)}
-          onCreate={api.createSchool}
+          api={api}
           creating={creating}
           prefix={platform?.tenant_db_prefix}
         />

@@ -6,7 +6,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import or_
 
 from utils.auth import db
-from utils.auth_middleware import login_required
 from utils.rolePermissionManagement import permission_required
 
 logger = logging.getLogger(__name__)
@@ -243,14 +242,6 @@ def current_school_id():
     """Caller's school. None for a legacy/unmigrated install (matches None)."""
     return getattr(getattr(request, "user", None), "school_id", None)
 
-
-def scoped_get_asset(pk):
-    # Load an asset by primary key, only if it belongs to the caller's
-    try:
-        pk = int(pk)
-    except (TypeError, ValueError):
-        return None
-    return Asset.query.filter_by(id=pk, school_id=current_school_id()).first()
 
 
 def create_asset_history(asset, action, performed_by=None):

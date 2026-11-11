@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
+import TeacherProfileSection from "../components/TeacherProfileSection";
+import UserAvatar from "../components/UserAvatar";
 import { useState, useEffect, useRef } from "react";
-import { APP_NAME, APP_YEAR } from "../config/appConfig";
-import "../css/dashboard.css";
+import { APP_YEAR } from "../config/appConfig";
 import SettingsPanel from "../components/SettingsPanel";
 import { useTeacherDashboard } from "../controllers/TeachersSide/teacherDashboard";
 import { useTeacherAssignments } from "../controllers/TeachersSide/useTeacherAssignments";
@@ -122,6 +123,7 @@ function TeacherDashboard() {
     // teacher leaves
     leaveBalance,
     leaveHistory,
+    withdrawLeave,
     leaveForm,
     setLeaveForm,
     handleLeaveChange,
@@ -304,6 +306,7 @@ function TeacherDashboard() {
     // profile
     teacher,
     formData,
+    setFormData,
     editMode,
     setEditMode,
     handleChange,
@@ -377,7 +380,7 @@ function TeacherDashboard() {
         </div>
 
         {/* ================= NAV ================= */}
-        <nav className="flex-1 overflow-y-auto no-scrollbar scroll-smooth px-2 py-4 space-y-2 text-sm">
+        <nav className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth px-2 py-4 space-y-2 text-sm">
           {/* SECTION TITLE */}
           {sidebarOpen && (
             <p className="text-xs text-gray-400 px-3 mt-2">MAIN</p>
@@ -527,7 +530,7 @@ function TeacherDashboard() {
       <main
         className={`flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8 
 ${sidebarOpen ? "md:ml-64" : "md:ml-20"}
-maincolor transition-all duration-300 
+bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] transition-all duration-300 
 dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
       >
         {/* CENTER WRAPPER */}
@@ -701,10 +704,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
     backdrop-blur-md px-2 py-1.5 rounded-full 
     transition shadow-md hover:scale-105"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      className="rounded-full w-9 h-9 border-2 border-white dark:border-slate-600 shadow"
-                    />
+                    <UserAvatar className="rounded-full w-9 h-9 border-2 border-white dark:border-slate-600 shadow" />
 
                     <span className="font-medium hidden sm:inline text-sm text-gray-800 dark:text-gray-200">
                       {teacher?.first_name}
@@ -928,7 +928,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                 </div>
 
                 {/* SUMMARY */}
-                <div className="grid grid-cols-3 gap-3 mb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-5">
                   {[
                     {
                       label: "Present",
@@ -982,7 +982,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-3 text-center text-sm">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 text-center text-sm">
                             <div>
                               <p className="text-xs text-gray-500">P</p>
                               <p className="text-green-600 font-semibold">
@@ -1118,7 +1118,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* ===================== DASHBOARD SECTION END =========================== */}
         {/* ============================= ANALYTICS SECTION START ============================= */}
         {activeSection === "analytics" && (
-          <section className="section p-4 sm:p-6 space-y-6 active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-5 sm:p-6 text-white shadow">
               <h2 className="text-lg sm:text-xl font-semibold">
@@ -1288,7 +1288,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/* ============================= ANALYTICS SECTION END ============================= */}
         {/*  ============================= MY CLASSES START =============================  */}
         {activeSection === "classes" && (
-          <section className="section p-4 sm:p-6 space-y-6 hidden active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 text-white">
               <h2 className="text-lg sm:text-xl font-semibold">My Classes</h2>
@@ -1348,7 +1348,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                       </div>
 
                       {/* STATS */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-center">
                           <p className="text-xs text-gray-400 dark:text-gray-500">
                             Students
@@ -1474,11 +1474,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   >
                     {/* STUDENT */}
                     <div className="md:col-span-3 flex items-center gap-3">
-                      <img
-                        src={`https://i.pravatar.cc/150?u=${student.student_id}`}
-                        alt={student.full_name}
-                        className="w-11 h-11 rounded-full object-cover"
-                      />
+                      <UserAvatar name={student.full_name} className="w-11 h-11 rounded-full object-cover" />
 
                       <div>
                         <p className="text-sm font-medium">
@@ -1547,7 +1543,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         <div
           className={`${
             isStudentProfileOpen ? "flex" : "hidden"
-          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[60] p-2 sm:p-4`}
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[110] p-2 sm:p-4`}
         >
           <div className="bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 w-full max-w-5xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
             {/* HEADER */}
@@ -1564,11 +1560,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
             {/* PROFILE */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-              <img
-                src={`https://i.pravatar.cc/150?u=${selectedStudent?.student_id}`}
-                alt={selectedStudent?.full_name}
-                className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm"
-              />
+              <UserAvatar name={selectedStudent?.full_name} className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm" />
 
               <div className="text-center sm:text-left">
                 <h3 className="text-xl font-semibold">
@@ -1701,7 +1693,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                       type="month"
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="px-4 py-2 rounded-xl text-sm border border-white/20 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-white"
+                      className="px-4 py-2 rounded-xl text-sm border border-white/20 bg-white dark:bg-slate-800 text-gray-700 focus:outline-none focus:ring-2 focus:ring-white"
                     />
                   </div>
 
@@ -1709,7 +1701,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
                   <div className="flex items-end">
                     <button
                       onClick={downloadAttendanceReport}
-                      className="bg-white hover:bg-gray-100 transition text-indigo-600 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm"
+                      className="bg-white dark:bg-slate-800 hover:bg-gray-100 transition text-indigo-600 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm"
                     >
                       Download Monthly Report
                     </button>
@@ -1759,7 +1751,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
 
                     {classes.map((c) => (
                       <option
-                        key={c.academic_class_id}
+                        key={c.teacher_class_id ?? `${c.academic_class_id}-${c.subject_id ?? "none"}`}
                         value={c.academic_class_id}
                       >
                         {c.class_name}
@@ -1966,7 +1958,7 @@ dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
         {/*  ============================= ATTENDANCE SECTION END =============================  */}
         {/*  ============================= TIMETABLE SECTION START =============================  */}
         {activeSection === "timetable" && (
-          <section className="section p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* ================= HEADER ================= */}
             <div
               className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white
@@ -1983,7 +1975,7 @@ flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
               <button
                 onClick={downloadTeacherTimetablePDF}
                 disabled={downloadLoading}
-                className="bg-white text-indigo-600 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
+                className="bg-white dark:bg-slate-800 text-indigo-600 px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
               >
                 {downloadLoading ? "Downloading..." : "Download PDF"}
               </button>
@@ -2214,7 +2206,7 @@ flex justify-between items-center"
         {/*  ============================= TIMETABLE SECTION END =============================  */}
         {/*  ============================= ASSIGNMENTS START =============================  */}
         {activeSection === "assignments" && (
-          <section className="section p-4 sm:p-6 space-y-6 hidden active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div
               className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-5 sm:p-6 
@@ -2232,7 +2224,7 @@ flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
 
               <button
                 onClick={() => setShowModal(true)}
-                className="bg-white text-purple-600 px-5 py-2 rounded-xl text-sm font-medium hover:bg-gray-100"
+                className="bg-white dark:bg-slate-800 text-purple-600 px-5 py-2 rounded-xl text-sm font-medium hover:bg-gray-100"
               >
                 + New Assignment
               </button>
@@ -2249,7 +2241,7 @@ text-gray-800 dark:text-white text-sm"
 
                 {assignedClasses.map((cls) => (
                   <option
-                    key={cls.academic_class_id}
+                    key={cls.teacher_class_id ?? `${cls.academic_class_id}-${cls.subject_id ?? "none"}`}
                     value={cls.academic_class_id}
                   >
                     {cls.class_name}
@@ -2431,7 +2423,7 @@ bg-gray-50 dark:bg-slate-700
               </div>
 
               {/* STATS BAR */}
-              <div className="px-4 sm:px-5 py-3 border-b dark:border-slate-700 grid grid-cols-3 sm:flex sm:flex-wrap gap-2 text-xs bg-gray-50 dark:bg-slate-900">
+              <div className="px-4 sm:px-5 py-3 border-b dark:border-slate-700 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 sm:flex sm:flex-wrap gap-2 text-xs bg-gray-50 dark:bg-slate-900">
                 <span className="bg-purple-100 dark:bg-purple-900/30 text-purple-600 px-3 py-1 rounded-full">
                   Total: {assignmentSubmissions.length}
                 </span>
@@ -2736,7 +2728,7 @@ bg-gray-50 dark:bg-slate-700
                             String(assignmentForm.academic_class_id),
                         )
                         .map((c) => (
-                          <option key={c.subject_id} value={c.subject_id}>
+                          <option key={c.teacher_class_id ?? `${c.academic_class_id}-${c.subject_id}`} value={c.subject_id}>
                             {c.subject_name}
                           </option>
                         ))}
@@ -2881,7 +2873,7 @@ bg-gray-50 dark:bg-slate-700
         {/* ============================= ASSIGNMENTS END ============================= */}
         {/* ================= TEACHER EXAM & RESULT SECTION START ================= */}
         {activeSection === "exams" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             <div className="rounded-3xl bg-gradient-to-r from-indigo-600 via-blue-600 to-violet-600 p-6 text-white shadow-xl">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
@@ -2907,7 +2899,7 @@ bg-gray-50 dark:bg-slate-700
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+              <div className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 p-5 shadow-sm">
                 <p className="text-xs font-semibold text-slate-500">
                   Total Students
                 </p>
@@ -2916,7 +2908,7 @@ bg-gray-50 dark:bg-slate-700
                 </h3>
               </div>
 
-              <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+              <div className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 p-5 shadow-sm">
                 <p className="text-xs font-semibold text-slate-500">
                   Filtered Students
                 </p>
@@ -2925,7 +2917,7 @@ bg-gray-50 dark:bg-slate-700
                 </h3>
               </div>
 
-              <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+              <div className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 p-5 shadow-sm">
                 <p className="text-xs font-semibold text-slate-500">
                   Completed
                 </p>
@@ -2938,7 +2930,7 @@ bg-gray-50 dark:bg-slate-700
                 </h3>
               </div>
 
-              <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
+              <div className="rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 p-5 shadow-sm">
                 <p className="text-xs font-semibold text-slate-500">Pending</p>
                 <h3 className="mt-1 text-2xl font-black text-amber-600">
                   {
@@ -2950,7 +2942,7 @@ bg-gray-50 dark:bg-slate-700
               </div>
             </div>
 
-            <div className="rounded-3xl bg-white border border-slate-200 shadow-sm p-5">
+            <div className="rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 shadow-sm p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
@@ -2959,7 +2951,7 @@ bg-gray-50 dark:bg-slate-700
                   <select
                     value={ExamselectedClass}
                     onChange={(e) => ExamsetselectedClass(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   >
                     <option value="all">All Classes</option>
                     {Array.isArray(ExamClasses) &&
@@ -2978,7 +2970,7 @@ bg-gray-50 dark:bg-slate-700
                   <select
                     value={ExamselectedSubject}
                     onChange={(e) => ExamsetselectedSubject(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   >
                     {Array.isArray(ExamSubjects) &&
                       ExamSubjects.map((subject) => (
@@ -3002,7 +2994,7 @@ bg-gray-50 dark:bg-slate-700
                       setSelectedExam(examName || "");
                       setSelectedAcademicYear(academicYear || "");
                     }}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   >
                     <option value="">Select Exam</option>
 
@@ -3027,13 +3019,13 @@ bg-gray-50 dark:bg-slate-700
                     value={ExamSearch}
                     onChange={(e) => ExamsetSearch(e.target.value)}
                     placeholder="Search by student name..."
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                    className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+            <div className="rounded-3xl bg-white dark:bg-slate-800 border border-slate-200 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50 px-5 py-4">
                 <div>
                   <h3 className="font-black text-slate-900">
@@ -3150,7 +3142,7 @@ bg-gray-50 dark:bg-slate-700
 
         {marksModalOpen && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-3 sm:p-5">
-            <div className="w-full max-w-4xl max-h-[94vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="w-full max-w-4xl max-h-[94vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-800 shadow-2xl">
               <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-xl px-5 sm:px-7 py-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -3215,13 +3207,13 @@ bg-gray-50 dark:bg-slate-700
                   ].map(([label, markName, outOfName]) => (
                     <div
                       key={markName}
-                      className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                      className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-5 shadow-sm"
                     >
                       <label className="block text-sm font-black text-slate-900 mb-3">
                         {label}
                       </label>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <p className="mb-1 text-[11px] font-bold uppercase text-slate-400">
                             Obtained
@@ -3252,7 +3244,7 @@ bg-gray-50 dark:bg-slate-700
                   ))}
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-5 shadow-sm">
                   <label className="block text-sm font-black text-slate-900 mb-2">
                     Remarks
                   </label>
@@ -3708,7 +3700,7 @@ bg-gray-50 dark:bg-slate-700
         {/* ===================== TEACHER ANNOUNCEMENTS and NOTIFICATIONS END ========================*/}
         {/* ============================= STUDENT LEAVE REQUEST SECTION ============================= */}
         {activeSection === "studentLeave" && (
-          <section className="section p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow">
               <h2 className="text-xl font-semibold">Leave Requests</h2>
@@ -3829,7 +3821,7 @@ bg-gray-50 dark:bg-slate-700
         {/* ============================= STUDENT LEAVE SECTION END ============================= */}
         {/*  ============================= TEACHER LEAVE SECTION END =============================  */}
         {activeSection === "teacherLeave" && (
-          <section className="section p-4 sm:p-6 space-y-6 hidden dark:bg-slate-900 dark:text-gray-100 active">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow">
               <h2 className="text-xl font-semibold">My Leave Requests</h2>
@@ -4017,12 +4009,23 @@ bg-gray-50 dark:bg-slate-700
                           </p>
                         </div>
 
-                        {/* RIGHT SIDE STATUS */}
-                        <span
-                          className={`text-xs px-3 py-1 rounded-full ${statusColor}`}
-                        >
-                          {l.status}
-                        </span>
+                        {/* RIGHT SIDE: status, and withdraw while still pending */}
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`text-xs px-3 py-1 rounded-full ${statusColor}`}
+                          >
+                            {l.status}
+                          </span>
+                          {l.status === "Pending" && (
+                            <button
+                              type="button"
+                              onClick={() => withdrawLeave(l.id)}
+                              className="text-xs font-medium px-3 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10"
+                            >
+                              Withdraw
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })
@@ -4044,538 +4047,17 @@ bg-gray-50 dark:bg-slate-700
         )}
 
         {activeSection === "profile" && (
-          <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
-            {/* PROFILE HEADER */}
-            <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-xl overflow-hidden">
-              <div className="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
-
-              <div className="relative flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src="https://i.pravatar.cc/120?img=12"
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg"
-                />
-
-                <div className="text-center sm:text-left flex-1">
-                  <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                    {editMode ? (
-                      <>
-                        <input
-                          name="first_name"
-                          value={formData.first_name || ""}
-                          onChange={handleChange}
-                          placeholder="First Name"
-                          className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                        />
-                        <input
-                          name="middle_name"
-                          value={formData.middle_name || ""}
-                          onChange={handleChange}
-                          placeholder="Middle Name"
-                          className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                        />
-                        <input
-                          name="last_name"
-                          value={formData.last_name || ""}
-                          onChange={handleChange}
-                          placeholder="Last Name"
-                          className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                        />
-                      </>
-                    ) : (
-                      `${teacher?.first_name} ${teacher?.middle_name} ${teacher?.last_name}`
-                    )}
-                  </h2>
-
-                  <p className="text-sm opacity-90 mt-1">
-                    {teacher?.designation} •{" "}
-                    {teacher?.specialization || "Department"}
-                  </p>
-
-                  <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
-                    <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {teacher?.teacher_id}
-                    </span>
-
-                    <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {teacher?.experience_years || 0}+ Years Exp
-                    </span>
-
-                    <span className="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
-                      {teacher?.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {/* PERSONAL */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">👤 Personal Info</h4>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    DOB:{" "}
-                    {editMode ? (
-                      <input
-                        type="date"
-                        name="date_of_birth"
-                        value={formData.date_of_birth || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">
-                        {teacher?.date_of_birth}
-                      </span>
-                    )}
-                  </p>
-
-                  <p>
-                    Gender:{" "}
-                    {editMode ? (
-                      <input
-                        name="gender"
-                        value={formData.gender || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">{teacher?.gender}</span>
-                    )}
-                  </p>
-
-                  <p>
-                    Phone:{" "}
-                    {editMode ? (
-                      <input
-                        name="mobile"
-                        value={formData.mobile || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">{teacher?.mobile}</span>
-                    )}
-                  </p>
-
-                  <p>
-                    Email:{" "}
-                    {editMode ? (
-                      <input
-                        name="email"
-                        value={formData.email || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">{teacher?.email}</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* PROFESSIONAL */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">💼 Professional</h4>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    Designation:{" "}
-                    {editMode ? (
-                      <input
-                        name="designation"
-                        value={formData.designation || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">
-                        {teacher?.designation}
-                      </span>
-                    )}
-                  </p>
-
-                  <p>
-                    Subjects:
-                    <span className="font-medium">
-                      {teacher?.classes?.length
-                        ? teacher.classes
-                            .map((c) => c.subject_name)
-                            .filter(Boolean)
-                            .join(", ")
-                        : "N/A"}
-                    </span>
-                  </p>
-
-                  <p>
-                    Classes:
-                    <span className="font-medium">
-                      {teacher?.classes?.length
-                        ? teacher.classes
-                            .map((c) => c.class_name)
-                            .filter(Boolean)
-                            .join(", ")
-                        : "N/A"}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              {/* ACADEMIC */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">🎓 Academic</h4>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    Degree:{" "}
-                    {editMode ? (
-                      <input
-                        name="degree"
-                        value={formData.degree || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">{teacher?.degree}</span>
-                    )}
-                  </p>
-
-                  <p>
-                    University:{" "}
-                    {editMode ? (
-                      <input
-                        name="university"
-                        value={formData.university || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">{teacher?.university}</span>
-                    )}
-                  </p>
-
-                  <p>
-                    Experience:{" "}
-                    {editMode ? (
-                      <input
-                        name="experience_years"
-                        value={formData.experience_years || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">
-                        {teacher?.experience_years} Years
-                      </span>
-                    )}
-                  </p>
-
-                  <p>
-                    Specialization:{" "}
-                    {editMode ? (
-                      <input
-                        name="specialization"
-                        value={formData.specialization || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">
-                        {teacher?.specialization}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* EMPLOYMENT */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">🏢 Employment</h4>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    Joining:{" "}
-                    {editMode ? (
-                      <input
-                        type="date"
-                        name="joining_date"
-                        value={formData.joining_date || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">
-                        {teacher?.joining_date}
-                      </span>
-                    )}
-                  </p>
-
-                  <p>
-                    Type:{" "}
-                    {editMode ? (
-                      <input
-                        name="employment_type"
-                        value={formData.employment_type || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span className="font-medium">
-                        {teacher?.employment_type}
-                      </span>
-                    )}
-                  </p>
-
-                  <p>
-                    Shift: <span className="font-medium">{teacher?.shift}</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* PERFORMANCE (READ ONLY) */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">📊 Performance</h4>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    Classes:{" "}
-                    <span className="font-medium">
-                      {teacher?.total_classes_taken}
-                    </span>
-                  </p>
-                  <p>
-                    Assignments:{" "}
-                    <span className="font-medium">
-                      {teacher?.assignments_count}
-                    </span>
-                  </p>
-                  <p>
-                    Rating:{" "}
-                    <span className="text-yellow-500">★ {teacher?.rating}</span>
-                  </p>
-                  <p>
-                    Attendance:{" "}
-                    <span className="text-green-600">
-                      {teacher?.attendance_percentage}%
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              {/* ADDRESS */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">📍 Address</h4>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    {editMode ? (
-                      <>
-                        <input
-                          name="city"
-                          value={formData.city || ""}
-                          onChange={handleChange}
-                          className="input mr-2"
-                        />
-                        <input
-                          name="state"
-                          value={formData.state || ""}
-                          onChange={handleChange}
-                          className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                        />
-                      </>
-                    ) : (
-                      `${teacher?.city}, ${teacher?.state}`
-                    )}
-                  </p>
-
-                  <p>
-                    Pincode:{" "}
-                    {editMode ? (
-                      <input
-                        name="pincode"
-                        value={formData.pincode || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      teacher?.pincode
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* HEALTH */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">🩺 Health & Emergency</h4>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    Blood Group:{" "}
-                    {editMode ? (
-                      <select
-                        name="blood_group"
-                        value={formData.blood_group || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      >
-                        <option value="">Select Blood Group</option>
-                        {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
-                          (bg) => (
-                            <option key={bg} value={bg}>
-                              {bg}
-                            </option>
-                          ),
-                        )}
-                      </select>
-                    ) : (
-                      <span className="text-red-500">
-                        {teacher?.blood_group || "N/A"}
-                      </span>
-                    )}
-                  </p>
-
-                  <p>
-                    Medical Condition:{" "}
-                    {editMode ? (
-                      <input
-                        name="medical_condition"
-                        value={formData.medical_condition || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      teacher?.medical_condition || "None"
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* EMERGENCY */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">Emergency Contact</h4>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    Name:{" "}
-                    {editMode ? (
-                      <input
-                        name="emergency_name"
-                        value={formData.emergency_name || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      teacher?.emergency_name
-                    )}
-                  </p>
-
-                  <p>
-                    Relation:{" "}
-                    {editMode ? (
-                      <input
-                        name="emergency_relation"
-                        value={formData.emergency_relation || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      teacher?.emergency_relation
-                    )}
-                  </p>
-
-                  <p>
-                    Phone:{" "}
-                    {editMode ? (
-                      <input
-                        name="emergency_phone"
-                        value={formData.emergency_phone || ""}
-                        onChange={handleChange}
-                        className="mt-1 w-full p-2 rounded-xl text-sm border focus:outline-none focus:ring-2 transition 
-                bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 
-                border-gray-200 dark:border-slate-700 focus:ring-blue-500"
-                      />
-                    ) : (
-                      teacher?.emergency_phone
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {/* SYSTEM */}
-              <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-md">
-                <h4 className="font-semibold mb-3">⚙️ System</h4>
-                <div className="space-y-2 text-sm">
-                  <p>Username: {teacher?.username}</p>
-                  <p>
-                    Status:{" "}
-                    <span className="text-green-600">{teacher?.status}</span>
-                  </p>
-                  <p>Last Login: {teacher?.last_login || "—"}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* ACTION */}
-            <div className="sticky bottom-4 flex justify-center sm:justify-end gap-3">
-              {editMode ? (
-                <>
-                  <button
-                    onClick={handleSave}
-                    className="px-6 py-3 rounded-xl bg-green-600 text-white"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setEditMode(false)}
-                    className="px-6 py-3 rounded-xl bg-gray-400 text-white"
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setEditMode(true)}
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium shadow-lg hover:opacity-90"
-                >
-                  Edit Profile
-                </button>
-              )}
-            </div>
-          </section>
+          <TeacherProfileSection
+            teacher={teacher}
+            formData={formData}
+            setFormData={setFormData}
+            editMode={editMode}
+            setEditMode={setEditMode}
+            handleChange={handleChange}
+            handleSave={handleSave}
+            assignedClasses={assignedClasses}
+            onChangePassword={() => setPasswordModalOpen(true)}
+          />
         )}
         {/* ===================== PROFILE SECTION END ========================*/}
         {passwordModalOpen && (

@@ -1,3 +1,4 @@
+from sqlalchemy.exc import SQLAlchemyError
 from utils.auth import db
 from utils.auth_middleware import login_required, get_current_user
 from utils.studentDetails import (
@@ -8,12 +9,11 @@ from utils.studentDetails import (
     Batch,
     Section,
 )
-from utils.Notifications import Notification, ActivityLog, create_notification
+from utils.Notifications import ActivityLog, create_notification
 from utils.teacherDetails import Teacher
 from utils.tenancy import current_school_id as _current_school_id
 from flask import request, jsonify
 from flask.views import MethodView
-from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 import logging
 
@@ -760,3 +760,28 @@ class AdminLeaveDashboard(MethodView):
         )
         
         
+
+class TeacherLeaveCancelAPI(MethodView):
+    """A teacher withdraws their own leave request, but only while it is still pending."""
+
+    @login_required
+    def delete(self, leave_id):
+        if getattr(request, "user_type", None) != "teacher":
+            return jsonify({"error": "Only teachers can withdraw their own leave"}), 403
+
+        school_id = _current_school_id()
+        leave = TeacherLeave.query.filter_by(
+            id=leave_id, teacher_id=request.user.id, school_id=school_id
+        ).first()
+        if leave is None:
+            return jsonify({"error": "Leave request not found"}), 404
+        if leave.status != "Pending":
+            return jsonify({"error": "Only pending leave can be withdrawn. Approved or rejected leave cannot be deleted."}), 400
+
+        try:
+            db.session.delete(leave)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"message": "Leave request withdrawn"}), 200

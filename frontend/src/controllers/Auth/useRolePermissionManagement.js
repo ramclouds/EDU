@@ -10,14 +10,14 @@ import { BASE_URL } from "../../config/appConfig";
 
 // CONSTANTS
 
-export const RBAC_ACTIONS = [
+const RBAC_ACTIONS = [
   "view",
   "create",
   "edit",
   "delete",
 ];
 
-export const RBAC_USER_TYPES = [
+const RBAC_USER_TYPES = [
   {
     value: "all",
     label: "All Users",
@@ -40,7 +40,7 @@ export const RBAC_USER_TYPES = [
   },
 ];
 
-export const DASHBOARD_PAGES = [
+const DASHBOARD_PAGES = [
   {
     key: "library-admin-dashboard",
     moduleCode: "library",
@@ -78,7 +78,7 @@ export const DASHBOARD_PAGES = [
   },
 ];
 
-export const DASHBOARD_ACCESS_LEVELS = [
+const DASHBOARD_ACCESS_LEVELS = [
   {
     value: "none",
     label: "No Access",
@@ -97,7 +97,7 @@ export const DASHBOARD_ACCESS_LEVELS = [
 ];
 
 /** {view, create, edit, delete} -> "none" | "read" | "write" */
-export const dashboardAccessLevelFromActions = (actions = {}) => {
+const dashboardAccessLevelFromActions = (actions = {}) => {
   if (!actions || !actions.view) {
     return "none";
   }
@@ -110,7 +110,7 @@ export const dashboardAccessLevelFromActions = (actions = {}) => {
 };
 
 /** "none" | "read" | "write" -> {view, create, edit, delete} */
-export const dashboardActionsFromAccessLevel = (level) => {
+const dashboardActionsFromAccessLevel = (level) => {
   if (level === "write") {
     return {
       view: true,
@@ -806,7 +806,7 @@ export function useRolePermissionManagement({
           typeof externalAuthenticatedFetch === "function"
             ? externalAuthenticatedFetch
             : async (url, requestOptions = {}) => {
-              const token = localStorage.getItem("token");
+              const token = localStorage.getItem("signed_in");
 
               return fetch(url, {
                 ...requestOptions,

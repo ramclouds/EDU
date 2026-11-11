@@ -1,12 +1,13 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import UserAvatar from "../components/UserAvatar";
+import { useSectionInUrl } from "../controllers/useSectionInUrl";
+import DashboardSwitcher from "../components/DashboardSwitcher";
 import { useState, useEffect, useRef } from "react";
 import {
-  APP_NAME,
   APP_YEAR,
   BASE_URL,
   FILE_BASE_URL,
 } from "../config/appConfig";
-import "../css/dashboard.css";
 import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
@@ -48,6 +49,7 @@ function AdminDashboard() {
   const [activeSection, setActiveSection] = useState(
     location.state?.activeSection || "dashboard",
   );
+  useSectionInUrl(activeSection, setActiveSection);
   const [search, setSearch] = useState("");
 
   // ================= NOTIFICATIONS SECTION (LOCAL UI STATE) =================
@@ -836,7 +838,8 @@ function AdminDashboard() {
 
         {/* NAV */}
         {/* ========================= HOSTEL ADMIN SIDEBAR NAV ========================= */}
-        <nav className="h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-4 space-y-2 text-sm">
+        <nav className="h-full overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth px-4 py-4 space-y-2 text-sm">
+          <DashboardSwitcher expanded={sidebarExpanded} />
           {[
             // MAIN
             {
@@ -1010,7 +1013,7 @@ function AdminDashboard() {
       <main
         className={`flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8
     ${sidebarOpen ? "md:ml-64" : "md:ml-20"}
-    maincolor transition-all duration-300
+    bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] transition-all duration-300
     dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
       >
         {/* CENTER WRAPPER */}
@@ -1221,7 +1224,7 @@ function AdminDashboard() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 divide-x border-t text-xs font-medium dark:divide-slate-700 dark:border-slate-700">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 divide-x border-t text-xs font-medium dark:divide-slate-700 dark:border-slate-700">
                         <button
                           type="button"
                           onClick={() => {
@@ -1263,11 +1266,7 @@ function AdminDashboard() {
               backdrop-blur-md transition-all duration-300 hover:scale-105
               dark:from-slate-700/70 dark:to-slate-700/60"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      alt="Admin profile"
-                      className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600"
-                    />
+                    <UserAvatar className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600" />
 
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 dark:text-gray-200 sm:inline">
                       {admin?.first_name || "Admin"}
@@ -1362,7 +1361,7 @@ function AdminDashboard() {
         </div>
         {/* ===================== DASHBOARD SECTION START =========================== */}
         {activeSection === "dashboard" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1927,7 +1926,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== FLOORS & BLOCKS SECTION =========================== --> */}
         {activeSection === "floors" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-teal-500 to-cyan-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1960,7 +1959,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openCreateHostelModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-building" />
                     New Hostel
@@ -2714,7 +2713,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== ROOMS SECTION =========================== --> */}
         {activeSection === "rooms" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -2746,7 +2745,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openCreateRoomModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-plus-lg" />
                     New Room
@@ -3138,7 +3137,7 @@ function AdminDashboard() {
               </div>
 
               <div className="max-h-[70vh] overflow-y-auto p-5">
-                <div className="mb-5 grid grid-cols-3 gap-3 text-center">
+                <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 text-center">
                   <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-700/50">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       Capacity
@@ -3253,7 +3252,7 @@ function AdminDashboard() {
         {/* <!-- =========================== BED MANAGEMENT SECTION =========================== --> */}
         {/* <!-- =========================== BED MANAGEMENT SECTION =========================== --> */}
         {activeSection === "beds" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -3286,7 +3285,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openCreateBedModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-plus-lg" />
                     New Bed
@@ -3685,7 +3684,7 @@ function AdminDashboard() {
         )}
         {/* <!-- =========================== STUDENTS SECTION =========================== --> */}
         {activeSection === "students" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -4042,7 +4041,7 @@ function AdminDashboard() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50">
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Class
@@ -4152,7 +4151,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== ROOM ALLOTMENT SECTION =========================== --> */}
         {activeSection === "room-allotment" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -4518,7 +4517,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== HOSTEL STAFF SECTION =========================== --> */}
         {activeSection === "staff" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -4552,7 +4551,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openCreateStaffModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-person-plus" />
                     Add Staff
@@ -4992,7 +4991,7 @@ function AdminDashboard() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50">
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Role
@@ -5045,7 +5044,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== VISITORS SECTION =========================== --> */}
         {activeSection === "visitors" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -5078,7 +5077,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openVisitorModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-person-plus" />
                     Add Visitor
@@ -5574,7 +5573,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== ATTENDANCE SECTION =========================== --> */}
         {activeSection === "attendance" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -5909,7 +5908,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== CHECK-IN / CHECK-OUT SECTION =========================== --> */}
         {activeSection === "checkin-checkout" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-orange-500 to-amber-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -5943,7 +5942,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openCheckoutModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-box-arrow-right" />
                     New Check-Out
@@ -6377,7 +6376,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== LEAVE REQUEST SECTION =========================== --> */}
         {activeSection === "leave-requests" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -6411,7 +6410,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openLeaveModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-plus-circle" />
                     New Leave Request
@@ -6903,7 +6902,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== MESS MENU SECTION =========================== --> */}
         {activeSection === "mess-menu" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-yellow-600 to-orange-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -7133,7 +7132,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== MEAL ATTENDANCE SECTION =========================== --> */}
         {activeSection === "meal-attendance" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-lime-600 to-emerald-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -7186,7 +7185,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={markAllPresent}
                     disabled={!canWriteHostel || bulkMarking}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-check2-all" />
                     {bulkMarking ? "Marking…" : "Mark All Present"}
@@ -7451,7 +7450,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== COMPLAINTS SECTION =========================== --> */}
         {activeSection === "complaints" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -7851,7 +7850,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== MAINTENANCE SECTION =========================== --> */}
         {activeSection === "maintenance" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-slate-600 to-gray-700 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -7885,7 +7884,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openCreateMaintenanceModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-plus-lg" />
                     New Request
@@ -8381,7 +8380,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== FEE MANAGEMENT SECTION =========================== --> */}
         {activeSection === "fee-management" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-green-600 to-emerald-700 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -8416,7 +8415,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openCreateStructureModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-plus-lg" />
                     New Fee Structure
@@ -8917,7 +8916,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== PAYMENT SECTION =========================== --> */}
         {activeSection === "payment" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -8949,7 +8948,7 @@ function AdminDashboard() {
                     type="button"
                     onClick={() => openPaymentModal()}
                     disabled={!canWriteHostel}
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-cash-coin" />
                     Record Payment
@@ -9336,7 +9335,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== PENDING DUES SECTION =========================== --> */}
         {activeSection === "pending-dues" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-rose-600 to-red-700 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -9622,7 +9621,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== REPORTS & ANALYTICS SECTION =========================== --> */}
         {activeSection === "reports" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -9889,7 +9888,7 @@ function AdminDashboard() {
 
         {/* <!-- =========================== ACTIVITY LOGS SECTION =========================== --> */}
         {activeSection === "activity-logs" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-slate-700 to-gray-800 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -10146,7 +10145,7 @@ function AdminDashboard() {
 
         {/* ===================== NOTIFICATIONS SECTION START ===================== */}
         {activeSection === "notifications" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -10182,7 +10181,7 @@ function AdminDashboard() {
                       onClick={() =>
                         markAllNotificationsRead && markAllNotificationsRead()
                       }
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-700 shadow transition hover:bg-white/90"
+                      className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-700 shadow transition hover:bg-white/90"
                     >
                       <i className="bi bi-check2-all" />
                       Mark all read
@@ -10371,7 +10370,7 @@ function AdminDashboard() {
 
         {/* ===================== ANNOUNCEMENTS SECTION START ===================== */}
         {activeSection === "announcements" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -10410,7 +10409,7 @@ function AdminDashboard() {
                         ? "Read-only access — ask your Super Admin for Full Access"
                         : ""
                     }
-                    className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-700 shadow transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-700 shadow transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <i className="bi bi-plus-lg" />
                     New Announcement
@@ -10767,7 +10766,7 @@ function AdminDashboard() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                           Category
@@ -10819,7 +10818,7 @@ function AdminDashboard() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                           Notice Date
@@ -10962,16 +10961,13 @@ function AdminDashboard() {
         )}
 
         {activeSection === "profile" && (
-          <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* ================= PROFILE HEADER ================= */}
             <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-xl overflow-hidden">
               <div className="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
 
               <div className="relative flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src="https://i.pravatar.cc/120?img=12"
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg"
-                />
+                <UserAvatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
 
                 <div className="text-center sm:text-left flex-1">
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -10982,21 +10978,21 @@ function AdminDashboard() {
                           value={formData.first_name || ""}
                           onChange={handleChange}
                           placeholder="First Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="middle_name"
                           value={formData.middle_name || ""}
                           onChange={handleChange}
                           placeholder="Middle Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="last_name"
                           value={formData.last_name || ""}
                           onChange={handleChange}
                           placeholder="Last Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     ) : (
@@ -11005,7 +11001,7 @@ function AdminDashboard() {
                   </h2>
 
                   <p className="text-sm opacity-90 mt-1">
-                    {admin?.designation} • {admin?.specialization || "NA"}
+                    {admin?.designation} • {admin?.specialization || "Not added"}
                   </p>
 
                   <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
@@ -11014,11 +11010,11 @@ function AdminDashboard() {
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
-                      {admin?.status || "NA"}
+                      {admin?.status || "Not added"}
                     </span>
                   </div>
                 </div>
@@ -11101,7 +11097,7 @@ function AdminDashboard() {
                   <p>
                     Role:{" "}
                     <span className="font-medium">
-                      {admin?.designation || "NA"}
+                      {admin?.designation || "Not added"}
                     </span>
                   </p>
 
@@ -11128,7 +11124,7 @@ function AdminDashboard() {
                   <p>
                     Access Level:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11142,26 +11138,26 @@ function AdminDashboard() {
                   <p>
                     School Name:{" "}
                     <span className="font-medium">
-                      {admin?.school_name || "NA"}
+                      {admin?.school_name || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Code:{" "}
                     <span className="font-medium">
-                      {admin?.school_code || "NA"}
+                      {admin?.school_code || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Board:{" "}
-                    <span className="font-medium">{admin?.board || "NA"}</span>
+                    <span className="font-medium">{admin?.board || "Not added"}</span>
                   </p>
 
                   <p>
                     Established:{" "}
                     <span className="font-medium">
-                      {admin?.established_year || "NA"}
+                      {admin?.established_year || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11175,14 +11171,14 @@ function AdminDashboard() {
                   <p>
                     Users Managed:{" "}
                     <span className="font-medium">
-                      {admin?.users_managed || "NA"}
+                      {admin?.users_managed || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Active Sessions:{" "}
                     <span className="font-medium">
-                      {admin?.active_sessions || "NA"}
+                      {admin?.active_sessions || "Not added"}
                     </span>
                   </p>
 
@@ -11200,21 +11196,21 @@ function AdminDashboard() {
                   <p>
                     Fee Access:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.fee_access || "NA"}
+                      {admin?.fee_access || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Discount Authority:{" "}
                     <span className="font-medium">
-                      {admin?.discount_authority || "NA"}
+                      {admin?.discount_authority || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Revenue View:{" "}
                     <span className="font-medium">
-                      {admin?.revenue_view || "NA"}
+                      {admin?.revenue_view || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11235,14 +11231,14 @@ function AdminDashboard() {
                   <p>
                     2FA:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.two_factor_enabled || "NA"}
+                      {admin?.two_factor_enabled || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Login Alerts:{" "}
                     <span className="font-medium">
-                      {admin?.login_alerts || "NA"}
+                      {admin?.login_alerts || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11256,21 +11252,21 @@ function AdminDashboard() {
                   <p>
                     Logins (30d):{" "}
                     <span className="font-medium">
-                      {admin?.logins_30d || "NA"}
+                      {admin?.logins_30d || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Actions:{" "}
                     <span className="font-medium">
-                      {admin?.actions_count || "NA"}
+                      {admin?.actions_count || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Last Action:{" "}
                     <span className="font-medium">
-                      {admin?.last_action || "NA"}
+                      {admin?.last_action || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -11396,7 +11392,7 @@ function AdminDashboard() {
                   <p>
                     Created On:{" "}
                     <span className="font-medium">
-                      {admin?.created_on || "NA"}
+                      {admin?.created_on || "Not added"}
                     </span>
                   </p>
                 </div>

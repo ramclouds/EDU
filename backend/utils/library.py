@@ -73,28 +73,6 @@ def parse_positive_integer(value, default=1):
         return default
 
 
-def normalize_admin_rights(admin):
-    if not admin:
-        return set()
-
-    role = clean_text(getattr(admin, "role", "")).lower()
-    admin_type = clean_text(getattr(admin, "admin_type", "")).lower()
-
-    if role == "super_admin" or admin_type == "super admin":
-        return {"read", "write", "edit", "delete"}
-
-    access_level = clean_text(getattr(admin, "access_level", "")).lower()
-
-    if access_level in {
-        "full control",
-        "full",
-        "all",
-        "administrator",
-    }:
-        return {"read", "write", "edit", "delete"}
-
-    return {item.strip().lower() for item in access_level.split(",") if item.strip()}
-
 
 def current_school_id():
     """Caller's school. None for a legacy/unmigrated install (matches None)."""
@@ -1916,36 +1894,7 @@ class LibraryCategoryOptionsAPI(MethodView):
         )
 
 
-def safe_student_value(student, *field_names, default=""):
-    for field_name in field_names:
-        value = getattr(student, field_name, None)
 
-        if value not in (None, ""):
-            return value
-
-    return default
-
-
-def get_student_full_name(student):
-    direct_name = safe_student_value(
-        student,
-        "full_name",
-        "name",
-    )
-
-    if direct_name:
-        return clean_text(direct_name)
-
-    name_parts = [
-        safe_student_value(student, "first_name"),
-        safe_student_value(student, "middle_name"),
-        safe_student_value(student, "last_name"),
-    ]
-
-    return (
-        clean_text(" ".join(str(part) for part in name_parts if part not in (None, "")))
-        or f"Student {student.id}"
-    )
 
 
 def get_student_academic_details(student):
@@ -2247,35 +2196,6 @@ def serialize_book_issue(issue):
 
 
 # EXISTING STUDENT LIBRARY SERVICE
-class LibraryService:
-
-    @staticmethod
-    def calculate_status_and_fine(issue, today):
-        days_left = (issue.due_date - today).days
-
-        if issue.return_date:
-            return "Returned", 0, days_left
-
-        if today > issue.due_date:
-            overdue_days = (today - issue.due_date).days
-            fine = overdue_days * float(issue.fine_per_day)
-            return "Overdue", fine, days_left
-
-        if days_left <= 2:
-            return "Due Soon", 0, days_left
-
-        return "On Time", 0, days_left
-
-    @staticmethod
-    def sync_issue(issue, status, fine):
-        issue.fine_amount = Decimal(str(fine))
-
-        if status == "Overdue":
-            issue.status = "Overdue"
-        elif status == "Returned":
-            issue.status = "Returned"
-        else:
-            issue.status = "Issued"
 
 
 # AUTHOR VALIDATION
@@ -3992,210 +3912,9 @@ class LibraryStudentFinePaymentAPI(MethodView):
             )
 
 
-def build_member_full_name(member):
-    name_parts = [
-        clean_text(getattr(member, "first_name", "")),
-        clean_text(getattr(member, "middle_name", "")),
-        clean_text(getattr(member, "last_name", "")),
-    ]
-
-    return (
-        clean_text(" ".join(part for part in name_parts if part))
-        or f"Member {member.id}"
-    )
 
 
-def serialize_admin_library_member(admin):
-    admin_type = clean_text(getattr(admin, "admin_type", ""))
-    role = clean_text(getattr(admin, "role", ""))
-    admin_type_lower = admin_type.lower()
-    role_lower = role.lower()
 
-    is_full_admin = (
-        role_lower
-        in {
-            "super_admin",
-            "super-admin",
-            "super administrator",
-        }
-        or "administrator" in role_lower
-        or "admin" in admin_type_lower
-    )
-
-    member_role = "Admin" if is_full_admin else "Staff"
-
-    department = (
-        clean_text(getattr(admin, "department", ""))
-        or admin_type
-        or role
-        or "Administration"
-    )
-
-    return {
-        "id": admin.id,
-        "member_key": f"admin-{admin.id}",
-        "member_type": ("admin" if member_role == "Admin" else "staff"),
-        "role": member_role,
-        "member_code": (
-            getattr(admin, "admin_id", None)
-            or getattr(admin, "user_id", None)
-            or f"A{admin.id:04d}"
-        ),
-        "name": build_member_full_name(admin),
-        "email": (getattr(admin, "email", None) or ""),
-        "mobile": (getattr(admin, "mobile", None) or ""),
-        "department": department,
-        "designation": (
-            getattr(admin, "designation", None) or role or admin_type or ""
-        ),
-        "class_or_department": department,
-        "status": (getattr(admin, "status", None) or "Active"),
-        "active_books": 0,
-        "returned_books": 0,
-        "overdue_books": 0,
-        "pending_fine": 0.0,
-        "collected_fine": 0.0,
-        "library_status": (getattr(admin, "status", None) or "Active"),
-        "profile": {
-            "admin_type": admin_type,
-            "role": role,
-            "department": department,
-            "designation": (
-                getattr(
-                    admin,
-                    "designation",
-                    None,
-                )
-                or ""
-            ),
-            "address": (getattr(admin, "address", None) or ""),
-            "city": (getattr(admin, "city", None) or ""),
-            "state": (getattr(admin, "state", None) or ""),
-            "joining_date": (
-                admin.joining_date.isoformat()
-                if getattr(
-                    admin,
-                    "joining_date",
-                    None,
-                )
-                else None
-            ),
-            "employment_type": (
-                getattr(
-                    admin,
-                    "employment_type",
-                    None,
-                )
-                or ""
-            ),
-        },
-    }
-
-
-def serialize_student_member(student):
-    student_data = serialize_library_student(student)
-
-    issues = (
-        BookIssue.query.filter(BookIssue.student_id == student.id)
-        .order_by(BookIssue.id.desc())
-        .all()
-    )
-
-    issue_rows = [serialize_book_issue(issue) for issue in issues]
-
-    active_issues = [issue for issue in issue_rows if not issue["return_date"]]
-
-    returned_issues = [issue for issue in issue_rows if issue["return_date"]]
-
-    overdue_count = sum(1 for issue in active_issues if issue["status"] == "Overdue")
-
-    pending_fine = sum(float(issue.get("pending_fine", 0) or 0) for issue in issue_rows)
-
-    collected_fine = (
-        db.session.query(
-            func.coalesce(
-                func.sum(LibraryFinePayment.amount),
-                0,
-            )
-        )
-        .filter(
-            LibraryFinePayment.student_id == student.id,
-            LibraryFinePayment.status == "Collected",
-        )
-        .scalar()
-    )
-
-    if overdue_count > 0:
-        library_status = "Blocked"
-    elif pending_fine > 0:
-        library_status = "Pending"
-    else:
-        library_status = student_data["status"] or "Active"
-
-    return {
-        **student_data,
-        "member_key": f"student-{student.id}",
-        "member_type": "student",
-        "role": "Student",
-        "member_code": (student_data["student_id"]),
-        "class_or_department": (student_data["class_name"]),
-        "active_books": len(active_issues),
-        "returned_books": len(returned_issues),
-        "overdue_books": overdue_count,
-        "pending_fine": float(pending_fine),
-        "collected_fine": float(collected_fine or 0),
-        "library_status": library_status,
-    }
-
-
-def serialize_teacher_member(teacher):
-    teacher_data = serialize_library_teacher(teacher)
-
-    issues = (
-        TeacherBookIssue.query.filter(TeacherBookIssue.teacher_id == teacher.id)
-        .order_by(TeacherBookIssue.id.desc())
-        .all()
-    )
-    issue_rows = [serialize_teacher_book_issue(issue) for issue in issues]
-    active_issues = [issue for issue in issue_rows if not issue["return_date"]]
-    returned_issues = [issue for issue in issue_rows if issue["return_date"]]
-    overdue_count = sum(1 for issue in active_issues if issue["status"] == "Overdue")
-    pending_fine = sum(float(issue.get("pending_fine", 0) or 0) for issue in issue_rows)
-    collected_fine = (
-        db.session.query(
-            func.coalesce(
-                func.sum(TeacherLibraryFinePayment.amount),
-                0,
-            )
-        )
-        .filter(
-            TeacherLibraryFinePayment.teacher_id == teacher.id,
-            TeacherLibraryFinePayment.status == "Collected",
-        )
-        .scalar()
-    )
-
-    if overdue_count > 0:
-        library_status = "Blocked"
-    elif pending_fine > 0:
-        library_status = "Pending"
-    else:
-        library_status = teacher_data["status"] or "Active"
-
-    return {
-        **teacher_data,
-        "member_key": f"teacher-{teacher.id}",
-        "member_type": "teacher",
-        "role": "Teacher",
-        "member_code": (teacher_data["teacher_id"]),
-        "class_or_department": (teacher_data["department"]),
-        "active_books": len(active_issues),
-        "returned_books": len(returned_issues),
-        "overdue_books": overdue_count,
-        "pending_fine": float(pending_fine),
-        "collected_fine": float(collected_fine or 0),
-        "library_status": library_status,
-    }
 
 
 class LibraryStudentsAPI(MethodView):

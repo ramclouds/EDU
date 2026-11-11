@@ -1,7 +1,11 @@
 import { useLocation } from "react-router-dom";
+import LibraryMembershipToggle from "../components/LibraryMembershipToggle";
+import UserAvatar from "../components/UserAvatar";
+import { useSectionInUrl } from "../controllers/useSectionInUrl";
+import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
+import DashboardSwitcher from "../components/DashboardSwitcher";
 import { useState, useEffect } from "react";
-import { APP_NAME, APP_YEAR, BASE_URL } from "../config/appConfig";
-import "../css/dashboard.css";
+import { APP_YEAR, BASE_URL } from "../config/appConfig";
 import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
@@ -30,6 +34,7 @@ function AdminDashboard() {
   const [activeSection, setActiveSection] = useState(
     location.state?.activeSection || "dashboard",
   );
+  useSectionInUrl(activeSection, setActiveSection);
   // const [noticeTab, setNoticeTab] = useState("announcements");
   const [search, setSearch] = useState("");
   const [notificationFilterTab, setNotificationFilterTab] = useState("all");
@@ -565,14 +570,16 @@ function AdminDashboard() {
     isSuperAdmin,
   } = useAdminProfile({ fetchWithAuth, showToast });
 
+  const dashAccess = useDashboardAccess();
   useEffect(() => {
     if (!admin?.id) return;
+    if (!dashAccess.loaded) return;
 
-    if (!isSuperAdmin && !isAcademicAdmin) {
-      showToast("You do not have access to the Academic Dashboard", "error");
-      navigate("/super-admin-dashboard", { replace: true });
+    if (!isSuperAdmin && !isAcademicAdmin && !dashAccess.canView("academic-admin-dashboard")) {
+      showToast("You do not have access to this dashboard", "error");
+      navigate(dashAccess.homeRoute, { replace: true });
     }
-  }, [admin?.id, isSuperAdmin, isAcademicAdmin, navigate, showToast]);
+  }, [admin?.id, isSuperAdmin, isAcademicAdmin, navigate, showToast, dashAccess.loaded, dashAccess.canView, dashAccess.homeRoute]);
 
   useEffect(() => {
     const desktopMedia = window.matchMedia("(min-width: 768px)");
@@ -641,8 +648,9 @@ function AdminDashboard() {
         {/* ========================= Academic ADMIN SIDEBAR NAV ========================= */}
         <nav
           aria-label="Academic management navigation"
-          className="min-h-0 flex-1 space-y-2 no-scrollbar overflow-y-auto overscroll-contain px-3 py-4 text-sm [scrollbar-width:thin]"
+          className="min-h-0 flex-1 space-y-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overflow-y-auto overscroll-contain px-3 py-4 text-sm [scrollbar-width:thin]"
         >
+          <DashboardSwitcher expanded={sidebarExpanded} />
           {[
             {
               title: "MAIN",
@@ -651,10 +659,10 @@ function AdminDashboard() {
             {
               title: "ACADEMIC SETUP",
               items: [
-                ["classes", "bi-collection", "Classes"],
-                ["divisions-sections", "bi-diagram-3", "Grades & Sections"],
-                ["subjects", "bi-journal-bookmark", "Subjects"],
                 ["batches", "bi-layers", "Academic Years"],
+                ["divisions-sections", "bi-diagram-3", "Grades & Sections"],
+                ["classes", "bi-collection", "Classes"],
+                ["subjects", "bi-journal-bookmark", "Subjects"],
               ],
             },
             {
@@ -773,9 +781,9 @@ function AdminDashboard() {
 
       {/* MAIN */}
       <main
-        className={`maincolor min-h-screen min-w-0 flex-1 overflow-x-hidden
+        className={`bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] min-h-screen min-w-0 flex-1 overflow-x-hidden
     px-3 py-4 text-gray-800 transition-[margin,width] duration-300
-    dark:bg-slate-900 dark:text-gray-100
+    dark:text-gray-100
     sm:px-5 sm:py-6 lg:px-8
     ${sidebarExpanded ? "md:ml-64" : "md:ml-20"}`}
       >
@@ -990,11 +998,7 @@ function AdminDashboard() {
               backdrop-blur-md transition-all duration-300 hover:scale-105
               dark:from-slate-700/70 dark:to-slate-700/60"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      alt="Admin profile"
-                      className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600"
-                    />
+                    <UserAvatar className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600" />
 
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 dark:text-gray-200 sm:inline">
                       {admin?.first_name || "Admin"}
@@ -1089,7 +1093,7 @@ function AdminDashboard() {
         </div>
         {/* ================= Academic DASHBOARD ================= */}
         {activeSection === "dashboard" && (
-          <section className="section active space-y-6 p-4 sm:p-6">
+          <section className="space-y-6 p-4 sm:p-6">
             {/* HEADER */}
             <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1376,7 +1380,7 @@ function AdminDashboard() {
 
                 {/* =========================== TEACHERS SECTION START ============================ */}
         {activeSection === "teachers" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
@@ -1392,7 +1396,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={openTeacherManagementAddModal}
-                  className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow"
+                  className="bg-white dark:bg-slate-800 text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium shadow"
                 >
                   + Add Teacher
                 </button>
@@ -1400,28 +1404,28 @@ function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-xl shadow text-center">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Total Teachers</p>
                 <h2 className="font-bold text-lg">
                   {teacherManagementStats.total}
                 </h2>
               </div>
 
-              <div className="bg-white p-4 rounded-xl shadow text-center">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Active</p>
                 <h2 className="font-bold text-green-600 text-lg">
                   {teacherManagementStats.active}
                 </h2>
               </div>
 
-              <div className="bg-white p-4 rounded-xl shadow text-center">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Inactive</p>
                 <h2 className="font-bold text-red-500 text-lg">
                   {teacherManagementStats.inactive}
                 </h2>
               </div>
 
-              <div className="bg-white p-4 rounded-xl shadow text-center">
+              <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow text-center">
                 <p className="text-xs text-gray-500">Suspended</p>
                 <h2 className="font-bold text-indigo-600 text-lg">
                   {teacherManagementStats.suspended}
@@ -1429,7 +1433,7 @@ function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow flex flex-col sm:flex-row sm:items-end gap-4">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow flex flex-col sm:flex-row sm:items-end gap-4">
               <div className="flex-1">
                 <label className="text-xs text-gray-500">Search Teacher</label>
                 <input
@@ -1478,7 +1482,7 @@ function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold">Teacher List</h3>
 
@@ -1501,7 +1505,7 @@ function AdminDashboard() {
                     className="border rounded-xl p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
                   >
                     <div className="space-y-1">
-                      <h4 className="font-semibold text-gray-800">
+                      <h4 className="font-semibold text-gray-800 dark:text-gray-100">
                         {teacher.full_name ||
                           `${teacher.first_name || ""} ${teacher.last_name || ""}`}
                       </h4>
@@ -2078,6 +2082,13 @@ function AdminDashboard() {
                         />
                       </div>
 
+                    </div>
+
+                    {/* Login account for the teacher (separate from health details) */}
+                    <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm space-y-4">
+                      <h3 className="font-bold text-slate-900 dark:text-white">
+                        🔐 Teacher Login Account
+                      </h3>
                       <div>
                         <label className="block text-xs font-medium text-slate-500 mb-1">
                           Username
@@ -2266,7 +2277,7 @@ function AdminDashboard() {
         {/* VIEW TEACHER MODAL */}
         {teacherManagementViewModalOpen && teacherManagementSelectedTeacher && (
           <div className="fixed inset-0 md:pl-64 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 relative">
+            <div className="bg-white dark:bg-slate-800 w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl p-5 relative">
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-xl font-semibold">
@@ -2412,9 +2423,9 @@ function AdminDashboard() {
                       No attendance records found.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto overflow-hidden rounded-xl border border-gray-100">
+                    <div className="overflow-x-auto overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700">
                       <table className="min-w-full text-left text-sm">
-                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                        <thead className="bg-gray-50 dark:bg-slate-900 text-xs uppercase text-gray-500">
                           <tr>
                             <th className="px-4 py-2.5">Date</th>
                             <th className="px-4 py-2.5">Status</th>
@@ -2468,10 +2479,10 @@ function AdminDashboard() {
                     teacherProfileLeaves.map((leave, idx) => (
                       <div
                         key={leave.id || idx}
-                        className="flex items-center justify-between rounded-xl border border-gray-100 p-3"
+                        className="flex items-center justify-between rounded-xl border border-gray-100 dark:border-slate-700 p-3"
                       >
                         <div>
-                          <p className="text-sm font-medium text-gray-800">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
                             {leave.leave_type || "Leave"} · {leave.from_date} to{" "}
                             {leave.to_date}
                           </p>
@@ -2526,7 +2537,7 @@ function AdminDashboard() {
 
                 {/*  ============================= MY CLASSES START =============================  */}
         {activeSection === "students" && (
-          <section className="section p-4 sm:p-6 space-y-6 hidden active">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 sm:p-6 text-white">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -2543,7 +2554,7 @@ function AdminDashboard() {
                 <button
                   type="button"
                   onClick={studentManagement.openEnrollModal}
-                  className="bg-white text-indigo-600 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-indigo-50 transition-all duration-200"
+                  className="bg-white dark:bg-slate-800 text-indigo-600 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:bg-indigo-50 transition-all duration-200"
                 >
                   <i className="bi bi-person-plus-fill me-2"></i>
                   Enroll Student
@@ -2645,7 +2656,7 @@ function AdminDashboard() {
                       </div>
 
                       {/* STATS */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="bg-gray-50 dark:bg-slate-700 p-3 rounded-xl text-center">
                           <p className="text-xs text-gray-400 dark:text-gray-500">
                             Students
@@ -2771,11 +2782,7 @@ function AdminDashboard() {
                   >
                     {/* STUDENT */}
                     <div className="md:col-span-3 flex items-center gap-3">
-                      <img
-                        src={`https://i.pravatar.cc/150?u=${student.student_id}`}
-                        alt={student.full_name}
-                        className="w-11 h-11 rounded-full object-cover"
-                      />
+                      <UserAvatar name={student.full_name} className="w-11 h-11 rounded-full object-cover" />
 
                       <div>
                         <p className="text-sm font-medium">
@@ -2844,7 +2851,7 @@ function AdminDashboard() {
         <div
           className={`${
             isStudentProfileOpen ? "flex" : "hidden"
-          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[60] p-2 sm:p-4`}
+          } fixed inset-0 bg-black/50 backdrop-blur-sm items-end sm:items-center justify-center z-[110] p-2 sm:p-4`}
         >
           <div className="bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 w-full max-w-5xl rounded-3xl shadow-2xl p-6 space-y-6 overflow-y-auto max-h-[90vh]">
             {/* HEADER */}
@@ -2861,11 +2868,7 @@ function AdminDashboard() {
 
             {/* PROFILE */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-              <img
-                src={`https://i.pravatar.cc/150?u=${selectedStudent?.student_id}`}
-                alt={selectedStudent?.full_name}
-                className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm"
-              />
+              <UserAvatar name={selectedStudent?.full_name} className="w-24 h-24 rounded-2xl object-cover border dark:border-slate-600 shadow-sm" />
 
               <div className="text-center sm:text-left">
                 <h3 className="text-xl font-semibold">
@@ -2875,6 +2878,7 @@ function AdminDashboard() {
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Student ID: {selectedStudent?.student_id || "N/A"}
                 </p>
+                <LibraryMembershipToggle studentId={selectedStudent?.id} />
 
                 <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
                   <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-1 rounded-full">
@@ -3005,7 +3009,7 @@ function AdminDashboard() {
                   </div>
                 ) : studentProfileAttendance?.summary ? (
                   <>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                       <div className="rounded-xl bg-emerald-50 dark:bg-emerald-500/10 p-4 text-center">
                         <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
                           {studentProfileAttendance.summary.present || 0}
@@ -3831,7 +3835,7 @@ function AdminDashboard() {
 
         {/* ================= ACADEMIC YEARS (BATCHES) ================= */}
         {activeSection === "batches" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -3865,7 +3869,7 @@ function AdminDashboard() {
                     <button
                       type="button"
                       onClick={batchManagement.openCreateBatchModal}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
                     >
                       <i className="bi bi-plus-lg" />
                       Add Academic Year
@@ -3969,7 +3973,7 @@ function AdminDashboard() {
             </div>
 
             {/* ACADEMIC YEAR CARDS */}
-            {batchManagement.batchLoading ? (
+            {batchManagement.batchLoading && batchManagement.batches.length === 0 ? (
               <div className="rounded-2xl border border-gray-100 bg-white p-16 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <div className="flex flex-col items-center gap-3 text-gray-500">
                   <span className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
@@ -4059,7 +4063,7 @@ function AdminDashboard() {
                         </div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-3 text-center">
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
                         <div className="rounded-xl bg-gray-50 p-3 dark:bg-slate-900/50">
                           <p className="text-lg font-bold text-gray-900 dark:text-white">
                             {batch.class_count || 0}
@@ -4438,7 +4442,7 @@ function AdminDashboard() {
                       </div>
                     ) : batchManagement.overviewData ? (
                       <>
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                           <div className="rounded-xl bg-indigo-50 p-3 text-center dark:bg-indigo-500/10">
                             <p className="text-xl font-bold text-indigo-700 dark:text-indigo-300">
                               {
@@ -4646,7 +4650,7 @@ function AdminDashboard() {
 
         {/* ================= SUBJECTS ================= */}
         {activeSection === "subjects" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -4682,7 +4686,7 @@ function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => subjectManagement.openSubjectModal()}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
                     >
                       <i className="bi bi-plus-lg" />
                       Add Subject
@@ -4847,7 +4851,7 @@ function AdminDashboard() {
                   </thead>
 
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                    {subjectManagement.subjectsLoading ? (
+                    {subjectManagement.subjectsLoading && subjectManagement.subjects.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-5 py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-gray-500">
@@ -5120,7 +5124,7 @@ function AdminDashboard() {
 
         {/* ================= DIVISIONS & SECTIONS ================= */}
         {activeSection === "divisions-sections" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -5301,7 +5305,7 @@ function AdminDashboard() {
                     </thead>
 
                     <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                      {divisionsSections.divisionLoading ? (
+                      {divisionsSections.divisionLoading && divisionsSections.divisions.length === 0 ? (
                         <tr>
                           <td colSpan={3} className="px-5 py-14 text-center">
                             <div className="flex flex-col items-center gap-3 text-gray-500">
@@ -5890,7 +5894,7 @@ function AdminDashboard() {
 
         {/* ================= CLASSES ================= */}
         {activeSection === "classes" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-5 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -5924,7 +5928,7 @@ function AdminDashboard() {
                     <button
                       type="button"
                       onClick={academicClasses.openCreateClassModal}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-indigo-600 shadow transition hover:bg-gray-100"
                     >
                       <i className="bi bi-plus-lg" />
                       Add Class
@@ -6079,7 +6083,7 @@ function AdminDashboard() {
                   </thead>
 
                   <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                    {academicClasses.classLoading ? (
+                    {academicClasses.classLoading && academicClasses.classes.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-5 py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-gray-500">
@@ -6592,7 +6596,7 @@ function AdminDashboard() {
 
                 {/* =========================== PREMIUM TIMETABLE SECTION ============================ */}
         {activeSection === "timetable" && (
-          <section className="space-y-6 animate-in fade-in duration-500">
+          <section className="space-y-6 animate-in animate-fade-in duration-500">
             {/*  HEADER  */}
             <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -6608,7 +6612,7 @@ function AdminDashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
                   <button
                     onClick={() => openLectureModal()}
-                    className="w-full sm:w-auto bg-white text-indigo-600 px-4 py-3 rounded-xl font-medium shadow hover:shadow-md transition"
+                    className="w-full sm:w-auto bg-white dark:bg-slate-800 text-indigo-600 px-4 py-3 rounded-xl font-medium shadow hover:shadow-md transition"
                   >
                     + Schedule Lecture
                   </button>
@@ -6630,7 +6634,7 @@ function AdminDashboard() {
               </div>
             </div>
             {/* FILTERS */}
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-6 shadow-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <select
                   value={filters.academic_class_id}
@@ -6709,7 +6713,7 @@ function AdminDashboard() {
               ].map((item) => (
                 <div
                   key={item.title}
-                  className="group rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  className="group rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 p-4 sm:p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -6731,7 +6735,7 @@ function AdminDashboard() {
             </div>
 
             {/* TIMETABLE */}
-            <div className="w-full max-w-full overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+            <div className="w-full max-w-full overflow-hidden rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 shadow-sm">
               <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">
@@ -6756,7 +6760,7 @@ function AdminDashboard() {
                 {timeSlots.map((slot) => (
                   <div
                     key={slot}
-                    className="bg-white rounded-2xl shadow-sm border p-4"
+                    className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border p-4"
                   >
                     <h3 className="font-semibold mb-4">{slot}</h3>
 
@@ -6994,7 +6998,7 @@ function AdminDashboard() {
         {/* ================= LECTURE MODAL ================= */}
         <div
           id="lectureModal"
-          className={`fixed inset-0 z-[70] ${
+          className={`fixed inset-0 z-[110] ${
             lectureModalOpen ? "flex" : "hidden"
           } items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4`}
         >
@@ -7006,15 +7010,15 @@ function AdminDashboard() {
       max-h-[92vh]
       overflow-hidden
       rounded-2xl
-      bg-white
+      bg-white dark:bg-slate-800
       shadow-2xl
       border border-slate-200
       flex flex-col
-      animate-in fade-in zoom-in-95 duration-200
+      animate-in animate-fade-in zoom-in-95 duration-200
     "
           >
             {/* HEADER */}
-            <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white dark:bg-slate-800 border-b border-slate-200 px-4 sm:px-6 py-4 flex items-center justify-between">
               <div className="min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
                   Schedule Lecture
@@ -7058,7 +7062,7 @@ function AdminDashboard() {
               w-full h-11 px-4
               rounded-xl
               border border-slate-200
-              bg-white
+              bg-white dark:bg-slate-800
               text-sm
               focus:ring-2 focus:ring-indigo-500/20
               focus:border-indigo-500
@@ -7071,79 +7075,6 @@ function AdminDashboard() {
                     {TTClasses?.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.display_name || item.class_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">
-                    Division
-                  </label>
-
-                  <select
-                    value={selectedDivision}
-                    onChange={(e) => setSelectedDivision(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm"
-                  >
-                    <option value="">All Divisions</option>
-
-                    {divisions.map((division) => (
-                      <option key={division} value={division}>
-                        {division}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {/* DIVISION */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-600">
-                    Division
-                  </label>
-
-                  <select
-                    value={lectureForm.division_id || ""}
-                    onChange={(e) =>
-                      updateLectureForm("division_id", e.target.value)
-                    }
-                    className="
-              w-full h-11 px-4 rounded-xl border border-slate-200
-              text-sm focus:ring-2 focus:ring-indigo-500/20
-              focus:border-indigo-500 outline-none
-            "
-                  >
-                    <option value="">Select Division</option>
-
-                    {TTDivisions?.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.division_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* SECTION */}
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-600">
-                    Section
-                  </label>
-
-                  <select
-                    value={lectureForm.section_id || ""}
-                    onChange={(e) =>
-                      updateLectureForm("section_id", e.target.value)
-                    }
-                    className="
-              w-full h-11 px-4 rounded-xl border border-slate-200
-              text-sm focus:ring-2 focus:ring-indigo-500/20
-              focus:border-indigo-500 outline-none
-            "
-                  >
-                    <option value="">Select Section</option>
-
-                    {TTsections?.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.section_name}
                       </option>
                     ))}
                   </select>
@@ -7382,7 +7313,7 @@ function AdminDashboard() {
             </div>
 
             {/* FOOTER */}
-            <div className="sticky bottom-0 bg-white border-t border-slate-200 px-4 sm:px-6 py-4">
+            <div className="sticky bottom-0 bg-white dark:bg-slate-800 border-t border-slate-200 px-4 sm:px-6 py-4">
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
                 <button
                   onClick={closeLectureModal}
@@ -7391,7 +7322,7 @@ function AdminDashboard() {
             px-5 py-2.5
             rounded-xl
             border border-slate-300
-            bg-white
+            bg-white dark:bg-slate-800
             text-slate-700
             font-medium
             hover:bg-slate-50
@@ -7425,7 +7356,7 @@ function AdminDashboard() {
 
 
                 {activeSection === "attendance" && (
-          <section className="section active p-3 sm:p-5 lg:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-gray-100">
+          <section className="p-3 sm:p-5 lg:p-6 space-y-6 min-h-screen dark:bg-slate-900 dark:text-gray-100">
             {/* HEADER */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 p-6 sm:p-8 shadow-xl">
               <div className="relative z-10">
@@ -7492,7 +7423,7 @@ function AdminDashboard() {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
               <div className="xl:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* PRESENT */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Present</p>
@@ -7508,7 +7439,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* ABSENT */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Absent</p>
@@ -7524,7 +7455,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* TOTAL */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Total</p>
@@ -7540,7 +7471,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* PERCENTAGE */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-gray-500 text-sm">Attendance %</p>
@@ -7558,7 +7489,7 @@ function AdminDashboard() {
             </div>
 
             {/* ================= FILTERS ================= */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* ROLE */}
                 <div>
@@ -7569,7 +7500,7 @@ function AdminDashboard() {
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-slate-700 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   >
                     <option value="students">Students</option>
 
@@ -7587,7 +7518,7 @@ function AdminDashboard() {
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-slate-700 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
 
@@ -7598,7 +7529,7 @@ function AdminDashboard() {
                   </label>
                   <select
                     value={selectedClass}
-                    className="w-full h-11 rounded-xl border border-gray-200 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-slate-700 px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     onChange={(e) => setSelectedClass(e.target.value)}
                   >
                     <option value="">All Classes</option>
@@ -7625,7 +7556,7 @@ function AdminDashboard() {
                       value={searchAttendance}
                       onChange={(e) => setSearchAttendance(e.target.value)}
                       placeholder="Search..."
-                      className="w-full h-11 rounded-xl border border-gray-200 pl-11 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      className="w-full h-11 rounded-xl border border-gray-200 dark:border-slate-700 pl-11 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
                 </div>
@@ -7633,11 +7564,11 @@ function AdminDashboard() {
             </div>
 
             {/* ================= TABLE ================= */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
               {/* TOP */}
-              <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+              <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-semibold text-lg text-gray-800">
+                  <h3 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
                     Attendance List
                   </h3>
 
@@ -7678,7 +7609,7 @@ function AdminDashboard() {
               {/* TABLE */}
               <div className="overflow-auto">
                 <table className="w-full min-w-[900px] text-sm">
-                  <thead className="bg-gray-50 sticky top-0 z-10 text-gray-600">
+                  <thead className="bg-gray-50 dark:bg-slate-900 sticky top-0 z-10 text-gray-600">
                     <tr>
                       <th className="p-4 text-left font-semibold">ID</th>
 
@@ -7692,7 +7623,7 @@ function AdminDashboard() {
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-gray-100 bg-white dark:bg-slate-800">
                     {loadingAttendance ? (
                       <tr>
                         <td colSpan="5" className="text-center p-8">
@@ -7755,7 +7686,7 @@ function AdminDashboard() {
               </div>
 
               {/* PAGINATION */}
-              <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="p-4 border-t border-gray-100 dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-center justify-between">
                 <p className="text-sm text-gray-500">
                   Showing {attendanceList.length} of {pagination.total} records
                 </p>
@@ -7764,7 +7695,7 @@ function AdminDashboard() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage(page - 1)}
-                    className="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition disabled:opacity-50"
+                    className="w-10 h-10 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-100 transition disabled:opacity-50"
                   >
                     <i className="fas fa-chevron-left text-xs"></i>
                   </button>
@@ -7778,7 +7709,7 @@ function AdminDashboard() {
                       pagination.pages === 0 || page >= pagination.pages
                     }
                     onClick={() => setPage(page + 1)}
-                    className="w-10 h-10 rounded-xl border border-gray-200 hover:bg-gray-100 transition disabled:opacity-50"
+                    className="w-10 h-10 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-100 transition disabled:opacity-50"
                   >
                     <i className="fas fa-chevron-right text-xs"></i>
                   </button>
@@ -7791,7 +7722,7 @@ function AdminDashboard() {
 
         {/* ===================== PROFILE SECTION START ========================*/}
                 {activeSection === "exams" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -7828,7 +7759,7 @@ function AdminDashboard() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
@@ -8009,10 +7940,10 @@ function AdminDashboard() {
               ].map(([label, value]) => (
                 <div
                   key={label}
-                  className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm"
+                  className="p-4 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-sm"
                 >
                   <p className="text-xs text-gray-500 font-medium">{label}</p>
-                  <h5 className="text-xl font-bold text-gray-800">
+                  <h5 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                     {value || 0}
                   </h5>
                 </div>
@@ -8020,8 +7951,8 @@ function AdminDashboard() {
             </div>
 
             {/* Workflow */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <h3 className="font-bold text-gray-800 mb-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
+              <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4">
                 Exam Result Workflow
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-7 gap-3 text-sm">
@@ -8047,10 +7978,10 @@ function AdminDashboard() {
 
             {/* Class Progress */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <div className="xl:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900">
                   <div>
-                    <h3 className="font-bold text-gray-800">
+                    <h3 className="font-bold text-gray-800 dark:text-gray-100">
                       Class Wise Exam Progress
                     </h3>
                     <p className="text-xs text-gray-500">
@@ -8075,11 +8006,11 @@ function AdminDashboard() {
                     examManagementClasses.map((item) => (
                       <div
                         key={item.exam_id}
-                        className="border border-gray-200 rounded-2xl p-5 hover:shadow-md transition"
+                        className="border border-gray-200 dark:border-slate-700 rounded-2xl p-5 hover:shadow-md transition"
                       >
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <h3 className="text-lg font-bold text-gray-800">
+                            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
                               {item.class_name}
                             </h3>
                             <p className="text-xs text-gray-500">
@@ -8276,9 +8207,9 @@ function AdminDashboard() {
             </div>
 
             {/* Exam Terms Table */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-gray-100 bg-gray-50">
-                <h3 className="font-bold text-gray-800">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+                <h3 className="font-bold text-gray-800 dark:text-gray-100">
                   Created Examinations
                 </h3>
                 <p className="text-xs text-gray-500">
@@ -8288,7 +8219,7 @@ function AdminDashboard() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 text-xs uppercase">
                     <tr>
                       <th className="px-4 py-3">Class</th>
                       <th className="px-4 py-3">Exam</th>
@@ -8354,7 +8285,7 @@ function AdminDashboard() {
         {/* ================= CREATE EXAM MODAL START ================= */}
         {examManagementModalOpen && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-3 sm:p-5">
-            <div className="relative w-full max-w-5xl max-h-[94vh] overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="relative w-full max-w-5xl max-h-[94vh] overflow-hidden rounded-3xl bg-white dark:bg-slate-800 shadow-2xl">
               {/* Header */}
               <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-slate-200">
                 <div className="flex items-start justify-between gap-4 px-5 sm:px-7 py-5">
@@ -8421,7 +8352,7 @@ function AdminDashboard() {
                             )
                           }
                           placeholder="Annual Examination"
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         />
                       </div>
 
@@ -8438,7 +8369,7 @@ function AdminDashboard() {
                               e.target.value,
                             )
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         >
                           <option value="">Select Academic Batch</option>
                           {(examManagementOptions.batches || []).map(
@@ -8463,7 +8394,7 @@ function AdminDashboard() {
                               e.target.value,
                             )
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         >
                           <option value="Unit Test">Unit Test</option>
                           <option value="Mid Term">Mid Term</option>
@@ -8486,7 +8417,7 @@ function AdminDashboard() {
                               e.target.value,
                             )
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         />
                       </div>
 
@@ -8500,7 +8431,7 @@ function AdminDashboard() {
                           onChange={(e) =>
                             updateExamManagementForm("end_date", e.target.value)
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
+                          className="w-full rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 transition"
                         />
                       </div>
                     </div>
@@ -8509,7 +8440,7 @@ function AdminDashboard() {
                   {/* Assignment Details */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {/* Classes */}
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                    <div className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-5 sm:p-6 shadow-sm">
                       <div className="flex items-center justify-between gap-3 mb-4">
                         <div>
                           <h4 className="font-black text-slate-900">
@@ -8557,7 +8488,7 @@ function AdminDashboard() {
                     </div>
 
                     {/* Subjects */}
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+                    <div className="rounded-3xl border border-slate-200 bg-white dark:bg-slate-800 p-5 sm:p-6 shadow-sm">
                       <div className="flex items-center justify-between gap-3 mb-4">
                         <div>
                           <h4 className="font-black text-slate-900">
@@ -8608,7 +8539,7 @@ function AdminDashboard() {
                       <button
                         type="button"
                         onClick={closeExamManagementModal}
-                        className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                        className="w-full sm:w-auto rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
                       >
                         Cancel
                       </button>
@@ -8634,10 +8565,10 @@ function AdminDashboard() {
         {/* ================= EXAM DETAILS MODAL START ================= */}
         {examManagementDetailsModalOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
-              <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+              <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-800">
+                  <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
                     {examManagementSelectedDetails?.exam?.class_name || "Exam"}{" "}
                     Details
                   </h3>
@@ -8664,12 +8595,12 @@ function AdminDashboard() {
                 ) : (
                   <>
                     <div>
-                      <h4 className="font-bold text-gray-800 mb-3">
+                      <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-3">
                         Subject Status
                       </h4>
                       <div className="overflow-x-auto border rounded-xl">
                         <table className="w-full text-left text-sm">
-                          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                          <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 text-xs uppercase">
                             <tr>
                               <th className="px-4 py-3">Subject</th>
                               <th className="px-4 py-3">Teacher</th>
@@ -8719,12 +8650,12 @@ function AdminDashboard() {
                     {(examManagementSelectedDetails?.students || []).length >
                       0 && (
                       <div>
-                        <h4 className="font-bold text-gray-800 mb-3">
+                        <h4 className="font-bold text-gray-800 dark:text-gray-100 mb-3">
                           Student Marks
                         </h4>
                         <div className="overflow-x-auto border rounded-xl">
                           <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                            <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 text-xs uppercase">
                               <tr>
                                 <th className="px-4 py-3">Roll</th>
                                 <th className="px-4 py-3">Student</th>
@@ -8740,7 +8671,7 @@ function AdminDashboard() {
                               </tr>
                             </thead>
 
-                            <tbody className="divide-y divide-slate-100 bg-white">
+                            <tbody className="divide-y divide-slate-100 bg-white dark:bg-slate-800">
                               {examManagementSelectedDetails.students.map(
                                 (student, index) => {
                                   const hasResult = Boolean(student.result_id);
@@ -9001,7 +8932,7 @@ function AdminDashboard() {
 
 
                 {activeSection === "results" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -9098,7 +9029,7 @@ function AdminDashboard() {
 
                       showToast?.("Results exported as CSV", "success");
                     }}
-                    className="bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md"
+                    className="bg-white dark:bg-slate-800 text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md"
                   >
                     <i className="bi bi-filetype-csv me-1.5" />
                     Export CSV
@@ -9108,7 +9039,7 @@ function AdminDashboard() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
@@ -9289,10 +9220,10 @@ function AdminDashboard() {
               ].map(([label, value]) => (
                 <div
                   key={label}
-                  className="p-4 bg-white border border-gray-100 rounded-xl shadow-sm"
+                  className="p-4 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-sm"
                 >
                   <p className="text-xs text-gray-500 font-medium">{label}</p>
-                  <h5 className="text-xl font-bold text-gray-800">
+                  <h5 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                     {value || 0}
                   </h5>
                 </div>
@@ -9300,8 +9231,8 @@ function AdminDashboard() {
             </div>
 
             {/* Workflow */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <h3 className="font-bold text-gray-800 mb-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
+              <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-4">
                 Exam Result Workflow
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-7 gap-3 text-sm">
@@ -9349,15 +9280,15 @@ function AdminDashboard() {
 
               return (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
                     <p className="text-xs font-semibold uppercase text-gray-400">
                       Total Results
                     </p>
-                    <p className="mt-2 text-2xl font-bold text-gray-800">
+                    <p className="mt-2 text-2xl font-bold text-gray-800 dark:text-gray-100">
                       {total}
                     </p>
                   </div>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
                     <p className="text-xs font-semibold uppercase text-gray-400">
                       Average %
                     </p>
@@ -9365,7 +9296,7 @@ function AdminDashboard() {
                       {avgPercentage}%
                     </p>
                   </div>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
                     <p className="text-xs font-semibold uppercase text-gray-400">
                       Pass Rate
                     </p>
@@ -9376,7 +9307,7 @@ function AdminDashboard() {
                       {passCount} passed
                     </p>
                   </div>
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-5">
                     <p className="text-xs font-semibold uppercase text-gray-400">
                       Failing
                     </p>
@@ -9392,9 +9323,9 @@ function AdminDashboard() {
             })()}
 
             {/* Result Rows */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-gray-100 bg-gray-50">
-                <h3 className="font-bold text-gray-800">Student Result Rows</h3>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+                <h3 className="font-bold text-gray-800 dark:text-gray-100">Student Result Rows</h3>
                 <p className="text-xs text-gray-500">
                   Searchable result data from submitted marks. Click a row to
                   verify or edit.
@@ -9403,7 +9334,7 @@ function AdminDashboard() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                  <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 text-xs uppercase">
                     <tr>
                       <th className="px-4 py-3">Roll</th>
                       <th className="px-4 py-3">Student</th>
@@ -9505,7 +9436,7 @@ function AdminDashboard() {
 
         {/* ================= REPORTS & ANALYTICS ================= */}
         {activeSection === "reports" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -9691,7 +9622,7 @@ function AdminDashboard() {
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
                     ["Total Exams", examManagementStats.totalExams],
                     ["Classes Covered", examManagementStats.classesCovered],
@@ -9857,7 +9788,7 @@ function AdminDashboard() {
 
         {/* ================= NOTIFICATIONS ================= */}
         {activeSection === "notifications" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* HEADER */}
             <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -9875,7 +9806,7 @@ function AdminDashboard() {
                     <button
                       type="button"
                       onClick={() => setCreateNotifModalOpen(true)}
-                      className="bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md self-start"
+                      className="bg-white dark:bg-slate-800 text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-md self-start"
                     >
                       <i className="bi bi-plus-lg me-1.5" />
                       Create Notification
@@ -10247,10 +10178,7 @@ function AdminDashboard() {
               <div className="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
 
               <div className="relative flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src="https://i.pravatar.cc/120?img=12"
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg"
-                />
+                <UserAvatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
 
                 <div className="text-center sm:text-left flex-1">
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -10261,21 +10189,21 @@ function AdminDashboard() {
                           value={formData.first_name || ""}
                           onChange={handleChange}
                           placeholder="First Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="middle_name"
                           value={formData.middle_name || ""}
                           onChange={handleChange}
                           placeholder="Middle Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="last_name"
                           value={formData.last_name || ""}
                           onChange={handleChange}
                           placeholder="Last Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     ) : (
@@ -10284,7 +10212,7 @@ function AdminDashboard() {
                   </h2>
 
                   <p className="text-sm opacity-90 mt-1">
-                    {admin?.designation} • {admin?.specialization || "NA"}
+                    {admin?.designation} • {admin?.specialization || "Not added"}
                   </p>
 
                   <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
@@ -10293,11 +10221,11 @@ function AdminDashboard() {
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
-                      {admin?.status || "NA"}
+                      {admin?.status || "Not added"}
                     </span>
                   </div>
                 </div>
@@ -10380,7 +10308,7 @@ function AdminDashboard() {
                   <p>
                     Role:{" "}
                     <span className="font-medium">
-                      {admin?.designation || "NA"}
+                      {admin?.designation || "Not added"}
                     </span>
                   </p>
 
@@ -10407,7 +10335,7 @@ function AdminDashboard() {
                   <p>
                     Access Level:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -10421,26 +10349,26 @@ function AdminDashboard() {
                   <p>
                     School Name:{" "}
                     <span className="font-medium">
-                      {admin?.school_name || "NA"}
+                      {admin?.school_name || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Code:{" "}
                     <span className="font-medium">
-                      {admin?.school_code || "NA"}
+                      {admin?.school_code || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Board:{" "}
-                    <span className="font-medium">{admin?.board || "NA"}</span>
+                    <span className="font-medium">{admin?.board || "Not added"}</span>
                   </p>
 
                   <p>
                     Established:{" "}
                     <span className="font-medium">
-                      {admin?.established_year || "NA"}
+                      {admin?.established_year || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -10454,14 +10382,14 @@ function AdminDashboard() {
                   <p>
                     Users Managed:{" "}
                     <span className="font-medium">
-                      {admin?.users_managed || "NA"}
+                      {admin?.users_managed || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Active Sessions:{" "}
                     <span className="font-medium">
-                      {admin?.active_sessions || "NA"}
+                      {admin?.active_sessions || "Not added"}
                     </span>
                   </p>
 
@@ -10479,21 +10407,21 @@ function AdminDashboard() {
                   <p>
                     Fee Access:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.fee_access || "NA"}
+                      {admin?.fee_access || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Discount Authority:{" "}
                     <span className="font-medium">
-                      {admin?.discount_authority || "NA"}
+                      {admin?.discount_authority || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Revenue View:{" "}
                     <span className="font-medium">
-                      {admin?.revenue_view || "NA"}
+                      {admin?.revenue_view || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -10514,14 +10442,14 @@ function AdminDashboard() {
                   <p>
                     2FA:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.two_factor_enabled || "NA"}
+                      {admin?.two_factor_enabled || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Login Alerts:{" "}
                     <span className="font-medium">
-                      {admin?.login_alerts || "NA"}
+                      {admin?.login_alerts || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -10535,21 +10463,21 @@ function AdminDashboard() {
                   <p>
                     Logins (30d):{" "}
                     <span className="font-medium">
-                      {admin?.logins_30d || "NA"}
+                      {admin?.logins_30d || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Actions:{" "}
                     <span className="font-medium">
-                      {admin?.actions_count || "NA"}
+                      {admin?.actions_count || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Last Action:{" "}
                     <span className="font-medium">
-                      {admin?.last_action || "NA"}
+                      {admin?.last_action || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -10675,7 +10603,7 @@ function AdminDashboard() {
                   <p>
                     Created On:{" "}
                     <span className="font-medium">
-                      {admin?.created_on || "NA"}
+                      {admin?.created_on || "Not added"}
                     </span>
                   </p>
                 </div>

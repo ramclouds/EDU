@@ -1,4 +1,5 @@
 import os
+import secrets
 import re
 from datetime import datetime
 
@@ -30,6 +31,8 @@ ALLOWED_EXTENSIONS = {"pdf", "doc", "docx"}
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 UPLOAD_BASE = os.path.abspath(os.path.join(BASE_DIR, "..", "Submitted_Assignments"))
+ASSIGNMENT_BASE = os.path.abspath(os.path.join(BASE_DIR, "..", "Assignment_Files"))
+MAX_ASSIGNMENT_BYTES = 10 * 1024 * 1024
 
 
 # MODELS
@@ -183,7 +186,8 @@ def get_student_class_info(student_id):
 def create_folder_structure(info):
 
     folder_name = f"{info['batch']}_{info['division']}_{info['section']}"
-    folder_path = os.path.join(UPLOAD_BASE, folder_name)
+    # Each school has its own folder, so one school never reads or overwrites another's files.
+    folder_path = os.path.join(UPLOAD_BASE, str(_current_school_id()), folder_name)
     os.makedirs(folder_path, exist_ok=True)
 
     return folder_path, folder_name
@@ -408,7 +412,8 @@ class GetStudentAssignmentsAPI(MethodView):
 
 
 # Get only Teacher Assigned Classes
-class TeacherAssignedClassesAPI(MethodView):
+class TeacherSubjectAssignmentsAPI(MethodView):
+    """Each class and subject this teacher is assigned to (used by the assignment form)."""
 
     @login_required
     def get(self, teacher_id):
@@ -498,24 +503,32 @@ class CreateAssignmentAPI(MethodView):
                 school_id=_current_school_id(),
             )
 
+            # Check the attachment before anything is saved.
+            file = request.files.get("file")
+            attachment = None
+            if file and file.filename:
+                if not allowed_file(file.filename):
+                    return jsonify({"error": "Only PDF, DOC or DOCX files can be attached"}), 400
+                data = file.read(MAX_ASSIGNMENT_BYTES + 1)
+                if len(data) > MAX_ASSIGNMENT_BYTES:
+                    return jsonify({"error": "The attached file is larger than 10 MB"}), 400
+                attachment = (data, secure_filename(file.filename) or "attachment", file.filename.rsplit(".", 1)[1].lower())
+
             db.session.add(assignment)
             db.session.flush()
 
-            file = request.files.get("file")
-
-            if file:
-
-                os.makedirs("Assignment_Files", exist_ok=True)
-
-                filename = secure_filename(file.filename)
-
-                file.save(os.path.join("Assignment_Files", filename))
-
+            if attachment:
+                data, display_name, ext = attachment
+                stored = f"{secrets.token_hex(16)}.{ext}"
+                folder = os.path.join(ASSIGNMENT_BASE, str(_current_school_id()))
+                os.makedirs(folder, exist_ok=True)
+                with open(os.path.join(folder, stored), "wb") as fh:
+                    fh.write(data)
                 db.session.add(
                     AssignmentFile(
                         assignment_id=assignment.id,
-                        file_name=filename,
-                        file_url=f"/Assignment_Files/{filename}",
+                        file_name=display_name,
+                        file_url=f"/Assignment_Files/{stored}",
                     )
                 )
 

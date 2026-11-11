@@ -5,7 +5,7 @@ import { BASE_URL } from "../config/appConfig";
 // Shared plumbing
 
 function authHeaders(json = false) {
-  const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+  const headers = { Authorization: `Bearer ${localStorage.getItem("signed_in")}` };
   if (json) headers["Content-Type"] = "application/json";
   return headers;
 }
@@ -828,8 +828,7 @@ export function SchoolOverviewSection() {
           <Row label="Teachers (active / total)" value={`${o.people.teachers_active} / ${o.people.teachers_total}`} />
           <Row label="Non-teaching staff (active)" value={o.people.staff_active} />
           <Row label="Admins (active)" value={o.people.admins_active} />
-          {s.max_students ? <Bar percent={(100 * o.people.students_active) / s.max_students} /> : null}
-          {s.max_students ? <p className="text-xs text-gray-400">{o.people.students_active} of {s.max_students} student places used</p> : null}
+          <p className="text-xs text-gray-400">{o.people.students_active} active students</p>
         </AreaCard>
 
         <AreaCard title="Attendance today" icon="bi-calendar-check">

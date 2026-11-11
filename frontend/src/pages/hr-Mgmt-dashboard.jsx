@@ -1,12 +1,14 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import UserAvatar from "../components/UserAvatar";
+import { useSectionInUrl } from "../controllers/useSectionInUrl";
+import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
+import DashboardSwitcher from "../components/DashboardSwitcher";
 import { useState, useEffect, useRef } from "react";
 import {
-  APP_NAME,
   APP_YEAR,
   BASE_URL,
   FILE_BASE_URL,
 } from "../config/appConfig";
-import "../css/dashboard.css";
 import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
@@ -24,6 +26,7 @@ function HRAdminDashboard() {
   const [activeSection, setActiveSection] = useState(
     location.state?.activeSection || "dashboard",
   );
+  useSectionInUrl(activeSection, setActiveSection);
   const [noticeTab, setNoticeTab] = useState("announcements");
   const [search, setSearch] = useState("");
 
@@ -110,14 +113,16 @@ function HRAdminDashboard() {
     dashboardType,
   } = useAdminProfile({ fetchWithAuth, showToast });
 
+  const dashAccess = useDashboardAccess();
   useEffect(() => {
     if (!admin?.id) return;
+    if (!dashAccess.loaded) return;
 
-    if (!isSuperAdmin && !isHRAdmin) {
-      showToast("You do not have access to the HR Dashboard", "error");
-      navigate("/super-admin-dashboard", { replace: true });
+    if (!isSuperAdmin && !isHRAdmin && !dashAccess.canView("hr-admin-dashboard")) {
+      showToast("You do not have access to this dashboard", "error");
+      navigate(dashAccess.homeRoute, { replace: true });
     }
-  }, [admin?.id, isSuperAdmin, isHRAdmin, navigate, showToast]);
+  }, [admin?.id, isSuperAdmin, isHRAdmin, navigate, showToast, dashAccess.loaded, dashAccess.canView, dashAccess.homeRoute]);
 
   useEffect(() => {
     if (window.innerWidth >= 768) {
@@ -172,7 +177,8 @@ function HRAdminDashboard() {
 
         {/* NAV */}
         {/* ========================= HR Mgmt SIDEBAR NAV ========================= */}
-        <nav className="h-full overflow-y-auto no-scrollbar scroll-smooth px-4 py-4 space-y-2 text-sm">
+        <nav className="h-full overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth px-4 py-4 space-y-2 text-sm">
+          <DashboardSwitcher expanded={sidebarExpanded} />
           {[
             {
               title: "MAIN",
@@ -323,7 +329,7 @@ function HRAdminDashboard() {
       <main
         className={`flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8
     ${sidebarOpen ? "md:ml-64" : "md:ml-20"}
-    maincolor transition-all duration-300
+    bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] transition-all duration-300
     dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
       >
         {/* CENTER WRAPPER */}
@@ -515,11 +521,7 @@ function HRAdminDashboard() {
               backdrop-blur-md transition-all duration-300 hover:scale-105
               dark:from-slate-700/70 dark:to-slate-700/60"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      alt="Admin profile"
-                      className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600"
-                    />
+                    <UserAvatar className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600" />
 
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 dark:text-gray-200 sm:inline">
                       {admin?.first_name || "Admin"}
@@ -633,16 +635,13 @@ function HRAdminDashboard() {
 
         {/* ===================== PROFILE SECTION START ========================*/}
         {activeSection === "profile" && (
-          <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* ================= PROFILE HEADER ================= */}
             <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-xl overflow-hidden">
               <div className="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
 
               <div className="relative flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src="https://i.pravatar.cc/120?img=12"
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg"
-                />
+                <UserAvatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
 
                 <div className="text-center sm:text-left flex-1">
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -653,21 +652,21 @@ function HRAdminDashboard() {
                           value={formData.first_name || ""}
                           onChange={handleChange}
                           placeholder="First Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="middle_name"
                           value={formData.middle_name || ""}
                           onChange={handleChange}
                           placeholder="Middle Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="last_name"
                           value={formData.last_name || ""}
                           onChange={handleChange}
                           placeholder="Last Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     ) : (
@@ -676,7 +675,7 @@ function HRAdminDashboard() {
                   </h2>
 
                   <p className="text-sm opacity-90 mt-1">
-                    {admin?.designation} • {admin?.specialization || "NA"}
+                    {admin?.designation} • {admin?.specialization || "Not added"}
                   </p>
 
                   <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
@@ -685,11 +684,11 @@ function HRAdminDashboard() {
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
-                      {admin?.status || "NA"}
+                      {admin?.status || "Not added"}
                     </span>
                   </div>
                 </div>
@@ -772,7 +771,7 @@ function HRAdminDashboard() {
                   <p>
                     Role:{" "}
                     <span className="font-medium">
-                      {admin?.designation || "NA"}
+                      {admin?.designation || "Not added"}
                     </span>
                   </p>
 
@@ -799,7 +798,7 @@ function HRAdminDashboard() {
                   <p>
                     Access Level:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -813,26 +812,26 @@ function HRAdminDashboard() {
                   <p>
                     School Name:{" "}
                     <span className="font-medium">
-                      {admin?.school_name || "NA"}
+                      {admin?.school_name || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Code:{" "}
                     <span className="font-medium">
-                      {admin?.school_code || "NA"}
+                      {admin?.school_code || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Board:{" "}
-                    <span className="font-medium">{admin?.board || "NA"}</span>
+                    <span className="font-medium">{admin?.board || "Not added"}</span>
                   </p>
 
                   <p>
                     Established:{" "}
                     <span className="font-medium">
-                      {admin?.established_year || "NA"}
+                      {admin?.established_year || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -846,14 +845,14 @@ function HRAdminDashboard() {
                   <p>
                     Users Managed:{" "}
                     <span className="font-medium">
-                      {admin?.users_managed || "NA"}
+                      {admin?.users_managed || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Active Sessions:{" "}
                     <span className="font-medium">
-                      {admin?.active_sessions || "NA"}
+                      {admin?.active_sessions || "Not added"}
                     </span>
                   </p>
 
@@ -871,21 +870,21 @@ function HRAdminDashboard() {
                   <p>
                     Fee Access:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.fee_access || "NA"}
+                      {admin?.fee_access || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Discount Authority:{" "}
                     <span className="font-medium">
-                      {admin?.discount_authority || "NA"}
+                      {admin?.discount_authority || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Revenue View:{" "}
                     <span className="font-medium">
-                      {admin?.revenue_view || "NA"}
+                      {admin?.revenue_view || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -906,14 +905,14 @@ function HRAdminDashboard() {
                   <p>
                     2FA:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.two_factor_enabled || "NA"}
+                      {admin?.two_factor_enabled || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Login Alerts:{" "}
                     <span className="font-medium">
-                      {admin?.login_alerts || "NA"}
+                      {admin?.login_alerts || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -927,21 +926,21 @@ function HRAdminDashboard() {
                   <p>
                     Logins (30d):{" "}
                     <span className="font-medium">
-                      {admin?.logins_30d || "NA"}
+                      {admin?.logins_30d || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Actions:{" "}
                     <span className="font-medium">
-                      {admin?.actions_count || "NA"}
+                      {admin?.actions_count || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Last Action:{" "}
                     <span className="font-medium">
-                      {admin?.last_action || "NA"}
+                      {admin?.last_action || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -1067,7 +1066,7 @@ function HRAdminDashboard() {
                   <p>
                     Created On:{" "}
                     <span className="font-medium">
-                      {admin?.created_on || "NA"}
+                      {admin?.created_on || "Not added"}
                     </span>
                   </p>
                 </div>

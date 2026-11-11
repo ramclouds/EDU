@@ -12,6 +12,25 @@ from sqlalchemy.exc import SQLAlchemyError
 from utils.auth import db
 from utils.auth_middleware import login_required
 from utils.platform import School, audit, developer_required
+from utils.tenant_routing import platform_school_snapshot, school_urls, tenant_scope
+
+
+def _sync_logo_to_school_db(school):
+    """The logo is stored on the platform row and on the school's own copy."""
+    database_name, school_pk, logo_url = school.database_name, school.id, school.logo_url
+    if not database_name:
+        return
+    try:
+        with tenant_scope(database_name):
+            copy = School.query.get(school_pk)
+            if copy is not None:
+                copy.logo_url = logo_url
+                db.session.commit()
+    except Exception:
+        # The platform record is the source of truth. A school database that has
+        # not been brought up to date yet must not make the upload fail.
+        db.session.rollback()
+        logger.warning("Could not copy the logo into %s; run scripts/update_school_databases.py", database_name)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +56,8 @@ def school_public(school):
         "id": school.id,
         "name": school.name,
         "school_code": school.school_code,
+        "tenant_id": school.tenant_id,
+        **school_urls(school.tenant_id),
         "plan": school.plan,
         "status": school.status,
         "logo_url": school.logo_url,
@@ -79,7 +100,9 @@ class SchoolLogoAPI(MethodView):
             logger.exception("Database error saving school logo")
             return jsonify({"error": "Internal server error"}), 500
         audit("school.logo_upload", school=school)
-        return jsonify({"message": "Logo saved", "school": school.to_dict()}), 200
+        payload = school.to_dict()
+        _sync_logo_to_school_db(school)
+        return jsonify({"message": "Logo saved", "school": payload}), 200
 
     def delete(self, school_id):
         school = School.query.get(school_id)
@@ -94,7 +117,9 @@ class SchoolLogoAPI(MethodView):
             logger.exception("Database error removing school logo")
             return jsonify({"error": "Internal server error"}), 500
         audit("school.logo_remove", school=school)
-        return jsonify({"message": "Logo removed", "school": school.to_dict()}), 200
+        payload = school.to_dict()
+        _sync_logo_to_school_db(school)
+        return jsonify({"message": "Logo removed", "school": payload}), 200
 
 
 class SchoolLogoServeAPI(MethodView):
@@ -114,5 +139,4 @@ class SchoolMeAPI(MethodView):
         school_id = getattr(request.user, "school_id", None)
         if not school_id:
             return jsonify({"school": None}), 200
-        school = School.query.get(school_id)
-        return jsonify({"school": school_public(school)}), 200
+        return jsonify({"school": school_public(platform_school_snapshot(school_id))}), 200

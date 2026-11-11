@@ -144,6 +144,7 @@ class StudentDetails(MethodView):
                 return jsonify({"error": "Student not found"}), 404
 
             response = {
+                "library_member": bool(student.library_member),
                 "id": student.id,
                 "student_id": student.student_id,
                 "first_name": student.first_name,

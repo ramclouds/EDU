@@ -2,7 +2,7 @@ import logging
 from flask import jsonify
 from flask.views import MethodView
 
-from utils.auth import db, Teacher, Student, Admin
+from utils.auth import Teacher, Student, Admin
 from utils.auth_middleware import login_required
 from utils.teacherDetails import TeacherClass
 from utils.studentDetails import (

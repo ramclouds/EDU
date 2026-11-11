@@ -41,7 +41,7 @@ export function useTeacherProfile({ fetchWithAuth }) {
         try {
             return {
                 user: JSON.parse(localStorage.getItem("user")),
-                token: localStorage.getItem("token"),
+                token: localStorage.getItem("signed_in"),
             };
         } catch {
             return { user: null, token: null };
@@ -50,7 +50,7 @@ export function useTeacherProfile({ fetchWithAuth }) {
 
     // ================= LOGOUT =================
     const logoutUser = () => {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("signed_in");
         if (token) {
             fetch(`${BASE_URL}/logout`, {
                 method: "POST",
@@ -183,6 +183,7 @@ export function useTeacherProfile({ fetchWithAuth }) {
         // profile
         teacher,
         formData,
+        setFormData,
         loading,
         editMode,
         setEditMode,

@@ -148,6 +148,31 @@ NOTICE_CATEGORIES = (
 NOTICE_PRIORITIES = ("High", "Medium", "Low")
 
 
+
+# The dashboards send "message" and "target_role"; the notice model uses "description" and "audience".
+_TARGET_TO_AUDIENCE = {
+    "all": "All",
+    "students": "Students",
+    "teachers": "Teachers",
+    "admins": "Admins",
+    "staff": "Staff",
+}
+
+
+def normalize_notice_payload(data):
+    data = dict(data or {})
+    if not data.get("description") and data.get("message"):
+        data["description"] = data["message"]
+    if not data.get("audience") and data.get("target_role"):
+        key = str(data["target_role"]).strip().lower()
+        data["audience"] = _TARGET_TO_AUDIENCE.get(key, data["target_role"])
+    if not data.get("notice_date"):
+        data["notice_date"] = datetime.utcnow().date().isoformat()
+    if not data.get("category"):
+        data["category"] = "General"
+    return data
+
+
 def validate_notice_data(data):
 
     required_fields = [
@@ -182,6 +207,7 @@ class CreateNoticeAPI(MethodView):
 
             data = request.get_json()
 
+            data = normalize_notice_payload(data)
             error = validate_notice_data(data)
 
             if error:
@@ -553,106 +579,6 @@ class MarkNoticeReadAPI(MethodView):
 
 
 # ================= UPDATE NOTICE =================
-class UpdateNoticeAPI(MethodView):
-
-    @login_required
-    def put(self, notice_id):
-
-        try:
-            user = request.user
-
-            if user.__class__.__name__ not in ("Admin", "Teacher"):
-                return (
-                    jsonify(
-                        {"error": "Only admins or teachers can edit announcements"}
-                    ),
-                    403,
-                )
-
-            notice = Notice.query.filter_by(
-                id=notice_id,
-                school_id=current_school_id(),
-            ).first()
-
-            if not notice:
-                return jsonify({"error": "Notice not found"}), 404
-
-            # Teachers may only edit notices they created themselves.
-            if user.__class__.__name__ == "Teacher" and notice.created_by != user.id:
-                return (
-                    jsonify({"error": "You can only edit your own announcements"}),
-                    403,
-                )
-
-            data = request.get_json() or {}
-
-            error = validate_notice_data(
-                {**serialize_notice(notice), **data}
-            )
-
-            if error:
-                return jsonify({"error": error}), 400
-
-            if "title" in data:
-                notice.title = data["title"].strip()
-
-            if "description" in data:
-                notice.description = data["description"].strip()
-
-            if "category" in data:
-                notice.category = data["category"]
-
-            if "priority" in data:
-                notice.priority = data["priority"]
-
-            if "audience" in data:
-                notice.audience = data["audience"]
-
-            if "academic_class_id" in data:
-                notice.academic_class_id = data["academic_class_id"]
-
-            if data.get("notice_date"):
-                notice.notice_date = datetime.strptime(
-                    data["notice_date"], "%Y-%m-%d"
-                ).date()
-
-            if "expiry_date" in data:
-                notice.expiry_date = (
-                    datetime.strptime(data["expiry_date"], "%Y-%m-%d").date()
-                    if data.get("expiry_date")
-                    else None
-                )
-
-            if "is_active" in data:
-                notice.is_active = bool(data["is_active"])
-
-            db.session.commit()
-
-            return (
-                jsonify(
-                    {
-                        "message": "Notice updated successfully",
-                        "notice": serialize_notice(notice),
-                    }
-                ),
-                200,
-            )
-
-        except ValueError:
-            return (
-                jsonify({"error": "Invalid date format (YYYY-MM-DD required)"}),
-                400,
-            )
-
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            logger.exception(e)
-            return jsonify({"error": "Database error"}), 500
-
-        except Exception as e:
-            db.session.rollback()
-            logger.exception(e)
-            return jsonify({"error": "Failed to update notice"}), 500
 
 
 # ================= DELETE / DEACTIVATE NOTICE =================

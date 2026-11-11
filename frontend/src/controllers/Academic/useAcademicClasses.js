@@ -21,7 +21,7 @@ export function useAcademicClasses() {
   const navigate = useNavigate();
 
   const authHeaders = useCallback(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("signed_in");
     return {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,

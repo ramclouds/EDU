@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../config/appConfig";
@@ -69,7 +69,7 @@ export function useTeacherDashboard(activeSection, setActiveSection) {
     try {
       return {
         user: JSON.parse(localStorage.getItem("user")),
-        token: localStorage.getItem("token"),
+        token: localStorage.getItem("signed_in"),
       };
     } catch {
       return { user: null, token: null };
@@ -77,7 +77,7 @@ export function useTeacherDashboard(activeSection, setActiveSection) {
   };
 
   const logoutUser = () => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("signed_in");
     if (token) {
       fetch(`${BASE_URL}/logout`, {
         method: "POST",
@@ -90,22 +90,21 @@ export function useTeacherDashboard(activeSection, setActiveSection) {
   };
 
   // 🍞  UI HELPERS
-  const showToast = (message, type = "success") => {
+  // Stable identities (useCallback): effects that depend on these run once per real change,
+  // not on every render of the page.
+  const showToast = useCallback((message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => {
       setToast({ show: false, message: "", type });
     }, 3000);
-  };
+  }, []);
 
   // 🌐  API HELPER (COMMON FETCH)
-  const fetchWithAuth = async (url, options = {}) => {
-    const { token } = getAuth();
-
+  const fetchWithAuth = useCallback(async (url, options = {}) => {
     const res = await fetch(url, {
       ...options,
       headers: {
         ...(options.headers || {}),
-        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -115,7 +114,7 @@ export function useTeacherDashboard(activeSection, setActiveSection) {
     }
 
     return res;
-  };
+  }, []);
 
   // ===================== Notifications  ===================
   const fetchNotifications = async () => {
@@ -146,8 +145,16 @@ export function useTeacherDashboard(activeSection, setActiveSection) {
   useEffect(() => {
     fetchNotifications();
 
-    const interval = setInterval(fetchNotifications, 15000); // refresh every 15 sec
-    return () => clearInterval(interval);
+    // refresh every 30 sec, and only while the tab is visible
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    };
+    const interval = setInterval(refreshIfVisible, 30000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
   }, []);
 
   // MARK AS READ FUNCTION

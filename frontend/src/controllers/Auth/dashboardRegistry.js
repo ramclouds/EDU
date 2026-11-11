@@ -1,5 +1,5 @@
 
-export const DASHBOARD_REGISTRY = [
+const DASHBOARD_REGISTRY = [
   {
     key: "super-admin-dashboard",
     label: "Super Admin Dashboard",
@@ -61,6 +61,3 @@ export const DASHBOARD_BY_KEY = DASHBOARD_REGISTRY.reduce((map, entry) => {
 }, {});
 
 /** Dashboards a Super Admin is allowed to jump to from their own sidebar. */
-export const SUPER_ADMIN_LINKABLE_DASHBOARDS = DASHBOARD_REGISTRY.filter(
-  (entry) => entry.key !== "teacher-dashboard" && entry.key !== "student-dashboard",
-);

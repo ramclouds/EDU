@@ -36,7 +36,7 @@ export function useTeacherTimetable({
                 user: JSON.parse(
                     localStorage.getItem("user")
                 ),
-                token: localStorage.getItem("token"),
+                token: localStorage.getItem("signed_in"),
             };
         } catch {
             return {

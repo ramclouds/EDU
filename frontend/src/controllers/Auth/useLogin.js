@@ -58,6 +58,15 @@ export function useLogin() {
               data.error ||
               "Your account does not have access to any dashboard yet. Please contact a Super Administrator.",
           });
+        } else if (data.error_code === "MULTIPLE_SCHOOLS") {
+          // The same email/username and password exist in more than one school.
+          const list = (data.schools || [])
+            .map((s) => `${s.name} (${s.school_code})`)
+            .join(", ");
+          setLoginNotice({
+            type: "error",
+            message: `${data.error}${list ? ` Your schools: ${list}.` : ""}`,
+          });
         } else if (data.error_code === "SCHOOL_ACCESS_DENIED") {
           // The school itself is suspended or its trial/subscription
           setLoginNotice({
@@ -73,7 +82,7 @@ export function useLogin() {
 
       // ================= STORE AUTH =================
 
-      localStorage.setItem("token", data.token);
+      localStorage.setItem("signed_in", "1");
       setSchoolProfile(data.school ?? null);
       localStorage.setItem("role", data.role);
       localStorage.setItem(
@@ -101,15 +110,11 @@ export function useLogin() {
       try {
         let rbacAccess = data.rbac || null;
 
-        if (!rbacAccess && data.token) {
+        if (!rbacAccess) {
+          // the session cookie is sent automatically (see controllers/apiSession.js)
           const rbacResponse = await fetch(
             `${BASE_URL}/rbac/my-access`,
-            {
-              method: "GET",
-              headers: {
-                Authorization: `Bearer ${data.token}`,
-              },
-            }
+            { method: "GET" }
           );
 
           if (rbacResponse.ok) {
@@ -208,7 +213,7 @@ export function useLogin() {
     try {
 
       const response = await fetch(
-        `${BASE_URL}/forgot-password`,
+        `${BASE_URL}/password/forgot`,
         {
           method: "POST",
           headers: {
@@ -220,18 +225,15 @@ export function useLogin() {
         }
       );
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (response.ok) {
-
-        toast.success("Password reset link sent");
+        // The same message whether or not an account matches, so this reveals nothing.
+        toast.success(data.message || "If an account matches that email, a reset link has been sent.");
         setShowForgotModal(false);
         setResetEmail("");
-
       } else {
-
         toast.error(data.error || "Something went wrong");
-
       }
 
     } catch (error) {

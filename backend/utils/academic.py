@@ -2317,6 +2317,51 @@ class AdminExamOptionsAPI(MethodView):
             return jsonify({"error": "Failed to load exam options"}), 500
 
 
+def _announce_exam(school_id, class_id, exam_name, exam_type, start_date, end_date):
+    """Put an exam on the class's announcements and notify each student of the class."""
+    from utils.announcement import Notice
+    from utils.Notifications import create_notification
+    from utils.studentDetails import AcademicClass, Division, Section, StudentAcademicRecord
+
+    try:
+        academic_class = AcademicClass.query.get(class_id)
+        division = Division.query.get(academic_class.division_id) if academic_class else None
+        section = Section.query.get(academic_class.section_id) if academic_class else None
+        label = f"{division.division_name} {section.section_name}" if division and section else f"Class {class_id}"
+        when = f"{start_date} to {end_date}" if start_date and end_date else "dates to be announced"
+        kind = exam_type or "examination"
+
+        db.session.add(
+            Notice(
+                school_id=school_id,
+                title=f"Examination: {exam_name}",
+                description=f"{exam_name} ({kind}) for {label}, {when}. Check your timetable.",
+                category="Examination",
+                priority="High",
+                notice_date=start_date or datetime.utcnow().date(),
+                expiry_date=end_date,
+                audience="Students",
+                academic_class_id=class_id,
+                is_active=True,
+            )
+        )
+        db.session.commit()
+
+        records = StudentAcademicRecord.query.filter_by(academic_class_id=class_id, is_current=True).all()
+        for record in records:
+            create_notification(
+                user_id=record.student_id,
+                role="student",
+                title=f"Examination: {exam_name}",
+                message=f"{exam_name} for {label}, {when}.",
+                type="exam",
+                student_id=record.student_id,
+            )
+    except Exception:
+        db.session.rollback()
+        logger.exception("Could not announce exam %s", exam_name)
+
+
 class AdminExamTermAPI(MethodView):
     @permission_required("academic", "view")
     def get(self):
@@ -2412,6 +2457,7 @@ class AdminExamTermAPI(MethodView):
                 return jsonify({"error": "start_date cannot be after end_date"}), 400
 
             created_or_updated = []
+            announce_targets = []
             school_id = _current_school_id()
 
             for class_id in class_ids:
@@ -2425,6 +2471,7 @@ class AdminExamTermAPI(MethodView):
                     exam_name=exam_name,
                     school_id=school_id,
                 ).first()
+                is_new_exam = not exam
                 if not exam:
                     exam = Exam(
                         academic_class_id=class_id,
@@ -2451,8 +2498,15 @@ class AdminExamTermAPI(MethodView):
                             ExamSubject(exam_id=exam.id, subject_id=subject_id)
                         )
                 created_or_updated.append(exam.id)
+                if is_new_exam:
+                    # Only a newly created exam is announced. Re-saving an exam does not repeat it.
+                    announce_targets.append((class_id, exam_name, exam_type, start_date, end_date))
 
             db.session.commit()
+            # Students of each class see the exam on their announcements and get a notification.
+            # One announcement and one notification per class and exam, not per subject.
+            for target in dict.fromkeys(announce_targets):
+                _announce_exam(school_id, *target)
             return (
                 jsonify(
                     {

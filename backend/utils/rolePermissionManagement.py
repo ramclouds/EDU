@@ -404,7 +404,13 @@ def get_user_dashboard_access(user, dashboard_entry):
 
 
 def list_dashboard_access_for_user(user):
-    # Return every dashboard the user may see, each with can_view
+    # Every dashboard the user is granted, and whether the school's plan includes it.
+    # A dashboard outside the plan is listed with plan_locked = true and can_view = false.
+    from utils.plans import allowed_dashboards, upgrade_message
+    from utils.tenant_routing import current_tenant_plan
+
+    plan, custom = current_tenant_plan()
+    included = allowed_dashboards(plan, custom)
 
     results = []
 
@@ -414,13 +420,18 @@ def list_dashboard_access_for_user(user):
         if not rights["can_view"]:
             continue
 
+        plan_ok = entry["key"] in included
         results.append(
             {
                 "key": entry["key"],
                 "label": entry["label"],
                 "route": entry["route"],
-                "can_view": rights["can_view"],
-                "can_write": rights["can_write"],
+                "can_view": bool(rights["can_view"] and plan_ok),
+                "can_write": bool(rights["can_write"] and plan_ok),
+                "plan_allowed": plan_ok,
+                "plan_locked": not plan_ok,
+                "plan_message": None if plan_ok else upgrade_message(entry["key"], plan),
+                "plan": plan,
             }
         )
 

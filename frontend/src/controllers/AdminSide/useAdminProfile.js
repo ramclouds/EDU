@@ -463,7 +463,7 @@ export function useAdminProfile({
                 localStorage.getItem("user"),
                 null,
             ),
-            token: localStorage.getItem("token"),
+            token: localStorage.getItem("signed_in"),
         };
     }, []);
 
@@ -562,7 +562,7 @@ export function useAdminProfile({
 
     const handleLogout = useCallback(() => {
         // Best-effort server-side revocation: the backend now issues a
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("signed_in");
         if (token) {
             fetch(`${BASE_URL}/logout`, {
                 method: "POST",
@@ -572,7 +572,7 @@ export function useAdminProfile({
             });
         }
 
-        localStorage.removeItem("token");
+        localStorage.removeItem("signed_in");
         localStorage.removeItem("user");
 
         window.location.href = "/";

@@ -12,6 +12,20 @@
   --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.05);
   --shadow-lg: 0 12px 28px -6px rgb(15 23 42 / 0.12), 0 4px 10px -4px rgb(15 23 42 / 0.08);
   --shadow-xl: 0 24px 48px -12px rgb(15 23 42 / 0.18), 0 8px 16px -8px rgb(15 23 42 / 0.1);
+
+  /* Replaces the old custom dashboard.css animation */
+  --animate-fade-in: fade-in 0.4s ease-in;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @layer base {
@@ -75,4 +89,40 @@
     -webkit-backdrop-filter: saturate(180%) blur(12px);
     backdrop-filter: saturate(180%) blur(12px);
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Dark mode safety net.
+   Light colours that a page still uses on a dark page are switched to their dark
+   partner. An element that already has its own dark: class is left alone.
+   --------------------------------------------------------------------------- */
+.dark .bg-white:not([class*="dark:bg-"]),
+.dark .bg-gray-50:not([class*="dark:bg-"]),
+.dark .bg-slate-50:not([class*="dark:bg-"]) {
+  background-color: #1e293b;
+}
+.dark .bg-gray-100:not([class*="dark:bg-"]),
+.dark .bg-slate-100:not([class*="dark:bg-"]),
+.dark .bg-gray-200:not([class*="dark:bg-"]),
+.dark .bg-slate-200:not([class*="dark:bg-"]) {
+  background-color: #334155;
+}
+.dark .text-gray-900:not([class*="dark:text-"]),
+.dark .text-gray-800:not([class*="dark:text-"]),
+.dark .text-slate-900:not([class*="dark:text-"]),
+.dark .text-slate-800:not([class*="dark:text-"]) {
+  color: #f1f5f9;
+}
+.dark .text-gray-700:not([class*="dark:text-"]),
+.dark .text-slate-700:not([class*="dark:text-"]) {
+  color: #e2e8f0;
+}
+.dark .border-gray-100:not([class*="dark:border-"]),
+.dark .border-gray-200:not([class*="dark:border-"]),
+.dark .border-slate-200:not([class*="dark:border-"]) {
+  border-color: #334155;
+}
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]):not([class*="dark:border-"]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]):not([class*="dark:border-"]) {
+  border-color: #334155;
 }

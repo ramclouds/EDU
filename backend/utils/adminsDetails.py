@@ -161,14 +161,6 @@ def get_admin_config(admin_type):
     return ADMIN_TYPE_CONFIG.get(str(admin_type or "").strip())
 
 
-def get_expected_dashboard_permission(admin_type):
-    config = get_admin_config(admin_type)
-
-    if not config:
-        return None
-
-    return config["permission"]
-
 
 # ACCESS RESOLVER
 def _rbac_dashboard_rights(admin, config):
@@ -346,36 +338,40 @@ def resolve_admin_access(admin):
 
 
 # PERMISSION CHECK HELPERS
-def admin_has_right(admin, right):
-    # Check whether an admin has a given CRUD right
 
-    if is_super_admin(admin):
-        return True
-
-    normalized_right = str(right or "").strip().lower()
-
-    if normalized_right not in AVAILABLE_RIGHTS:
-        return False
-
-    return normalized_right in normalize_rights(admin.access_level)
-
-
-def admin_has_dashboard_permission(admin, permission):
-    # Check whether an admin can access a dashboard
-
-    if is_super_admin(admin):
-        return True
-
-    normalized_permission = str(permission or "").strip().lower()
-
-    access = resolve_admin_access(admin)
-
-    return normalized_permission in access["dashboard_permissions"]
 
 
 # PROFILE SERIALIZER
+def _admin_role_name(admin):
+    """The RBAC role assigned to this admin (e.g. "Academic Admin"), if any."""
+    try:
+        from utils.rolePermissionManagement import RBACUserRole
+
+        assignment = RBACUserRole.query.filter_by(user_type="admin", user_id=admin.id).first()
+        return assignment.role.name if assignment and assignment.role else None
+    except Exception:
+        logger.exception("Could not read the admin's role")
+        return None
+
+
+def _access_level_label(access):
+    rights = access.get("rights") or {}
+    if access.get("is_super_admin") or (rights.get("delete") and rights.get("edit")):
+        return "Full Control"
+    if access.get("can_write"):
+        return "Can edit"
+    if access.get("can_read"):
+        return "View only"
+    return "No access"
+
+
 def admin_to_dict(admin):
     access = resolve_admin_access(admin)
+
+    from utils.platform import School  # the school's own copy inside its database
+    school = School.query.get(admin.school_id) if admin.school_id else None
+    role_name = _admin_role_name(admin)
+    designation = admin.designation or role_name or (admin.admin_type or None)
 
     return {
         # Primary
@@ -406,10 +402,13 @@ def admin_to_dict(admin):
         # Role and access
         "role": admin.role,
         "admin_type": admin.admin_type,
-        "designation": admin.designation,
+        "designation": designation,
+        "role_name": role_name,
+        "school_name": school.name if school else None,
+        "school_code": school.school_code if school else None,
         "department": admin.department,
         "permissions": admin.permissions,
-        "access_level": admin.access_level,
+        "access_level": admin.access_level or _access_level_label(access),
         "modules_enabled": admin.modules_enabled,
         # Resolved dashboard access
         "dashboard_type": access["dashboard_type"],
@@ -442,9 +441,7 @@ def admin_to_dict(admin):
         "employment_type": admin.employment_type,
         "shift": admin.shift,
         "salary": admin.salary,
-        # School information
-        "school_name": admin.school_name,
-        "school_code": admin.school_code,
+        # School information (school_name and school_code are set above, from the school record)
         "board": admin.board,
         "established_year": admin.established_year,
         # System control

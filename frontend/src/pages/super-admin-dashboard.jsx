@@ -1,13 +1,12 @@
 import { useNavigate } from "react-router-dom";
+import UserAvatar from "../components/UserAvatar";
 import { useState, useEffect, useRef } from "react";
 import { useDashboardAccess } from "../controllers/Auth/useDashboardAccess";
 import {
-  APP_NAME,
   APP_YEAR,
   BASE_URL,
   FILE_BASE_URL,
 } from "../config/appConfig";
-import "../css/dashboard.css";
 import SettingsPanel from "../components/SettingsPanel";
 import { useDashboardUI } from "../controllers/useDashboardUI";
 import { useAdminDashboard } from "../controllers/AdminSide/adminDashboard";
@@ -26,7 +25,7 @@ import {
   EventsSection,
 } from "../components/SuperAdminSections";
 import { useAssets } from "../controllers/Assets/useAssets";
-import { useLeaveManagement } from "../controllers/academic/useLeaveManagement";
+import { useLeaveManagement } from "../controllers/Academic/useLeaveManagement";
 import { useStudentEnrollment } from "../controllers/Academic/useStudentEnrollment";
 import { useRolePermissionManagement } from "../controllers/Auth/useRolePermissionManagement";
 import GlobalSearch from "../components/GlobalSearch";
@@ -118,7 +117,7 @@ function AdminDashboard() {
     setActivityLogsError(null);
 
     fetch(`${BASE_URL}/admin/activity-logs`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem("signed_in")}` },
     })
       .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
@@ -430,7 +429,7 @@ function AdminDashboard() {
         </div>
 
         {/* NAV */}
-        <nav className="flex-1 overflow-y-auto no-scrollbar scroll-smooth px-2 py-4 space-y-2 text-sm">
+        <nav className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth px-2 py-4 space-y-2 text-sm">
           {[
             {
               title: "MAIN",
@@ -673,7 +672,7 @@ function AdminDashboard() {
       <main
         className={`flex-1 w-full min-h-screen p-4 sm:p-6 md:p-8
     ${sidebarOpen ? "md:ml-64" : "md:ml-20"}
-    maincolor transition-all duration-300
+    bg-[#e5e7ec] dark:bg-slate-900 font-[Inter,system-ui,sans-serif] transition-all duration-300
     dark:bg-slate-900 text-gray-800 dark:text-gray-100`}
       >
         {/* CENTER WRAPPER */}
@@ -865,11 +864,7 @@ function AdminDashboard() {
               backdrop-blur-md transition-all duration-300 hover:scale-105
               dark:from-slate-700/70 dark:to-slate-700/60"
                   >
-                    <img
-                      src="https://i.pravatar.cc/100"
-                      alt="Admin profile"
-                      className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600"
-                    />
+                    <UserAvatar className="h-9 w-9 rounded-full border-2 border-white shadow dark:border-slate-600" />
 
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 dark:text-gray-200 sm:inline">
                       {admin?.first_name || "Admin"}
@@ -1057,7 +1052,7 @@ function AdminDashboard() {
         {activeSection === "roles" && (
           <section className="space-y-6">
             {/* SECTION HEADER */}
-            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
                   <i className="fas fa-user-shield text-xl" />
@@ -1079,7 +1074,7 @@ function AdminDashboard() {
                   type="button"
                   onClick={refreshRbacRolePermissionManagement}
                   disabled={rbacLoading}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <i
                     className={`fas fa-sync-alt ${
@@ -1102,7 +1097,7 @@ function AdminDashboard() {
 
             {/* LOADING */}
             {rbacLoading ? (
-              <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 shadow-sm">
                 <div className="text-center">
                   <i className="fas fa-spinner animate-spin text-4xl text-indigo-600" />
 
@@ -1114,7 +1109,7 @@ function AdminDashboard() {
             ) : (
               <>
                 {/* CARD 1: ROLES AND PERMISSIONS */}
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 shadow-sm">
                   <div className="border-b border-slate-200 p-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -1304,7 +1299,7 @@ function AdminDashboard() {
                                 )
                               }
                               disabled={rbacSelectedRole.code === "super-admin"}
-                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <i className="fas fa-times mr-1.5" />
                               Revoke All
@@ -1348,7 +1343,7 @@ function AdminDashboard() {
                         ) : (
                           <div className="overflow-x-auto">
                             <table className="w-full min-w-[640px]">
-                              <thead className="bg-white">
+                              <thead className="bg-white dark:bg-slate-800">
                                 <tr className="border-b border-slate-200">
                                   <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                                     Dashboard Page
@@ -1479,7 +1474,7 @@ function AdminDashboard() {
                       </div>
                     ) : (
                       <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center">
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white dark:bg-slate-800 text-slate-400 shadow-sm">
                           <i className="fas fa-user-tag text-xl" />
                         </div>
 
@@ -1496,7 +1491,7 @@ function AdminDashboard() {
                 </div>
 
                 {/* CARD 2: USER ROLE ASSIGNMENT */}
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:bg-slate-800 shadow-sm">
                   <div className="border-b border-slate-200 p-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                       <div>
@@ -1536,7 +1531,7 @@ function AdminDashboard() {
                           name="user_type"
                           value={rbacUserFilters.user_type}
                           onChange={updateRbacUserFilter}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                         >
                           {rbacUserTypes.map((type) => (
                             <option key={type.value} value={type.value}>
@@ -1579,7 +1574,7 @@ function AdminDashboard() {
                           name="role_id"
                           value={rbacUserFilters.role_id}
                           onChange={updateRbacUserFilter}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                         >
                           <option value="">All Roles</option>
 
@@ -1600,7 +1595,7 @@ function AdminDashboard() {
                           name="status"
                           value={rbacUserFilters.status}
                           onChange={updateRbacUserFilter}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                          className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                         >
                           <option value="">All Status</option>
                           <option value="active">Active</option>
@@ -1632,7 +1627,7 @@ function AdminDashboard() {
                             clearSelectedUser: true,
                           });
                         }}
-                        className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="mt-auto inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
                         <i className="fas fa-undo" />
                         Reset
@@ -1785,7 +1780,7 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   {/* POPUP HEADER */}
                   <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-6 sm:py-5">
                     <div className="flex min-w-0 items-center gap-4">
@@ -1886,7 +1881,7 @@ function AdminDashboard() {
                               assignRbacRoleToUser(event.target.value)
                             }
                             disabled={rbacSavingUserAccess}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <option value="">No Role Assigned</option>
 
@@ -1960,7 +1955,7 @@ function AdminDashboard() {
 
                               <div className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-amber-600" />
 
-                              <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+                              <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white dark:bg-slate-800 shadow transition peer-checked:translate-x-5" />
                             </div>
                           </label>
 
@@ -1977,7 +1972,7 @@ function AdminDashboard() {
                                   name="expires_at"
                                   value={rbacTemporaryAccessForm.expires_at}
                                   onChange={updateRbacTemporaryAccessForm}
-                                  className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                                  className="w-full rounded-lg border border-amber-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                                 />
                               </div>
 
@@ -1992,7 +1987,7 @@ function AdminDashboard() {
                                   value={rbacTemporaryAccessForm.reason}
                                   onChange={updateRbacTemporaryAccessForm}
                                   placeholder="Example: Temporary exam result verification access"
-                                  className="w-full resize-none rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                                  className="w-full resize-none rounded-lg border border-amber-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
                                 />
                               </div>
 
@@ -2041,7 +2036,7 @@ function AdminDashboard() {
 
                         <div className="overflow-x-auto">
                           <table className="w-full min-w-[640px]">
-                            <thead className="bg-white">
+                            <thead className="bg-white dark:bg-slate-800">
                               <tr className="border-b border-slate-200">
                                 <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                                   Dashboard Page
@@ -2180,7 +2175,7 @@ function AdminDashboard() {
                       type="button"
                       onClick={resetRbacUserOverrides}
                       disabled={rbacSavingUserAccess || rbacUserAccessLoading}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <i className="fas fa-undo" />
                       Reset to Role Permissions
@@ -2191,7 +2186,7 @@ function AdminDashboard() {
                         type="button"
                         onClick={closeRbacUserAccessModal}
                         disabled={rbacSavingUserAccess}
-                        className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                        className="rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                       >
                         Cancel
                       </button>
@@ -2235,7 +2230,7 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
                     <div>
                       <h3 className="text-lg font-bold text-slate-900">
@@ -2307,7 +2302,7 @@ function AdminDashboard() {
                         name="user_type"
                         value={rbacRoleForm.user_type}
                         onChange={updateRbacRoleForm}
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        className="w-full rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                       >
                         {rbacUserTypes.map((type) => (
                           <option key={type.value} value={type.value}>
@@ -2356,7 +2351,7 @@ function AdminDashboard() {
 
                         <div className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-indigo-600" />
 
-                        <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+                        <div className="absolute left-1 top-1 h-4 w-4 rounded-full bg-white dark:bg-slate-800 shadow transition peer-checked:translate-x-5" />
                       </div>
                     </label>
                   </div>
@@ -2366,7 +2361,7 @@ function AdminDashboard() {
                       type="button"
                       onClick={closeRbacRoleModal}
                       disabled={rbacSavingRole}
-                      className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                      className="rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -2408,7 +2403,7 @@ function AdminDashboard() {
                   }
                 }}
               >
-                <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white dark:bg-slate-800 shadow-2xl">
                   <div className="p-6 text-center">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600">
                       <i className="fas fa-trash-alt text-2xl" />
@@ -2432,7 +2427,7 @@ function AdminDashboard() {
                       type="button"
                       onClick={closeRbacDeleteRoleModal}
                       disabled={rbacDeletingRole}
-                      className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                      className="flex-1 rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -2479,7 +2474,7 @@ function AdminDashboard() {
             </div>
 
             {/* TABS */}
-            <div className="flex flex-wrap gap-2 bg-white p-2 rounded-xl shadow text-sm">
+            <div className="flex flex-wrap gap-2 bg-white dark:bg-slate-800 p-2 rounded-xl shadow text-sm">
               {["promote", "report"].map((tab) => (
                 <button
                   key={tab}
@@ -2499,7 +2494,7 @@ function AdminDashboard() {
 
             {/* PROMOTE TAB */}
             {enrollmentActiveTab === "promote" && (
-              <div className="bg-white p-6 rounded-xl shadow animate-in fade-in duration-300">
+              <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow animate-in animate-fade-in duration-300">
                 <h3 className="font-bold text-lg mb-4 text-orange-600">
                   Mass Promotion Module
                 </h3>
@@ -2576,7 +2571,7 @@ function AdminDashboard() {
 
             {/* REPORT TAB */}
             {enrollmentActiveTab === "report" && (
-              <div className="bg-white p-5 rounded-xl shadow animate-in fade-in duration-300">
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow animate-in animate-fade-in duration-300">
                 <h3 className="font-bold mb-4">Export Student Data</h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-6">
@@ -2655,9 +2650,9 @@ function AdminDashboard() {
                   </button>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-slate-700">
                   <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-600">
+                    <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600">
                       <tr>
                         <th className="p-4">ID</th>
                         <th className="p-4">Student Name</th>
@@ -2721,7 +2716,7 @@ function AdminDashboard() {
         {/* =========================== ATTENDANCE SECTION END ============================ */}
         {/* ============================= LEAVE MANAGEMENT SECTION START ============================= */}
         {activeSection === "leave" && (
-          <section className="section active p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* HEADER */}
             <div
               className="bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600
@@ -2978,7 +2973,7 @@ function AdminDashboard() {
 
         {/* ============================= Asset Inventory START ============================= */}
         {activeSection === "assets" && (
-          <section className="section active p-4 sm:p-6 space-y-6">
+          <section className="p-4 sm:p-6 space-y-6">
             {/* TOP SECTION */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* MAIN CARD */}
@@ -3020,7 +3015,7 @@ function AdminDashboard() {
                       resetAssetForm();
                       openAddAssetModal();
                     }}
-                    className="bg-white text-indigo-700 hover:bg-indigo-50 px-5 py-3 rounded-2xl text-sm font-bold shadow-lg transition"
+                    className="bg-white dark:bg-slate-800 text-indigo-700 hover:bg-indigo-50 px-5 py-3 rounded-2xl text-sm font-bold shadow-lg transition"
                   >
                     + Register Asset
                   </button>
@@ -3030,7 +3025,7 @@ function AdminDashboard() {
               </div>
 
               {/* OPERATIONAL */}
-              <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] uppercase font-black text-slate-400">
@@ -3053,7 +3048,7 @@ function AdminDashboard() {
               </div>
 
               {/* REPAIR */}
-              <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[10px] uppercase font-black text-slate-400">
@@ -3077,7 +3072,7 @@ function AdminDashboard() {
             </div>
 
             {/* SEARCH + FILTERS */}
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-5">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 shadow-sm p-5 space-y-5">
               {/* SEARCH */}
               <div className="relative">
                 <input
@@ -3118,7 +3113,7 @@ function AdminDashboard() {
             </div>
 
             {/* ASSET TABLE */}
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1200px] text-sm">
                   <thead className="bg-slate-50 border-b border-slate-100">
@@ -3341,7 +3336,7 @@ function AdminDashboard() {
 
             {/* DELETED ASSET HISTORY */}
             {deletedAssets?.length > 0 && (
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-black text-slate-800">
@@ -3416,7 +3411,7 @@ function AdminDashboard() {
         {/*  Add Asset Modal START  */}
         {isAddAssetModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 overflow-y-auto py-10">
-            <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden animate-[fadeIn_.3s_ease]">
+            <div className="bg-white dark:bg-slate-800 w-full max-w-6xl rounded-3xl shadow-2xl overflow-hidden animate-[fadeIn_.3s_ease]">
               {/* HEADER */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-indigo-600 to-blue-500 text-white">
                 <div>
@@ -3839,7 +3834,7 @@ function AdminDashboard() {
                 </div>
               ) : (
                 <div className="max-h-[70vh] overflow-y-auto">
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto"><table className="w-full text-sm">
                     <thead className="sticky top-0 bg-white dark:bg-slate-800">
                       <tr className="border-b border-gray-100 text-left text-xs uppercase tracking-wide text-gray-400 dark:border-slate-700">
                         <th className="px-5 py-3">Time</th>
@@ -3869,7 +3864,7 @@ function AdminDashboard() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
               )}
             </div>
@@ -3896,16 +3891,13 @@ function AdminDashboard() {
         )}
 
         {activeSection === "profile" && (
-          <section className="section hidden p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100 active">
+          <section className="p-4 sm:p-6 space-y-6 dark:bg-slate-900 dark:text-gray-100">
             {/* ================= PROFILE HEADER ================= */}
             <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-xl overflow-hidden">
               <div className="absolute inset-0 bg-white/10 backdrop-blur-xl"></div>
 
               <div className="relative flex flex-col sm:flex-row items-center gap-6">
-                <img
-                  src="https://i.pravatar.cc/120?img=12"
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg"
-                />
+                <UserAvatar className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white shadow-lg" />
 
                 <div className="text-center sm:text-left flex-1">
                   <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -3916,21 +3908,21 @@ function AdminDashboard() {
                           value={formData.first_name || ""}
                           onChange={handleChange}
                           placeholder="First Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="middle_name"
                           value={formData.middle_name || ""}
                           onChange={handleChange}
                           placeholder="Middle Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                         <input
                           name="last_name"
                           value={formData.last_name || ""}
                           onChange={handleChange}
                           placeholder="Last Name"
-                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900"
+                          className="w-full p-2 rounded-xl text-sm border bg-white/90 text-gray-900 dark:text-gray-100"
                         />
                       </div>
                     ) : (
@@ -3939,7 +3931,7 @@ function AdminDashboard() {
                   </h2>
 
                   <p className="text-sm opacity-90 mt-1">
-                    {admin?.designation} • {admin?.specialization || "NA"}
+                    {admin?.designation} • {admin?.specialization || "Not added"}
                   </p>
 
                   <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
@@ -3948,11 +3940,11 @@ function AdminDashboard() {
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-white/20 rounded-full">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
 
                     <span className="px-3 py-1 text-xs bg-green-400 text-green-900 rounded-full font-medium">
-                      {admin?.status || "NA"}
+                      {admin?.status || "Not added"}
                     </span>
                   </div>
                 </div>
@@ -4035,7 +4027,7 @@ function AdminDashboard() {
                   <p>
                     Role:{" "}
                     <span className="font-medium">
-                      {admin?.designation || "NA"}
+                      {admin?.designation || "Not added"}
                     </span>
                   </p>
 
@@ -4043,14 +4035,14 @@ function AdminDashboard() {
                     Permissions:{" "}
                     <span className="font-medium">
                       {" "}
-                      {admin?.permissions || "NA"}
+                      {admin?.permissions || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Access Level:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.access_level || "NA"}
+                      {admin?.access_level || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4064,26 +4056,26 @@ function AdminDashboard() {
                   <p>
                     School Name:{" "}
                     <span className="font-medium">
-                      {admin?.school_name || "NA"}
+                      {admin?.school_name || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Code:{" "}
                     <span className="font-medium">
-                      {admin?.school_code || "NA"}
+                      {admin?.school_code || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Board:{" "}
-                    <span className="font-medium">{admin?.board || "NA"}</span>
+                    <span className="font-medium">{admin?.board || "Not added"}</span>
                   </p>
 
                   <p>
                     Established:{" "}
                     <span className="font-medium">
-                      {admin?.established_year || "NA"}
+                      {admin?.established_year || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4097,14 +4089,14 @@ function AdminDashboard() {
                   <p>
                     Users Managed:{" "}
                     <span className="font-medium">
-                      {admin?.users_managed || "NA"}
+                      {admin?.users_managed || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Active Sessions:{" "}
                     <span className="font-medium">
-                      {admin?.active_sessions || "NA"}
+                      {admin?.active_sessions || "Not added"}
                     </span>
                   </p>
 
@@ -4122,21 +4114,21 @@ function AdminDashboard() {
                   <p>
                     Fee Access:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.fee_access || "NA"}
+                      {admin?.fee_access || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Discount Authority:{" "}
                     <span className="font-medium">
-                      {admin?.discount_authority || "NA"}
+                      {admin?.discount_authority || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Revenue View:{" "}
                     <span className="font-medium">
-                      {admin?.revenue_view || "NA"}
+                      {admin?.revenue_view || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4157,14 +4149,14 @@ function AdminDashboard() {
                   <p>
                     2FA:{" "}
                     <span className="text-green-600 font-medium">
-                      {admin?.two_factor_enabled || "NA"}
+                      {admin?.two_factor_enabled || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Login Alerts:{" "}
                     <span className="font-medium">
-                      {admin?.login_alerts || "NA"}
+                      {admin?.login_alerts || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4178,21 +4170,21 @@ function AdminDashboard() {
                   <p>
                     Logins (30d):{" "}
                     <span className="font-medium">
-                      {admin?.logins_30d || "NA"}
+                      {admin?.logins_30d || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Actions:{" "}
                     <span className="font-medium">
-                      {admin?.actions_count || "NA"}
+                      {admin?.actions_count || "Not added"}
                     </span>
                   </p>
 
                   <p>
                     Last Action:{" "}
                     <span className="font-medium">
-                      {admin?.last_action || "NA"}
+                      {admin?.last_action || "Not added"}
                     </span>
                   </p>
                 </div>
@@ -4318,7 +4310,7 @@ function AdminDashboard() {
                   <p>
                     Created On:{" "}
                     <span className="font-medium">
-                      {admin?.created_on || "NA"}
+                      {admin?.created_on || "Not added"}
                     </span>
                   </p>
                 </div>

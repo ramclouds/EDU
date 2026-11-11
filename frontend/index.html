@@ -22,6 +22,19 @@
     less external dependency at runtime.
   -->
 
+  <script>
+    // Set the theme before anything paints (matches controllers/theme.js).
+    (function () {
+      try {
+        var p = localStorage.getItem("theme");
+        var dark = p === "dark" || ((p === null || p === "system") &&
+          window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      } catch (e) {}
+    })();
+  </script>
+
   <style>
     body {
       font-family: "Inter", sans-serif;

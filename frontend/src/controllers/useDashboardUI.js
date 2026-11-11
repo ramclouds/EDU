@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "./theme";
 
 export function useDashboardUI() {
   const navigate = useNavigate();
@@ -10,9 +11,14 @@ export function useDashboardUI() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [darkMode, setDarkMode] = useState(
-    localStorage.getItem("theme") === "dark"
-  );
+  // shared with every page (login, developer console): see controllers/theme.js
+  const { isDark: darkMode, toggle: toggleTheme, setTheme } = useTheme(); // setTheme saves to the account
+
+  // Kept for the dashboards that still call setDarkMode(true | false | updater).
+  const setDarkMode = (next) => {
+    const value = typeof next === "function" ? next(darkMode) : next;
+    setTheme(value ? "dark" : "light");
+  };
 
   const bellRef = useRef(null);
 
@@ -44,22 +50,6 @@ export function useDashboardUI() {
       setSidebarOpen(false);
     }
   };
-
-  const toggleTheme = () => {
-    setDarkMode((prev) => !prev);
-  };
-
-  useEffect(() => {
-    const root = document.documentElement;
-
-    if (darkMode) {
-      root.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      root.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  }, [darkMode]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
